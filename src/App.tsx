@@ -54,7 +54,12 @@ import {
   ShoppingBag,
   Truck,
   Bike,
-  Car
+  Car,
+  SlidersHorizontal,
+  List,
+  Shield,
+  Target,
+  ArrowUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Location, Order, AppScreen, ChatMessage, UserProfile, UberProTier } from './types';
@@ -1363,13 +1368,38 @@ export default function App() {
                   ))}
                 </div>
 
+                {/* Region Outlines (Simulated) */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-40">
+                  <path 
+                    d="M 100 100 Q 200 50 300 100 T 500 100 M 50 300 Q 150 250 250 300 T 450 300 M 200 500 Q 300 450 400 500 T 600 500" 
+                    fill="none" 
+                    stroke="blue" 
+                    strokeWidth="2" 
+                    strokeDasharray="5,5"
+                  />
+                  <path 
+                    d="M 150 150 L 250 100 L 350 150 L 250 200 Z M 400 400 L 500 350 L 600 400 L 500 450 Z" 
+                    fill="rgba(59, 130, 246, 0.05)" 
+                    stroke="blue" 
+                    strokeWidth="1.5"
+                  />
+                </svg>
+
                 {location && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     {/* Pulsing blue dot for driver */}
                     <div className="relative z-10">
-                      <div className="w-8 h-8 bg-blue-500 rounded-full border-4 border-white shadow-[0_0_20px_rgba(59,130,246,0.8)] flex items-center justify-center">
-                        <Navigation size={16} className="text-white fill-white" style={{ transform: 'rotate(45deg)' }} />
-                      </div>
+                      {user.isOnline ? (
+                        <div className="w-10 h-10 bg-white rounded-full shadow-xl flex items-center justify-center border-2 border-blue-500">
+                          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                            <Navigation size={18} className="text-white fill-white" style={{ transform: 'rotate(45deg)' }} />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-8 h-8 bg-blue-500 rounded-full border-4 border-white shadow-[0_0_20px_rgba(59,130,246,0.8)] flex items-center justify-center">
+                          <Navigation size={16} className="text-white fill-white" style={{ transform: 'rotate(45deg)' }} />
+                        </div>
+                      )}
                       <div className="absolute -inset-6 bg-blue-500/30 rounded-full animate-ping" />
                       {pendingOrder && (
                         <motion.div 
@@ -1379,6 +1409,23 @@ export default function App() {
                         />
                       )}
                     </div>
+
+                    {/* Surge Badges and More Buttons */}
+                    {user.isOnline && (
+                      <>
+                        <div className="absolute top-1/4 right-1/4 bg-blue-600 text-white px-3 py-1 rounded-lg font-black shadow-lg flex items-center gap-1">
+                          <span>1.4x</span>
+                        </div>
+                        <div className="absolute bottom-1/3 left-1/4 bg-blue-600 text-white px-4 py-2 rounded-xl font-black shadow-xl flex items-center gap-2">
+                          <ArrowUp size={16} />
+                          <span>More...</span>
+                        </div>
+                        <div className="absolute top-1/2 left-1/3 bg-blue-600 text-white px-4 py-2 rounded-xl font-black shadow-xl flex items-center gap-2">
+                          <ArrowUp size={16} />
+                          <span>More...</span>
+                        </div>
+                      </>
+                    )}
 
                     {/* Restaurant and Customer markers */}
                     {activeOrders.map(order => {
@@ -1460,10 +1507,22 @@ export default function App() {
                     )}
                   </div>
                 )}
+
+                {/* Map Action Buttons */}
+                {user.isOnline && (
+                  <div className="absolute bottom-32 left-4 right-4 flex justify-between items-center pointer-events-none">
+                    <button className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 pointer-events-auto active:scale-90 transition-transform">
+                      <Shield size={28} />
+                    </button>
+                    <button className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 pointer-events-auto active:scale-90 transition-transform">
+                      <Target size={28} />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Top Controls */}
-              {!user.isOnline && (
+              {!user.isOnline ? (
                 <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-50">
                   <button onClick={() => setIsSideMenuOpen(true)} className={`p-3 rounded-full shadow-xl active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}>
                     <Menu size={24} />
@@ -1487,42 +1546,60 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+              ) : (
+                <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-50">
+                  <button 
+                    onClick={() => setIsSideMenuOpen(true)} 
+                    className="w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-black active:scale-95 transition-transform"
+                  >
+                    <Menu size={24} />
+                  </button>
+                  
+                  <motion.button 
+                    initial={{ y: -50 }}
+                    animate={{ y: 0 }}
+                    onClick={() => setCurrentScreen('earnings')}
+                    className="bg-black text-white px-8 py-3 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform"
+                  >
+                    <span className="text-2xl font-black tracking-tight">£{earnings.toFixed(2)}</span>
+                  </motion.button>
+
+                  <motion.div 
+                    initial={{ x: 50 }}
+                    animate={{ x: 0 }}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-full shadow-xl flex items-center gap-2 font-black"
+                  >
+                    <span className="text-lg">1.3x</span>
+                    <ArrowUp size={20} />
+                  </motion.div>
+                </div>
               )}
 
               {/* Bottom Menu Toggle Button / Map Status Bar */}
               {!pendingOrder && !isBottomMenuOpen && (
-                <div className="absolute bottom-8 left-4 right-4 z-50">
+                <div className="absolute bottom-0 left-0 right-0 z-50">
                   {user.isOnline ? (
                     <motion.div 
                       initial={{ y: 100 }}
                       animate={{ y: 0 }}
-                      className={`w-full ${theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-white'} rounded-full shadow-2xl border border-white/10 flex items-center justify-between px-6 py-4`}
+                      className="w-full bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.1)] flex items-center justify-between px-8 py-6"
                     >
-                      <div className="flex items-center gap-3 ml-2">
-                        <motion.div 
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ duration: 1, repeat: Infinity }}
-                          className="w-2 h-2 bg-blue-500 rounded-full" 
-                        />
-                        <span className={`text-lg font-black ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
-                          {new Date().getHours() >= 11 && new Date().getHours() <= 14 ? "It's lunchtime" : 
-                           new Date().getHours() >= 17 && new Date().getHours() <= 20 ? "It's dinnertime" : 
-                           "Finding trips"}
+                      <button className="text-black">
+                        <SlidersHorizontal size={28} />
+                      </button>
+                      
+                      <div className="flex flex-col items-center">
+                        <span className="text-2xl font-black text-black tracking-tight">
+                          Finding trips
                         </span>
                       </div>
 
-                      <button 
-                        onClick={() => {
-                          setUser(u => ({ ...u, isOnline: false, faceVerified: false }));
-                          setIsBottomMenuOpen(false);
-                        }} 
-                        className="bg-red-600 text-white px-6 py-2 rounded-full font-black text-sm active:scale-95 transition-transform"
-                      >
-                        OFFLINE
+                      <button onClick={() => setIsBottomMenuOpen(true)} className="text-black">
+                        <List size={28} />
                       </button>
                     </motion.div>
                   ) : (
-                    <div className="flex justify-center">
+                    <div className="flex justify-center mb-8 px-4">
                       <motion.button
                         initial={{ y: 100 }}
                         animate={{ y: 0 }}
@@ -1635,20 +1712,23 @@ export default function App() {
                               </button>
                             </div>
 
-                            <div className={`w-full p-4 rounded-2xl flex items-center justify-between mb-4 border ${theme === 'dark' ? 'bg-blue-500/10 border-blue-500/20' : 'bg-blue-50 border-blue-100'}`}>
-                              <div className="flex items-center gap-3">
+                            <div className={`w-full p-6 rounded-3xl flex items-center justify-between mb-4 border-2 ${theme === 'dark' ? 'bg-blue-500/10 border-blue-500/30' : 'bg-blue-50 border-blue-200'}`}>
+                              <div className="flex items-center gap-4">
                                 <motion.div 
                                   animate={{ scale: [1, 1.2, 1] }}
                                   transition={{ duration: 1, repeat: Infinity }}
-                                  className="w-2 h-2 bg-blue-500 rounded-full" 
+                                  className="w-3 h-3 bg-blue-500 rounded-full" 
                                 />
-                                <span className={`font-black text-sm ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>Finding trips in {currentCity}...</span>
+                                <div>
+                                  <p className={`font-black text-lg leading-none ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>Finding trips</p>
+                                  <p className="text-xs text-gray-400 font-bold mt-1">{currentCity}</p>
+                                </div>
                               </div>
                               <button 
                                 onClick={() => { setUser(u => ({ ...u, isOnline: false, faceVerified: false })); setIsBottomMenuOpen(false); }} 
-                                className={`text-xs font-black uppercase tracking-wider ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}
+                                className="bg-red-600 text-white px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-transform shadow-lg"
                               >
-                                OFFLINE
+                                GO OFFLINE
                               </button>
                             </div>
                           </>
