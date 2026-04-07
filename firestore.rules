@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - name: string (required)
+    //   - email: string (optional)
+    //   - rating: number
+    //   - tier: string (enum: Blue, Gold, Platinum, Diamond)
+    //   - points: number
+    //   - deliveries: number
+    //   - walletBalance: number
+    //   - faceSignature: string (required for verification)
+    //   - profilePic: string (URL)
+    //   - documentsUploaded: bool
+    //   - faceVerified: bool
+    //   - documentExpiries: map
+    //
+    // Collection: scheduled_orders
+    // Document ID: auto-generated
+    // Fields:
+    //   - driverUid: string (required)
+    //   - restaurantName: string (required)
+    //   - scheduledTime: timestamp (required)
+    //   - status: string (enum: pending, active, completed)
+    //   - estimatedPay: number
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "hassennabeel9@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidUser(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             (data.faceSignature is string || !('faceSignature' in data)) &&
+             data.deliveries is number && data.deliveries >= 0 &&
+             data.walletBalance is number && data.walletBalance >= 0;
+    }
+
+    function isValidScheduledOrder(data) {
+      return data.driverUid is string && data.driverUid == request.auth.uid &&
+             data.restaurantName is string && data.restaurantName.size() > 0 &&
+             data.scheduledTime is timestamp &&
+             data.status in ['pending', 'active', 'completed'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Allow users to read their own profile
+      // Also allow reading other profiles for face search (limited fields would be better but for now we'll allow read if authenticated)
+      // Actually, searching by faceSignature requires a query.
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data);
+      
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
+      
+      allow delete: if isAdmin();
+    }
+
+    match /scheduled_orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.driverUid == request.auth.uid || isAdmin());
+      
+      allow create: if isAuthenticated() && isValidScheduledOrder(request.resource.data);
+      
+      allow update: if isAuthenticated() && (resource.data.driverUid == request.auth.uid || isAdmin()) && isValidScheduledOrder(request.resource.data);
+      
+      allow delete: if isAuthenticated() && (resource.data.driverUid == request.auth.uid || isAdmin());
+    }
+  }
+}

@@ -29,6 +29,7 @@ import {
   Bell,
   MessageSquare,
   LogOut,
+  Plus,
   HelpCircle,
   Briefcase,
   Gift,
@@ -62,30 +63,33 @@ import {
   ArrowUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Location, Order, AppScreen, ChatMessage, UserProfile, UberProTier } from './types';
+import { Location, Order, AppScreen, ChatMessage, UserProfile, UberProTier, ScheduledOrder } from './types';
+import { auth, db, signInWithGoogle, logout, handleFirestoreError, OperationType } from './firebase';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 
 // Mock data for nearby restaurants (UK names)
 const MOCK_RESTAURANTS = [
-  { name: "Greggs", offset: { lat: 0.002, lng: 0.002 } },
-  { name: "Costa Coffee", offset: { lat: -0.001, lng: 0.003 } },
-  { name: "Nando's", offset: { lat: 0.003, lng: -0.001 } },
-  { name: "Wagamama", offset: { lat: -0.002, lng: -0.002 } },
-  { name: "Local Chippy", offset: { lat: 0.001, lng: -0.003 } },
-  { name: "McDonald's", offset: { lat: 0.004, lng: 0.004 } },
-  { name: "Starbucks", offset: { lat: -0.003, lng: 0.005 } },
-  { name: "Burger King", offset: { lat: 0.005, lng: -0.002 } },
-  { name: "Pizza Express", offset: { lat: -0.004, lng: -0.004 } },
-  { name: "Subway", offset: { lat: 0.002, lng: -0.005 } },
-  { name: "Five Guys", offset: { lat: -0.005, lng: 0.002 } },
-  { name: "KFC", offset: { lat: 0.006, lng: 0.001 } },
-  { name: "Pret A Manger", offset: { lat: -0.002, lng: 0.006 } },
-  { name: "Leon", offset: { lat: 0.003, lng: 0.007 } },
-  { name: "Itsu", offset: { lat: -0.006, lng: -0.001 } },
-  { name: "Wasabi", offset: { lat: 0.001, lng: -0.007 } },
-  { name: "Zizzi", offset: { lat: -0.007, lng: 0.003 } },
-  { name: "Ask Italian", offset: { lat: 0.004, lng: -0.006 } },
-  { name: "Taco Bell", offset: { lat: -0.001, lng: -0.008 } },
-  { name: "Shake Shack", offset: { lat: 0.008, lng: 0.001 } },
+  { name: "Greggs", offset: { lat: 0.002, lng: 0.002 }, busyness: 'High' },
+  { name: "Costa Coffee", offset: { lat: -0.001, lng: 0.003 }, busyness: 'Medium' },
+  { name: "Nando's", offset: { lat: 0.003, lng: -0.001 }, busyness: 'Low' },
+  { name: "Wagamama", offset: { lat: -0.002, lng: -0.002 }, busyness: 'High' },
+  { name: "Local Chippy", offset: { lat: 0.001, lng: -0.003 }, busyness: 'Medium' },
+  { name: "McDonald's", offset: { lat: 0.004, lng: 0.004 }, busyness: 'High' },
+  { name: "Starbucks", offset: { lat: -0.003, lng: 0.005 }, busyness: 'Medium' },
+  { name: "Burger King", offset: { lat: 0.005, lng: -0.002 }, busyness: 'Low' },
+  { name: "Pizza Express", offset: { lat: -0.004, lng: -0.004 }, busyness: 'Medium' },
+  { name: "Subway", offset: { lat: 0.002, lng: -0.005 }, busyness: 'Low' },
+  { name: "Five Guys", offset: { lat: -0.005, lng: 0.002 }, busyness: 'High' },
+  { name: "KFC", offset: { lat: 0.006, lng: 0.001 }, busyness: 'Medium' },
+  { name: "Pret A Manger", offset: { lat: -0.002, lng: 0.006 }, busyness: 'High' },
+  { name: "Leon", offset: { lat: 0.003, lng: 0.007 }, busyness: 'Medium' },
+  { name: "Itsu", offset: { lat: -0.006, lng: -0.001 }, busyness: 'Low' },
+  { name: "Wasabi", offset: { lat: 0.001, lng: -0.007 }, busyness: 'Medium' },
+  { name: "Zizzi", offset: { lat: -0.007, lng: 0.003 }, busyness: 'Low' },
+  { name: "Ask Italian", offset: { lat: 0.004, lng: -0.006 }, busyness: 'Medium' },
+  { name: "Taco Bell", offset: { lat: -0.001, lng: -0.008 }, busyness: 'High' },
+  { name: "Shake Shack", offset: { lat: 0.008, lng: 0.001 }, busyness: 'High' },
 ];
 
 const MOCK_CUSTOMERS = ["James", "Sophie", "Oliver", "Emily", "Jack", "Chloe"];
@@ -115,6 +119,12 @@ export default function App() {
       isOnline: false,
       documentsUploaded: false,
       faceVerified: false,
+      walletBalance: 0,
+      documentExpiries: {
+        "Driving Licence": "2026-05-01",
+        "Vehicle Insurance": "2026-06-15",
+        "Bank Statement": "2026-04-10"
+      }
     };
   });
 
@@ -139,7 +149,7 @@ export default function App() {
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
   const [earnings, setEarnings] = useState(() => {
     const saved = localStorage.getItem('uber_earnings');
-    return saved ? parseFloat(saved) : 124.50;
+    return saved ? parseFloat(saved) : 0.00;
   });
   const [bankBalance, setBankBalance] = useState(() => {
     const saved = localStorage.getItem('uber_bank_balance');
@@ -180,29 +190,62 @@ export default function App() {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   
   const [isBottomMenuOpen, setIsBottomMenuOpen] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isSafetyToolkitOpen, setIsSafetyToolkitOpen] = useState(false);
+  const [isDestFilterOpen, setIsDestFilterOpen] = useState(false);
+  const [isNightMode, setIsNightMode] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerifyingToOnline, setIsVerifyingToOnline] = useState(false);
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [viewingOrderDetailsId, setViewingOrderDetailsId] = useState<string | null>(null);
   const [hotspots, setHotspots] = useState<{ latitude: number, longitude: number, intensity: number, size: number }[]>([]);
+
+  // New Maintenance/Update States
+  const [isUpdating, setIsUpdating] = useState(true);
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isUnderMaintenance, setIsUnderMaintenance] = useState(false);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<typeof MOCK_RESTAURANTS[0] | null>(null);
+  const [rewards, setRewards] = useState<{ completed: number, target: number, reward: string }[]>([
+    { completed: 0, target: 5, reward: "£10 Bonus" },
+    { completed: 0, target: 10, reward: "£25 Bonus" },
+    { completed: 0, target: 20, reward: "£60 Bonus" },
+  ]);
+  const wakeLockRef = useRef<any>(null);
+  const [activeTopTab, setActiveTopTab] = useState<'status' | 'browse' | 'earnings'>('status');
+  const [showLastTripCard, setShowLastTripCard] = useState(false);
+  const [scheduledOrders, setScheduledOrders] = useState<ScheduledOrder[]>([
+    { id: 'sch_1', driverUid: 'mock', restaurantName: 'Pizza Express', scheduledTime: new Date(Date.now() + 3600000).toISOString(), status: 'pending', estimatedPay: 12.50 },
+    { id: 'sch_2', driverUid: 'mock', restaurantName: 'Burger King', scheduledTime: new Date(Date.now() + 7200000).toISOString(), status: 'pending', estimatedPay: 8.75 },
+  ]);
+  const [isNewUserFormOpen, setIsNewUserFormOpen] = useState(false);
+  const [newUserDetails, setNewUserDetails] = useState({ name: '', email: '' });
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [lastTrip, setLastTrip] = useState<{ amount: number, time: string, type: string } | null>({
+    amount: 7.75,
+    time: "4:16 PM",
+    type: "Uber Eats"
+  });
 
   // Generate random hotspots around driver
   useEffect(() => {
     if (location) {
       const generateHotspots = () => {
-        const newHotspots = Array.from({ length: 8 }).map(() => ({
-          latitude: location.latitude + (Math.random() - 0.5) * 0.03,
-          longitude: location.longitude + (Math.random() - 0.5) * 0.03,
-          intensity: 0.2 + Math.random() * 0.8,
-          size: 100 + Math.random() * 300
+        const newHotspots = Array.from({ length: 15 }).map(() => ({
+          latitude: location.latitude + (Math.random() - 0.5) * 0.05,
+          longitude: location.longitude + (Math.random() - 0.5) * 0.05,
+          intensity: 0.4 + Math.random() * 0.6,
+          size: 150 + Math.random() * 450
         }));
         setHotspots(newHotspots as any);
       };
       
       generateHotspots();
-      const interval = setInterval(generateHotspots, 30000); // Refresh every 30s
+      const interval = setInterval(generateHotspots, 20000); // Refresh every 20s
       return () => clearInterval(interval);
     }
-  }, [location === null]); // Only run once or when location is first set
+  }, [location === null]);
   
   const currentCity = useMemo(() => {
     if (!location) return "London";
@@ -270,32 +313,323 @@ export default function App() {
     return () => clearInterval(interval);
   }, [activeOrders]);
 
-  // Background Mode Simulation
+  // Firebase Auth Listener
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      const hidden = document.hidden;
-      setIsBackgrounded(hidden);
+    const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
+      setFirebaseUser(fUser);
+      if (fUser) {
+        // Load user profile from Firestore
+        try {
+          const userDoc = await getDoc(doc(db, 'users', fUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as UserProfile;
+            setUser(userData);
+          } else {
+            // New user from Google Auth, but profile not created yet
+            setNewUserDetails({ name: fUser.displayName || '', email: fUser.email || '' });
+          }
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, `users/${fUser.uid}`);
+        }
+      }
+      setIsAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sync User Profile to Firestore
+  useEffect(() => {
+    if (firebaseUser && user.name) {
+      const syncProfile = async () => {
+        try {
+          await setDoc(doc(db, 'users', firebaseUser.uid), {
+            ...user,
+            uid: firebaseUser.uid,
+            email: firebaseUser.email
+          }, { merge: true });
+        } catch (error) {
+          handleFirestoreError(error, OperationType.WRITE, `users/${firebaseUser.uid}`);
+        }
+      };
+      syncProfile();
+    }
+  }, [user, firebaseUser]);
+
+  // Load Scheduled Orders
+  useEffect(() => {
+    if (firebaseUser) {
+      const q = query(collection(db, 'scheduled_orders'), where('driverUid', '==', firebaseUser.uid));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ScheduledOrder));
+        setScheduledOrders(orders);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'scheduled_orders');
+      });
+      return () => unsubscribe();
+    }
+  }, [firebaseUser]);
+  useEffect(() => {
+    const checkMidnightTransfer = () => {
+      const lastTransfer = localStorage.getItem('uber_last_transfer');
+      const today = new Date().toISOString().split('T')[0];
       
-      if (hidden && user.isOnline) {
-        sendNotification("Background Mode Active", "You'll still receive order notifications while the app is in the background.");
+      if (lastTransfer !== today) {
+        if (earnings > 0) {
+          setUser(u => ({ ...u, walletBalance: u.walletBalance + earnings }));
+          setEarnings(0);
+          sendNotification("Daily Transfer", "Your earnings from yesterday have been moved to your wallet.");
+        }
+        localStorage.setItem('uber_last_transfer', today);
       }
     };
+    
+    checkMidnightTransfer();
+    const interval = setInterval(checkMidnightTransfer, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [earnings]);
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  // Quest & Surge Notifications
+  useEffect(() => {
+    if (user.isOnline) {
+      const interval = setInterval(() => {
+        const rand = Math.random();
+        if (rand < 0.1) {
+          sendNotification("New Quest Available", "Complete 5 trips to earn an extra £10!");
+          playUberSound('order');
+        } else if (rand < 0.2) {
+          sendNotification("Surge Alert", "High demand in your area! Earnings are 1.5x.");
+          playUberSound('order');
+        }
+      }, 120000); // Every 2 mins check for random events
+      return () => clearInterval(interval);
+    }
   }, [user.isOnline]);
+
+  // Document Expiration Check
+  const checkDocsExpired = () => {
+    if (!user.documentExpiries) return false;
+    const today = new Date();
+    return Object.values(user.documentExpiries).some(expiry => new Date(expiry as string) < today);
+  };
 
   // UK Units: Miles
   const MILES_PER_DEGREE = 69;
 
   const [isSimulatingMovement, setIsSimulatingMovement] = useState(false);
 
-  // Geolocation tracking
+  const UpdateScreen = () => (
+    <div className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center p-12 text-white">
+      <motion.div 
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="w-full max-w-sm flex flex-col items-center"
+      >
+        <div className="w-24 h-24 bg-white rounded-[30px] flex items-center justify-center mb-12">
+          <RefreshCw size={48} className="text-black animate-spin" />
+        </div>
+        <h1 className="text-4xl font-black mb-4 tracking-tighter">UPDATING...</h1>
+        <p className="text-gray-500 font-bold mb-12 text-center">We're improving your driver experience. Please wait.</p>
+        
+        <div className="w-full h-3 bg-gray-900 rounded-full overflow-hidden">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${updateProgress}%` }}
+            className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]"
+          />
+        </div>
+        <span className="mt-4 font-black text-xl">{updateProgress}%</span>
+      </motion.div>
+    </div>
+  );
+
+  const MaintenanceScreen = () => (
+    <div className="fixed inset-0 z-[1000] bg-white flex flex-col items-center justify-center p-12 text-black">
+      <motion.div 
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="w-full max-w-sm flex flex-col items-center text-center"
+      >
+        <div className="w-24 h-24 bg-red-100 rounded-[30px] flex items-center justify-center mb-12">
+          <ShieldAlert size={48} className="text-red-600" />
+        </div>
+        <h1 className="text-4xl font-black mb-4 tracking-tighter">UNDER MAINTENANCE</h1>
+        <p className="text-gray-400 font-bold mb-12">We've detected a minor bug. Our team is fixing it right now. We'll be back shortly!</p>
+        
+        <button 
+          onClick={() => setIsUnderMaintenance(false)}
+          className="w-full py-5 bg-black text-white rounded-2xl font-black text-xl"
+        >
+          RETRY
+        </button>
+      </motion.div>
+    </div>
+  );
+
+  const OrderDetailsModal = () => {
+    const order = activeOrders.find(o => o.id === viewingOrderDetailsId);
+    if (!order) return null;
+
+    return (
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        exit={{ opacity: 0 }} 
+        className="absolute inset-0 z-[400] bg-black/80 backdrop-blur-sm flex items-end justify-center"
+      >
+        <motion.div 
+          initial={{ y: '100%' }} 
+          animate={{ y: 0 }} 
+          exit={{ y: '100%' }} 
+          className={`w-full max-w-sm rounded-t-[40px] p-8 shadow-2xl ${theme === 'dark' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black'}`}
+        >
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-black">Order Details</h2>
+            <button onClick={() => setViewingOrderDetailsId(null)} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><X size={24} /></button>
+          </div>
+
+          <div className="space-y-6 mb-12">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center shrink-0">
+                <Coffee size={24} />
+              </div>
+              <div>
+                <p className="text-xs font-black text-blue-500 uppercase tracking-widest mb-1">Restaurant</p>
+                <p className="text-xl font-bold">{order.restaurantName}</p>
+                <p className="text-sm text-gray-400 font-bold">Pickup items: {order.items.join(', ')}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center shrink-0">
+                <User size={24} />
+              </div>
+              <div>
+                <p className="text-xs font-black text-green-500 uppercase tracking-widest mb-1">Customer</p>
+                <p className="text-xl font-bold">{order.customerName}</p>
+                <p className="text-sm text-gray-400 font-bold">Estimated Pay: £{order.estimatedPay.toFixed(2)}</p>
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-2xl ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-bold text-gray-500">Order ID</span>
+                <span className="font-black">#{order.id.slice(-6).toUpperCase()}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-gray-500">Status</span>
+                <span className="font-black text-blue-500 uppercase text-xs tracking-widest">{order.status.replace('_', ' ')}</span>
+              </div>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => setViewingOrderDetailsId(null)}
+            className={`w-full py-5 rounded-3xl font-black text-xl active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}
+          >
+            CLOSE
+          </button>
+        </motion.div>
+      </motion.div>
+    );
+  };
+
+  const ScanningScreen = () => (
+    <div className="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center p-12 text-white">
+      <div className="relative w-48 h-48 mb-12">
+        <motion.div 
+          animate={{ rotate: 360 }}
+          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+          className="absolute inset-0 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full"
+        />
+        <div className="absolute inset-4 border-2 border-dashed border-gray-700 rounded-full flex items-center justify-center">
+          <Search size={48} className="text-gray-500 animate-pulse" />
+        </div>
+      </div>
+      <h2 className="text-3xl font-black mb-2">SCANNING FOR BUGS</h2>
+      <p className="text-gray-500 font-bold">Ensuring your app is safe and ready.</p>
+    </div>
+  );
+
+  // Simulated Update and Scan Sequence
   useEffect(() => {
-    if (isSimulatingMovement) {
+    const runSequence = async () => {
+      // 1. Update Progress
+      for (let i = 0; i <= 100; i += 5) {
+        setUpdateProgress(i);
+        await new Promise(r => setTimeout(r, 100));
+      }
+      setIsUpdating(false);
+      
+      // 2. Scanning for Bugs
+      setIsScanning(true);
+      await new Promise(r => setTimeout(r, 2000));
+      
+      // 3. Randomly decide if maintenance is needed (simulated bug)
+      const hasBug = Math.random() > 0.95; // 5% chance of maintenance
+      if (hasBug) {
+        setIsUnderMaintenance(true);
+      }
+      setIsScanning(false);
+    };
+    runSequence();
+  }, []);
+
+  // Screen Wake Lock
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      if (user.isOnline && 'wakeLock' in navigator) {
+        try {
+          wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+        } catch (err) {
+          console.error(`${err.name}, ${err.message}`);
+        }
+      } else if (!user.isOnline && wakeLockRef.current) {
+        wakeLockRef.current.release();
+        wakeLockRef.current = null;
+      }
+    };
+    requestWakeLock();
+  }, [user.isOnline]);
+  // Geolocation tracking & Navigation Simulation
+  useEffect(() => {
+    if (isSimulatingMovement || isNavigating) {
+      let angle = 0;
       const interval = setInterval(() => {
         setLocation(prev => {
           if (!prev) return { latitude: 51.5074, longitude: -0.1278 };
+          
+          if (isNavigating && activeOrders.length > 0) {
+            const order = activeOrders[0];
+            const target = order.status === 'accepted' ? order.restaurantLocation : order.customerLocation;
+            
+            // Move towards target
+            const dLat = target.latitude - prev.latitude;
+            const dLng = target.longitude - prev.longitude;
+            const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+            
+            if (dist < 0.0001) {
+              // Arrived!
+              return prev;
+            }
+            
+            const step = 0.0002; // Speed
+            return {
+              latitude: prev.latitude + (dLat / dist) * step,
+              longitude: prev.longitude + (dLng / dist) * step,
+            };
+          }
+
+          // Circular movement if simulating but not navigating
+          if (isSimulatingMovement) {
+            angle += 0.05;
+            const radius = 0.001;
+            return {
+              latitude: 51.5074 + Math.sin(angle) * radius,
+              longitude: -0.1278 + Math.cos(angle) * radius,
+            };
+          }
+
+          // Random drift if not navigating
           return {
             latitude: prev.latitude + (Math.random() - 0.5) * 0.0001,
             longitude: prev.longitude + (Math.random() - 0.5) * 0.0001,
@@ -329,10 +663,25 @@ export default function App() {
     }
   }, []);
 
+  const [toasts, setToasts] = useState<{ id: string, title: string, body: string }[]>([]);
+
+  const addToast = (title: string, body: string) => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setToasts(prev => [...prev, { id, title, body }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 5000);
+  };
+
   const sendNotification = (title: string, body: string) => {
     if ("Notification" in window && Notification.permission === "granted") {
-      new Notification(title, { body, icon: "https://picsum.photos/seed/uber/100/100" });
+      try {
+        new Notification(title, { body, icon: "https://picsum.photos/seed/uber/100/100" });
+      } catch (e) {
+        console.warn("Notification API failed, falling back to in-app toast.");
+      }
     }
+    addToast(title, body);
     setNotifications(prev => [body, ...prev]);
   };
 
@@ -383,7 +732,8 @@ export default function App() {
         status: 'pending' as const,
         items: ["Meal Deal", "Extra Fries", "Coke Zero"],
         distToRest,
-        pin: Math.floor(1000 + Math.random() * 9000).toString()
+        pin: Math.floor(1000 + Math.random() * 9000).toString(),
+        isMatching: activeOrders.length > 0
       };
     });
 
@@ -435,23 +785,61 @@ export default function App() {
   useEffect(() => {
     if (user.isOnline && activeOrders.length < 3 && !pendingOrder) {
       const timer = setTimeout(() => {
-        const newOrder = generateSmartOrder();
+        // 20% chance to pick a scheduled order if available
+        const shouldPickScheduled = Math.random() < 0.2 && scheduledOrders.length > 0;
+        
+        let newOrder: Order | null = null;
+        
+        if (shouldPickScheduled) {
+          const sch = scheduledOrders[Math.floor(Math.random() * scheduledOrders.length)];
+          // Convert scheduled order to a real order
+          newOrder = {
+            id: sch.id,
+            restaurantName: sch.restaurantName,
+            customerName: "Scheduled Customer",
+            restaurantLocation: { 
+              latitude: location!.latitude + (Math.random() - 0.5) * 0.02, 
+              longitude: location!.longitude + (Math.random() - 0.5) * 0.02 
+            },
+            customerLocation: { 
+              latitude: location!.latitude + (Math.random() - 0.5) * 0.04, 
+              longitude: location!.longitude + (Math.random() - 0.5) * 0.04 
+            },
+            estimatedPay: sch.estimatedPay,
+            estimatedDistance: 2.5,
+            estimatedTime: 15,
+            status: 'pending',
+            items: ["Scheduled Meal"],
+            isMatching: false
+          };
+          // Remove from scheduled list so it doesn't pop up again
+          setScheduledOrders(prev => prev.filter(s => s.id !== sch.id));
+        } else {
+          newOrder = generateSmartOrder();
+        }
+
         if (newOrder) {
           setPendingOrder(newOrder);
           setOrderExpiryTimer(10);
-          sendNotification("High Priority Trip", `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName}`);
+          const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
+          sendNotification(prefix + (shouldPickScheduled ? "Scheduled Trip" : "High Priority"), `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName}`);
           playUberSound('order');
         }
       }, 8000 + Math.random() * 12000);
       return () => clearTimeout(timer);
     }
-  }, [user.isOnline, activeOrders, pendingOrder, location]);
+  }, [user.isOnline, activeOrders, pendingOrder, location, scheduledOrders]);
 
   const handleAcceptOrder = () => {
     if (pendingOrder) {
+      if (activeOrders.length >= 3) {
+        sendNotification("Limit Reached", "You can only handle up to 3 active orders at a time.");
+        return;
+      }
       setActiveOrders(prev => [...prev, { ...pendingOrder, status: 'accepted' }]);
       setPendingOrder(null);
       setOrderExpiryTimer(10);
+      setIsNavigating(true);
       playUberSound('accept');
     }
   };
@@ -480,6 +868,32 @@ export default function App() {
     } else if (order.status === 'picked_up') {
       setVerifyingDeliveryId(orderId);
     }
+  };
+
+  const handleCompleteDelivery = (orderId: string) => {
+    const order = activeOrders.find(o => o.id === orderId);
+    if (!order) return;
+
+    setEarnings(prev => prev + order.estimatedPay);
+    setActiveOrders(prev => prev.filter(o => o.id !== orderId));
+    setVerifyingDeliveryId(null);
+    setEnteredPin("");
+    setIsPhotoCaptured(false);
+    setIsNavigating(false);
+    
+    // Update Rewards
+    setRewards(prev => {
+      const updated = prev.map(r => ({ ...r, completed: r.completed + 1 }));
+      updated.forEach(r => {
+        if (r.completed === r.target) {
+          sendNotification("Reward Unlocked!", `Congratulations! You've earned the ${r.reward}`);
+        }
+      });
+      return updated;
+    });
+    
+    sendNotification("Delivery Complete", `You earned £${order.estimatedPay.toFixed(2)}`);
+    playUberSound('accept');
   };
 
   const distanceToTarget = (order: Order) => {
@@ -559,14 +973,12 @@ export default function App() {
   };
 
   const handleVerify = async () => {
-    if (isVerifying) return;
-    setIsVerifying(true);
-    playUberSound('message');
+    if (isVerifying || (lockoutUntil && Date.now() < lockoutUntil)) return;
     
-    // 1. Flash effect
+    setIsVerifying(true);
     setIsFlashing(true);
-    setTimeout(() => setIsFlashing(false), 150);
-
+    setTimeout(() => setIsFlashing(false), 200);
+    
     // Capture frame for profile pic
     let capturedPic = "";
     if (videoRef.current) {
@@ -580,37 +992,216 @@ export default function App() {
       }
     }
 
-    await new Promise(r => setTimeout(r, 2000));
+    // Simulate face signature generation
+    // In a real app, this would be a hash of the face features from the video frame
+    // We'll use a simple hash of the image data for demo purposes
+    const simulatedSignature = "face_sig_" + capturedPic.length % 100;
     
-    // Always success for now to avoid "dont work" complaints, but keep lockout logic available
-    const isSuccess = true; 
-
-    if (isSuccess) {
-      setUser(u => ({ 
-        ...u, 
-        faceVerified: true, 
-        isOnline: true, // Force online after successful verification
-        profilePic: capturedPic || u.profilePic
-      }));
-      sendNotification("Identity Verified", "Your face verification was successful.");
-      playUberSound('accept');
+    try {
+      // Search for user with this face signature
+      const q = query(collection(db, 'users'), where('faceSignature', '==', simulatedSignature));
+      const querySnapshot = await getDocs(q);
       
-      await new Promise(r => setTimeout(r, 1500));
-      stopCamera();
-      setIsVerifyingToOnline(false);
+      if (!querySnapshot.empty) {
+        // Face recognized!
+        const userData = querySnapshot.docs[0].data() as UserProfile;
+        setUser({ ...userData, profilePic: capturedPic || userData.profilePic });
+        sendNotification("Welcome Back", `Face recognized: ${userData.name}`);
+        
+        // Mark as verified and go home
+        setUser(u => ({ ...u, faceVerified: true }));
+        setIsVerifying(false);
+        setTimeout(() => {
+          setCurrentScreen('home');
+          if (isVerifyingToOnline) {
+            setUser(u => ({ ...u, isOnline: true }));
+            setIsVerifyingToOnline(false);
+          }
+          stopCamera();
+        }, 1500);
+      } else {
+        // Face not recognized
+        setIsVerifying(false);
+        // Store the signature and pic temporarily for the new user form
+        setNewUserDetails(prev => ({ ...prev, faceSignature: simulatedSignature, profilePic: capturedPic } as any));
+        setIsNewUserFormOpen(true);
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'users');
       setIsVerifying(false);
-      setCurrentScreen('home');
-    } else {
-      setLockoutUntil(Date.now() + 60000); // 1 minute lockout
-      sendNotification("Verification Failed", "Identity could not be verified. Locked out for 1 minute.");
-      stopCamera();
-      setIsVerifyingToOnline(false);
-      setIsVerifying(false);
-      // Stay on screen to show lockout
     }
   };
 
   // UI Components
+  const ScheduledOrdersScreen = () => {
+    const [isAdding, setIsAdding] = useState(false);
+    const [newOrder, setNewOrder] = useState({ restaurantName: '', time: '' });
+
+    const handleAdd = async () => {
+      if (!firebaseUser) return;
+      try {
+        await addDoc(collection(db, 'scheduled_orders'), {
+          driverUid: firebaseUser.uid,
+          restaurantName: newOrder.restaurantName,
+          scheduledTime: new Date(newOrder.time).toISOString(),
+          status: 'pending',
+          estimatedPay: 10 + Math.random() * 15
+        });
+        setIsAdding(false);
+        sendNotification("Order Scheduled", `Scheduled for ${newOrder.restaurantName}`);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, 'scheduled_orders');
+      }
+    };
+
+    return (
+      <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 flex flex-col">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
+            <h1 className="text-2xl font-black">Scheduled</h1>
+          </div>
+          <button onClick={() => setIsAdding(true)} className="p-2 bg-black text-white rounded-full"><Plus size={24} /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-4 pb-24">
+          {scheduledOrders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+              <Clock size={48} className="mb-4 opacity-20" />
+              <p className="font-bold">No scheduled orders</p>
+            </div>
+          ) : (
+            scheduledOrders.map(order => (
+              <div key={order.id} className="p-6 bg-gray-50 rounded-[32px] border border-gray-100 flex justify-between items-center">
+                <div>
+                  <h3 className="font-black text-lg">{order.restaurantName}</h3>
+                  <p className="text-sm text-gray-500 font-bold">{new Date(order.scheduledTime).toLocaleString()}</p>
+                  <div className="mt-2 inline-block px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-[10px] font-black uppercase">
+                    {order.status}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-black text-xl text-green-600">£{order.estimatedPay.toFixed(2)}</p>
+                  <button 
+                    onClick={async () => {
+                      try {
+                        await deleteDoc(doc(db, 'scheduled_orders', order.id));
+                      } catch (error) {
+                        handleFirestoreError(error, OperationType.DELETE, `scheduled_orders/${order.id}`);
+                      }
+                    }}
+                    className="mt-2 text-red-500"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <AnimatePresence>
+          {isAdding && (
+            <div className="fixed inset-0 z-[500] flex items-end justify-center p-4">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdding(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+              <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="bg-white w-full max-w-md rounded-[32px] p-8 shadow-2xl relative z-10">
+                <h2 className="text-2xl font-black mb-6">Schedule Order</h2>
+                <div className="space-y-4 mb-8">
+                  <input 
+                    type="text" 
+                    placeholder="Restaurant Name" 
+                    className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
+                    value={newOrder.restaurantName}
+                    onChange={e => setNewOrder({...newOrder, restaurantName: e.target.value})}
+                  />
+                  <input 
+                    type="datetime-local" 
+                    className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
+                    value={newOrder.time}
+                    onChange={e => setNewOrder({...newOrder, time: e.target.value})}
+                  />
+                </div>
+                <button onClick={handleAdd} className="w-full py-5 bg-black text-white rounded-2xl font-black text-xl">SCHEDULE</button>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  };
+
+  const NewUserForm = () => (
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-6">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-md rounded-[40px] p-8 shadow-2xl relative z-10">
+        <h2 className="text-3xl font-black mb-2">New User?</h2>
+        <p className="text-gray-500 font-bold mb-8 text-sm">We don't recognize your face. Create an account to start earning.</p>
+        
+        <div className="space-y-4 mb-8">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Full Name</label>
+            <input 
+              type="text" 
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
+              value={newUserDetails.name}
+              onChange={e => setNewUserDetails({...newUserDetails, name: e.target.value})}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Email</label>
+            <input 
+              type="email" 
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
+              value={newUserDetails.email}
+              onChange={e => setNewUserDetails({...newUserDetails, email: e.target.value})}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-4">
+          <button onClick={() => setIsNewUserFormOpen(false)} className="flex-1 py-4 bg-gray-100 text-black rounded-2xl font-black">CANCEL</button>
+          <button 
+            onClick={async () => {
+              // Create user in Firestore
+              try {
+                // In this demo, we'll use a random UID if not logged in with Google
+                const uid = firebaseUser?.uid || "user_" + Math.random().toString(36).substr(2, 9);
+                const newUserProfile: UserProfile = {
+                  name: newUserDetails.name,
+                  rating: 5.0,
+                  tier: 'Blue',
+                  points: 0,
+                  deliveries: 0,
+                  isOnline: false,
+                  documentsUploaded: true,
+                  faceVerified: true,
+                  walletBalance: 0,
+                  profilePic: (newUserDetails as any).profilePic || "",
+                  documentExpiries: {
+                    "Driving Licence": "2027-01-01",
+                    "Vehicle Insurance": "2027-01-01",
+                    "Bank Statement": "2027-01-01"
+                  },
+                  faceSignature: (newUserDetails as any).faceSignature || ""
+                } as any;
+
+                await setDoc(doc(db, 'users', uid), newUserProfile);
+                setUser(newUserProfile);
+                setIsNewUserFormOpen(false);
+                setCurrentScreen('home');
+                sendNotification("Account Created", `Welcome to Uber Eats, ${newUserDetails.name}!`);
+              } catch (error) {
+                handleFirestoreError(error, OperationType.WRITE, 'users');
+              }
+            }} 
+            className="flex-2 py-4 bg-black text-white rounded-2xl font-black"
+          >
+            CREATE ACCOUNT
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
   const EarningsDetail = () => {
     const [page, setPage] = useState(0);
     const pages = ['Today', 'Weekly', 'Recent'];
@@ -620,7 +1211,7 @@ export default function App() {
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
-        className="absolute inset-0 z-[300] bg-black text-white flex flex-col"
+        className="absolute inset-0 z-[300] bg-black text-white flex flex-col pb-12"
       >
         <div className="p-6 border-b border-white/10">
           <div className="flex items-center justify-between mb-6">
@@ -884,7 +1475,7 @@ export default function App() {
       initial={{ x: '-100%' }}
       animate={{ x: 0 }}
       exit={{ x: '-100%' }}
-      className="absolute inset-0 z-[100] bg-black text-white flex flex-col"
+      className="absolute inset-0 z-[100] bg-black text-white flex flex-col pb-12"
     >
       <div className="p-6 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -904,9 +1495,11 @@ export default function App() {
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {[
           { icon: <Briefcase />, label: "Opportunities", screen: 'opportunities' },
+          { icon: <Clock />, label: "Scheduled Orders", screen: 'scheduled_orders' },
           { icon: <TrendingUp />, label: "Earnings", screen: 'earnings_detail' },
           { icon: <CreditCard />, label: "Wallet", screen: 'wallet' },
           { icon: <Star />, label: "Uber Pro", screen: 'uber_pro' },
+          { icon: <Target />, label: "Rewards & Quests", screen: 'rewards' },
           { icon: <Mail />, label: "Inbox", screen: 'inbox' },
           { icon: <ShieldCheck />, label: "Safety Toolkit", screen: 'safety' },
           { icon: <Settings />, label: "Account", screen: 'account' },
@@ -956,10 +1549,75 @@ export default function App() {
     </motion.div>
   );
 
+  const Heatmap = () => (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {[
+        { x: '25%', y: '35%', intensity: 0.2, size: 100 },
+        { x: '65%', y: '45%', intensity: 0.3, size: 150 },
+        { x: '45%', y: '75%', intensity: 0.15, size: 80 },
+        { x: '85%', y: '25%', intensity: 0.25, size: 130 },
+      ].map((h, i) => (
+        <motion.div 
+          key={i}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: h.intensity, scale: 1 }}
+          transition={{ duration: 3, repeat: Infinity, repeatType: 'reverse' }}
+          className="absolute rounded-full bg-orange-500 blur-3xl"
+          style={{ 
+            left: h.x, 
+            top: h.y, 
+            width: h.size, 
+            height: h.size,
+            transform: 'translate(-50%, -50%)'
+          }}
+        />
+      ))}
+    </div>
+  );
+
   return (
-    <div className={`h-screen w-full font-sans overflow-hidden flex flex-col select-none relative transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-gray-100 text-black'}`}>
+    <div className={`h-[100dvh] w-full md:max-w-[420px] md:h-[850px] md:rounded-[3rem] md:border-[12px] md:border-black md:shadow-2xl md:my-8 font-sans overflow-hidden flex flex-col select-none relative transition-all duration-500 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-gray-100 text-black'}`}>
+      {/* In-App Toasts */}
+      <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-[380px] px-4 pointer-events-none">
+        <AnimatePresence>
+          {toasts.map(toast => (
+            <motion.div 
+              key={toast.id}
+              initial={{ y: -50, opacity: 0, scale: 0.9 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -20, opacity: 0, scale: 0.9 }}
+              className="bg-black/90 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl mb-2 flex items-center gap-4 pointer-events-auto border border-white/10"
+            >
+              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center shrink-0">
+                <Bell size={20} />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-black text-sm">{toast.title}</h4>
+                <p className="text-xs text-gray-400 font-bold">{toast.body}</p>
+              </div>
+              <button 
+                onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                className="p-1 hover:bg-white/10 rounded-full"
+              >
+                <X size={16} />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {/* Maintenance/Update Screens */}
+      <AnimatePresence>
+        {isUpdating && <UpdateScreen key="update" />}
+        {isScanning && <ScanningScreen key="scanning" />}
+        {isUnderMaintenance && <MaintenanceScreen key="maintenance" />}
+      </AnimatePresence>
+
+      {/* Desktop Notch */}
+      <div className="hidden md:block absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-black rounded-b-2xl z-[200]" />
+      
       {/* Status Bar */}
-      <div className={`h-6 w-full flex justify-between items-center px-6 text-[10px] font-medium opacity-80 z-[110] ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
+      <div className={`h-8 w-full flex justify-between items-center px-6 pt-2 text-[10px] font-medium opacity-80 z-[110] ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
         <span>9:41</span>
         <div className="flex gap-1 items-center">
           <Zap size={10} fill="currentColor" />
@@ -977,7 +1635,7 @@ export default function App() {
       <div className="flex-1 relative overflow-hidden">
         <AnimatePresence mode="wait">
           {currentScreen === 'onboarding' && (
-            <motion.div key="onboarding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full w-full bg-white text-black p-8 flex flex-col justify-center">
+            <motion.div key="onboarding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full w-full bg-white text-black p-8 flex flex-col justify-center pb-24">
               <div className="mb-12">
                 <div className="w-20 h-20 bg-black rounded-2xl flex items-center justify-center mb-6">
                   <span className="text-white text-4xl font-black">U</span>
@@ -994,7 +1652,7 @@ export default function App() {
           )}
 
           {currentScreen === 'documents' && (
-            <motion.div key="documents" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="h-full w-full bg-white text-black p-6 flex flex-col">
+            <motion.div key="documents" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="h-full w-full bg-white text-black p-6 flex flex-col pb-24">
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen('onboarding')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
                 <h1 className="text-3xl font-black">Documents</h1>
@@ -1047,7 +1705,7 @@ export default function App() {
           )}
 
           {currentScreen === 'face_verification' && (
-            <motion.div key="face" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full w-full bg-black text-white p-6 flex flex-col items-center relative">
+            <motion.div key="face" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full w-full bg-black text-white p-6 flex flex-col items-center relative pb-24">
               {/* Flash Effect */}
               <AnimatePresence>
                 {isFlashing && (
@@ -1124,11 +1782,24 @@ export default function App() {
               >
                 {user.faceVerified ? 'SUCCESS' : isVerifying ? 'VERIFYING...' : (lockoutUntil && Date.now() < lockoutUntil) ? 'LOCKED' : 'VERIFY'}
               </button>
+
+              <button 
+                onClick={() => {
+                  setUser(u => ({ ...u, faceVerified: true }));
+                  setCurrentScreen('home');
+                  stopCamera();
+                }}
+                className="mt-4 text-gray-500 font-bold text-sm underline"
+              >
+                Skip Verification (Demo Mode)
+              </button>
             </motion.div>
           )}
 
           {currentScreen === 'home' && (
             <motion.div key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative">
+              {/* Heatmap Simulation */}
+              {user.isOnline && !isNavigating && <Heatmap />}
               {/* Matching / Trip Request Overlay */}
               <AnimatePresence>
                 {pendingOrder && (
@@ -1187,8 +1858,13 @@ export default function App() {
                     <div className="flex-1 p-8 flex flex-col">
                       <div className="flex justify-between items-start mb-8">
                         <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase ${pendingOrder.isMatching ? 'bg-orange-500 text-white' : 'bg-blue-600 text-white'}`}>
+                              {pendingOrder.isMatching ? 'Matching Trip' : 'New Trip'}
+                            </span>
+                          </div>
                           <h2 className="text-4xl font-black mb-1">£{pendingOrder.estimatedPay.toFixed(2)}</h2>
-                          <p className="text-orange-400 font-black tracking-widest uppercase text-xs">Estimated Pay</p>
+                          <p className="text-gray-400 font-black tracking-widest uppercase text-xs">Estimated Pay</p>
                         </div>
                         <div className="text-right">
                           <p className="text-2xl font-black">{pendingOrder.estimatedTime} min</p>
@@ -1244,25 +1920,25 @@ export default function App() {
               </AnimatePresence>
 
               {/* Background Mode Indicator */}
-              {user.isOnline && (
-                <div className={`absolute top-24 left-1/2 -translate-x-1/2 z-50 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 border ${theme === 'dark' ? 'bg-black/80 border-white/10' : 'bg-white/80 border-black/10'}`}>
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-[10px] font-black tracking-widest uppercase">Background Mode Active</span>
+              {user.isOnline && !isNavigating && (
+                <div className={`absolute top-28 left-1/2 -translate-x-1/2 z-50 px-4 py-1.5 rounded-full flex items-center gap-2 border shadow-2xl transition-all duration-300 ${theme === 'dark' ? 'bg-black border-white/20' : 'bg-white border-black/10'}`}>
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
+                  <span className="text-[10px] font-black tracking-widest uppercase tracking-[0.2em]">Active</span>
                 </div>
               )}
 
               {/* Map Simulation */}
               <div 
                 onClick={() => setSelectedMarkerId(null)}
-                className={`absolute inset-0 overflow-hidden transition-all duration-500 ${theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-[#eef2f6]'} ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'blur-md grayscale opacity-50 pointer-events-none' : ''}`}
+                className={`absolute inset-0 overflow-hidden transition-all duration-500 ${isNightMode || theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-[#eef2f6]'} ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'blur-md grayscale opacity-50 pointer-events-none' : ''}`}
               >
                 {/* Roads */}
                 <div className="absolute inset-0 opacity-40" style={{ 
                   backgroundImage: `
-                    linear-gradient(90deg, ${theme === 'dark' ? '#333' : '#ccc'} 4px, transparent 4px),
-                    linear-gradient(${theme === 'dark' ? '#333' : '#ccc'} 4px, transparent 4px),
-                    linear-gradient(90deg, ${theme === 'dark' ? '#222' : '#bbb'} 2px, transparent 2px),
-                    linear-gradient(${theme === 'dark' ? '#222' : '#bbb'} 2px, transparent 2px)
+                    linear-gradient(90deg, ${isNightMode || theme === 'dark' ? '#333' : '#ccc'} 4px, transparent 4px),
+                    linear-gradient(${isNightMode || theme === 'dark' ? '#333' : '#ccc'} 4px, transparent 4px),
+                    linear-gradient(90deg, ${isNightMode || theme === 'dark' ? '#222' : '#bbb'} 2px, transparent 2px),
+                    linear-gradient(${isNightMode || theme === 'dark' ? '#222' : '#bbb'} 2px, transparent 2px)
                   `,
                   backgroundSize: '150px 150px, 150px 150px, 30px 30px, 30px 30px',
                   transform: location ? `translate(${(location.longitude * 10000) % 150}px, ${(location.latitude * 10000) % 150}px)` : 'none'
@@ -1278,6 +1954,40 @@ export default function App() {
                   transform: location ? `translate(${(location.longitude * 8000) % 300}px, ${(location.latitude * 8000) % 300}px)` : 'none'
                 }} />
                 
+                {/* Navigation Overlay */}
+                <AnimatePresence>
+                  {isNavigating && activeOrders.length > 0 && (
+                    <motion.div 
+                      initial={{ y: -100 }}
+                      animate={{ y: 0 }}
+                      exit={{ y: -100 }}
+                      className="absolute top-0 left-0 right-0 z-[150] bg-blue-600 text-white px-4 py-2 shadow-2xl flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="bg-white/20 p-1.5 rounded-lg">
+                          <Navigation size={18} className="fill-white" style={{ transform: 'rotate(45deg)' }} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-black leading-none mb-0.5">
+                            {activeOrders[0].status === 'accepted' ? 'Head to Restaurant' : 'Head to Customer'}
+                          </p>
+                          <p className="text-[10px] font-bold opacity-80">
+                            {activeOrders[0].status === 'accepted' ? activeOrders[0].restaurantName : activeOrders[0].customerName}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-black leading-none mb-0.5">
+                          {distanceToTarget(activeOrders[0])} mi
+                        </p>
+                        <p className="text-[10px] font-bold opacity-80">
+                          {Math.floor(parseFloat(distanceToTarget(activeOrders[0])) * 5 + 2)} min
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 {/* Buildings & Blocks */}
                 <div className="absolute inset-0 opacity-25" style={{ 
                   backgroundImage: `
@@ -1326,24 +2036,53 @@ export default function App() {
                   const x = rest.offset.lng * 50000;
                   const y = -rest.offset.lat * 50000;
                   return (
-                    <div 
+                    <motion.div 
                       key={`rest-${i}`}
-                      className="absolute pointer-events-none flex flex-col items-center"
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setSelectedRestaurant(rest)}
+                      className="absolute cursor-pointer flex flex-col items-center pointer-events-auto"
                       style={{ 
                         left: '50%', 
                         top: '50%', 
                         transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))` 
                       }}
                     >
-                      <div className="w-6 h-6 bg-orange-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-                        <Coffee size={12} className="text-white" />
+                      <div className={`w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center ${rest.busyness === 'High' ? 'bg-red-500' : rest.busyness === 'Medium' ? 'bg-orange-500' : 'bg-green-500'}`}>
+                        <Coffee size={16} className="text-white" />
                       </div>
-                      <span className={`text-[8px] font-black mt-1 px-1 rounded bg-white/80 ${theme === 'dark' ? 'text-black' : 'text-black'}`}>
+                      <span className={`text-[10px] font-black mt-1 px-2 py-0.5 rounded-full bg-white shadow-sm ${theme === 'dark' ? 'text-black' : 'text-black'}`}>
                         {rest.name}
                       </span>
-                    </div>
+                    </motion.div>
                   );
                 })}
+
+                {/* Restaurant Busyness Modal */}
+                <AnimatePresence>
+                  {selectedRestaurant && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 20 }}
+                      className="absolute bottom-32 left-6 right-6 bg-white rounded-3xl p-6 shadow-2xl z-[300] text-black"
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="text-2xl font-black">{selectedRestaurant.name}</h3>
+                          <p className="text-gray-400 font-bold">Popular Restaurant</p>
+                        </div>
+                        <button onClick={() => setSelectedRestaurant(null)} className="p-2 bg-gray-100 rounded-full">
+                          <X size={20} />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl">
+                        <div className={`w-3 h-3 rounded-full ${selectedRestaurant.busyness === 'High' ? 'bg-red-500 animate-pulse' : selectedRestaurant.busyness === 'Medium' ? 'bg-orange-500' : 'bg-green-500'}`} />
+                        <span className="font-black">{selectedRestaurant.busyness} Demand</span>
+                        <span className="text-gray-400 font-bold ml-auto">~5 min wait</span>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Simulated Street Labels */}
                 <div className="absolute inset-0 pointer-events-none opacity-20 overflow-hidden">
@@ -1411,19 +2150,33 @@ export default function App() {
                     </div>
 
                     {/* Surge Badges and More Buttons */}
-                    {user.isOnline && (
+                    {user.isOnline && !isNavigating && (
                       <>
                         <div className="absolute top-1/4 right-1/4 bg-blue-600 text-white px-3 py-1 rounded-lg font-black shadow-lg flex items-center gap-1">
                           <span>1.4x</span>
                         </div>
-                        <div className="absolute bottom-1/3 left-1/4 bg-blue-600 text-white px-4 py-2 rounded-xl font-black shadow-xl flex items-center gap-2">
-                          <ArrowUp size={16} />
-                          <span>More...</span>
-                        </div>
-                        <div className="absolute top-1/2 left-1/3 bg-blue-600 text-white px-4 py-2 rounded-xl font-black shadow-xl flex items-center gap-2">
-                          <ArrowUp size={16} />
-                          <span>More...</span>
-                        </div>
+                        <motion.button 
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            sendNotification("Trip Planner", "New high-demand area detected in Shoreditch. Head there for 1.5x surge!");
+                            setIsDestFilterOpen(true);
+                          }}
+                          className="absolute bottom-40 left-4 bg-blue-600 text-white px-3 py-2 rounded-xl font-black shadow-xl flex items-center gap-2 pointer-events-auto z-40"
+                        >
+                          <ArrowUp size={14} />
+                          <span className="text-xs">More...</span>
+                        </motion.button>
+                        <motion.button 
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            sendNotification("Surge Alert", "Surge is active in your current area. Earn an extra £2 per delivery!");
+                            setIsSafetyToolkitOpen(true);
+                          }}
+                          className="absolute top-40 right-4 bg-blue-600 text-white px-3 py-2 rounded-xl font-black shadow-xl flex items-center gap-2 pointer-events-auto z-40"
+                        >
+                          <ArrowUp size={14} />
+                          <span className="text-xs">More...</span>
+                        </motion.button>
                       </>
                     )}
 
@@ -1494,11 +2247,11 @@ export default function App() {
                               className="absolute transition-transform duration-1000 pointer-events-none" 
                               style={{ transform: `translate(${x}px, ${y}px)`, zIndex: 150 }}
                             >
-                              <div className="p-2 rounded-full border-2 border-white shadow-xl bg-orange-500 animate-pulse">
+                              <div className={`p-2 rounded-full border-2 border-white shadow-xl ${pendingOrder.isMatching ? 'bg-orange-500 animate-pulse' : 'bg-blue-500'}`}>
                                 {i === 0 ? <Coffee size={16} className="text-white" /> : <User size={16} className="text-white" />}
                               </div>
-                              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-orange-600 px-2 py-1 rounded text-[8px] font-black text-white whitespace-nowrap shadow-lg">
-                                {i === 0 ? 'PICKUP MATCH' : 'DROPOFF MATCH'}
+                              <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 rounded text-[8px] font-black text-white whitespace-nowrap shadow-lg ${pendingOrder.isMatching ? 'bg-orange-600' : 'bg-blue-600'}`}>
+                                {i === 0 ? (pendingOrder.isMatching ? 'PICKUP MATCH' : 'PICKUP TRIP') : (pendingOrder.isMatching ? 'DROPOFF MATCH' : 'DROPOFF TRIP')}
                               </div>
                             </motion.div>
                           );
@@ -1511,39 +2264,181 @@ export default function App() {
                 {/* Map Action Buttons */}
                 {user.isOnline && (
                   <div className="absolute bottom-32 left-4 right-4 flex justify-between items-center pointer-events-none">
-                    <button className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 pointer-events-auto active:scale-90 transition-transform">
+                    <button 
+                      onClick={() => setIsSafetyToolkitOpen(true)}
+                      className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 pointer-events-auto active:scale-90 transition-transform"
+                    >
                       <Shield size={28} />
                     </button>
                     <button className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 pointer-events-auto active:scale-90 transition-transform">
                       <Target size={28} />
                     </button>
+                    <button 
+                      onClick={() => setIsDestFilterOpen(true)}
+                      className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 pointer-events-auto active:scale-90 transition-transform"
+                    >
+                      <MapPin size={28} />
+                    </button>
                   </div>
                 )}
               </div>
 
+              {/* Destination Filter Modal */}
+              <AnimatePresence>
+                {isDestFilterOpen && (
+                  <div className="absolute inset-0 z-[250] flex items-end justify-center p-4">
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setIsDestFilterOpen(false)}
+                      className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                    />
+                    <motion.div 
+                      initial={{ y: 100, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: 100, opacity: 0 }}
+                      className="bg-white w-full max-w-md rounded-[32px] p-8 shadow-2xl relative z-10"
+                    >
+                      <div className="flex justify-between items-center mb-8">
+                        <h2 className="text-3xl font-black text-black">Set Destination</h2>
+                        <button onClick={() => setIsDestFilterOpen(false)} className="p-2 bg-gray-100 rounded-full text-black">
+                          <X size={24} />
+                        </button>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
+                          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Current Filter</p>
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white">
+                              <Navigation size={24} />
+                            </div>
+                            <div>
+                              <p className="text-xl font-black text-black">Heading Home</p>
+                              <p className="text-sm font-bold text-gray-400">2 uses remaining today</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="relative">
+                          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={24} />
+                          <input 
+                            type="text" 
+                            placeholder="Where to?" 
+                            className="w-full bg-gray-100 border-none rounded-2xl py-6 pl-16 pr-6 text-xl font-bold focus:ring-2 focus:ring-blue-600 outline-none"
+                          />
+                        </div>
+
+                        <button 
+                          onClick={() => setIsDestFilterOpen(false)}
+                          className="w-full py-6 bg-black text-white rounded-2xl text-xl font-black shadow-xl active:scale-95 transition-transform"
+                        >
+                          Set Destination
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
+
+              {/* Safety Toolkit Modal */}
+              <AnimatePresence>
+                {isSafetyToolkitOpen && (
+                  <div className="absolute inset-0 z-[250] flex items-end justify-center p-4">
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setIsSafetyToolkitOpen(false)}
+                      className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                    />
+                    <motion.div 
+                      initial={{ y: 100, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: 100, opacity: 0 }}
+                      className="bg-white w-full max-w-md rounded-[32px] p-8 shadow-2xl relative z-10"
+                    >
+                      <div className="flex justify-between items-center mb-8">
+                        <h2 className="text-3xl font-black text-black">Safety Toolkit</h2>
+                        <button onClick={() => setIsSafetyToolkitOpen(false)} className="p-2 bg-gray-100 rounded-full text-black">
+                          <X size={24} />
+                        </button>
+                      </div>
+
+                      <div className="space-y-4">
+                        <button className="w-full p-6 bg-red-600 text-white rounded-2xl flex items-center justify-between shadow-lg active:scale-95 transition-transform">
+                          <div className="flex items-center gap-4">
+                            <ShieldAlert size={32} />
+                            <div className="text-left">
+                              <p className="text-xl font-black">Emergency Assistance</p>
+                              <p className="text-sm font-bold opacity-80">Call 911</p>
+                            </div>
+                          </div>
+                          <Phone size={24} />
+                        </button>
+
+                        <button className="w-full p-6 bg-gray-50 text-black rounded-2xl flex items-center justify-between border border-gray-100 active:scale-95 transition-transform">
+                          <div className="flex items-center gap-4">
+                            <Share2 size={32} className="text-blue-600" />
+                            <div className="text-left">
+                              <p className="text-xl font-black">Share My Trip</p>
+                              <p className="text-sm font-bold text-gray-400">Let friends track you</p>
+                            </div>
+                          </div>
+                          <ChevronRight size={24} className="text-gray-300" />
+                        </button>
+
+                        <button className="w-full p-6 bg-gray-50 text-black rounded-2xl flex items-center justify-between border border-gray-100 active:scale-95 transition-transform">
+                          <div className="flex items-center gap-4">
+                            <Camera size={32} className="text-blue-600" />
+                            <div className="text-left">
+                              <p className="text-xl font-black">Record My Trip</p>
+                              <p className="text-sm font-bold text-gray-400">Audio and video recording</p>
+                            </div>
+                          </div>
+                          <ChevronRight size={24} className="text-gray-300" />
+                        </button>
+                      </div>
+
+                      <p className="mt-8 text-center text-xs font-bold text-gray-400">
+                        Your safety is our priority. These tools are available 24/7.
+                      </p>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
+
               {/* Top Controls */}
               {!user.isOnline ? (
-                <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-50">
-                  <button onClick={() => setIsSideMenuOpen(true)} className={`p-3 rounded-full shadow-xl active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}>
-                    <Menu size={24} />
-                  </button>
-                  
-                  <motion.button 
-                    initial={{ y: -50 }}
-                    animate={{ y: 0 }}
-                    onClick={() => setCurrentScreen('earnings')}
-                    className="bg-black text-white px-6 py-2.5 rounded-full shadow-2xl flex items-center gap-2 border border-white/10 active:scale-95 transition-transform"
-                  >
-                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                      <span className="text-white font-black text-xs">£</span>
-                    </div>
-                    <span className="text-xl font-black">{earnings.toFixed(2)}</span>
-                  </motion.button>
-
-                  <div className="flex items-center gap-2">
-                    <button className={`p-3 rounded-full shadow-xl ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}>
-                      <Search size={24} />
+                <div className="absolute top-4 left-4 right-4 flex flex-col gap-4 z-50">
+                  <div className="flex justify-between items-center">
+                    <button onClick={() => setIsSideMenuOpen(true)} className={`p-3 rounded-full shadow-xl active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}>
+                      <Menu size={24} />
                     </button>
+                    
+                    {/* Top Tabs (Status, Browse, Earnings) */}
+                    <div className="flex bg-black/80 backdrop-blur-md p-1 rounded-full border border-white/10 shadow-2xl">
+                      {(['status', 'browse', 'earnings'] as const).map(tab => (
+                        <button 
+                          key={tab}
+                          onClick={() => {
+                            setActiveTopTab(tab);
+                            if (tab === 'earnings') setCurrentScreen('earnings');
+                            if (tab === 'browse') setCurrentScreen('opportunities');
+                          }}
+                          className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeTopTab === tab ? 'bg-white text-black' : 'text-gray-400'}`}
+                        >
+                          {tab}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button className={`p-3 rounded-full shadow-xl ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}>
+                        <Search size={24} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -1599,19 +2494,80 @@ export default function App() {
                       </button>
                     </motion.div>
                   ) : (
-                    <div className="flex justify-center mb-8 px-4">
+                    <div className="flex flex-col items-center w-full">
+                      {/* GO Button */}
                       <motion.button
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => {
+                          if (checkDocsExpired()) {
+                            sendNotification("Documents Expired", "Please update your documents to go online.");
+                            setCurrentScreen('documents');
+                            return;
+                          }
+                          if (user.faceVerified) {
+                            setUser(u => ({ ...u, isOnline: true }));
+                            playUberSound('accept');
+                          } else {
+                            setIsVerifyingToOnline(true);
+                            playUberSound('order');
+                            setCurrentScreen('face_verification');
+                          }
+                        }}
+                        className="w-24 h-24 bg-blue-600 rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(37,99,235,0.6)] border-4 border-white mb-8 active:scale-95 transition-transform"
+                      >
+                        <span className="text-white font-black text-2xl tracking-widest">GO</span>
+                      </motion.button>
+
+                      {/* Bottom Status Bar */}
+                      <motion.div 
                         initial={{ y: 100 }}
                         animate={{ y: 0 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => setIsBottomMenuOpen(true)}
-                        className="bg-black text-white px-8 py-4 rounded-full font-black text-lg shadow-2xl flex items-center gap-3 border border-white/10"
+                        className="w-full bg-white border-t border-gray-100 px-6 py-4 flex items-center justify-between shadow-[0_-10px_30px_rgba(0,0,0,0.05)]"
                       >
-                        <ChevronUp size={24} className="animate-bounce" />
-                        <span>OPEN MENU</span>
-                      </motion.button>
+                        <button onClick={() => setIsBottomMenuOpen(true)} className="text-black">
+                          <ChevronUp size={24} />
+                        </button>
+                        <div className="flex flex-col items-center">
+                          <span className="text-xl font-black text-black">Offline</span>
+                          <span className="text-xs font-bold text-gray-400">5 min to request</span>
+                        </div>
+                        <button onClick={() => setIsBottomMenuOpen(true)} className="text-black">
+                          <List size={24} />
+                        </button>
+                      </motion.div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Last Trip Card Overlay */}
+              {!user.isOnline && lastTrip && (
+                <div className="absolute top-24 left-4 right-4 z-[60] flex justify-center">
+                  <motion.div 
+                    initial={{ y: -100, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-gray-100 flex flex-col items-center"
+                  >
+                    <div className="flex justify-between w-full items-center mb-4">
+                      <Eye size={20} className="text-gray-300" />
+                      <div className="flex flex-col items-center">
+                        <span className="text-3xl font-black text-black">£{lastTrip.amount.toFixed(2)}</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Last Trip</span>
+                      </div>
+                      <HelpCircle size={20} className="text-gray-300" />
+                    </div>
+                    
+                    <div className="flex flex-col items-center mb-4">
+                      <span className="text-sm font-bold text-black">Today at {lastTrip.time}</span>
+                      <span className="text-xs font-bold text-gray-400">{lastTrip.type}</span>
+                    </div>
+
+                    <button className="text-blue-600 font-black text-xs uppercase tracking-widest">
+                      See all trips
+                    </button>
+                  </motion.div>
                 </div>
               )}
 
@@ -1636,7 +2592,7 @@ export default function App() {
                         <div className={`w-12 h-1.5 rounded-full mb-4 ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-200'}`} />
                       </div>
                       
-                      <div className="overflow-y-auto px-6 pb-12 custom-scrollbar flex-1">
+                      <div className="overflow-y-auto px-6 pb-20 custom-scrollbar flex-1">
                         {!user.isOnline ? (
                           <>
                             <div className="flex justify-between w-full mb-8 px-4">
@@ -1861,33 +2817,42 @@ export default function App() {
                   )}
 
                   {activeOrders.map((order, idx) => (
-                    <motion.div key={order.id} initial={{ y: 100 }} animate={{ y: 0 }} className="bg-white text-black rounded-2xl shadow-2xl overflow-hidden mb-2">
-                      <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-blue-50">
+                    <motion.div 
+                      key={order.id} 
+                      initial={{ y: 100 }} 
+                      animate={{ y: 0 }} 
+                      className="bg-white text-black rounded-xl shadow-xl overflow-hidden mb-2 cursor-pointer active:scale-[0.98] transition-transform"
+                      onClick={() => setViewingOrderDetailsId(order.id)}
+                    >
+                      <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-blue-50">
                         <div className="flex items-center gap-2 text-blue-600 font-bold">
-                          <Navigation size={18} />
-                          <span>{order.status === 'accepted' ? `Pickup: ${order.restaurantName}` : `Dropoff: ${order.customerName}`}</span>
+                          <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-[9px] font-black">
+                            {idx + 1}
+                          </div>
+                          <Navigation size={14} />
+                          <span className="text-xs">{order.status === 'accepted' ? `Pickup: ${order.restaurantName}` : `Dropoff: ${order.customerName}`}</span>
                         </div>
-                        <div className="text-sm font-bold text-gray-400">{distanceToTarget(order)} mi</div>
+                        <div className="text-[10px] font-bold text-gray-400">{distanceToTarget(order)} mi</div>
                       </div>
                       
-                      <div className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                            {order.status === 'accepted' ? <Coffee size={24} /> : <User size={24} />}
+                      <div className="p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                            {order.status === 'accepted' ? <Coffee size={20} /> : <User size={20} />}
                           </div>
                           <div>
-                            <h3 className="font-bold text-lg leading-tight">{order.status === 'accepted' ? order.restaurantName : order.customerName}</h3>
-                            <p className="text-sm text-gray-500">{order.items.length} items • £{order.estimatedPay.toFixed(2)}</p>
+                            <h3 className="font-bold text-sm leading-tight">{order.status === 'accepted' ? order.restaurantName : order.customerName}</h3>
+                            <p className="text-[10px] text-gray-500">{order.items.length} items • £{order.estimatedPay.toFixed(2)}</p>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
                           {order.status === 'returning_to_restaurant' ? (
                             <button 
                               onClick={() => {
                                 setActiveOrders(prev => prev.filter(o => o.id !== order.id));
                                 sendNotification("Order Returned", `Order from ${order.restaurantName} returned successfully.`);
                               }}
-                              className="px-6 py-3 bg-red-600 text-white rounded-2xl font-black text-sm active:scale-95 transition-transform"
+                              className="px-4 py-2 bg-red-600 text-white rounded-xl font-black text-[10px] active:scale-95 transition-transform"
                             >
                               RETURNED
                             </button>
@@ -1895,15 +2860,15 @@ export default function App() {
                             <>
                               <button 
                                 onClick={() => setCancellingOrderId(order.id)} 
-                                className={`w-12 h-12 rounded-full flex items-center justify-center border ${theme === 'dark' ? 'bg-white/5 border-white/10 text-red-500' : 'bg-gray-50 border-gray-100 text-red-600'}`}
+                                className={`w-10 h-10 rounded-full flex items-center justify-center border ${theme === 'dark' ? 'bg-white/5 border-white/10 text-red-500' : 'bg-gray-50 border-gray-100 text-red-600'}`}
                               >
-                                <X size={24} />
+                                <X size={20} />
                               </button>
-                              <button onClick={() => { setActiveChatOrderId(order.id); setCurrentScreen('chat'); }} className={`w-12 h-12 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-white/5 text-white' : 'bg-gray-100 text-black'}`}>
-                                <MessageSquare size={24} />
+                              <button onClick={() => { setActiveChatOrderId(order.id); setCurrentScreen('chat'); }} className={`w-10 h-10 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-white/5 text-white' : 'bg-gray-100 text-black'}`}>
+                                <MessageSquare size={20} />
                               </button>
-                              <button onClick={() => handleNextStep(order.id)} className={`w-12 h-12 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}>
-                                <ArrowRight size={24} />
+                              <button onClick={() => handleNextStep(order.id)} className={`w-10 h-10 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}>
+                                <ArrowRight size={20} />
                               </button>
                             </>
                           )}
@@ -1913,6 +2878,11 @@ export default function App() {
                   ))}
                 </AnimatePresence>
               </div>
+
+              {/* Cancel Trip Modal */}
+              <AnimatePresence>
+                {viewingOrderDetailsId && <OrderDetailsModal />}
+              </AnimatePresence>
 
               {/* Cancel Trip Modal */}
               <AnimatePresence>
@@ -1968,42 +2938,42 @@ export default function App() {
               <AnimatePresence>
                 {pendingOrder && (
                   <motion.div initial={{ scale: 0.8, opacity: 0, y: 50 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.8, opacity: 0, y: 50 }} className="absolute inset-x-4 bottom-24 z-[60]">
-                    <div className="bg-white text-black rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
-                      <div className="bg-blue-600 p-6 text-white text-center relative">
-                        <div className="text-sm font-bold tracking-widest opacity-80 mb-1 uppercase">New Delivery Opportunity</div>
-                        <div className="text-4xl font-black">£{pendingOrder.estimatedPay.toFixed(2)}</div>
-                        <div className="text-sm font-bold opacity-80 mt-1">Includes expected tip</div>
-                        <div className="mt-4 flex justify-center">
-                          <div className="w-12 h-12 rounded-full border-4 border-white/30 flex items-center justify-center relative">
+                    <div className="bg-white text-black rounded-2xl overflow-hidden shadow-[0_15px_45px_rgba(0,0,0,0.4)]">
+                      <div className="bg-blue-600 p-4 text-white text-center relative">
+                        <div className="text-[10px] font-bold tracking-widest opacity-80 mb-1 uppercase">New Delivery Opportunity</div>
+                        <div className="text-3xl font-black">£{pendingOrder.estimatedPay.toFixed(2)}</div>
+                        <div className="text-[10px] font-bold opacity-80 mt-1">Includes expected tip</div>
+                        <div className="mt-3 flex justify-center">
+                          <div className="w-10 h-10 rounded-full border-4 border-white/30 flex items-center justify-center relative">
                             <svg className="absolute inset-0 w-full h-full -rotate-90">
                               <circle 
-                                cx="24" cy="24" r="20" 
+                                cx="20" cy="20" r="16" 
                                 fill="none" 
                                 stroke="white" 
                                 strokeWidth="4" 
-                                strokeDasharray="125.6" 
-                                strokeDashoffset={125.6 * (1 - orderExpiryTimer / 10)}
+                                strokeDasharray="100.48" 
+                                strokeDashoffset={100.48 * (1 - orderExpiryTimer / 10)}
                                 className="transition-all duration-1000 ease-linear"
                               />
                             </svg>
-                            <span className="font-black text-lg">{orderExpiryTimer}</span>
+                            <span className="font-black text-sm">{orderExpiryTimer}</span>
                           </div>
                         </div>
-                        <button onClick={handleDeclineOrder} className="absolute top-4 right-4 p-1 bg-black/20 rounded-full"><X size={20} /></button>
+                        <button onClick={handleDeclineOrder} className="absolute top-3 right-3 p-1 bg-black/20 rounded-full"><X size={16} /></button>
                       </div>
-                      <div className="p-6">
-                        <div className="flex items-center gap-4 mb-6">
+                      <div className="p-4">
+                        <div className="flex items-center gap-3 mb-4">
                           <div className="flex flex-col items-center gap-1">
-                            <div className="w-3 h-3 bg-green-500 rounded-full" />
-                            <div className="w-0.5 h-6 bg-gray-200" />
-                            <div className="w-3 h-3 bg-blue-500 rounded-full" />
+                            <div className="w-2 h-2 bg-green-500 rounded-full" />
+                            <div className="w-0.5 h-4 bg-gray-200" />
+                            <div className="w-2 h-2 bg-blue-500 rounded-full" />
                           </div>
                           <div className="flex-1">
-                            <div className="font-bold text-lg mb-4">{pendingOrder.restaurantName}</div>
-                            <div className="font-bold text-lg text-gray-400">Customer Address</div>
+                            <div className="font-bold text-sm mb-2">{pendingOrder.restaurantName}</div>
+                            <div className="font-bold text-sm text-gray-400">Customer Address</div>
                           </div>
                         </div>
-                        <button onClick={handleAcceptOrder} className="w-full py-5 bg-black text-white rounded-2xl font-black text-xl tracking-wide">ACCEPT</button>
+                        <button onClick={handleAcceptOrder} className="w-full py-4 bg-black text-white rounded-xl font-black text-lg tracking-wide">ACCEPT</button>
                       </div>
                     </div>
                   </motion.div>
@@ -2132,7 +3102,7 @@ export default function App() {
           )}
 
           {currentScreen === 'wallet' && (
-            <motion.div key="wallet" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6">
+            <motion.div key="wallet" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
                 <h1 className="text-3xl font-black">Wallet</h1>
@@ -2168,7 +3138,7 @@ export default function App() {
           )}
 
           {currentScreen === 'opportunities' && (
-            <motion.div key="opps" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6">
+            <motion.div key="opps" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
                 <h1 className="text-3xl font-black">Opportunities</h1>
@@ -2197,8 +3167,55 @@ export default function App() {
             </motion.div>
           )}
 
+          {currentScreen === 'rewards' && (
+            <motion.div key="rewards" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
+              <div className="flex items-center gap-4 mb-8">
+                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
+                <h1 className="text-3xl font-black">Rewards</h1>
+              </div>
+              <div className="space-y-6">
+                <div className="p-8 bg-black text-white rounded-[40px] relative overflow-hidden">
+                  <div className="relative z-10">
+                    <h2 className="text-4xl font-black mb-2">Quest</h2>
+                    <p className="text-gray-400 font-bold mb-6">Complete orders to earn bonuses</p>
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-blue-600 rounded-2xl"><Target size={32} /></div>
+                      <div>
+                        <span className="block text-2xl font-black">{rewards[0].completed} / {rewards[2].target}</span>
+                        <span className="text-sm text-gray-400 font-bold">Total Orders Today</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/20 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
+                </div>
+
+                <div className="space-y-4">
+                  {rewards.map((reward, i) => {
+                    const progress = Math.min(100, (reward.completed / reward.target) * 100);
+                    return (
+                      <div key={i} className="p-6 bg-gray-50 rounded-[30px] border border-gray-100">
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="text-xl font-black">{reward.reward}</h3>
+                          <span className="font-black text-blue-600">{reward.completed}/{reward.target}</span>
+                        </div>
+                        <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden mb-2">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${progress}%` }}
+                            className="h-full bg-blue-600"
+                          />
+                        </div>
+                        <p className="text-sm text-gray-400 font-bold">Complete {reward.target} orders to unlock</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {currentScreen === 'inbox' && (
-            <motion.div key="inbox" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6">
+            <motion.div key="inbox" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
                 <h1 className="text-3xl font-black">Inbox</h1>
@@ -2329,7 +3346,7 @@ export default function App() {
           )}
 
           {currentScreen === 'account' && (
-            <motion.div key="account" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
+            <motion.div key="account" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen('home')} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><X size={24} /></button>
                 <h1 className="text-3xl font-black">Account</h1>
@@ -2347,6 +3364,29 @@ export default function App() {
                   { icon: <FileText />, label: "Documents", action: () => setCurrentScreen('documents') },
                   { icon: <CreditCard />, label: "Payment", action: () => setCurrentScreen('earnings') },
                   { icon: <Settings />, label: "App Settings", action: () => sendNotification("Settings", "Settings updated.") },
+                  { icon: <ShieldAlert />, label: "Simulate Bug Scan", action: () => {
+                    setIsScanning(true);
+                    setTimeout(() => {
+                      setIsScanning(false);
+                      setIsUnderMaintenance(true);
+                    }, 2000);
+                  }},
+                  { icon: <Zap />, label: "Test All Features", action: async () => {
+                    sendNotification("Test Mode", "Starting automated feature test...");
+                    setUser(u => ({ ...u, isOnline: true }));
+                    await new Promise(r => setTimeout(r, 2000));
+                    const testOrder = generateSmartOrder();
+                    if (testOrder) {
+                      setPendingOrder(testOrder);
+                      await new Promise(r => setTimeout(r, 3000));
+                      handleAcceptOrder();
+                      await new Promise(r => setTimeout(r, 3000));
+                      setActiveOrders(prev => prev.map(o => o.id === testOrder.id ? { ...o, status: 'picked_up' } : o));
+                      await new Promise(r => setTimeout(r, 3000));
+                      handleCompleteDelivery(testOrder.id);
+                      sendNotification("Test Mode", "Feature test completed successfully!");
+                    }
+                  }},
                 ].map((item, idx) => (
                   <button 
                     key={idx} 
@@ -2366,16 +3406,16 @@ export default function App() {
                     <div className="flex items-center gap-4">
                       <div className="text-blue-500"><Moon size={24} /></div>
                       <div>
-                        <p className="font-bold">Dark Mode</p>
-                        <p className="text-xs text-gray-400 font-bold">Switch app theme</p>
+                        <p className="font-bold">Night Mode</p>
+                        <p className="text-xs text-gray-400 font-bold">Always use dark map</p>
                       </div>
                     </div>
                     <div 
-                      onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                      className={`w-12 h-6 rounded-full relative p-1 transition-colors cursor-pointer ${theme === 'dark' ? 'bg-blue-500' : 'bg-gray-300'}`}
+                      onClick={() => setIsNightMode(!isNightMode)}
+                      className={`w-12 h-6 rounded-full relative p-1 transition-colors cursor-pointer ${isNightMode ? 'bg-blue-500' : 'bg-gray-300'}`}
                     >
                       <motion.div 
-                        animate={{ x: theme === 'dark' ? 24 : 0 }}
+                        animate={{ x: isNightMode ? 24 : 0 }}
                         className="w-4 h-4 bg-white rounded-full shadow-sm" 
                       />
                     </div>
@@ -2418,7 +3458,7 @@ export default function App() {
           )}
 
           {currentScreen === 'earnings' && (
-            <motion.div key="earnings" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
+            <motion.div key="earnings" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen('home')} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><X size={24} /></button>
                 <h1 className="text-3xl font-black">Earnings</h1>
@@ -2477,16 +3517,25 @@ export default function App() {
               </div>
             </motion.div>
           )}
+
+          {currentScreen === 'scheduled_orders' && <ScheduledOrdersScreen />}
         </AnimatePresence>
+
+        {isNewUserFormOpen && <NewUserForm />}
       </div>
 
       {/* Bottom Nav */}
-      <div className="h-20 bg-black border-t border-white/10 flex items-center justify-around px-4 z-[110]">
-        <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={24} />} label="Home" />
-        <NavButton active={currentScreen === 'earnings'} onClick={() => setCurrentScreen('earnings')} icon={<TrendingUp size={24} />} label="Earnings" />
-        <NavButton active={currentScreen === 'inbox'} onClick={() => setCurrentScreen('inbox')} icon={<Mail size={24} />} label="Inbox" />
-        <NavButton active={currentScreen === 'account'} onClick={() => setCurrentScreen('account')} icon={<User size={24} />} label="Account" />
-      </div>
+      {currentScreen !== 'home' && (
+        <div className="h-24 bg-black border-t border-white/10 flex items-center justify-around px-4 pb-6 z-[110]">
+          <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={24} />} label="Home" />
+          <NavButton active={currentScreen === 'earnings'} onClick={() => setCurrentScreen('earnings')} icon={<TrendingUp size={24} />} label="Earnings" />
+          <NavButton active={currentScreen === 'inbox'} onClick={() => setCurrentScreen('inbox')} icon={<Mail size={24} />} label="Inbox" />
+          <NavButton active={currentScreen === 'account'} onClick={() => setCurrentScreen('account')} icon={<User size={24} />} label="Account" />
+        </div>
+      )}
+
+      {/* Home Indicator */}
+      <div className="h-1 w-32 bg-white/20 rounded-full mx-auto mb-2 shrink-0 z-[120]" />
     </div>
   );
 }

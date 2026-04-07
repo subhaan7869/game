@@ -1,0 +1,48 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores driver profile information and face verification data.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "name": { "type": "string", "description": "Full name of the driver" },
+        "email": { "type": "string", "description": "Email address" },
+        "rating": { "type": "number", "description": "Driver rating" },
+        "tier": { "type": "string", "enum": ["Blue", "Gold", "Platinum", "Diamond"], "description": "Uber Pro Tier" },
+        "points": { "type": "number", "description": "Uber Pro points" },
+        "deliveries": { "type": "number", "description": "Total deliveries completed" },
+        "walletBalance": { "type": "number", "description": "Current wallet balance" },
+        "faceSignature": { "type": "string", "description": "Simulated face recognition signature" },
+        "profilePic": { "type": "string", "description": "URL to profile picture" },
+        "documentsUploaded": { "type": "boolean", "description": "Whether documents are uploaded" },
+        "faceVerified": { "type": "boolean", "description": "Whether face is verified" },
+        "documentExpiries": { "type": "object", "description": "Map of document names to expiry dates" }
+      },
+      "required": ["uid", "name", "faceSignature"]
+    },
+    "ScheduledOrder": {
+      "title": "Scheduled Order",
+      "description": "Orders scheduled by the driver for a specific time.",
+      "type": "object",
+      "properties": {
+        "driverUid": { "type": "string", "description": "UID of the driver who scheduled the order" },
+        "restaurantName": { "type": "string", "description": "Name of the restaurant" },
+        "scheduledTime": { "type": "string", "format": "date-time", "description": "Time the order is scheduled for" },
+        "status": { "type": "string", "enum": ["pending", "active", "completed"], "description": "Status of the scheduled order" },
+        "estimatedPay": { "type": "number", "description": "Estimated earnings" }
+      },
+      "required": ["driverUid", "restaurantName", "scheduledTime"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "UserProfile",
+      "description": "Collection of driver profiles"
+    },
+    "scheduled_orders": {
+      "schema": "ScheduledOrder",
+      "description": "Collection of scheduled orders"
+    }
+  }
+}

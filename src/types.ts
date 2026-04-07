@@ -15,6 +15,7 @@ export interface Order {
   customerName: string;
   items: string[];
   pin?: string;
+  isMatching?: boolean;
 }
 
 export interface ChatMessage {
@@ -25,7 +26,16 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-export type AppScreen = 'onboarding' | 'documents' | 'face_verification' | 'home' | 'earnings' | 'inbox' | 'account' | 'chat' | 'uber_pro' | 'wallet' | 'opportunities' | 'safety' | 'earnings_detail' | 'banking';
+export interface ScheduledOrder {
+  id: string;
+  driverUid: string;
+  restaurantName: string;
+  scheduledTime: string;
+  status: 'pending' | 'active' | 'completed';
+  estimatedPay: number;
+}
+
+export type AppScreen = 'onboarding' | 'documents' | 'face_verification' | 'home' | 'earnings' | 'inbox' | 'account' | 'chat' | 'uber_pro' | 'wallet' | 'opportunities' | 'safety' | 'earnings_detail' | 'banking' | 'scheduled_orders' | 'rewards';
 
 export type UberProTier = 'Blue' | 'Gold' | 'Platinum' | 'Diamond';
 
@@ -39,4 +49,6 @@ export interface UserProfile {
   documentsUploaded: boolean;
   faceVerified: boolean;
   profilePic?: string;
+  documentExpiries?: Record<string, string>;
+  walletBalance: number;
 }
