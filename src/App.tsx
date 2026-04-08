@@ -193,12 +193,27 @@ export default function App() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [isSafetyToolkitOpen, setIsSafetyToolkitOpen] = useState(false);
   const [isDestFilterOpen, setIsDestFilterOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [isNightMode, setIsNightMode] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerifyingToOnline, setIsVerifyingToOnline] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [routeWaypoints, setRouteWaypoints] = useState<Location[]>([]);
+  const [trafficSegments, setTrafficSegments] = useState<{ start: Location, end: Location, intensity: 'low' | 'medium' | 'high' }[]>([]);
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [selectedCancelReason, setSelectedCancelReason] = useState<string | null>(null);
   const [viewingOrderDetailsId, setViewingOrderDetailsId] = useState<string | null>(null);
+  const [earningsGoal, setEarningsGoal] = useState(50.00);
   const [hotspots, setHotspots] = useState<{ latitude: number, longitude: number, intensity: number, size: number }[]>([]);
+  const [jobTypePreference, setJobTypePreference] = useState<'normal' | 'matching' | 'both'>(() => {
+    const saved = localStorage.getItem('uber_job_preference');
+    return (saved as any) || 'both';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('uber_job_preference', jobTypePreference);
+  }, [jobTypePreference]);
 
   // New Maintenance/Update States
   const [isUpdating, setIsUpdating] = useState(true);
@@ -592,8 +607,40 @@ export default function App() {
   }, [user.isOnline]);
   // Geolocation tracking & Navigation Simulation
   useEffect(() => {
+    let angle = 0;
+    let deviationChance = 0.02; // 2% chance to deviate each second
+
+    const generateRoute = (start: Location, end: Location) => {
+      const waypoints: Location[] = [start];
+      const steps = 4;
+      for (let i = 1; i < steps; i++) {
+        waypoints.push({
+          latitude: start.latitude + (end.latitude - start.latitude) * (i / steps) + (Math.random() - 0.5) * 0.002,
+          longitude: start.longitude + (end.longitude - start.longitude) * (i / steps) + (Math.random() - 0.5) * 0.002,
+        });
+      }
+      waypoints.push(end);
+      return waypoints;
+    };
+
+    const generateTraffic = (center: Location) => {
+      const segments: { start: Location, end: Location, intensity: 'low' | 'medium' | 'high' }[] = [];
+      for (let i = 0; i < 10; i++) {
+        const start = {
+          latitude: center.latitude + (Math.random() - 0.5) * 0.02,
+          longitude: center.longitude + (Math.random() - 0.5) * 0.02,
+        };
+        const end = {
+          latitude: start.latitude + (Math.random() - 0.5) * 0.005,
+          longitude: start.longitude + (Math.random() - 0.5) * 0.005,
+        };
+        const intensities: ('low' | 'medium' | 'high')[] = ['low', 'medium', 'high'];
+        segments.push({ start, end, intensity: intensities[Math.floor(Math.random() * 3)] });
+      }
+      return segments;
+    };
+
     if (isSimulatingMovement || isNavigating) {
-      let angle = 0;
       const interval = setInterval(() => {
         setLocation(prev => {
           if (!prev) return { latitude: 51.5074, longitude: -0.1278 };
@@ -602,13 +649,41 @@ export default function App() {
             const order = activeOrders[0];
             const target = order.status === 'accepted' ? order.restaurantLocation : order.customerLocation;
             
-            // Move towards target
-            const dLat = target.latitude - prev.latitude;
-            const dLng = target.longitude - prev.longitude;
+            // Initial route generation
+            if (routeWaypoints.length === 0) {
+              setRouteWaypoints(generateRoute(prev, target));
+              setTrafficSegments(generateTraffic(prev));
+            }
+
+            // Check for deviation
+            if (Math.random() < deviationChance && !isRecalculating) {
+              setIsRecalculating(true);
+              sendNotification("Route Deviation", "Recalculating optimal path...");
+              setTimeout(() => {
+                setRouteWaypoints(generateRoute(prev, target));
+                setIsRecalculating(false);
+              }, 2000);
+              
+              // Deviate slightly
+              return {
+                latitude: prev.latitude + (Math.random() - 0.5) * 0.001,
+                longitude: prev.longitude + (Math.random() - 0.5) * 0.001,
+              };
+            }
+
+            if (isRecalculating) return prev;
+
+            // Move towards next waypoint
+            const nextWaypoint = routeWaypoints[0] || target;
+            const dLat = nextWaypoint.latitude - prev.latitude;
+            const dLng = nextWaypoint.longitude - prev.longitude;
             const dist = Math.sqrt(dLat * dLat + dLng * dLng);
             
             if (dist < 0.0001) {
-              // Arrived!
+              // Arrived at waypoint
+              if (routeWaypoints.length > 0) {
+                setRouteWaypoints(prevWaypoints => prevWaypoints.slice(1));
+              }
               return prev;
             }
             
@@ -618,6 +693,9 @@ export default function App() {
               longitude: prev.longitude + (dLng / dist) * step,
             };
           }
+
+          // Reset route if not navigating
+          if (routeWaypoints.length > 0) setRouteWaypoints([]);
 
           // Circular movement if simulating but not navigating
           if (isSimulatingMovement) {
@@ -733,7 +811,7 @@ export default function App() {
         items: ["Meal Deal", "Extra Fries", "Coke Zero"],
         distToRest,
         pin: Math.floor(1000 + Math.random() * 9000).toString(),
-        isMatching: activeOrders.length > 0
+        isMatching: activeOrders.length > 0 || Math.random() < 0.3
       };
     });
 
@@ -810,12 +888,23 @@ export default function App() {
             estimatedTime: 15,
             status: 'pending',
             items: ["Scheduled Meal"],
-            isMatching: false
+            isMatching: activeOrders.length > 0 || Math.random() < 0.2
           };
+
+          // Check preference for scheduled as well
+          if (jobTypePreference === 'matching' && !newOrder.isMatching) return;
+          if (jobTypePreference === 'normal' && newOrder.isMatching) return;
+
           // Remove from scheduled list so it doesn't pop up again
           setScheduledOrders(prev => prev.filter(s => s.id !== sch.id));
         } else {
           newOrder = generateSmartOrder();
+          
+          // Check preference before showing
+          if (newOrder) {
+            if (jobTypePreference === 'matching' && !newOrder.isMatching) return;
+            if (jobTypePreference === 'normal' && newOrder.isMatching) return;
+          }
         }
 
         if (newOrder) {
@@ -828,12 +917,13 @@ export default function App() {
       }, 8000 + Math.random() * 12000);
       return () => clearTimeout(timer);
     }
-  }, [user.isOnline, activeOrders, pendingOrder, location, scheduledOrders]);
+  }, [user.isOnline, activeOrders, pendingOrder, location, scheduledOrders, jobTypePreference]);
 
   const handleAcceptOrder = () => {
     if (pendingOrder) {
       if (activeOrders.length >= 3) {
         sendNotification("Limit Reached", "You can only handle up to 3 active orders at a time.");
+        setPendingOrder(null);
         return;
       }
       setActiveOrders(prev => [...prev, { ...pendingOrder, status: 'accepted' }]);
@@ -850,10 +940,12 @@ export default function App() {
     playUberSound('accept');
   };
 
-  const handleCancelOrder = (orderId: string) => {
+  const handleCancelOrder = (orderId: string, reason: string) => {
+    console.log(`Order ${orderId} cancelled. Reason: ${reason}`);
     setActiveOrders(prev => prev.filter(o => o.id !== orderId));
     setCancellingOrderId(null);
-    sendNotification("Trip Cancelled", "The trip has been removed from your active tasks.");
+    setSelectedCancelReason(null);
+    sendNotification("Trip Cancelled", `Trip cancelled: ${reason}`);
     playUberSound('accept');
   };
 
@@ -893,6 +985,12 @@ export default function App() {
     });
     
     sendNotification("Delivery Complete", `You earned £${order.estimatedPay.toFixed(2)}`);
+    setLastTrip({
+      amount: order.estimatedPay,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: "Uber Eats"
+    });
+    setShowLastTripCard(true);
     playUberSound('accept');
   };
 
@@ -1470,6 +1568,13 @@ export default function App() {
     );
   };
 
+  const userTier = useMemo(() => {
+    if (user.points >= 3000) return 'Diamond';
+    if (user.points >= 1500) return 'Platinum';
+    if (user.points >= 500) return 'Gold';
+    return 'Blue';
+  }, [user.points]);
+
   const SideMenu = () => (
     <motion.div 
       initial={{ x: '-100%' }}
@@ -1484,7 +1589,19 @@ export default function App() {
           </div>
           <div>
             <h2 className="font-black text-xl">{user.name}</h2>
-            <p className="text-sm font-bold text-gray-400">{user.rating} ★ • {user.tier} Tier</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-bold text-gray-400">{user.rating} ★ • {userTier} Tier</p>
+            </div>
+            <div className="mt-2 w-32 h-1 bg-white/10 rounded-full overflow-hidden">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${userTier === 'Diamond' ? 100 : (user.points % 500) / 5}%` }}
+                className="h-full bg-blue-500"
+              />
+            </div>
+            <p className="text-[8px] font-black text-blue-400 mt-1 uppercase tracking-widest">
+              {userTier === 'Diamond' ? 'Max Tier Reached' : `${500 - (user.points % 500)} pts to next tier`}
+            </p>
           </div>
         </div>
         <button onClick={() => setIsSideMenuOpen(false)} className="p-2 bg-white/10 rounded-full">
@@ -1500,14 +1617,21 @@ export default function App() {
           { icon: <CreditCard />, label: "Wallet", screen: 'wallet' },
           { icon: <Star />, label: "Uber Pro", screen: 'uber_pro' },
           { icon: <Target />, label: "Rewards & Quests", screen: 'rewards' },
-          { icon: <Mail />, label: "Inbox", screen: 'inbox' },
-          { icon: <ShieldCheck />, label: "Safety Toolkit", screen: 'safety' },
+          { icon: <Mail />, label: "Inbox", action: () => setIsInboxOpen(true) },
+          { icon: <ShieldCheck />, label: "Safety Toolkit", action: () => setIsSafetyToolkitOpen(true) },
           { icon: <Settings />, label: "Account", screen: 'account' },
           { icon: <HelpCircle />, label: "Help", screen: 'home' },
         ].map((item, idx) => (
           <button 
             key={idx} 
-            onClick={() => { setCurrentScreen(item.screen as AppScreen); setIsSideMenuOpen(false); }}
+            onClick={() => { 
+              if ('action' in item) {
+                item.action();
+              } else {
+                setCurrentScreen(item.screen as AppScreen);
+              }
+              setIsSideMenuOpen(false); 
+            }}
             className="w-full flex items-center gap-4 p-4 hover:bg-white/5 rounded-2xl transition-colors"
           >
             <div className="text-gray-400">{item.icon}</div>
@@ -1576,7 +1700,7 @@ export default function App() {
   );
 
   return (
-    <div className={`h-[100dvh] w-full md:max-w-[420px] md:h-[850px] md:rounded-[3rem] md:border-[12px] md:border-black md:shadow-2xl md:my-8 font-sans overflow-hidden flex flex-col select-none relative transition-all duration-500 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-gray-100 text-black'}`}>
+    <div className={`h-[100dvh] w-full font-sans overflow-hidden flex flex-col select-none relative transition-all duration-500 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-gray-100 text-black'}`}>
       {/* In-App Toasts */}
       <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-[380px] px-4 pointer-events-none">
         <AnimatePresence>
@@ -1919,6 +2043,47 @@ export default function App() {
                 )}
               </AnimatePresence>
 
+              {/* Earnings Goal Tracker */}
+              {user.isOnline && !isNavigating && (
+                <motion.div 
+                  initial={{ y: -50, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  className={`absolute top-16 left-1/2 -translate-x-1/2 z-[100] w-[85%] max-w-sm p-4 rounded-3xl shadow-2xl border backdrop-blur-md ${theme === 'dark' ? 'bg-black/80 border-white/10' : 'bg-white/90 border-black/5'}`}
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Daily Earnings Goal</p>
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-2xl font-black">£{earnings.toFixed(2)}</p>
+                        <p className="text-gray-400 text-sm font-bold">/ £{earningsGoal}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        const newGoal = prompt("Set your daily earnings goal:", earningsGoal.toString());
+                        if (newGoal && !isNaN(parseFloat(newGoal))) {
+                          setEarningsGoal(parseFloat(newGoal));
+                          sendNotification("Goal Updated", `Your daily goal is now £${parseFloat(newGoal).toFixed(2)}`);
+                        }
+                      }}
+                      className="p-2 bg-blue-600/10 text-blue-600 rounded-xl hover:bg-blue-600/20 transition-colors"
+                    >
+                      <Settings size={16} />
+                    </button>
+                  </div>
+                  <div className="h-2 w-full bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(100, (earnings / earningsGoal) * 100)}%` }}
+                      className={`h-full rounded-full ${earnings >= earningsGoal ? 'bg-green-500' : 'bg-blue-600'}`}
+                    />
+                  </div>
+                  {earnings >= earningsGoal && (
+                    <p className="text-[10px] font-black text-green-500 mt-2 uppercase tracking-widest text-center">Goal Achieved! 🏆</p>
+                  )}
+                </motion.div>
+              )}
+
               {/* Background Mode Indicator */}
               {user.isOnline && !isNavigating && (
                 <div className={`absolute top-28 left-1/2 -translate-x-1/2 z-50 px-4 py-1.5 rounded-full flex items-center gap-2 border shadow-2xl transition-all duration-300 ${theme === 'dark' ? 'bg-black border-white/20' : 'bg-white border-black/10'}`}>
@@ -1945,14 +2110,27 @@ export default function App() {
                 }} />
                 
                 {/* Traffic Lines (Simulated) */}
-                <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ 
-                  backgroundImage: `
-                    linear-gradient(90deg, transparent 48%, #ff4d4d 48%, #ff4d4d 52%, transparent 52%),
-                    linear-gradient(transparent 48%, #ffcc00 48%, #ffcc00 52%, transparent 52%)
-                  `,
-                  backgroundSize: '300px 300px',
-                  transform: location ? `translate(${(location.longitude * 8000) % 300}px, ${(location.latitude * 8000) % 300}px)` : 'none'
-                }} />
+                {trafficSegments.map((seg, i) => {
+                  const x1 = (seg.start.longitude - location!.longitude) * 50000;
+                  const y1 = (location!.latitude - seg.start.latitude) * 50000;
+                  const x2 = (seg.end.longitude - location!.longitude) * 50000;
+                  const y2 = (location!.latitude - seg.end.latitude) * 50000;
+                  
+                  return (
+                    <svg key={`traffic-${i}`} className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+                      <line 
+                        x1={`calc(50% + ${x1}px)`} 
+                        y1={`calc(50% + ${y1}px)`} 
+                        x2={`calc(50% + ${x2}px)`} 
+                        y2={`calc(50% + ${y2}px)`} 
+                        stroke={seg.intensity === 'high' ? '#ef4444' : seg.intensity === 'medium' ? '#f59e0b' : '#10b981'} 
+                        strokeWidth="4" 
+                        strokeLinecap="round"
+                        opacity="0.6"
+                      />
+                    </svg>
+                  );
+                })}
                 
                 {/* Navigation Overlay */}
                 <AnimatePresence>
@@ -1961,15 +2139,19 @@ export default function App() {
                       initial={{ y: -100 }}
                       animate={{ y: 0 }}
                       exit={{ y: -100 }}
-                      className="absolute top-0 left-0 right-0 z-[150] bg-blue-600 text-white px-4 py-2 shadow-2xl flex items-center justify-between"
+                      className={`absolute top-0 left-0 right-0 z-[150] text-white px-4 py-2 shadow-2xl flex items-center justify-between transition-colors duration-500 ${isRecalculating ? 'bg-orange-600' : 'bg-blue-600'}`}
                     >
                       <div className="flex items-center gap-2">
                         <div className="bg-white/20 p-1.5 rounded-lg">
-                          <Navigation size={18} className="fill-white" style={{ transform: 'rotate(45deg)' }} />
+                          {isRecalculating ? (
+                            <RefreshCw size={18} className="animate-spin" />
+                          ) : (
+                            <Navigation size={18} className="fill-white" style={{ transform: 'rotate(45deg)' }} />
+                          )}
                         </div>
                         <div>
                           <p className="text-sm font-black leading-none mb-0.5">
-                            {activeOrders[0].status === 'accepted' ? 'Head to Restaurant' : 'Head to Customer'}
+                            {isRecalculating ? 'Recalculating Route...' : (activeOrders[0].status === 'accepted' ? 'Head to Restaurant' : 'Head to Customer')}
                           </p>
                           <p className="text-[10px] font-bold opacity-80">
                             {activeOrders[0].status === 'accepted' ? activeOrders[0].restaurantName : activeOrders[0].customerName}
@@ -2044,13 +2226,14 @@ export default function App() {
                       style={{ 
                         left: '50%', 
                         top: '50%', 
-                        transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))` 
+                        transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                        opacity: activeOrders.some(o => o.restaurantName === rest.name) ? 0 : 1
                       }}
                     >
-                      <div className={`w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center ${rest.busyness === 'High' ? 'bg-red-500' : rest.busyness === 'Medium' ? 'bg-orange-500' : 'bg-green-500'}`}>
-                        <Coffee size={16} className="text-white" />
+                      <div className={`w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center ${rest.busyness === 'High' ? 'bg-red-500' : rest.busyness === 'Medium' ? 'bg-orange-500' : 'bg-green-500'}`}>
+                        <Coffee size={12} className="text-white" />
                       </div>
-                      <span className={`text-[10px] font-black mt-1 px-2 py-0.5 rounded-full bg-white shadow-sm ${theme === 'dark' ? 'text-black' : 'text-black'}`}>
+                      <span className={`text-[8px] font-black mt-1 px-1.5 py-0.5 rounded-full bg-white/80 backdrop-blur-sm shadow-sm ${theme === 'dark' ? 'text-black' : 'text-black'}`}>
                         {rest.name}
                       </span>
                     </motion.div>
@@ -2123,6 +2306,43 @@ export default function App() {
                     strokeWidth="1.5"
                   />
                 </svg>
+
+                {/* Active Route Path */}
+                {isNavigating && location && routeWaypoints.length > 0 && (
+                  <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+                    <motion.path 
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      transition={{ duration: 1 }}
+                      d={`M ${50}% ${50}% ${routeWaypoints.map(wp => {
+                        const x = (wp.longitude - location.longitude) * 50000;
+                        const y = (location.latitude - wp.latitude) * 50000;
+                        return `L calc(50% + ${x}px) calc(50% + ${y}px)`;
+                      }).join(' ')}`}
+                      fill="none" 
+                      stroke="#3b82f6" 
+                      strokeWidth="6" 
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      opacity="0.8"
+                    />
+                    {/* Animated path overlay */}
+                    <motion.path 
+                      d={`M ${50}% ${50}% ${routeWaypoints.map(wp => {
+                        const x = (wp.longitude - location.longitude) * 50000;
+                        const y = (location.latitude - wp.latitude) * 50000;
+                        return `L calc(50% + ${x}px) calc(50% + ${y}px)`;
+                      }).join(' ')}`}
+                      fill="none" 
+                      stroke="white" 
+                      strokeWidth="2" 
+                      strokeDasharray="10,10"
+                      animate={{ strokeDashoffset: -20 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      opacity="0.5"
+                    />
+                  </svg>
+                )}
 
                 {location && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -2266,24 +2486,97 @@ export default function App() {
                   <div className="absolute bottom-32 left-4 right-4 flex justify-between items-center pointer-events-none">
                     <button 
                       onClick={() => setIsSafetyToolkitOpen(true)}
-                      className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 pointer-events-auto active:scale-90 transition-transform"
+                      className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 pointer-events-auto active:scale-90 transition-transform"
                     >
-                      <Shield size={28} />
-                    </button>
-                    <button className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 pointer-events-auto active:scale-90 transition-transform">
-                      <Target size={28} />
+                      <Shield size={24} />
                     </button>
                     <button 
-                      onClick={() => setIsDestFilterOpen(true)}
-                      className="w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 pointer-events-auto active:scale-90 transition-transform"
+                      onClick={() => {
+                        // Re-center logic
+                        setLocation({ latitude: 51.5074, longitude: -0.1278 });
+                        sendNotification("GPS Centered", "Map view reset to your current location.");
+                      }}
+                      className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 pointer-events-auto active:scale-90 transition-transform"
                     >
-                      <MapPin size={28} />
+                      <Target size={24} />
+                    </button>
+                    <button 
+                      onClick={() => setIsInboxOpen(true)}
+                      className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 pointer-events-auto active:scale-90 transition-transform"
+                    >
+                      <Bell size={24} />
+                      {notifications.length > 0 && (
+                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white">
+                          {notifications.length}
+                        </span>
+                      )}
                     </button>
                   </div>
                 )}
               </div>
 
-              {/* Destination Filter Modal */}
+              {/* Search Modal */}
+              <AnimatePresence>
+                {isSearchOpen && (
+                  <div className="absolute inset-0 z-[500] flex items-start justify-center p-6">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSearchOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                    <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -50, opacity: 0 }} className={`w-full max-w-md rounded-3xl p-6 shadow-2xl relative z-10 ${theme === 'dark' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black'}`}>
+                      <div className="flex items-center gap-4 mb-6">
+                        <Search className="text-gray-400" />
+                        <input 
+                          autoFocus
+                          type="text" 
+                          placeholder="Search for restaurants or areas..." 
+                          className="flex-1 bg-transparent border-none outline-none font-bold text-lg"
+                        />
+                        <button onClick={() => setIsSearchOpen(false)} className="p-2 bg-gray-100 dark:bg-white/5 rounded-full"><X size={20} /></button>
+                      </div>
+                      <div className="space-y-4">
+                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Recent Searches</p>
+                        {['Shoreditch', 'Westfield Stratford', 'Soho'].map(item => (
+                          <button key={item} className="w-full flex items-center gap-4 p-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors">
+                            <Clock size={16} className="text-gray-400" />
+                            <span className="font-bold">{item}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
+
+              {/* Inbox Modal */}
+              <AnimatePresence>
+                {isInboxOpen && (
+                  <div className="absolute inset-0 z-[500] flex items-end justify-center p-4">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsInboxOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                    <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className={`w-full max-w-md rounded-[40px] p-8 shadow-2xl relative z-10 max-h-[80vh] overflow-hidden flex flex-col ${theme === 'dark' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black'}`}>
+                      <div className="flex justify-between items-center mb-8">
+                        <h2 className="text-3xl font-black">Inbox</h2>
+                        <button onClick={() => setIsInboxOpen(false)} className="p-2 bg-gray-100 dark:bg-white/5 rounded-full"><X size={24} /></button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pb-10">
+                        {notifications.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                            <Mail size={48} className="mb-4 opacity-20" />
+                            <p className="font-bold">No new messages</p>
+                          </div>
+                        ) : (
+                          notifications.map((note, i) => (
+                            <div key={i} className={`p-5 rounded-3xl border ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}>
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="w-2 h-2 bg-blue-600 rounded-full" />
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">System Update</p>
+                              </div>
+                              <p className="font-bold leading-relaxed">{note}</p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
               <AnimatePresence>
                 {isDestFilterOpen && (
                   <div className="absolute inset-0 z-[250] flex items-end justify-center p-4">
@@ -2477,9 +2770,10 @@ export default function App() {
                     <motion.div 
                       initial={{ y: 100 }}
                       animate={{ y: 0 }}
-                      className="w-full bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.1)] flex items-center justify-between px-8 py-6"
+                      onClick={() => setIsBottomMenuOpen(true)}
+                      className="w-full bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.1)] flex items-center justify-between px-8 py-6 cursor-pointer active:scale-[0.99] transition-transform"
                     >
-                      <button className="text-black">
+                      <button className="text-black" onClick={(e) => { e.stopPropagation(); /* Add filter logic if needed */ }}>
                         <SlidersHorizontal size={28} />
                       </button>
                       
@@ -2489,7 +2783,7 @@ export default function App() {
                         </span>
                       </div>
 
-                      <button onClick={() => setIsBottomMenuOpen(true)} className="text-black">
+                      <button className="text-black">
                         <List size={28} />
                       </button>
                     </motion.div>
@@ -2543,13 +2837,19 @@ export default function App() {
               )}
 
               {/* Last Trip Card Overlay */}
-              {!user.isOnline && lastTrip && (
-                <div className="absolute top-24 left-4 right-4 z-[60] flex justify-center">
+              {!user.isOnline && lastTrip && showLastTripCard && (
+                <div className="absolute bottom-32 left-4 right-4 z-[60] flex justify-center">
                   <motion.div 
-                    initial={{ y: -100, opacity: 0 }}
+                    initial={{ y: 100, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-gray-100 flex flex-col items-center"
+                    className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-gray-100 flex flex-col items-center relative"
                   >
+                    <button 
+                      onClick={() => setShowLastTripCard(false)}
+                      className="absolute top-4 right-4 p-1 bg-gray-100 rounded-full text-gray-400 hover:text-black transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
                     <div className="flex justify-between w-full items-center mb-4">
                       <Eye size={20} className="text-gray-300" />
                       <div className="flex flex-col items-center">
@@ -2564,7 +2864,10 @@ export default function App() {
                       <span className="text-xs font-bold text-gray-400">{lastTrip.type}</span>
                     </div>
 
-                    <button className="text-blue-600 font-black text-xs uppercase tracking-widest">
+                    <button 
+                      onClick={() => { setCurrentScreen('earnings'); setShowLastTripCard(false); }}
+                      className="text-blue-600 font-black text-xs uppercase tracking-widest"
+                    >
                       See all trips
                     </button>
                   </motion.div>
@@ -2626,7 +2929,7 @@ export default function App() {
                                 <span className="text-xl font-black tracking-widest relative z-10 text-white">{(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'LOCKED' : 'GO'}</span>
                               </motion.button>
 
-                              <button className="flex flex-col items-center gap-2">
+                              <button onClick={() => setIsSearchOpen(true)} className="flex flex-col items-center gap-2">
                                 <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Search size={24} /></div>
                                 <span className="text-xs font-bold">Search</span>
                               </button>
@@ -2651,18 +2954,18 @@ export default function App() {
                               <div className="flex flex-col items-center gap-2">
                                 <div className="relative">
                                   <motion.div 
-                                    animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
+                                    animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.1, 0.4] }}
                                     transition={{ duration: 2, repeat: Infinity }}
                                     className="absolute inset-0 bg-blue-500 rounded-full"
                                   />
-                                  <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg relative z-10">
-                                    <Navigation size={32} className="animate-pulse" />
+                                  <div className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg relative z-10">
+                                    <Navigation size={28} className="animate-pulse" />
                                   </div>
                                 </div>
-                                <span className="text-sm font-black text-blue-600">FINDING TRIPS</span>
+                                <span className="text-[10px] font-black text-blue-600 tracking-widest uppercase">Finding trips</span>
                               </div>
 
-                              <button className="flex flex-col items-center gap-2">
+                              <button onClick={() => setIsSearchOpen(true)} className="flex flex-col items-center gap-2">
                                 <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Search size={24} /></div>
                                 <span className="text-xs font-bold">Search</span>
                               </button>
@@ -2692,28 +2995,30 @@ export default function App() {
 
                         {/* Common scrollable items */}
                         <div className="space-y-3">
-                          <div className={`p-4 rounded-2xl flex items-center gap-4 border ${theme === 'dark' ? 'bg-blue-500/10 border-blue-500/20' : 'bg-blue-50 border-blue-100'}`}>
+                          <div 
+                            onClick={() => setIsSafetyToolkitOpen(true)}
+                            className={`p-4 rounded-2xl flex items-center gap-4 border cursor-pointer active:scale-95 transition-transform ${theme === 'dark' ? 'bg-blue-500/10 border-blue-500/20' : 'bg-blue-50 border-blue-100'}`}
+                          >
                             <div className="p-2 bg-blue-600 text-white rounded-lg"><ShieldCheck size={20} /></div>
                             <div>
                               <p className="text-sm font-black">Safety Toolkit</p>
                               <p className={`text-[10px] font-bold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>Access emergency tools</p>
                             </div>
                           </div>
-                          <div className={`p-4 rounded-2xl flex items-center gap-4 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
-                            <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}><Gift size={20} /></div>
+                          <div 
+                            onClick={() => { setIsInboxOpen(true); setIsBottomMenuOpen(false); setCurrentScreen('inbox'); }}
+                            className={`p-4 rounded-2xl flex items-center gap-4 cursor-pointer active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}
+                          >
+                            <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}><Mail size={20} /></div>
                             <div>
-                              <p className="text-sm font-black">Promotions</p>
-                              <p className="text-[10px] text-gray-400 font-bold">Earn extra £2.00 per trip</p>
+                              <p className="text-sm font-black">Inbox</p>
+                              <p className="text-[10px] text-gray-400 font-bold">Check your notifications</p>
                             </div>
                           </div>
-                          <div className={`p-4 rounded-2xl flex items-center gap-4 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
-                            <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}><Star size={20} /></div>
-                            <div>
-                              <p className="text-sm font-black">Uber Pro</p>
-                              <p className="text-[10px] text-gray-400 font-bold">Gold status active</p>
-                            </div>
-                          </div>
-                          <div className={`p-4 rounded-2xl flex items-center gap-4 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
+                          <div 
+                            onClick={() => { setCurrentScreen('earnings'); setIsBottomMenuOpen(false); }}
+                            className={`p-4 rounded-2xl flex items-center gap-4 cursor-pointer active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}
+                          >
                             <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}><TrendingUp size={20} /></div>
                             <div>
                               <p className="text-sm font-black">Earnings Trend</p>
@@ -2730,92 +3035,6 @@ export default function App() {
               {/* Bottom Cards */}
               <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
                 <AnimatePresence>
-                  {user.isOnline && activeOrders.length === 0 && (
-                    <motion.div 
-                      initial={{ y: 200 }} 
-                      animate={{ y: 0 }} 
-                      exit={{ y: 200 }} 
-                      className="bg-white text-black rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.3)] flex flex-col max-h-[45vh] overflow-hidden"
-                    >
-                      <div className="flex flex-col items-center pt-4 pb-2">
-                        <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-4" />
-                      </div>
-                      
-                      <div className="overflow-y-auto px-6 pb-8 custom-scrollbar">
-                        <div className="flex justify-between w-full mb-6 px-4">
-                          <button onClick={() => setIsSideMenuOpen(true)} className="flex flex-col items-center gap-2">
-                            <div className="p-4 bg-gray-100 rounded-full"><Menu size={24} /></div>
-                            <span className="text-xs font-bold">Menu</span>
-                          </button>
-                          
-                          <div className="flex flex-col items-center gap-2">
-                            <div className="relative">
-                              <motion.div 
-                                animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
-                                transition={{ duration: 2, repeat: Infinity }}
-                                className="absolute inset-0 bg-blue-500 rounded-full"
-                              />
-                              <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg relative z-10">
-                                <Navigation size={32} className="animate-pulse" />
-                              </div>
-                            </div>
-                            <span className="text-sm font-black text-blue-600">FINDING TRIPS</span>
-                          </div>
-
-                          <button className="flex flex-col items-center gap-2">
-                            <div className="p-4 bg-gray-100 rounded-full"><Search size={24} /></div>
-                            <span className="text-xs font-bold">Search</span>
-                          </button>
-                        </div>
-
-                        <div className={`w-full p-4 rounded-2xl flex items-center justify-between mb-4 border ${theme === 'dark' ? 'bg-blue-500/10 border-blue-500/20' : 'bg-blue-50 border-blue-100'}`}>
-                          <div className="flex items-center gap-3">
-                            <motion.div 
-                              animate={{ scale: [1, 1.2, 1] }}
-                              transition={{ duration: 1, repeat: Infinity }}
-                              className="w-2 h-2 bg-blue-500 rounded-full" 
-                            />
-                            <span className={`font-black text-sm ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>Finding trips in {currentCity}...</span>
-                          </div>
-                          <button 
-                            onClick={() => setUser(u => ({ ...u, isOnline: false, faceVerified: false }))} 
-                            className={`text-xs font-black uppercase tracking-wider ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}
-                          >
-                            OFFLINE
-                          </button>
-                        </div>
-
-                        <div className="h-1 w-full bg-gray-100 rounded-full overflow-hidden mb-6">
-                          <motion.div animate={{ x: ['-100%', '100%'] }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }} className="h-full w-1/3 bg-blue-500" />
-                        </div>
-
-                        {/* Extra scrollable items */}
-                        <div className="space-y-3">
-                          <div className="p-4 bg-gray-50 rounded-2xl flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><TrendingUp size={20} /></div>
-                              <div>
-                                <p className="text-sm font-black">Earnings Trend</p>
-                                <p className="text-[10px] text-gray-400 font-bold">Busy area nearby</p>
-                              </div>
-                            </div>
-                            <ArrowRight size={16} className="text-gray-300" />
-                          </div>
-                          <div className="p-4 bg-gray-50 rounded-2xl flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className="p-2 bg-green-100 text-green-600 rounded-lg"><Star size={20} /></div>
-                              <div>
-                                <p className="text-sm font-black">Uber Pro</p>
-                                <p className="text-[10px] text-gray-400 font-bold">Gold status active</p>
-                              </div>
-                            </div>
-                            <ArrowRight size={16} className="text-gray-300" />
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-
                   {activeOrders.map((order, idx) => (
                     <motion.div 
                       key={order.id} 
@@ -2903,17 +3122,41 @@ export default function App() {
                         <X size={32} strokeWidth={3} />
                       </div>
                       <h2 className="text-2xl font-black text-center mb-2">Cancel Trip?</h2>
-                      <p className="text-center text-gray-400 font-bold mb-8">Cancelling may affect your Gold status and points.</p>
+                      <p className="text-center text-gray-400 font-bold mb-6">Select a reason for cancelling this trip.</p>
+                      
+                      <div className="space-y-2 mb-8 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                        {['Customer unavailable', 'Restaurant delay', 'Vehicle trouble', 'Safety concern', 'Other'].map(reason => (
+                          <button
+                            key={reason}
+                            onClick={() => setSelectedCancelReason(reason)}
+                            className={`w-full p-3 rounded-xl text-left font-bold transition-all ${
+                              selectedCancelReason === reason 
+                                ? 'bg-red-600 text-white' 
+                                : theme === 'dark' ? 'bg-white/5 text-gray-300' : 'bg-gray-50 text-gray-600'
+                            }`}
+                          >
+                            {reason}
+                          </button>
+                        ))}
+                      </div>
                       
                       <div className="space-y-3">
                         <button 
-                          onClick={() => handleCancelOrder(cancellingOrderId)}
-                          className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-lg active:scale-95 transition-transform"
+                          disabled={!selectedCancelReason}
+                          onClick={() => handleCancelOrder(cancellingOrderId, selectedCancelReason!)}
+                          className={`w-full py-4 rounded-2xl font-black text-lg transition-all ${
+                            selectedCancelReason 
+                              ? 'bg-red-600 text-white active:scale-95' 
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
                         >
-                          YES, CANCEL
+                          CONFIRM CANCELLATION
                         </button>
                         <button 
-                          onClick={() => setCancellingOrderId(null)}
+                          onClick={() => {
+                            setCancellingOrderId(null);
+                            setSelectedCancelReason(null);
+                          }}
                           className={`w-full py-4 rounded-2xl font-black text-lg active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white/5 text-white' : 'bg-gray-100 text-black'}`}
                         >
                           KEEP TRIP
@@ -3071,31 +3314,47 @@ export default function App() {
           {currentScreen === 'uber_pro' && (
             <motion.div key="pro" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto">
               <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
+                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform"><X size={24} /></button>
                 <h1 className="text-3xl font-black">Uber Pro</h1>
               </div>
-              <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-3xl p-8 text-white mb-8">
-                <p className="text-sm font-bold opacity-60 mb-2 uppercase tracking-widest">{user.tier} Tier</p>
-                <h2 className="text-4xl font-black mb-6">{user.points} Points</h2>
-                <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden mb-4">
-                  <div className="h-full bg-white" style={{ width: `${(user.points / 500) * 100}%` }} />
+              <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-[40px] p-8 text-white mb-8 relative overflow-hidden shadow-2xl shadow-blue-600/30">
+                <div className="relative z-10">
+                  <p className="text-xs font-black opacity-60 mb-2 uppercase tracking-[0.2em]">{userTier} Tier</p>
+                  <h2 className="text-5xl font-black mb-6">{user.points} <span className="text-xl opacity-60">pts</span></h2>
+                  <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden mb-4">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${userTier === 'Diamond' ? 100 : (user.points % 500) / 5}%` }}
+                      className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]"
+                    />
+                  </div>
+                  <p className="text-sm font-bold opacity-80">
+                    {userTier === 'Diamond' ? 'You have reached the highest tier!' : `${500 - (user.points % 500)} points to next tier`}
+                  </p>
                 </div>
-                <p className="text-sm font-bold opacity-80">380 points to Gold</p>
+                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 blur-3xl rounded-full" />
               </div>
               <div className="space-y-6">
-                <h3 className="font-black text-xl">Your Rewards</h3>
+                <h3 className="font-black text-2xl tracking-tight">Your Rewards</h3>
                 {[
-                  { title: "Fuel Discount", desc: "Save 3p/litre at BP", icon: <Zap /> },
-                  { title: "Free Coffee", desc: "Weekly Costa reward", icon: <Coffee /> },
-                  { title: "Priority Support", desc: "Fast-track help", icon: <HelpCircle /> },
+                  { title: "Fuel Discount", desc: "Save 3p/litre at BP", icon: <Zap />, color: 'bg-orange-500' },
+                  { title: "Free Coffee", desc: "Weekly Costa reward", icon: <Coffee />, color: 'bg-blue-500' },
+                  { title: "Priority Support", desc: "Fast-track help", icon: <HelpCircle />, color: 'bg-green-500' },
+                  { title: "Tuition Coverage", desc: "100% tuition coverage", icon: <ShieldCheck />, color: 'bg-purple-500' },
                 ].map((reward, i) => (
-                  <div key={i} className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl">
-                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-sm">{reward.icon}</div>
+                  <motion.div 
+                    key={i} 
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                    className="flex items-center gap-4 p-6 bg-gray-50 rounded-[30px] border border-gray-100 shadow-sm"
+                  >
+                    <div className={`w-14 h-14 ${reward.color} rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0`}>{reward.icon}</div>
                     <div>
-                      <p className="font-black">{reward.title}</p>
+                      <p className="font-black text-lg leading-tight">{reward.title}</p>
                       <p className="text-sm text-gray-400 font-bold">{reward.desc}</p>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </motion.div>
@@ -3217,21 +3476,37 @@ export default function App() {
           {currentScreen === 'inbox' && (
             <motion.div key="inbox" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
               <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
+                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform"><X size={24} /></button>
                 <h1 className="text-3xl font-black">Inbox</h1>
               </div>
               <div className="space-y-4">
                 {notifications.length === 0 ? (
-                  <div className="text-center py-20 text-gray-400 font-bold">No new messages</div>
+                  <div className="flex flex-col items-center justify-center py-32 text-gray-400">
+                    <Mail size={64} className="mb-4 opacity-10" />
+                    <p className="font-black text-xl">No new messages</p>
+                    <p className="text-sm font-bold opacity-60">Check back later for updates</p>
+                  </div>
                 ) : (
                   notifications.map((note, i) => (
-                    <div key={i} className="p-4 border-b border-gray-100 flex gap-4">
-                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 shrink-0"><Bell size={24} /></div>
-                      <div>
-                        <p className="font-bold">{note}</p>
-                        <p className="text-xs text-gray-400 font-bold mt-1">Just now</p>
+                    <motion.div 
+                      key={i} 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      className="p-6 bg-gray-50 rounded-[30px] border border-gray-100 flex gap-4 shadow-sm"
+                    >
+                      <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-blue-600/20">
+                        <Bell size={24} />
                       </div>
-                    </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-2 h-2 bg-blue-600 rounded-full" />
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">System Update</p>
+                        </div>
+                        <p className="font-black text-lg leading-tight mb-2">{note}</p>
+                        <p className="text-xs text-gray-400 font-bold">Just now • Uber Eats Driver</p>
+                      </div>
+                    </motion.div>
                   ))
                 )}
               </div>
@@ -3356,7 +3631,7 @@ export default function App() {
                   <img src={user.profilePic || "https://picsum.photos/seed/driver/200/200"} alt="Me" className="w-full h-full object-cover" />
                 </div>
                 <h2 className="text-2xl font-black">{user.name}</h2>
-                <p className="text-sm font-bold text-gray-400">London • Gold Partner</p>
+                <p className="text-sm font-bold text-gray-400">{currentCity} • {userTier} Partner</p>
               </div>
               <div className="space-y-2">
                 {[
@@ -3443,6 +3718,47 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Trip Preferences Section */}
+                <div className={`p-6 rounded-3xl mt-6 border-2 ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
+                  <h3 className="font-black text-lg mb-4 flex items-center gap-2">
+                    <SlidersHorizontal size={20} className="text-blue-600" />
+                    Trip Preferences
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    {[
+                      { id: 'both', label: 'All Jobs', desc: 'Normal & Matching' },
+                      { id: 'normal', label: 'Normal Only', desc: 'No stacked orders' },
+                      { id: 'matching', label: 'Matching Only', desc: 'Only stacked orders' }
+                    ].map((pref) => (
+                      <button
+                        key={pref.id}
+                        onClick={() => {
+                          setJobTypePreference(pref.id as any);
+                          sendNotification("Preference Updated", `Now receiving ${pref.label}`);
+                        }}
+                        className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-left ${
+                          jobTypePreference === pref.id 
+                            ? 'border-blue-600 bg-blue-600/5 text-blue-600' 
+                            : 'border-transparent bg-white/5 text-gray-400'
+                        }`}
+                      >
+                        <div>
+                          <p className="font-black text-sm">{pref.label}</p>
+                          <p className="text-[10px] font-bold opacity-60">{pref.desc}</p>
+                        </div>
+                        {jobTypePreference === pref.id && (
+                          <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white">
+                            <Check size={14} />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-4 text-[10px] font-bold text-gray-400 text-center uppercase tracking-widest">
+                    Limit: Max 3 active deliveries
+                  </p>
+                </div>
+
                 <button 
                   onClick={() => {
                     localStorage.clear();
@@ -3482,10 +3798,39 @@ export default function App() {
               </div>
 
               <div className={`${theme === 'dark' ? 'bg-white/5' : 'bg-black text-white'} rounded-3xl p-8 mb-8 relative overflow-hidden`}>
-                <p className="text-sm font-bold opacity-60 mb-2 uppercase tracking-widest">
-                  {earningsTab === 'today' ? 'Today' : earningsTab === 'weekly' ? 'This Week' : 'Total Earnings'}
-                </p>
+                <div className="flex justify-between items-start mb-2">
+                  <p className="text-sm font-bold opacity-60 uppercase tracking-widest">
+                    {earningsTab === 'today' ? 'Today' : earningsTab === 'weekly' ? 'This Week' : 'Total Earnings'}
+                  </p>
+                  <button 
+                    onClick={() => {
+                      const newGoal = prompt("Set your daily earnings goal:", earningsGoal.toString());
+                      if (newGoal && !isNaN(parseFloat(newGoal))) {
+                        setEarningsGoal(parseFloat(newGoal));
+                      }
+                    }}
+                    className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors"
+                  >
+                    <Target size={16} />
+                  </button>
+                </div>
                 <h2 className="text-5xl font-black mb-6">£{(earningsTab === 'today' ? earnings * 0.15 : earnings).toFixed(2)}</h2>
+                
+                {/* Goal Progress in Earnings Screen */}
+                <div className="mb-6">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2 opacity-60">
+                    <span>Daily Goal Progress</span>
+                    <span>{Math.min(100, Math.round((earnings / earningsGoal) * 100))}%</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(100, (earnings / earningsGoal) * 100)}%` }}
+                      className={`h-full rounded-full ${earnings >= earningsGoal ? 'bg-green-500' : 'bg-blue-500'}`}
+                    />
+                  </div>
+                </div>
+
                 <div className="flex gap-4">
                   <div className="flex-1 bg-white/10 p-4 rounded-2xl">
                     <p className="text-[10px] font-bold opacity-60 uppercase mb-1">Trips</p>
