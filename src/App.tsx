@@ -60,7 +60,8 @@ import {
   List,
   Shield,
   Target,
-  ArrowUp
+  ArrowUp,
+  Delete
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Location, Order, AppScreen, ChatMessage, UserProfile, UberProTier, ScheduledOrder } from './types';
@@ -1497,6 +1498,9 @@ export default function App() {
           delete next[order.id];
           return next;
         });
+      } else if (enteredPin.length === 4) {
+        sendNotification("Invalid PIN", "The PIN you entered is incorrect. Please try again.");
+        setEnteredPin("");
       }
     };
 
@@ -1505,7 +1509,7 @@ export default function App() {
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
-        className="absolute inset-0 z-[200] bg-white text-black p-6 flex flex-col"
+        className="absolute inset-0 z-[4000] bg-white text-black p-6 flex flex-col"
       >
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-black">Verify Delivery</h2>
@@ -1514,54 +1518,88 @@ export default function App() {
           </button>
         </div>
 
-        <div className="flex-1 space-y-8">
-          <div className="p-6 bg-gray-50 rounded-3xl">
-            <h3 className="font-bold text-lg mb-2">Customer: {order.customerName}</h3>
-            <p className="text-sm text-gray-500 mb-4">Ask the customer for their 4-digit PIN or take a photo of the delivery.</p>
+        <div className="flex-1 space-y-6 overflow-y-auto custom-scrollbar">
+          <div className="p-6 bg-gray-50 rounded-3xl text-center">
+            <h3 className="font-black text-xl mb-2">Order for {order.customerName}</h3>
+            <p className="text-sm text-gray-500 mb-6">Enter the 4-digit PIN from the customer's app to confirm delivery.</p>
             
-            <div className="flex gap-2 justify-center mb-6">
+            <div className="flex gap-3 justify-center mb-8">
               {[0, 1, 2, 3].map(i => (
-                <div key={i} className={`w-12 h-16 rounded-xl border-2 flex items-center justify-center text-2xl font-black ${enteredPin[i] ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                <div key={i} className={`w-14 h-20 rounded-2xl border-4 flex items-center justify-center text-3xl font-black transition-all ${enteredPin[i] ? 'border-black bg-white scale-105 shadow-lg' : 'border-gray-200 bg-gray-100'}`}>
                   {enteredPin[i] || ""}
                 </div>
               ))}
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, "C", 0, "OK"].map(val => (
+            <div className="grid grid-cols-3 gap-3 max-w-[280px] mx-auto">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, "C", 0].map(val => (
                 <button 
                   key={val}
                   onClick={() => {
                     if (val === "C") setEnteredPin("");
-                    else if (val === "OK") handleComplete();
-                    else if (enteredPin.length < 4) setEnteredPin(prev => prev + val);
+                    else if (enteredPin.length < 4) {
+                      const newPin = enteredPin + val;
+                      setEnteredPin(newPin);
+                    }
                   }}
-                  className="h-16 bg-white rounded-xl font-black text-xl shadow-sm active:scale-95 transition-transform"
+                  className="h-16 bg-white rounded-2xl font-black text-2xl shadow-sm active:scale-90 transition-transform border border-gray-100"
                 >
                   {val}
                 </button>
               ))}
+              <div className="flex items-center justify-center">
+                <button 
+                  onClick={() => setEnteredPin(prev => prev.slice(0, -1))}
+                  className="h-16 w-full bg-gray-100 rounded-2xl flex items-center justify-center active:scale-90 transition-transform"
+                >
+                  <Delete size={24} />
+                </button>
+              </div>
             </div>
+            {enteredPin.length === 4 && (
+              <motion.button 
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                onClick={handleComplete}
+                className="w-full mt-4 py-4 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-lg active:scale-95 transition-transform"
+              >
+                OK
+              </motion.button>
+            )}
           </div>
 
-          <div className="relative">
+          <div className="relative py-2">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-100" />
+              <div className="w-full border-t-2 border-gray-100" />
             </div>
             <div className="relative flex justify-center">
-              <span className="bg-white px-4 text-sm font-bold text-gray-400">OR</span>
+              <span className="bg-white px-6 text-xs font-black text-gray-400 uppercase tracking-widest">Or take a photo</span>
             </div>
           </div>
 
           <button 
             onClick={() => {
               setIsPhotoCaptured(true);
-              setTimeout(handleComplete, 1000);
+              sendNotification("Photo Saved", "Delivery photo has been captured.");
             }}
-            className={`w-full py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all ${isPhotoCaptured ? 'bg-green-500 text-white' : 'bg-gray-100 text-black active:scale-95'}`}
+            className={`w-full py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all ${isPhotoCaptured ? 'bg-green-100 text-green-600 border-2 border-green-500' : 'bg-gray-100 text-black active:scale-95 border-2 border-transparent'}`}
           >
-            {isPhotoCaptured ? <Check /> : <Camera />}
+            {isPhotoCaptured ? <Check size={24} strokeWidth={3} /> : <Camera size={24} />}
             {isPhotoCaptured ? 'PHOTO CAPTURED' : 'TAKE PHOTO'}
+          </button>
+        </div>
+
+        <div className="pt-6">
+          <button 
+            disabled={enteredPin.length < 4 && !isPhotoCaptured}
+            onClick={handleComplete}
+            className={`w-full py-5 rounded-2xl font-black text-xl transition-all shadow-xl ${
+              (enteredPin.length === 4 || isPhotoCaptured) 
+                ? 'bg-black text-white active:scale-95' 
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            CONFIRM DELIVERY
           </button>
         </div>
       </motion.div>
@@ -1778,7 +1816,7 @@ export default function App() {
           {currentScreen === 'documents' && (
             <motion.div key="documents" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="h-full w-full bg-white text-black p-6 flex flex-col pb-24">
               <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => setCurrentScreen('onboarding')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
+                <button onClick={() => setCurrentScreen(user.isOnline ? 'account' : 'onboarding')} className="p-2 bg-gray-100 rounded-full"><ArrowRight className="rotate-180" size={24} /></button>
                 <h1 className="text-3xl font-black">Documents</h1>
               </div>
               <p className="text-gray-400 font-bold mb-8">Tap each item to upload your documents.</p>
@@ -2779,8 +2817,15 @@ export default function App() {
                       
                       <div className="flex flex-col items-center">
                         <span className="text-2xl font-black text-black tracking-tight">
-                          Finding trips
+                          {activeOrders.length > 0 
+                            ? `${activeOrders.length} Active ${activeOrders.length === 1 ? 'Trip' : 'Trips'}`
+                            : 'Finding trips'}
                         </span>
+                        {activeOrders.length > 0 && (
+                          <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                            {activeOrders[0].status === 'accepted' ? 'Heading to pickup' : 'Heading to dropoff'}
+                          </span>
+                        )}
                       </div>
 
                       <button className="text-black">
@@ -2995,6 +3040,48 @@ export default function App() {
 
                         {/* Common scrollable items */}
                         <div className="space-y-3">
+                          {/* Active Orders in Menu */}
+                          {activeOrders.length > 0 && (
+                            <div className="space-y-2 mb-6">
+                              <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Active Deliveries</p>
+                              {activeOrders.map((order, idx) => (
+                                <motion.div 
+                                  key={order.id} 
+                                  initial={{ x: -20, opacity: 0 }} 
+                                  animate={{ x: 0, opacity: 1 }} 
+                                  transition={{ delay: idx * 0.1 }}
+                                  className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-gray-100 shadow-sm'}`}
+                                  onClick={() => {
+                                    setViewingOrderDetailsId(order.id);
+                                    setIsBottomMenuOpen(false);
+                                  }}
+                                >
+                                  <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-black">
+                                      {idx + 1}
+                                    </div>
+                                    <div>
+                                      <p className="text-sm font-black leading-tight">
+                                        {order.status === 'accepted' ? order.restaurantName : order.customerName}
+                                      </p>
+                                      <p className="text-[10px] font-bold text-gray-400">
+                                        {order.status === 'accepted' ? 'Pickup' : 'Dropoff'} • {distanceToTarget(order)} mi
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                    <button 
+                                      onClick={() => handleNextStep(order.id)}
+                                      className={`w-10 h-10 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}
+                                    >
+                                      <ArrowRight size={20} />
+                                    </button>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </div>
+                          )}
+
                           <div 
                             onClick={() => setIsSafetyToolkitOpen(true)}
                             className={`p-4 rounded-2xl flex items-center gap-4 border cursor-pointer active:scale-95 transition-transform ${theme === 'dark' ? 'bg-blue-500/10 border-blue-500/20' : 'bg-blue-50 border-blue-100'}`}
@@ -3033,14 +3120,15 @@ export default function App() {
               </AnimatePresence>
 
               {/* Bottom Cards */}
-              <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
+              <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2 pointer-events-none">
                 <AnimatePresence>
                   {activeOrders.map((order, idx) => (
                     <motion.div 
                       key={order.id} 
                       initial={{ y: 100 }} 
                       animate={{ y: 0 }} 
-                      className="bg-white text-black rounded-xl shadow-xl overflow-hidden mb-2 cursor-pointer active:scale-[0.98] transition-transform"
+                      exit={{ y: 100 }}
+                      className="bg-white text-black rounded-xl shadow-xl overflow-hidden mb-2 cursor-pointer active:scale-[0.98] transition-transform pointer-events-auto"
                       onClick={() => setViewingOrderDetailsId(order.id)}
                     >
                       <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-blue-50">
@@ -3311,6 +3399,53 @@ export default function App() {
             </motion.div>
           )}
 
+          {currentScreen === 'trip_preferences' && (
+            <motion.div key="trip_preferences" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
+              <div className="flex items-center gap-4 mb-8">
+                <button onClick={() => setCurrentScreen('account')} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={24} /></button>
+                <h1 className="text-3xl font-black">Trip Preferences</h1>
+              </div>
+              
+              <div className="space-y-6">
+                <div className={`p-6 rounded-[32px] border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}>
+                  <h3 className="font-black text-xl mb-4">Job Types</h3>
+                  <div className="space-y-3">
+                    {[
+                      { id: 'both', label: 'All Jobs', desc: 'Matching & Normal deliveries' },
+                      { id: 'matching', label: 'Matching Only', desc: 'Only high-value matching jobs' },
+                      { id: 'normal', label: 'Normal Only', desc: 'Standard delivery requests' }
+                    ].map(pref => (
+                      <button
+                        key={pref.id}
+                        onClick={() => {
+                          setJobTypePreference(pref.id as any);
+                          localStorage.setItem('jobTypePreference', pref.id);
+                          sendNotification("Preferences Updated", `Now receiving ${pref.label}`);
+                        }}
+                        className={`w-full p-4 rounded-2xl text-left transition-all border-2 ${
+                          jobTypePreference === pref.id 
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-[1.02]' 
+                            : theme === 'dark' ? 'bg-white/5 border-transparent text-gray-400' : 'bg-white border-transparent text-gray-600'
+                        }`}
+                      >
+                        <p className="font-black text-lg">{pref.label}</p>
+                        <p className={`text-xs font-bold ${jobTypePreference === pref.id ? 'text-blue-100' : 'text-gray-400'}`}>{pref.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={`p-6 rounded-[32px] border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}>
+                  <h3 className="font-black text-xl mb-2">Delivery Limit</h3>
+                  <p className="text-sm text-gray-400 font-bold mb-4">Maximum active deliveries at one time.</p>
+                  <div className="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm">
+                    <span className="font-black text-blue-900">Current Limit</span>
+                    <span className="text-2xl font-black text-blue-600">3</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
           {currentScreen === 'uber_pro' && (
             <motion.div key="pro" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto">
               <div className="flex items-center gap-4 mb-8">
@@ -3639,6 +3774,7 @@ export default function App() {
                   { icon: <FileText />, label: "Documents", action: () => setCurrentScreen('documents') },
                   { icon: <CreditCard />, label: "Payment", action: () => setCurrentScreen('earnings') },
                   { icon: <Settings />, label: "App Settings", action: () => sendNotification("Settings", "Settings updated.") },
+                  { icon: <SlidersHorizontal />, label: "Trip Preferences", action: () => setCurrentScreen('trip_preferences') },
                   { icon: <ShieldAlert />, label: "Simulate Bug Scan", action: () => {
                     setIsScanning(true);
                     setTimeout(() => {
