@@ -33,6 +33,37 @@
         "estimatedPay": { "type": "number", "description": "Estimated earnings" }
       },
       "required": ["driverUid", "restaurantName", "scheduledTime"]
+    },
+    "CarPlaySync": {
+      "title": "CarPlay Sync",
+      "description": "Synchronizes state between phone and CarPlay display.",
+      "type": "object",
+      "properties": {
+        "driverUid": { "type": "string", "description": "UID of the driver" },
+        "isActive": { "type": "boolean", "description": "Whether CarPlay is active" },
+        "activeOrderId": { "type": "string", "description": "ID of the currently active order" },
+        "isNavigating": { "type": "boolean", "description": "Whether navigation is active" },
+        "lastUpdated": { "type": "string", "format": "date-time", "description": "Timestamp of last sync" }
+      },
+      "required": ["driverUid", "isActive"]
+    },
+    "ActiveOrder": {
+      "title": "Active Order",
+      "description": "An order currently being handled by the driver.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "driverUid": { "type": "string" },
+        "restaurantName": { "type": "string" },
+        "customerName": { "type": "string" },
+        "status": { "type": "string", "enum": ["accepted", "picked_up", "arrived", "completed"] },
+        "estimatedPay": { "type": "number" },
+        "items": { "type": "array", "items": { "type": "string" } },
+        "pin": { "type": "string" },
+        "estimatedTime": { "type": "number" },
+        "estimatedDistance": { "type": "number" }
+      },
+      "required": ["id", "driverUid", "restaurantName", "status"]
     }
   },
   "firestore": {
@@ -43,6 +74,14 @@
     "scheduled_orders": {
       "schema": "ScheduledOrder",
       "description": "Collection of scheduled orders"
+    },
+    "carplay_sync": {
+      "schema": "CarPlaySync",
+      "description": "Real-time synchronization for CarPlay"
+    },
+    "active_orders": {
+      "schema": "ActiveOrder",
+      "description": "Real-time tracking of active deliveries"
     }
   }
 }

@@ -47,7 +47,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
          (request.auth.token.email == "hassennabeel9@gmail.com" && request.auth.token.email_verified == true));
     }
 
@@ -56,10 +57,12 @@ service cloud.firestore {
     }
 
     function isValidUser(data) {
-      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             (data.faceSignature is string || !('faceSignature' in data)) &&
-             data.deliveries is number && data.deliveries >= 0 &&
-             data.walletBalance is number && data.walletBalance >= 0;
+      // For updates/merges, we check fields if they are present
+      // For creates, we ensure core fields exist
+      return (data.name is string && data.name.size() > 0 && data.name.size() < 100) &&
+             (!('faceSignature' in data) || data.faceSignature is string) &&
+             (!('deliveries' in data) || (data.deliveries is number && data.deliveries >= 0)) &&
+             (!('walletBalance' in data) || (data.walletBalance is number && data.walletBalance >= 0));
     }
 
     function isValidScheduledOrder(data) {
@@ -74,10 +77,8 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      // Allow users to read their own profile
-      // Also allow reading other profiles for face search (limited fields would be better but for now we'll allow read if authenticated)
-      // Actually, searching by faceSignature requires a query.
-      allow read: if isAuthenticated();
+      // Allow anyone to read profiles for face recognition search
+      allow read: if true;
       
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data);
       
@@ -94,6 +95,16 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (resource.data.driverUid == request.auth.uid || isAdmin()) && isValidScheduledOrder(request.resource.data);
       
       allow delete: if isAuthenticated() && (resource.data.driverUid == request.auth.uid || isAdmin());
+    }
+
+    match /carplay_sync/{userId} {
+      allow read: if isAuthenticated() && isOwner(userId);
+      allow write: if isAuthenticated() && isOwner(userId);
+    }
+
+    match /active_orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.driverUid == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated() && (request.resource.data.driverUid == request.auth.uid || isAdmin());
     }
   }
 }

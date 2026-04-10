@@ -1,5 +1,5 @@
 {
   "name": "Uber Eats Driver Simulation",
   "description": "A high-fidelity simulation of the Uber Eats driver app for testing the delivery experience.",
-  "requestFramePermissions": ["geolocation", "camera", "notifications"]
+  "requestFramePermissions": ["geolocation", "camera", "notifications", "screen-wake-lock"]
 }
