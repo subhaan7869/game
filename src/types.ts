@@ -16,6 +16,7 @@ export interface Order {
   items: string[];
   pin?: string;
   isMatching?: boolean;
+  surge?: number;
 }
 
 export interface ChatMessage {
@@ -30,7 +31,7 @@ export interface ScheduledOrder {
   id: string;
   driverUid: string;
   restaurantName: string;
-  scheduledTime: string;
+  scheduledTime: any; // Can be Timestamp or string
   status: 'pending' | 'active' | 'completed';
   estimatedPay: number;
 }

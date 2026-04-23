@@ -23,6 +23,10 @@ service cloud.firestore {
         (request.auth.token.email == "hassennabeel9@gmail.com" && request.auth.token.email_verified == true);
     }
 
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
     function incoming() {
       return request.resource.data;
     }
@@ -45,14 +49,17 @@ service cloud.firestore {
              (!('email' in data) || (data.email is string && data.email.size() < 100)) &&
              (!('deliveries' in data) || (data.deliveries is number && data.deliveries >= 0)) &&
              (!('walletBalance' in data) || (data.walletBalance is number && data.walletBalance >= 0)) &&
-             (!('role' in data) || data.role == 'driver');
+             (!('role' in data) || data.role == 'driver'); // Prevent self-assigning admin
     }
 
     function isValidScheduledOrder(data) {
       return data.driverUid is string && data.driverUid == request.auth.uid &&
              data.restaurantName is string && data.restaurantName.size() > 0 && 
              data.restaurantName.size() < 200 &&
-             (data.scheduledTime is timestamp || (data.scheduledTime is string && data.scheduledTime.size() < 50)) &&
+             // Handle both native timestamp and ISO string if necessary, 
+             // but app sends ISO string. For 'is timestamp' check, we prefer native.
+             // However, for string validation:
+             data.scheduledTime is string && data.scheduledTime.size() < 50 &&
              data.status in ['pending', 'active', 'completed'];
     }
 

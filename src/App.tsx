@@ -32,6 +32,7 @@ import {
   MessageSquare,
   LogOut,
   Plus,
+  Minus,
   HelpCircle,
   Briefcase,
   Gift,
@@ -192,13 +193,15 @@ const OrderDetailsModal = ({
   theme, 
   onClose, 
   onNextStep, 
-  getArrivalTime 
+  getArrivalTime,
+  onOpenChat
 }: { 
   order: Order, 
   theme: string, 
   onClose: () => void, 
   onNextStep: (id: string) => void,
-  getArrivalTime: (mins: number) => string
+  getArrivalTime: (mins: number) => string,
+  onOpenChat: (id: string) => void
 }) => {
   return (
     <motion.div 
@@ -223,6 +226,12 @@ const OrderDetailsModal = ({
           <div className="text-right">
             <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Distance</p>
             <h3 className="text-2xl font-black">{order.estimatedDistance.toFixed(1)} mi</h3>
+            {order.pin && (
+              <div className="flex items-center gap-1 mt-2 text-green-500 font-black text-[10px] uppercase tracking-widest justify-end">
+                <ShieldCheck size={12} />
+                PIN Required
+              </div>
+            )}
           </div>
         </div>
 
@@ -249,10 +258,16 @@ const OrderDetailsModal = ({
         </div>
       </div>
 
-      <div className="p-6 border-t border-white/5">
+      <div className="p-6 border-t border-white/5 flex gap-4">
+        <button 
+          onClick={() => onOpenChat(order.id)}
+          className={`p-5 rounded-2xl flex items-center justify-center active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white/10 text-white' : 'bg-gray-100 text-black'}`}
+        >
+          <MessageSquare size={24} />
+        </button>
         <button 
           onClick={() => onNextStep(order.id)}
-          className="w-full py-5 bg-black text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform"
+          className="flex-1 py-5 bg-black text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform"
         >
           {order.status === 'accepted' ? 'START PICKUP' : 'START DROPOFF'}
         </button>
@@ -401,7 +416,7 @@ const ScheduledOrdersScreen = ({
       await addDoc(collection(db, 'scheduled_orders'), {
         driverUid: firebaseUser.uid,
         restaurantName: newOrder.restaurantName,
-        scheduledTime: new Date(newOrder.time).toISOString(),
+        scheduledTime: serverTimestamp(), // Use native timestamp for better sorting/rules
         status: 'pending',
         estimatedPay: 10 + Math.random() * 15
       });
@@ -433,7 +448,11 @@ const ScheduledOrdersScreen = ({
             <div key={order.id} className="p-6 bg-gray-50 rounded-[32px] border border-gray-100 flex justify-between items-center">
               <div>
                 <h3 className="font-black text-lg">{order.restaurantName}</h3>
-                <p className="text-sm text-gray-500 font-bold">{new Date(order.scheduledTime).toLocaleString()}</p>
+                <p className="text-sm text-gray-500 font-bold">
+                  {order.scheduledTime?.toDate 
+                    ? order.scheduledTime.toDate().toLocaleString() 
+                    : new Date(order.scheduledTime).toLocaleString()}
+                </p>
                 <div className="mt-2 inline-block px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-[10px] font-black uppercase">
                   {order.status}
                 </div>
@@ -1118,6 +1137,12 @@ export default function App() {
   // Location & Orders
   const [location, setLocation] = useState<Location | null>({ latitude: 51.5074, longitude: -0.1278 }); // Default to London
   const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const MAP_SCALE = 50000 * zoom;
+  const LABEL_SCALE = 10000 * zoom;
+  const BUILDING_SCALE = 6000 * zoom;
+  const PARK_SCALE = 2000 * zoom;
+
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
   const [earnings, setEarnings] = useState(() => {
@@ -1153,6 +1178,8 @@ export default function App() {
   // Chat & Notifications
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeChatOrderId, setActiveChatOrderId] = useState<string | null>(null);
+  const [chatInput, setChatInput] = useState("");
+  const [isCustomerTyping, setIsCustomerTyping] = useState(false);
   const [notifications, setNotifications] = useState<string[]>([]);
   const [verifyingDeliveryId, setVerifyingDeliveryId] = useState<string | null>(null);
   const [enteredPin, setEnteredPin] = useState("");
@@ -1179,6 +1206,19 @@ export default function App() {
   const [viewingOrderDetailsId, setViewingOrderDetailsId] = useState<string | null>(null);
   const [earningsGoal, setEarningsGoal] = useState(50.00);
   const [hotspots, setHotspots] = useState<{ latitude: number, longitude: number, intensity: number, size: number }[]>([]);
+  
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    if (currentScreen === 'chat') {
+      scrollToBottom();
+    }
+  }, [messages, currentScreen, isCustomerTyping]);
+
   const [jobTypePreference, setJobTypePreference] = useState<'normal' | 'matching' | 'both'>(() => {
     const saved = localStorage.getItem('uber_job_preference');
     return (saved as any) || 'both';
@@ -1623,6 +1663,30 @@ export default function App() {
                   setIsNavigating(false);
                 }
               }
+
+              // PIN Simulation: Customer sends PIN when driver is close to drop-off
+              if (order.status === 'picked_up' && order.pin) {
+                const distToCustomer = Math.sqrt(
+                  Math.pow(target.latitude - prev.latitude, 2) + 
+                  Math.pow(target.longitude - prev.longitude, 2)
+                ) * MILES_PER_DEGREE;
+                
+                if (distToCustomer < 0.2 && !messages.some(m => m.orderId === order.id && m.text.includes(order.pin!))) {
+                  setTimeout(() => {
+                    const text = `Hi! I'm coming to the door now. My delivery PIN is ${order.pin}. See you soon!`;
+                    setMessages(msgs => [...msgs, {
+                      id: Math.random().toString(),
+                      orderId: order.id,
+                      sender: 'customer',
+                      text,
+                      timestamp: Date.now()
+                    }]);
+                    sendNotification("Message from Customer", text);
+                    playUberSound('message');
+                  }, 1000);
+                }
+              }
+
               return prev;
             }
             
@@ -1726,7 +1790,44 @@ export default function App() {
 
   const allDocsUploaded = uploadedDocs.length === 3;
 
-  // Improved Order Matching Algorithm
+  // Surge Pricing Configuration
+  const [surgeMultiplier, setSurgeMultiplier] = useState(1.0);
+  const SURGE_AREAS = useMemo(() => [
+    { name: "Shoreditch", lat: 0.005, lng: 0.005, radius: 0.008, multiplier: 1.8 },
+    { name: "Soho", lat: -0.005, lng: -0.008, radius: 0.006, multiplier: 1.5 },
+    { name: "King's Cross", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.6 }
+  ], []);
+
+  // Update surge based on current location
+  useEffect(() => {
+    if (location) {
+      // Find the highest surge zone the driver is currently in
+      let maxSurge = 1.0;
+      
+      // Calculate local offset relative to starting point (simplification)
+      const localLat = location.latitude - 51.5074;
+      const localLng = location.longitude - (-0.1278);
+
+      SURGE_AREAS.forEach(area => {
+        const d = Math.sqrt(Math.pow(localLat - area.lat, 2) + Math.pow(localLng - area.lng, 2));
+        if (d < area.radius) {
+          maxSurge = Math.max(maxSurge, area.multiplier);
+        }
+      });
+      
+      // Also apply time-based surge modifier
+      const hour = new Date().getHours();
+      const isPeak = (hour >= 11 && hour <= 14) || (hour >= 18 && hour <= 21);
+      
+      if (isPeak && maxSurge === 1.0) {
+        maxSurge = 1.2; // Baseline surge during peak everywhere
+      }
+
+      setSurgeMultiplier(maxSurge);
+    }
+  }, [location, SURGE_AREAS]);
+
+  // Improved Order Matching Algorithm with Surge
   const generateSmartOrder = () => {
     if (!location) return null;
 
@@ -1742,7 +1843,18 @@ export default function App() {
 
       const distToRest = Math.sqrt(Math.pow(restLat - location.latitude, 2) + Math.pow(restLng - location.longitude, 2)) * MILES_PER_DEGREE;
       const tripDist = Math.sqrt(Math.pow(custLat - restLat, 2) + Math.pow(custLng - restLng, 2)) * MILES_PER_DEGREE;
-      const pay = 3.50 + (tripDist * 1.5) + (Math.random() * 2);
+      
+      // Check if restaurant is in a surge area
+      let activeSurge = surgeMultiplier;
+      SURGE_AREAS.forEach(area => {
+        const d = Math.sqrt(Math.pow(randomRest.offset.lat - area.lat, 2) + Math.pow(randomRest.offset.lng - area.lng, 2));
+        if (d < area.radius) {
+          activeSurge = Math.max(activeSurge, area.multiplier);
+        }
+      });
+
+      const basePay = 3.50 + (tripDist * 1.5) + (Math.random() * 2);
+      const pay = basePay * activeSurge;
 
       return {
         id: Math.random().toString(36).substr(2, 9),
@@ -1757,7 +1869,8 @@ export default function App() {
         items: ["Meal Deal", "Extra Fries", "Coke Zero"],
         distToRest,
         pin: Math.floor(1000 + Math.random() * 9000).toString(),
-        isMatching: activeOrders.length > 0 || Math.random() < 0.3
+        isMatching: activeOrders.length > 0 || Math.random() < 0.3,
+        surge: activeSurge > 1.0 ? activeSurge : undefined
       };
     });
 
@@ -1834,6 +1947,7 @@ export default function App() {
             estimatedTime: 15,
             status: 'pending',
             items: ["Scheduled Meal"],
+            pin: Math.floor(1000 + Math.random() * 9000).toString(),
             isMatching: activeOrders.length > 0 || Math.random() < 0.2
           };
 
@@ -1857,7 +1971,8 @@ export default function App() {
           setPendingOrder(newOrder);
           setOrderExpiryTimer(10);
           const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
-          sendNotification(prefix + (shouldPickScheduled ? "Scheduled Trip" : "High Priority"), `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName}`);
+          const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
+          sendNotification(prefix + (shouldPickScheduled ? "Scheduled Trip" : "High Priority") + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName}`);
           playUberSound('order');
         }
       }, 8000 + Math.random() * 12000);
@@ -1873,6 +1988,7 @@ export default function App() {
         return;
       }
       setActiveOrders(prev => [...prev, { ...pendingOrder, status: 'accepted' }]);
+      console.log(`Order Accepted: ${pendingOrder.id}, PIN: ${pendingOrder.pin}`);
       setPendingOrder(null);
       setOrderExpiryTimer(10);
       setIsNavigating(true);
@@ -1899,6 +2015,65 @@ export default function App() {
     setSelectedCancelReason(null);
     sendNotification("Trip Cancelled", `Trip cancelled: ${reason}`);
     playUberSound('accept');
+  };
+
+  const handleSendMessage = (text: string) => {
+    if (!activeChatOrderId || !text.trim()) return;
+
+    // Driver Message
+    const newMessage: ChatMessage = {
+      id: Math.random().toString(36).substr(2, 9),
+      orderId: activeChatOrderId,
+      sender: 'driver',
+      text: text.trim(),
+      timestamp: Date.now()
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+    setChatInput("");
+
+    // Start response timer if not already active
+    setCustomerTimers(prev => ({ 
+      ...prev, 
+      [activeChatOrderId]: prev[activeChatOrderId] || 300 
+    }));
+
+    // Customer Reply Simulation
+    setIsCustomerTyping(true);
+    setTimeout(() => {
+      const order = activeOrders.find(o => o.id === activeChatOrderId);
+      let reply = "Got it! Thanks.";
+      
+      const lowerText = text.toLowerCase();
+      if (lowerText.includes('pin') || lowerText.includes('code')) {
+        reply = `No problem! My delivery PIN is ${order?.pin || '8866'}.`;
+      } else if (lowerText.includes('arrive') || lowerText.includes('outside') || lowerText.includes('door')) {
+        reply = "Great! I'll be right there.";
+      } else if (lowerText.includes('find') || lowerText.includes('where')) {
+        reply = "I'm in the blue house with the red door. Look for the lights!";
+      }
+
+      const customerMsg: ChatMessage = {
+        id: Math.random().toString(36).substr(2, 9),
+        orderId: activeChatOrderId,
+        sender: 'customer',
+        text: reply,
+        timestamp: Date.now()
+      };
+
+      setMessages(prev => [...prev, customerMsg]);
+      setIsCustomerTyping(false);
+      playUberSound('message');
+      
+      // Stop timer on reply
+      setCustomerTimers(prev => {
+        const next = { ...prev };
+        delete next[activeChatOrderId];
+        return next;
+      });
+
+      sendNotification("Message from Customer", reply);
+    }, 2000 + Math.random() * 2000);
   };
 
   const handleNextStep = (orderId: string) => {
@@ -2395,6 +2570,18 @@ export default function App() {
                             <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase ${pendingOrder.isMatching ? 'bg-orange-500 text-white' : 'bg-blue-600 text-white'}`}>
                               {pendingOrder.isMatching ? 'Matching Trip' : 'New Trip'}
                             </span>
+                            {pendingOrder.pin && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase bg-green-500 text-white flex items-center gap-1">
+                                <ShieldCheck size={8} fill="currentColor" />
+                                PIN REQUIRED
+                              </span>
+                            )}
+                            {pendingOrder.surge && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase bg-blue-600 text-white flex items-center gap-1">
+                                <Zap size={8} fill="currentColor" />
+                                {pendingOrder.surge}x Surge
+                              </span>
+                            )}
                           </div>
                           <h2 className="text-4xl font-black mb-1">£{pendingOrder.estimatedPay.toFixed(2)}</h2>
                           <p className="text-gray-400 font-black tracking-widest uppercase text-xs">Estimated Pay</p>
@@ -2495,9 +2682,22 @@ export default function App() {
 
               {/* Background Mode Indicator */}
               {user.isOnline && !isNavigating && (
-                <div className={`absolute top-28 left-1/2 -translate-x-1/2 z-50 px-4 py-1.5 rounded-full flex items-center gap-2 border shadow-2xl transition-all duration-300 ${theme === 'dark' ? 'bg-black border-white/20' : 'bg-white border-black/10'}`}>
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
-                  <span className="text-[10px] font-black tracking-widest uppercase tracking-[0.2em]">Active</span>
+                <div className="absolute top-28 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
+                  <div className={`px-4 py-1.5 rounded-full flex items-center gap-2 border shadow-2xl transition-all duration-300 ${theme === 'dark' ? 'bg-black border-white/20' : 'bg-white border-black/10'}`}>
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
+                    <span className="text-[10px] font-black tracking-widest uppercase tracking-[0.2em]">Active</span>
+                  </div>
+                  
+                  {surgeMultiplier > 1.0 && (
+                    <motion.div 
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="px-3 py-1 bg-blue-600 text-white rounded-full flex items-center gap-2 shadow-lg border border-blue-400"
+                    >
+                      <Zap size={10} fill="currentColor" />
+                      <span className="text-[10px] font-black tracking-widest uppercase">{surgeMultiplier.toFixed(1)}x Surge Active</span>
+                    </motion.div>
+                  )}
                 </div>
               )}
 
@@ -2507,34 +2707,45 @@ export default function App() {
                   setSelectedMarkerId(null);
                   setSelectedRestaurant(null);
                 }}
-                drag
-                dragMomentum={false}
-                onDrag={(e, info) => {
+                onPan={(e, info) => {
                   setMapOffset(prev => ({
                     x: prev.x + info.delta.x,
                     y: prev.y + info.delta.y
                   }));
                 }}
-                className={`absolute inset-0 overflow-hidden transition-all duration-500 cursor-grab active:cursor-grabbing ${isNightMode || theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-[#eef2f6]'} ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'blur-md grayscale opacity-50 pointer-events-none' : ''}`}
+                className={`absolute inset-0 overflow-hidden cursor-grab active:cursor-grabbing ${isNightMode || theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-[#eef2f6]'} ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'blur-md grayscale opacity-50 pointer-events-none' : ''}`}
               >
-                {/* Roads */}
-                <div className="absolute inset-0 opacity-40" style={{ 
-                  backgroundImage: `
-                    linear-gradient(90deg, ${isNightMode || theme === 'dark' ? '#333' : '#ccc'} 4px, transparent 4px),
-                    linear-gradient(${isNightMode || theme === 'dark' ? '#333' : '#ccc'} 4px, transparent 4px),
-                    linear-gradient(90deg, ${isNightMode || theme === 'dark' ? '#222' : '#bbb'} 2px, transparent 2px),
-                    linear-gradient(${isNightMode || theme === 'dark' ? '#222' : '#bbb'} 2px, transparent 2px)
-                  `,
-                  backgroundSize: '150px 150px, 150px 150px, 30px 30px, 30px 30px',
-                  transform: location ? `translate(${(location.longitude * 10000 + mapOffset.x) % 150}px, ${(location.latitude * 10000 + mapOffset.y) % 150}px)` : 'none'
-                }} />
+                {/* Background Layer (Roads/Blocks Optimized) */}
+                <div className="absolute inset-0 pointer-events-none" style={{ 
+                  transform: `translate(${mapOffset.x}px, ${mapOffset.y}px)`,
+                  willChange: 'transform'
+                }}>
+                  {/* Roads Grid */}
+                  <div className="absolute inset-[-4000px] opacity-40" style={{ 
+                    backgroundImage: `
+                      linear-gradient(90deg, ${isNightMode || theme === 'dark' ? '#333' : '#ccc'} ${4 * zoom}px, transparent ${4 * zoom}px),
+                      linear-gradient(${isNightMode || theme === 'dark' ? '#333' : '#ccc'} ${4 * zoom}px, transparent ${4 * zoom}px)
+                    `,
+                    backgroundSize: `${150 * zoom}px ${150 * zoom}px`
+                  }} />
+                  
+                  {/* Buildings Grid */}
+                  <div className="absolute inset-[-4000px] opacity-25" style={{ 
+                    backgroundImage: `
+                      linear-gradient(45deg, ${theme === 'dark' ? '#444' : '#ddd'} 25%, transparent 25%, transparent 75%, ${theme === 'dark' ? '#444' : '#ddd'} 75%, ${theme === 'dark' ? '#444' : '#ddd'}),
+                      radial-gradient(circle, ${theme === 'dark' ? '#333' : '#ccc'} 20%, transparent 20%)
+                    `,
+                    backgroundSize: `${80 * zoom}px ${80 * zoom}px, ${50 * zoom}px ${50 * zoom}px`,
+                    backgroundPosition: `0 0, ${15 * zoom}px ${15 * zoom}px`
+                  }} />
+                </div>
                 
                 {/* Traffic Lines (Simulated) */}
                 {trafficSegments.map((seg, i) => {
-                  const x1 = (seg.start.longitude - location!.longitude) * 50000 + mapOffset.x;
-                  const y1 = (location!.latitude - seg.start.latitude) * 50000 + mapOffset.y;
-                  const x2 = (seg.end.longitude - location!.longitude) * 50000 + mapOffset.x;
-                  const y2 = (location!.latitude - seg.end.latitude) * 50000 + mapOffset.y;
+                  const x1 = (seg.start.longitude - location!.longitude) * MAP_SCALE + mapOffset.x;
+                  const y1 = (location!.latitude - seg.start.latitude) * MAP_SCALE + mapOffset.y;
+                  const x2 = (seg.end.longitude - location!.longitude) * MAP_SCALE + mapOffset.x;
+                  const y2 = (location!.latitude - seg.end.latitude) * MAP_SCALE + mapOffset.y;
                   
                   return (
                     <svg key={`traffic-${i}`} className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
@@ -2544,7 +2755,7 @@ export default function App() {
                         x2={`calc(50% + ${x2}px)`} 
                         y2={`calc(50% + ${y2}px)`} 
                         stroke={seg.intensity === 'high' ? '#ef4444' : seg.intensity === 'medium' ? '#f59e0b' : '#10b981'} 
-                        strokeWidth="4" 
+                        strokeWidth={4 * zoom} 
                         strokeLinecap="round"
                         opacity="0.6"
                       />
@@ -2590,22 +2801,52 @@ export default function App() {
                     linear-gradient(45deg, ${theme === 'dark' ? '#444' : '#ddd'} 25%, transparent 25%, transparent 75%, ${theme === 'dark' ? '#444' : '#ddd'} 75%, ${theme === 'dark' ? '#444' : '#ddd'}),
                     radial-gradient(circle, ${theme === 'dark' ? '#333' : '#ccc'} 20%, transparent 20%)
                   `,
-                  backgroundSize: '80px 80px, 80px 80px, 50px 50px',
-                  backgroundPosition: '0 0, 40px 40px, 15px 15px',
-                  transform: location ? `translate(${(location.longitude * 6000 + mapOffset.x) % 80}px, ${(location.latitude * 6000 + mapOffset.y) % 80}px)` : 'none'
+                  backgroundSize: `${80 * zoom}px ${80 * zoom}px, ${80 * zoom}px ${80 * zoom}px, ${50 * zoom}px ${50 * zoom}px`,
+                  backgroundPosition: `0 0, ${40 * zoom}px ${40 * zoom}px, ${15 * zoom}px ${15 * zoom}px`,
+                  transform: location ? `translate(${(location.longitude * BUILDING_SCALE + mapOffset.x) % (80 * zoom)}px, ${(location.latitude * BUILDING_SCALE + mapOffset.y) % (80 * zoom)}px)` : 'none'
                 }} />
                 
                 {/* Parks/Green areas */}
                 <div className="absolute inset-0 opacity-15" style={{ 
                   backgroundImage: 'radial-gradient(circle, #2d5a27 15%, transparent 85%), radial-gradient(circle, #1e3a1a 10%, transparent 70%)',
-                  backgroundSize: '500px 500px, 400px 400px',
-                  transform: location ? `translate(${(location.longitude * 2000 + mapOffset.x) % 500}px, ${(location.latitude * 2000 + mapOffset.y) % 500}px)` : 'none'
+                  backgroundSize: `${500 * zoom}px ${500 * zoom}px, ${400 * zoom}px ${400 * zoom}px`,
+                  transform: location ? `translate(${(location.longitude * PARK_SCALE + mapOffset.x) % (500 * zoom)}px, ${(location.latitude * PARK_SCALE + mapOffset.y) % (500 * zoom)}px)` : 'none'
                 }} />
+
+                {/* Surge Zones Visualization */}
+                {location && SURGE_AREAS.map((area, i) => {
+                  const x = area.lng * MAP_SCALE + mapOffset.x;
+                  const y = -area.lat * MAP_SCALE + mapOffset.y;
+                  return (
+                    <motion.div
+                      key={`surge-zone-${i}`}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ 
+                        opacity: [0.1, 0.2, 0.1],
+                        scale: [1, 1.1, 1]
+                      }}
+                      transition={{ duration: 4, repeat: Infinity }}
+                      className="absolute rounded-full border-4 border-blue-500/30 bg-blue-500/10 pointer-events-none"
+                      style={{
+                        width: area.radius * 2 * MAP_SCALE,
+                        height: area.radius * 2 * MAP_SCALE,
+                        left: '50%',
+                        top: '50%',
+                        transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                        zIndex: 10
+                      }}
+                    >
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-600/80 backdrop-blur-md px-2 py-0.5 rounded text-[8px] font-black text-white whitespace-nowrap shadow-xl">
+                        {area.multiplier}x Surge
+                      </div>
+                    </motion.div>
+                  );
+                })}
 
                 {/* Hotspots (Busy Areas) */}
                 {location && hotspots.map((spot, i) => {
-                  const x = (spot.longitude - location.longitude) * 50000 + mapOffset.x;
-                  const y = (location.latitude - spot.latitude) * 50000 + mapOffset.y;
+                  const x = (spot.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
+                  const y = (location.latitude - spot.latitude) * MAP_SCALE + mapOffset.y;
                   return (
                     <motion.div 
                       key={`hotspot-${i}`}
@@ -2616,8 +2857,8 @@ export default function App() {
                       transition={{ duration: 5 + i, repeat: Infinity }}
                       className="absolute rounded-full bg-orange-600 blur-[40px] pointer-events-none"
                       style={{ 
-                        width: spot.size,
-                        height: spot.size,
+                        width: spot.size * zoom,
+                        height: spot.size * zoom,
                         left: '50%', 
                         top: '50%', 
                         transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))` 
@@ -2628,8 +2869,8 @@ export default function App() {
 
                 {/* Mock Restaurants (Busy Map) */}
                 {location && MOCK_RESTAURANTS.map((rest, i) => {
-                  const x = rest.offset.lng * 50000 + mapOffset.x;
-                  const y = -rest.offset.lat * 50000 + mapOffset.y;
+                  const x = rest.offset.lng * MAP_SCALE + mapOffset.x;
+                  const y = -rest.offset.lat * MAP_SCALE + mapOffset.y;
                   const isOrderActive = activeOrders.some(o => o.restaurantName === rest.name);
                   
                   return (
@@ -2699,9 +2940,9 @@ export default function App() {
                       key={i}
                       className={`absolute text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${theme === 'dark' ? 'text-white/40' : 'text-black/40'}`}
                       style={{ 
-                        left: label.x, 
-                        top: label.y,
-                        transform: location ? `translate(${(location.longitude * 10000 + mapOffset.x) % 1000}px, ${(location.latitude * 10000 + mapOffset.y) % 1000}px)` : 'none'
+                        left: label.x * zoom, 
+                        top: label.y * zoom,
+                        transform: location ? `translate(${(location.longitude * LABEL_SCALE + mapOffset.x) % (1000 * zoom)}px, ${(location.latitude * LABEL_SCALE + mapOffset.y) % (1000 * zoom)}px)` : 'none'
                       }}
                     >
                       {label.name}
@@ -2729,8 +2970,8 @@ export default function App() {
                 {/* Active Order Pins */}
                 {location && activeOrders.map((order, i) => {
                   const target = order.status === 'accepted' ? order.restaurantLocation : order.customerLocation;
-                  const x = (target.longitude - location.longitude) * 50000 + mapOffset.x;
-                  const y = (location.latitude - target.latitude) * 50000 + mapOffset.y;
+                  const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
+                  const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
                   
                   return (
                     <motion.div 
@@ -2765,13 +3006,13 @@ export default function App() {
                       animate={{ pathLength: 1 }}
                       transition={{ duration: 1 }}
                       d={`M ${50}% ${50}% ${routeWaypoints.map(wp => {
-                        const x = (wp.longitude - location.longitude) * 50000;
-                        const y = (location.latitude - wp.latitude) * 50000;
+                        const x = (wp.longitude - location.longitude) * MAP_SCALE;
+                        const y = (location.latitude - wp.latitude) * MAP_SCALE;
                         return `L calc(50% + ${x}px) calc(50% + ${y}px)`;
                       }).join(' ')}`}
                       fill="none" 
                       stroke="#3b82f6" 
-                      strokeWidth="6" 
+                      strokeWidth={6 * zoom} 
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       opacity="0.8"
@@ -2779,15 +3020,15 @@ export default function App() {
                     {/* Animated path overlay */}
                     <motion.path 
                       d={`M calc(50% + ${mapOffset.x}px) calc(50% + ${mapOffset.y}px) ${routeWaypoints.map(wp => {
-                        const x = (wp.longitude - location.longitude) * 50000 + mapOffset.x;
-                        const y = (location.latitude - wp.latitude) * 50000 + mapOffset.y;
+                        const x = (wp.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
+                        const y = (location.latitude - wp.latitude) * MAP_SCALE + mapOffset.y;
                         return `L calc(50% + ${x}px) calc(50% + ${y}px)`;
                       }).join(' ')}`}
                       fill="none" 
                       stroke="white" 
-                      strokeWidth="2" 
-                      strokeDasharray="10,10"
-                      animate={{ strokeDashoffset: -20 }}
+                      strokeWidth={2 * zoom} 
+                      strokeDasharray={`${10 * zoom},${10 * zoom}`}
+                      animate={{ strokeDashoffset: -20 * zoom }}
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                       opacity="0.5"
                     />
@@ -2854,8 +3095,8 @@ export default function App() {
                     {activeOrders.map(order => {
                       const isPickup = order.status === 'accepted';
                       const target = isPickup ? order.restaurantLocation : order.customerLocation;
-                      const x = (target.longitude - location.longitude) * 50000 + mapOffset.x;
-                      const y = (location.latitude - target.latitude) * 50000 + mapOffset.y;
+                      const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
+                      const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
                       const isSelected = selectedMarkerId === order.id;
                       
                       return (
@@ -2907,8 +3148,8 @@ export default function App() {
                     {pendingOrder && (
                       <>
                         {[pendingOrder.restaurantLocation, pendingOrder.customerLocation].map((target, i) => {
-                          const x = (target.longitude - location.longitude) * 50000 + mapOffset.x;
-                          const y = (location.latitude - target.latitude) * 50000 + mapOffset.y;
+                          const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
+                          const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
                           return (
                             <motion.div 
                               key={`pending-${i}`}
@@ -2934,6 +3175,20 @@ export default function App() {
                 {/* Map Action Buttons */}
                 {user.isOnline && (
                   <div className="absolute bottom-32 left-4 right-4 flex flex-col gap-4 items-end pointer-events-none">
+                    <div className="flex flex-col gap-2 pointer-events-auto">
+                      <button 
+                        onClick={() => setZoom(prev => Math.min(prev + 0.2, 3))}
+                        className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 active:scale-95 transition-transform"
+                      >
+                        <Plus size={24} />
+                      </button>
+                      <button 
+                        onClick={() => setZoom(prev => Math.max(prev - 0.2, 0.4))}
+                        className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 active:scale-95 transition-transform"
+                      >
+                        <Minus size={24} />
+                      </button>
+                    </div>
                     <button 
                       onClick={() => setIsNightMode(!isNightMode)}
                       className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 pointer-events-auto active:scale-90 transition-transform"
@@ -3647,6 +3902,11 @@ export default function App() {
                     onClose={() => setViewingOrderDetailsId(null)}
                     onNextStep={handleNextStep}
                     getArrivalTime={getArrivalTime}
+                    onOpenChat={(id) => {
+                      setActiveChatOrderId(id);
+                      setViewingOrderDetailsId(null);
+                      setCurrentScreen('chat');
+                    }}
                   />
                 )}
               </AnimatePresence>
@@ -3811,87 +4071,126 @@ export default function App() {
           )}
 
           {currentScreen === 'chat' && (
-            <motion.div key="chat" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="h-full w-full bg-white text-black flex flex-col">
-              <div className="p-6 border-b border-gray-100 flex items-center gap-4">
-                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
+            <motion.div key="chat" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="fixed inset-0 z-[1000] bg-white text-black flex flex-col">
+              <div className="p-6 border-b border-gray-100 flex items-center gap-4 bg-white/80 backdrop-blur-md sticky top-0 z-10">
+                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors">
+                  <X size={24} />
+                </button>
                 <div className="flex-1">
-                  <h2 className="font-black text-xl">Chat with Customer</h2>
-                  <p className="text-xs text-gray-400 font-bold">Order #{activeChatOrderId?.substr(0, 5)}</p>
+                  <h2 className="font-black text-xl">
+                    {activeOrders.find(o => o.id === activeChatOrderId)?.customerName || 'Customer'}
+                  </h2>
+                  <p className="text-[10px] text-gray-400 font-black tracking-widest uppercase">Active Delivery</p>
                 </div>
-                <button className="p-3 bg-green-500 text-white rounded-full"><Phone size={20} /></button>
+                <button className="p-3 bg-green-500 text-white rounded-full transition-transform active:scale-95">
+                  <Phone size={20} />
+                </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.filter(m => m.orderId === activeChatOrderId).map(msg => (
-                  <div key={msg.id} className={`flex ${msg.sender === 'driver' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] p-4 rounded-2xl font-bold ${msg.sender === 'driver' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-black'}`}>
-                      {msg.text}
-                    </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
+                <div className="flex justify-center p-4">
+                  <div className="bg-white px-4 py-2 rounded-full border border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest shadow-sm">
+                    Today • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
-                ))}
-                {customerTimers[activeChatOrderId!] !== undefined && (
-                  <div className="flex justify-center">
-                    <div className="bg-red-50 text-red-600 px-4 py-2 rounded-full text-xs font-black border border-red-100">
-                      CUSTOMER RESPONSE TIMER: {Math.floor(customerTimers[activeChatOrderId!] / 60)}:{(customerTimers[activeChatOrderId!] % 60).toString().padStart(2, '0')}
+                </div>
+
+                {messages.filter(m => m.orderId === activeChatOrderId).map((msg, i, arr) => {
+                  const isLast = i === arr.length - 1;
+                  const showTime = isLast;
+
+                  return (
+                    <motion.div 
+                      key={msg.id} 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      className={`flex ${msg.sender === 'driver' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className="flex flex-col max-w-[80%]">
+                        <div className={`p-4 rounded-2xl font-bold text-sm shadow-sm ${
+                          msg.sender === 'driver' 
+                            ? 'bg-blue-600 text-white rounded-tr-none' 
+                            : 'bg-white text-black border border-gray-100 rounded-tl-none'
+                        }`}>
+                          {msg.text}
+                        </div>
+                        {showTime && (
+                          <span className={`text-[8px] font-black mt-1 text-gray-400 uppercase tracking-widest ${msg.sender === 'driver' ? 'text-right' : 'text-left'}`}>
+                            {msg.sender === 'driver' ? 'Delivered' : 'Just Now'}
+                          </span>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+
+                {isCustomerTyping && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex justify-start"
+                  >
+                    <div className="bg-white p-3 rounded-2xl border border-gray-100 rounded-tl-none flex gap-1 items-center shadow-sm">
+                      <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
+                      <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
+                      <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
                     </div>
+                  </motion.div>
+                )}
+
+                {customerTimers[activeChatOrderId!] !== undefined && (
+                  <div className="flex justify-center p-4">
+                    <motion.div 
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="bg-red-50 text-red-600 px-4 py-2 rounded-full text-[10px] font-black border border-red-100 uppercase tracking-widest flex items-center gap-2 shadow-sm"
+                    >
+                      <Clock size={12} />
+                      Waiting for Customer: {Math.floor(customerTimers[activeChatOrderId!] / 60)}:{(customerTimers[activeChatOrderId!] % 60).toString().padStart(2, '0')}
+                    </motion.div>
                   </div>
                 )}
+                
+                <div ref={messagesEndRef} />
               </div>
               
-              <div className="px-4 py-2 border-t border-gray-100 flex gap-2 overflow-x-auto no-scrollbar">
-                {["I've arrived", "I'm outside", "I'm at the door", "What's the PIN?", "Can't find you"].map(text => (
+              <div className="bg-white border-t border-gray-100 p-2 overflow-x-auto no-scrollbar flex gap-2">
+                {["I've arrived", "I'm outside", "What's the PIN?", "Please send PIN", "Can't find you"].map(text => (
                   <button 
                     key={text}
-                    onClick={() => {
-                      setMessages(prev => [...prev, { id: Math.random().toString(), orderId: activeChatOrderId!, sender: 'driver', text, timestamp: Date.now() }]);
-                      setCustomerTimers(prev => ({ ...prev, [activeChatOrderId!]: 300 })); // Start 5 min timer
-                      // Simulate customer reply
-                      setTimeout(() => {
-                        const order = activeOrders.find(o => o.id === activeChatOrderId);
-                        let reply = "Coming now!";
-                        if (text.toLowerCase().includes('pin')) {
-                          reply = `My PIN is ${order?.pin || '1234'}.`;
-                        }
-                        setMessages(prev => [...prev, { id: Math.random().toString(), orderId: activeChatOrderId!, sender: 'customer', text: reply, timestamp: Date.now() }]);
-                        playUberSound('message');
-                        setCustomerTimers(prev => {
-                          const next = { ...prev };
-                          delete next[activeChatOrderId!]; // Stop timer on reply
-                          return next;
-                        });
-                      }, 5000);
-                    }}
-                    className="whitespace-nowrap px-4 py-2 bg-gray-100 rounded-full text-xs font-bold hover:bg-gray-200 active:scale-95 transition-all"
+                    onClick={() => handleSendMessage(text)}
+                    className="whitespace-nowrap px-4 py-2 bg-gray-100 rounded-full text-xs font-black uppercase tracking-wider hover:bg-gray-200 active:scale-95 transition-all text-black border border-gray-50 shadow-sm"
                   >
                     {text}
                   </button>
                 ))}
               </div>
 
-              <div className="p-4 border-t border-gray-100 flex gap-2">
-                <input 
-                  type="text" 
-                  placeholder="Type a message..." 
-                  className="flex-1 bg-gray-100 rounded-full px-6 py-3 font-bold outline-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.currentTarget.value) {
-                      const text = e.currentTarget.value;
-                      setMessages(prev => [...prev, { id: Math.random().toString(), orderId: activeChatOrderId!, sender: 'driver', text, timestamp: Date.now() }]);
-                      e.currentTarget.value = '';
-                      // Simulate customer reply
-                      setTimeout(() => {
-                        const order = activeOrders.find(o => o.id === activeChatOrderId);
-                        let reply = "Thanks! See you soon.";
-                        if (text.toLowerCase().includes('pin') || text.toLowerCase().includes('code')) {
-                          reply = `Sure, my delivery PIN is ${order?.pin || '1234'}.`;
-                        }
-                        setMessages(prev => [...prev, { id: Math.random().toString(), orderId: activeChatOrderId!, sender: 'customer', text: reply, timestamp: Date.now() }]);
-                        sendNotification("New Message", `Customer: ${reply}`);
-                        playUberSound('message');
-                      }, 2000);
-                    }
-                  }}
-                />
-                <button className="p-4 bg-black text-white rounded-full"><Send size={20} /></button>
+              <div className="p-4 bg-white border-t border-gray-100 flex gap-2 pb-10">
+                <div className="flex-1 bg-gray-100 rounded-[28px] focus-within:bg-white focus-within:ring-2 focus-within:ring-black transition-all flex items-center px-4">
+                  <input 
+                    type="text" 
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Type a message..." 
+                    className="flex-1 bg-transparent py-4 text-sm font-bold outline-none"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && chatInput.trim()) {
+                        handleSendMessage(chatInput);
+                      }
+                    }}
+                  />
+                  {chatInput.trim() && (
+                    <button 
+                      onClick={() => handleSendMessage(chatInput)}
+                      className="p-2 text-blue-600 font-black text-xs uppercase tracking-widest hover:text-blue-700 transition-colors"
+                    >
+                      Send
+                    </button>
+                  )}
+                </div>
+                <button className="w-14 h-14 bg-black text-white rounded-full flex items-center justify-center shrink-0 shadow-lg active:scale-90 transition-transform">
+                  {chatInput.trim() ? <Send size={24} /> : <Target size={24} />}
+                </button>
               </div>
             </motion.div>
           )}
