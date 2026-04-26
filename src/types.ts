@@ -41,7 +41,7 @@ export interface ScheduledOrder {
   estimatedPay: number;
 }
 
-export type AppScreen = 'onboarding' | 'documents' | 'face_verification' | 'home' | 'earnings' | 'inbox' | 'account' | 'chat' | 'uber_pro' | 'wallet' | 'opportunities' | 'safety' | 'earnings_detail' | 'banking' | 'scheduled_orders' | 'rewards' | 'carplay_dashboard' | 'trip_history' | 'work_hub' | 'ratings' | 'planner' | 'uber_services';
+export type AppScreen = 'onboarding' | 'documents' | 'face_verification' | 'home' | 'earnings' | 'inbox' | 'account' | 'chat' | 'uber_pro' | 'wallet' | 'opportunities' | 'safety' | 'earnings_detail' | 'banking' | 'scheduled_orders' | 'rewards' | 'carplay_dashboard' | 'trip_history' | 'work_hub' | 'ratings' | 'planner' | 'uber_services' | 'vehicle_details' | 'payment_methods';
 
 export interface CompletedTrip {
   id: string;
@@ -56,6 +56,7 @@ export interface CompletedTrip {
 export type UberProTier = 'Blue' | 'Gold' | 'Platinum' | 'Diamond';
 
 export interface UserProfile {
+  uid?: string;
   name: string;
   rating: number;
   tier: UberProTier;
@@ -68,4 +69,18 @@ export interface UserProfile {
   profilePic?: string;
   documentExpiries?: Record<string, string>;
   walletBalance: number;
+  vehicleInfo?: {
+    make: string;
+    model: string;
+    year: number;
+    plate: string;
+    type: string;
+  };
+  paymentMethods?: {
+    id: string;
+    type: 'card' | 'bank';
+    last4: string;
+    bankName?: string;
+    isDefault: boolean;
+  }[];
 }

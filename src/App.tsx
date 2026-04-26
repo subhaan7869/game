@@ -28,6 +28,7 @@ import {
   Camera,
   FileText,
   CreditCard,
+  Landmark,
   Bell,
   MessageSquare,
   LogOut,
@@ -72,7 +73,7 @@ import {
   Car as CarIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Location, Order, AppScreen, ChatMessage, UserProfile, UberProTier, ScheduledOrder, CompletedTrip } from './types';
+import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, UberProTier, ScheduledOrder, CompletedTrip } from './types';
 import { auth, db, signInWithGoogle, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
@@ -102,6 +103,72 @@ const MOCK_RESTAURANTS = [
 ];
 
 const MOCK_CUSTOMERS = ["James", "Sophie", "Oliver", "Emily", "Jack", "Chloe"];
+
+// Helper components moved outside App to prevent flickering
+const UpdateScreen = ({ progress }: { progress: number }) => (
+  <div className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center p-12 text-white">
+    <motion.div 
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      className="w-full max-w-sm flex flex-col items-center"
+    >
+      <div className="w-24 h-24 bg-white rounded-[30px] flex items-center justify-center mb-12">
+        <RefreshCw size={48} className="text-black animate-spin" />
+      </div>
+      <h1 className="text-4xl font-black mb-4 tracking-tighter">UPDATING...</h1>
+      <p className="text-gray-500 font-bold mb-12 text-center">We're improving your driver experience. Please wait.</p>
+      
+      <div className="w-full h-3 bg-gray-900 rounded-full overflow-hidden">
+        <motion.div 
+          initial={{ width: 0 }}
+          animate={{ width: `${progress}%` }}
+          className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]"
+        />
+      </div>
+      <span className="mt-4 font-black text-xl">{progress}%</span>
+    </motion.div>
+  </div>
+);
+
+const MaintenanceScreen = ({ onRetry }: { onRetry: () => void }) => (
+  <div className="fixed inset-0 z-[1000] bg-white flex flex-col items-center justify-center p-12 text-black">
+    <motion.div 
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="w-full max-w-sm flex flex-col items-center text-center"
+    >
+      <div className="w-24 h-24 bg-red-100 rounded-[30px] flex items-center justify-center mb-12">
+        <ShieldAlert size={48} className="text-red-600" />
+      </div>
+      <h1 className="text-4xl font-black mb-4 tracking-tighter">UNDER MAINTENANCE</h1>
+      <p className="text-gray-400 font-bold mb-12">We've detected a minor bug. Our team is fixing it right now. We'll be back shortly!</p>
+      
+      <button 
+        onClick={onRetry}
+        className="w-full py-5 bg-black text-white rounded-2xl font-black text-xl"
+      >
+        RETRY
+      </button>
+    </motion.div>
+  </div>
+);
+
+const ScanningScreen = () => (
+  <div className="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center p-12 text-white">
+    <div className="relative w-48 h-48 mb-12">
+      <motion.div 
+        animate={{ rotate: 360 }}
+        transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+        className="absolute inset-0 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full"
+      />
+      <div className="absolute inset-4 border-2 border-dashed border-gray-700 rounded-full flex items-center justify-center">
+        <Search size={48} className="text-gray-500 animate-pulse" />
+      </div>
+    </div>
+    <h2 className="text-3xl font-black mb-2">SCANNING FOR BUGS</h2>
+    <p className="text-gray-500 font-bold">Ensuring your app is safe and ready.</p>
+  </div>
+);
 
 
 const Heatmap = () => (
@@ -167,9 +234,14 @@ const OrderDetailsModal = ({
             <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Distance</p>
             <h3 className="text-2xl font-black">{order.estimatedDistance.toFixed(1)} mi</h3>
             {order.pin && (
-              <div className="flex items-center gap-1 mt-2 text-green-500 font-black text-[10px] uppercase tracking-widest justify-end">
-                <ShieldCheck size={12} />
-                PIN Required
+              <div className="flex flex-col items-end gap-1 mt-2">
+                <div className="flex items-center gap-1 text-green-500 font-black text-[10px] uppercase tracking-widest">
+                  <ShieldCheck size={12} />
+                  PIN Required
+                </div>
+                <div className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full text-[10px] font-black uppercase">
+                  Code: {order.pin}
+                </div>
               </div>
             )}
           </div>
@@ -209,7 +281,7 @@ const OrderDetailsModal = ({
           onClick={() => onNextStep(order.id)}
           className="flex-1 py-5 bg-black text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform"
         >
-          {order.status === 'accepted' ? (order.type === 'ride' ? 'START TRIP' : 'START PICKUP') : (order.type === 'ride' ? 'CONFIRM DROPOFF' : 'START DROPOFF')}
+          {order.status === 'accepted' ? (order.type === 'ride' ? 'START TRIP' : 'START PICKUP') : 'COMPLETE DELIVERY'}
         </button>
       </div>
     </motion.div>
@@ -555,6 +627,10 @@ const TripPreferencesModal = ({
     </div>
   );
 };
+
+// End of SideMenu helpers
+
+// End of SideMenu helpers
 
 const NewUserForm = ({ 
   newUserDetails, 
@@ -1020,6 +1096,260 @@ const EarningsDetail = ({
   );
 };
 
+const VehicleDetailsScreen = ({ 
+  user, 
+  setUser, 
+  onClose,
+  theme
+}: { 
+  user: UserProfile, 
+  setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
+  onClose: () => void,
+  theme: string
+}) => {
+  const [vehicle, setVehicle] = useState(user.vehicleInfo || { make: '', model: '', year: 2024, plate: '', type: 'Car' });
+
+  const handleSave = () => {
+    setUser(u => ({ ...u, vehicleInfo: vehicle }));
+    onClose();
+  };
+
+  return (
+    <motion.div 
+      initial={{ x: '100%' }} 
+      animate={{ x: 0 }} 
+      exit={{ x: '100%' }} 
+      className={`h-full w-full p-6 overflow-y-auto ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
+    >
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={onClose} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={24} /></button>
+        <h1 className="text-3xl font-black">Vehicle Details</h1>
+      </div>
+      
+      <div className="space-y-6">
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Make</label>
+            <input 
+              type="text" 
+              value={vehicle.make}
+              onChange={e => setVehicle({...vehicle, make: e.target.value})}
+              placeholder="e.g. Toyota"
+              className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Model</label>
+            <input 
+              type="text" 
+              value={vehicle.model}
+              onChange={e => setVehicle({...vehicle, model: e.target.value})}
+              placeholder="e.g. Prius"
+              className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Year</label>
+              <input 
+                type="number" 
+                value={vehicle.year}
+                onChange={e => setVehicle({...vehicle, year: parseInt(e.target.value) || 2024})}
+                className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">License Plate</label>
+              <input 
+                type="text" 
+                value={vehicle.plate}
+                onChange={e => setVehicle({...vehicle, plate: e.target.value.toUpperCase()})}
+                placeholder="e.g. AB12 CDE"
+                className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
+              />
+            </div>
+          </div>
+        </div>
+        
+        <button 
+          onClick={handleSave}
+          className="w-full py-4 bg-black text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-transform mt-8"
+        >
+          SAVE CHANGES
+        </button>
+      </div>
+    </motion.div>
+  );
+};
+
+const PaymentMethodsScreen = ({ 
+  user, 
+  setUser, 
+  earnings,
+  onClose,
+  theme
+}: { 
+  user: UserProfile, 
+  setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
+  earnings: number,
+  onClose: () => void,
+  theme: string
+}) => {
+  const [isAdding, setIsAdding] = useState(false);
+  const [newMethod, setNewMethod] = useState<{type: 'card' | 'bank', last4: string, bankName?: string}>({ type: 'card', last4: '' });
+  
+  const paymentMethods = user.paymentMethods || [
+    { id: '1', type: 'bank', last4: '9876', bankName: 'Monzo', isDefault: true }
+  ];
+
+  const handleAdd = () => {
+    const method = {
+      id: Math.random().toString(),
+      ...newMethod,
+      isDefault: false
+    };
+    setUser(u => ({
+      ...u,
+      paymentMethods: [...(u.paymentMethods || []), method] as any
+    }));
+    setIsAdding(false);
+  };
+
+  return (
+    <motion.div 
+      initial={{ x: '100%' }} 
+      animate={{ x: 0 }} 
+      exit={{ x: '100%' }} 
+      className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
+    >
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={onClose} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={24} /></button>
+        <h1 className="text-3xl font-black">Payments</h1>
+      </div>
+
+      <div className="bg-blue-600 rounded-[32px] p-8 text-white mb-8 shadow-2xl shadow-blue-600/30 overflow-hidden relative">
+        <div className="relative z-10">
+          <p className="text-[10px] font-black opacity-60 uppercase tracking-widest mb-1">Available to cash out</p>
+          <h2 className="text-5xl font-black mb-6">£{earnings.toFixed(2)}</h2>
+          <button className="w-full py-3 bg-white text-blue-600 rounded-xl font-black text-sm uppercase tracking-widest active:scale-95 transition-transform">
+            CASH OUT NOW
+          </button>
+        </div>
+        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 blur-3xl rounded-full" />
+      </div>
+
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="font-black text-xl">Payment Methods</h3>
+          <button onClick={() => setIsAdding(true)} className="p-1 text-blue-600 font-black text-xs uppercase tracking-widest">Add New</button>
+        </div>
+
+        <div className="space-y-3">
+          {paymentMethods.map(method => (
+            <div key={method.id} className={`p-4 rounded-2xl border-2 flex items-center justify-between ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-100 shadow-sm'}`}>
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100 text-gray-500'}`}>
+                  {method.type === 'bank' ? <Landmark size={24} /> : <CreditCard size={24} />}
+                </div>
+                <div>
+                  <p className="font-bold">{method.type === 'bank' ? method.bankName : 'Personal Card'}</p>
+                  <p className="text-xs text-gray-400 font-bold">•••• {method.last4}</p>
+                </div>
+              </div>
+              {method.isDefault && (
+                <span className="text-[8px] font-black uppercase tracking-widest bg-blue-600 text-white px-2 py-0.5 rounded">Default</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="pt-6">
+          <h3 className="font-black text-xl mb-4">Transaction History</h3>
+          <div className="space-y-4">
+            {[
+              { id: '1', date: 'Yesterday', amount: 45.20, type: 'earnings', title: 'Daily Earnings' },
+              { id: '2', date: '2 days ago', amount: -150.00, type: 'payout', title: 'Bank Transfer' },
+              { id: '3', date: '3 days ago', amount: 38.50, type: 'earnings', title: 'Daily Earnings' },
+            ].map(tx => (
+              <div key={tx.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                <div>
+                  <p className="font-bold">{tx.title}</p>
+                  <p className="text-xs text-gray-400 font-bold">{tx.date}</p>
+                </div>
+                <div className={`font-black ${tx.type === 'payout' ? 'text-gray-400' : 'text-green-500'}`}>
+                  {tx.type === 'payout' ? '-' : '+'}£{Math.abs(tx.amount).toFixed(2)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {isAdding && (
+          <div className="fixed inset-0 z-[5000] flex items-end justify-center px-4 pb-10 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-black text-xl">Add Method</h3>
+                <button onClick={() => setIsAdding(false)} className="p-2 bg-gray-100 rounded-full"><X size={16} /></button>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setNewMethod({...newMethod, type: 'card'})} 
+                    className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest border-2 ${newMethod.type === 'card' ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-400 border-transparent'}`}
+                  >
+                    Card
+                  </button>
+                  <button 
+                    onClick={() => setNewMethod({...newMethod, type: 'bank'})} 
+                    className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest border-2 ${newMethod.type === 'bank' ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-400 border-transparent'}`}
+                  >
+                    Bank
+                  </button>
+                </div>
+                
+                {newMethod.type === 'bank' && (
+                  <input 
+                    type="text" 
+                    placeholder="Bank Name"
+                    className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500"
+                    onChange={e => setNewMethod({...newMethod, bankName: e.target.value})}
+                  />
+                )}
+
+                <input 
+                  type="text" 
+                  placeholder={newMethod.type === 'bank' ? "Account Number (last 4)" : "Card Number (last 4)"}
+                  maxLength={4}
+                  className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500"
+                  onChange={e => setNewMethod({...newMethod, last4: e.target.value})}
+                />
+
+                <button 
+                  onClick={handleAdd}
+                  disabled={!newMethod.last4}
+                  className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Plus size={20} />
+                  ADD METHOD
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
 const DeliveryVerificationModal = ({ 
   order, 
   enteredPin, 
@@ -1054,49 +1384,74 @@ const DeliveryVerificationModal = ({
       <div className="flex-1 p-6 flex flex-col">
         <div className="text-center mb-10">
           <h3 className="font-black text-2xl mb-2">{order.customerName}</h3>
-          <p className="text-gray-500 font-bold">Enter the 4-digit PIN to confirm delivery</p>
+          <p className="text-gray-500 font-bold">Ask customer for the 4-digit PIN</p>
+          <div className="mt-2 inline-block px-4 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-black uppercase tracking-widest">
+            Customer's PIN: {order.pin}
+          </div>
         </div>
         
-        <div className="flex gap-4 justify-center mb-12">
+        <div className="flex gap-2 justify-center mb-4">
           {[0, 1, 2, 3].map(i => (
-            <div key={i} className={`w-14 h-20 rounded-2xl border-4 flex items-center justify-center text-4xl font-black transition-all ${enteredPin[i] ? 'border-black bg-white shadow-xl' : 'border-gray-100 bg-gray-50'}`}>
+            <div key={i} className={`w-10 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-black transition-all ${enteredPin[i] ? 'border-black bg-white shadow-lg' : 'border-gray-100 bg-gray-50'}`}>
               {enteredPin[i] || ""}
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-3 gap-4 max-w-[320px] mx-auto mb-12">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, "C", 0].map(val => (
+        <div className="grid grid-cols-3 gap-1.5 max-w-[240px] mx-auto mb-4">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(val => (
             <button 
               key={val}
               onClick={() => {
-                if (val === "C") setEnteredPin("");
-                else if (enteredPin.length < 4) {
+                if (enteredPin.length < 4) {
                   setEnteredPin(enteredPin + val);
+                  if (enteredPin.length === 3 && (enteredPin + val) === order.pin) {
+                    setTimeout(onComplete, 300); // Auto-confirm on correct pin
+                  }
                 }
               }}
-              className="h-16 bg-gray-50 rounded-2xl font-black text-2xl active:scale-90 transition-transform border border-gray-100"
+              className="h-10 bg-gray-50 rounded-lg font-black text-lg active:scale-90 transition-transform border border-gray-100"
             >
               {val}
             </button>
           ))}
           <button 
-            onClick={() => setEnteredPin(enteredPin.slice(0, -1))}
-            className="h-16 bg-gray-50 rounded-2xl flex items-center justify-center active:scale-90 transition-transform border border-gray-100"
+            onClick={() => setEnteredPin("")}
+            className="h-10 bg-red-50 text-red-500 rounded-lg font-black text-sm active:scale-90 transition-transform border border-red-100 flex items-center justify-center"
           >
-            <Delete size={24} />
+            CLR
+          </button>
+          <button 
+            onClick={() => {
+              if (enteredPin.length < 4) setEnteredPin(enteredPin + "0");
+              if (enteredPin.length === 3 && (enteredPin + "0") === order.pin) {
+                setTimeout(onComplete, 300);
+              }
+            }}
+            className="h-10 bg-gray-50 rounded-lg font-black text-lg active:scale-90 transition-transform border border-gray-100"
+          >
+            0
+          </button>
+          <button 
+            onClick={() => {
+              if (enteredPin.length === 4) onComplete();
+            }}
+            className={`h-10 rounded-lg flex items-center justify-center active:scale-90 transition-transform border ${enteredPin.length === 4 ? 'bg-green-600 text-white border-green-700 shadow-lg' : 'bg-gray-50 text-gray-300 border-gray-100'}`}
+          >
+            <Check size={20} strokeWidth={4} />
           </button>
         </div>
 
-        <div className="mt-auto space-y-4">
+        <div className="mt-auto space-y-3">
           {(enteredPin.length === 4 || isPhotoCaptured) && (
             <motion.button 
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               onClick={onComplete}
-              className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform"
+              className="w-full py-4 bg-green-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2"
             >
-              {isPhotoCaptured ? 'CONFIRM PHOTO DELIVERY' : 'VERIFY PIN'}
+              <ShieldCheck size={20} />
+              {isPhotoCaptured ? 'CONFIRM PHOTO DELIVERY' : 'CONFIRM DELIVERY'}
             </motion.button>
           )}
           
@@ -1230,6 +1585,12 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // New Maintenance/Update States
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isUnderMaintenance, setIsUnderMaintenance] = useState(false);
+
   // Persist theme and earnings
   useEffect(() => {
     localStorage.setItem('uber_theme', theme);
@@ -1350,6 +1711,7 @@ export default function App() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isProfileLoaded, setIsProfileLoaded] = useState(false);
+  const [isSimulatingMovement, setIsSimulatingMovement] = useState(false);
   const [lastTrip, setLastTrip] = useState<{ amount: number, time: string, type: string } | null>({
     amount: 7.75,
     time: getArrivalTime(-45),
@@ -1501,8 +1863,13 @@ export default function App() {
 
     const moveInterval = setInterval(() => {
       const order = activeOrders[0];
-      const target = order.status === 'accepted' ? order.restaurantLocation : order.customerLocation;
+      if (!order) return;
+      const target = order.status === 'accepted' 
+        ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
+        : order.customerLocation;
       
+      if (!target || !location) return;
+
       const dLat = target.latitude - location.latitude;
       const dLng = target.longitude - location.longitude;
       const distance = Math.sqrt(dLat * dLat + dLng * dLng);
@@ -1670,8 +2037,13 @@ export default function App() {
   // UK Units: Miles
   const MILES_PER_DEGREE = 69;
 
-  const [isSimulatingMovement, setIsSimulatingMovement] = useState(false);
-
+  // Simulated Update and Scan Sequence
+  useEffect(() => {
+    // Disabled as per user request to remove non-game features
+    setIsUpdating(false);
+    setIsScanning(false);
+    setIsUnderMaintenance(false);
+  }, []);
 
   // Screen Wake Lock
   useEffect(() => {
@@ -1730,7 +2102,11 @@ export default function App() {
           
           if (isNavigating && activeOrders.length > 0) {
             const order = activeOrders[0];
-            const target = order.status === 'accepted' ? order.restaurantLocation : order.customerLocation;
+            const target = order.status === 'accepted' 
+              ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
+              : order.customerLocation;
+            
+            if (!target) return prev;
             
             // Reset route if target changed
             if (!lastTargetRef.current || lastTargetRef.current.latitude !== target.latitude || lastTargetRef.current.longitude !== target.longitude) {
@@ -2052,7 +2428,7 @@ export default function App() {
 
   // Simulate incoming orders when online
   useEffect(() => {
-    if (user.isOnline && activeOrders.length < 3 && !pendingOrder) {
+    if (user.isOnline && activeOrders.length < 3 && !pendingOrder && location) {
       const timer = setTimeout(() => {
         // 20% chance to pick a scheduled order if available
         const shouldPickScheduled = Math.random() < 0.2 && scheduledOrders.length > 0;
@@ -2064,15 +2440,16 @@ export default function App() {
           // Convert scheduled order to a real order
           newOrder = {
             id: sch.id,
+            type: 'delivery',
             restaurantName: sch.restaurantName,
             customerName: "Scheduled Customer",
             restaurantLocation: { 
-              latitude: location!.latitude + (Math.random() - 0.5) * 0.02, 
-              longitude: location!.longitude + (Math.random() - 0.5) * 0.02 
+              latitude: location.latitude + (Math.random() - 0.5) * 0.02, 
+              longitude: location.longitude + (Math.random() - 0.5) * 0.02 
             },
             customerLocation: { 
-              latitude: location!.latitude + (Math.random() - 0.5) * 0.04, 
-              longitude: location!.longitude + (Math.random() - 0.5) * 0.04 
+              latitude: location.latitude + (Math.random() - 0.5) * 0.04, 
+              longitude: location.longitude + (Math.random() - 0.5) * 0.04 
             },
             estimatedPay: sch.estimatedPay,
             estimatedDistance: 2.5,
@@ -2232,6 +2609,7 @@ export default function App() {
     if (!order) return;
 
     setEarnings(prev => prev + order.estimatedPay);
+    setBankBalance(prev => prev + order.estimatedPay);
     setCompletedTrips(prev => [
       {
         id: order.id,
@@ -2286,7 +2664,12 @@ export default function App() {
 
   const distanceToTarget = (order: Order) => {
     if (!location) return "0.0";
-    const target = order.status === 'accepted' ? order.restaurantLocation : order.customerLocation;
+    const target = order.status === 'accepted' 
+      ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
+      : order.customerLocation;
+    
+    if (!target) return "0.0";
+    
     const dLat = target.latitude - location.latitude;
     const dLng = target.longitude - location.longitude;
     const dist = Math.sqrt(dLat * dLat + dLng * dLng) * MILES_PER_DEGREE;
@@ -2884,11 +3267,11 @@ export default function App() {
                 </div>
                 
                 {/* Traffic Lines (Simulated) */}
-                {trafficSegments.map((seg, i) => {
-                  const x1 = (seg.start.longitude - location!.longitude) * MAP_SCALE + mapOffset.x;
-                  const y1 = (location!.latitude - seg.start.latitude) * MAP_SCALE + mapOffset.y;
-                  const x2 = (seg.end.longitude - location!.longitude) * MAP_SCALE + mapOffset.x;
-                  const y2 = (location!.latitude - seg.end.latitude) * MAP_SCALE + mapOffset.y;
+                {location && trafficSegments.map((seg, i) => {
+                  const x1 = (seg.start.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
+                  const y1 = (location.latitude - seg.start.latitude) * MAP_SCALE + mapOffset.y;
+                  const x2 = (seg.end.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
+                  const y2 = (location.latitude - seg.end.latitude) * MAP_SCALE + mapOffset.y;
                   
                   return (
                     <svg key={`traffic-${i}`} className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
@@ -3112,7 +3495,12 @@ export default function App() {
 
                 {/* Active Order Pins */}
                 {location && activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, i) => {
-                  const target = order.status === 'accepted' ? order.restaurantLocation : order.customerLocation;
+                  const target = order.status === 'accepted' 
+                    ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
+                    : order.customerLocation;
+                  
+                  if (!target) return null;
+                  
                   const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
                   const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
                   
@@ -3235,9 +3623,14 @@ export default function App() {
                     )}
 
                     {/* Restaurant and Customer markers */}
-                    {activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map(order => {
+                    {location && activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map(order => {
                       const isPickup = order.status === 'accepted';
-                      const target = isPickup ? order.restaurantLocation : order.customerLocation;
+                      const target = isPickup 
+                        ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
+                        : order.customerLocation;
+                      
+                      if (!target) return null;
+
                       const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
                       const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
                       const isSelected = selectedMarkerId === order.id;
@@ -3288,9 +3681,10 @@ export default function App() {
                     })}
 
                     {/* Pending Order Marker (Matching) */}
-                    {pendingOrder && (
+                    {location && pendingOrder && (
                       <>
-                        {[pendingOrder.restaurantLocation, pendingOrder.customerLocation].map((target, i) => {
+                        {[(pendingOrder.type === 'delivery' ? pendingOrder.restaurantLocation : pendingOrder.pickupLocation), pendingOrder.customerLocation].map((target, i) => {
+                          if (!target) return null;
                           const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
                           const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
                           return (
@@ -3642,7 +4036,7 @@ export default function App() {
 
               {/* Bottom Menu Toggle Button / Map Status Bar */}
               {!pendingOrder && !isBottomMenuOpen && (
-                <div className="absolute bottom-0 left-0 right-0 z-50">
+                <div className="absolute bottom-0 left-0 right-0 z-[150]">
                   {user.isOnline ? (
                     <motion.div 
                       initial={{ y: 100 }}
@@ -3694,16 +4088,48 @@ export default function App() {
                       </button>
                     </motion.div>
                   ) : (
-                    <div className="flex flex-col items-center w-full">
+                    <div className="flex flex-col items-center w-full relative">
                       <button 
                         onClick={() => setIsVehicleSettingsOpen(true)}
-                        className={`absolute top-6 left-6 z-[120] p-3 rounded-full shadow-2xl backdrop-blur-md border border-white/10 ${theme === 'dark' ? 'bg-black/80 text-white' : 'bg-white/90 text-black shadow-black/5'}`}
+                        className={`absolute top-6 left-6 z-[160] p-3 rounded-full shadow-2xl backdrop-blur-md border border-white/10 ${theme === 'dark' ? 'bg-black/80 text-white' : 'bg-white/90 text-black shadow-black/5'}`}
                       >
                         <Settings size={20} />
                       </button>
                       {/* GO Button */}
+                      <motion.div 
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="absolute bottom-40 left-1/2 -translate-x-1/2 z-[170]"
+                      >
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (checkDocsExpired()) {
+                              sendNotification("Documents Expired", "Please update your documents to go online.");
+                              setCurrentScreen('documents');
+                              return;
+                            }
+                            if (user.faceVerified) {
+                              setUser(u => ({ ...u, isOnline: true }));
+                              playUberSound('accept');
+                            } else {
+                              setIsVerifyingToOnline(true);
+                              playUberSound('order');
+                              setCurrentScreen('face_verification');
+                            }
+                          }}
+                          className="w-24 h-24 bg-blue-600 text-white rounded-full font-black text-2xl shadow-2xl flex items-center justify-center relative active:scale-95 transition-transform border-4 border-white"
+                        >
+                          <span className="relative z-10">GO</span>
+                          <motion.div 
+                            animate={{ scale: [1, 1.4, 1] }} 
+                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                            className="absolute inset-0 bg-blue-600/30 rounded-full" 
+                          />
+                        </button>
+                      </motion.div>
                       {/* Dashboard Feed (Authentic Uber Experience) */}
-                      <div className="absolute inset-x-0 bottom-0 max-h-[60%] overflow-y-auto no-scrollbar pb-10">
+                      <div className="absolute inset-x-0 bottom-20 max-h-[60%] overflow-y-auto no-scrollbar pb-10 z-[120]">
                         <motion.div 
                           initial={{ y: 200 }}
                           animate={{ y: 0 }}
@@ -3786,26 +4212,7 @@ export default function App() {
                             <p className="text-xs text-gray-400 font-bold mt-1">Earn more on every trip</p>
                           </div>
 
-                          <button 
-                            onClick={() => {
-                              if (checkDocsExpired()) {
-                                sendNotification("Documents Expired", "Please update your documents to go online.");
-                                setCurrentScreen('documents');
-                                return;
-                              }
-                              if (user.faceVerified) {
-                                setUser(u => ({ ...u, isOnline: true }));
-                                playUberSound('accept');
-                              } else {
-                                setIsVerifyingToOnline(true);
-                                playUberSound('order');
-                                setCurrentScreen('face_verification');
-                              }
-                            }}
-                            className="w-full py-5 bg-blue-600 text-white rounded-[32px] font-black text-xl shadow-xl shadow-blue-600/30 active:scale-95 transition-all"
-                          >
-                            GO ONLINE
-                          </button>
+                          <div className="pt-10"></div>
                         </motion.div>
                       </div>
                     </div>
@@ -4140,7 +4547,7 @@ export default function App() {
                                 onClick={() => handleNextStep(order.id)} 
                                 className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}
                               >
-                                {order.status === 'accepted' ? 'Confirm Pickup' : 'Confirm Dropoff'}
+                                {order.status === 'accepted' ? 'Confirm Pickup' : 'Complete Delivery'}
                               </button>
                             </>
                           )}
@@ -4758,6 +5165,25 @@ export default function App() {
             </motion.div>
           )}
 
+          {currentScreen === 'vehicle_details' && (
+            <VehicleDetailsScreen 
+              user={user} 
+              setUser={setUser} 
+              onClose={() => setCurrentScreen('account')} 
+              theme={theme} 
+            />
+          )}
+
+          {currentScreen === 'payment_methods' && (
+            <PaymentMethodsScreen 
+              user={user} 
+              setUser={setUser} 
+              earnings={earnings} 
+              onClose={() => setCurrentScreen('account')} 
+              theme={theme} 
+            />
+          )}
+
           {currentScreen === 'planner' && (
             <motion.div key="rewards" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
               <div className="flex items-center gap-4 mb-8">
@@ -4968,9 +5394,10 @@ export default function App() {
               <div className="space-y-2">
                 {[
                   { icon: <User />, label: "Personal Information", action: () => sendNotification("Account", "Personal info updated.") },
+                  { icon: <CarIcon />, label: "Vehicle Details", action: () => setCurrentScreen('vehicle_details') },
+                  { icon: <CreditCard />, label: "Payment", action: () => setCurrentScreen('payment_methods') },
                   { icon: <History />, label: "Trip History", action: () => setCurrentScreen('trip_history') },
                   { icon: <FileText />, label: "Documents", action: () => setCurrentScreen('documents') },
-                  { icon: <CreditCard />, label: "Payment", action: () => setCurrentScreen('earnings') },
                   { icon: <Settings />, label: "App Settings", action: () => sendNotification("Settings", "Settings updated.") },
                   { icon: <SlidersHorizontal />, label: "Trip Preferences", action: () => setCurrentScreen('trip_preferences') },
                   { icon: <ShieldAlert />, label: "Simulate Bug Scan", action: () => {
@@ -5281,9 +5708,18 @@ export default function App() {
               </div>
 
               <div className="space-y-6">
-                <h3 className="font-black text-xl">
-                  {earningsTab === 'recent' ? 'All Activity' : 'Recent Activity'}
-                </h3>
+                <div className="flex justify-between items-center">
+                  <h3 className="font-black text-xl">
+                    {earningsTab === 'recent' ? 'All Activity' : 'Recent Activity'}
+                  </h3>
+                  <button 
+                    onClick={() => setCurrentScreen('payment_methods')}
+                    className="flex items-center gap-2 text-blue-600 font-black text-[10px] uppercase tracking-widest bg-blue-50 dark:bg-blue-500/10 px-3 py-1.5 rounded-full active:scale-95 transition-transform"
+                  >
+                    <CreditCard size={14} />
+                    Payments & Payouts
+                  </button>
+                </div>
                 {(earningsTab === 'today' ? [1, 2] : [1, 2, 3, 4, 5]).map(i => (
                   <div key={i} className={`flex items-center justify-between py-2 border-b ${theme === 'dark' ? 'border-white/5' : 'border-gray-100'}`}>
                     <div className="flex items-center gap-4">
@@ -5349,14 +5785,12 @@ export default function App() {
       </div>
 
       {/* Bottom Nav */}
-      {currentScreen !== 'home' && (
-        <div className="h-20 bg-black border-t border-white/10 flex items-center justify-around px-4 z-[110]">
-          <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={24} />} label="Home" />
-          <NavButton active={currentScreen === 'earnings'} onClick={() => setCurrentScreen('earnings')} icon={<TrendingUp size={24} />} label="Earnings" />
-          <NavButton active={currentScreen === 'inbox'} onClick={() => setCurrentScreen('inbox')} icon={<Mail size={24} />} label="Inbox" />
-          <NavButton active={currentScreen === 'account'} onClick={() => setCurrentScreen('account')} icon={<User size={24} />} label="Account" />
-        </div>
-      )}
+      <div className="h-20 bg-black border-t border-white/10 flex items-center justify-around px-4 z-[110]">
+        <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={24} />} label="Home" />
+        <NavButton active={currentScreen === 'earnings'} onClick={() => setCurrentScreen('earnings')} icon={<TrendingUp size={24} />} label="Earnings" />
+        <NavButton active={currentScreen === 'inbox'} onClick={() => setCurrentScreen('inbox')} icon={<Mail size={24} />} label="Inbox" />
+        <NavButton active={currentScreen === 'account'} onClick={() => setCurrentScreen('account')} icon={<User size={24} />} label="Account" />
+      </div>
     </div>
   );
 }
