@@ -64,10 +64,15 @@ import {
   Shield,
   Target,
   ArrowUp,
-  Delete
+  ArrowDown,
+  History,
+  Delete,
+  Settings2,
+  Bike as BikeIcon,
+  Car as CarIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Location, Order, AppScreen, ChatMessage, UserProfile, UberProTier, ScheduledOrder } from './types';
+import { Location, Order, AppScreen, ChatMessage, UserProfile, UberProTier, ScheduledOrder, CompletedTrip } from './types';
 import { auth, db, signInWithGoogle, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
@@ -98,71 +103,6 @@ const MOCK_RESTAURANTS = [
 
 const MOCK_CUSTOMERS = ["James", "Sophie", "Oliver", "Emily", "Jack", "Chloe"];
 
-// Helper components moved outside App to prevent flickering
-const UpdateScreen = ({ progress }: { progress: number }) => (
-  <div className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center p-12 text-white">
-    <motion.div 
-      initial={{ scale: 0.8, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      className="w-full max-w-sm flex flex-col items-center"
-    >
-      <div className="w-24 h-24 bg-white rounded-[30px] flex items-center justify-center mb-12">
-        <RefreshCw size={48} className="text-black animate-spin" />
-      </div>
-      <h1 className="text-4xl font-black mb-4 tracking-tighter">UPDATING...</h1>
-      <p className="text-gray-500 font-bold mb-12 text-center">We're improving your driver experience. Please wait.</p>
-      
-      <div className="w-full h-3 bg-gray-900 rounded-full overflow-hidden">
-        <motion.div 
-          initial={{ width: 0 }}
-          animate={{ width: `${progress}%` }}
-          className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]"
-        />
-      </div>
-      <span className="mt-4 font-black text-xl">{progress}%</span>
-    </motion.div>
-  </div>
-);
-
-const MaintenanceScreen = ({ onRetry }: { onRetry: () => void }) => (
-  <div className="fixed inset-0 z-[1000] bg-white flex flex-col items-center justify-center p-12 text-black">
-    <motion.div 
-      initial={{ y: 20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      className="w-full max-w-sm flex flex-col items-center text-center"
-    >
-      <div className="w-24 h-24 bg-red-100 rounded-[30px] flex items-center justify-center mb-12">
-        <ShieldAlert size={48} className="text-red-600" />
-      </div>
-      <h1 className="text-4xl font-black mb-4 tracking-tighter">UNDER MAINTENANCE</h1>
-      <p className="text-gray-400 font-bold mb-12">We've detected a minor bug. Our team is fixing it right now. We'll be back shortly!</p>
-      
-      <button 
-        onClick={onRetry}
-        className="w-full py-5 bg-black text-white rounded-2xl font-black text-xl"
-      >
-        RETRY
-      </button>
-    </motion.div>
-  </div>
-);
-
-const ScanningScreen = () => (
-  <div className="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center p-12 text-white">
-    <div className="relative w-48 h-48 mb-12">
-      <motion.div 
-        animate={{ rotate: 360 }}
-        transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-        className="absolute inset-0 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full"
-      />
-      <div className="absolute inset-4 border-2 border-dashed border-gray-700 rounded-full flex items-center justify-center">
-        <Search size={48} className="text-gray-500 animate-pulse" />
-      </div>
-    </div>
-    <h2 className="text-3xl font-black mb-2">SCANNING FOR BUGS</h2>
-    <p className="text-gray-500 font-bold">Ensuring your app is safe and ready.</p>
-  </div>
-);
 
 const Heatmap = () => (
   <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -244,14 +184,14 @@ const OrderDetailsModal = ({
             </div>
             <div className="flex-1 space-y-8">
               <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Pickup</p>
-                <h4 className="font-black text-lg">{order.restaurantName}</h4>
-                <p className="text-sm font-bold text-gray-500">Arrive by {getArrivalTime(order.estimatedTime / 2)}</p>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{order.type === 'ride' ? 'Pickup' : 'Pickup'}</p>
+                <h4 className="font-black text-lg">{order.type === 'ride' ? `${order.customerName} • ${order.riderRating} ★` : order.restaurantName}</h4>
+                <p className="text-sm font-bold text-gray-500">{order.type === 'ride' ? 'Arrive at pickup by' : 'Arrive by'} {getArrivalTime(order.estimatedTime / 2)}</p>
               </div>
               <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Dropoff</p>
-                <h4 className="font-black text-lg">{order.customerName}</h4>
-                <p className="text-sm font-bold text-gray-500">Deliver by {getArrivalTime(order.estimatedTime)}</p>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{order.type === 'ride' ? 'Dropoff' : 'Dropoff'}</p>
+                <h4 className="font-black text-lg">{order.type === 'ride' ? 'Passenger Destination' : order.customerName}</h4>
+                <p className="text-sm font-bold text-gray-500">{order.type === 'ride' ? 'Estimated arrival by' : 'Deliver by'} {getArrivalTime(order.estimatedTime)}</p>
               </div>
             </div>
           </div>
@@ -269,7 +209,7 @@ const OrderDetailsModal = ({
           onClick={() => onNextStep(order.id)}
           className="flex-1 py-5 bg-black text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform"
         >
-          {order.status === 'accepted' ? 'START PICKUP' : 'START DROPOFF'}
+          {order.status === 'accepted' ? (order.type === 'ride' ? 'START TRIP' : 'START PICKUP') : (order.type === 'ride' ? 'CONFIRM DROPOFF' : 'START DROPOFF')}
         </button>
       </div>
     </motion.div>
@@ -340,9 +280,11 @@ const SideMenu = ({
 
     <div className="flex-1 overflow-y-auto px-6 space-y-1">
       {[
+        { icon: <Zap size={20} />, label: "Work Hub", screen: 'uber_services' },
+        { icon: <Star size={20} />, label: "Feedback", screen: 'ratings' },
         { icon: <Briefcase size={20} />, label: "Opportunities", screen: 'opportunities' },
         { icon: <Clock size={20} />, label: "Scheduled Orders", screen: 'scheduled_orders' },
-        { icon: <Star size={20} />, label: "Uber Pro", screen: 'uber_pro' },
+        { icon: <Gift size={20} />, label: "Uber Pro", screen: 'uber_pro' },
         { icon: <Target size={20} />, label: "Rewards & Quests", screen: 'rewards' },
         { icon: <ShieldCheck size={20} />, label: "Safety Toolkit", action: () => setIsSafetyToolkitOpen(true) },
         { 
@@ -356,7 +298,6 @@ const SideMenu = ({
           }
         },
         { icon: <Settings size={20} />, label: "App Settings", screen: 'account' },
-        { icon: <HelpCircle size={20} />, label: "Help", screen: 'home' },
       ].map((item, idx) => (
         <button 
           key={idx} 
@@ -504,6 +445,114 @@ const ScheduledOrdersScreen = ({
         )}
       </AnimatePresence>
     </motion.div>
+  );
+};
+
+const TripPreferencesModal = ({ 
+  vehicleType, 
+  setVehicleType, 
+  selectedServices, 
+  setSelectedServices, 
+  onClose,
+  theme 
+}: { 
+  vehicleType: 'Car' | 'Bike' | 'Scooter', 
+  setVehicleType: (val: 'Car' | 'Bike' | 'Scooter') => void,
+  selectedServices: JobType[],
+  setSelectedServices: (val: JobType[]) => void,
+  onClose: () => void,
+  theme: string
+}) => {
+  const toggleService = (service: JobType) => {
+    if (selectedServices.includes(service)) {
+      if (selectedServices.length > 1) {
+        setSelectedServices(selectedServices.filter(s => s !== service));
+      }
+    } else {
+      setSelectedServices([...selectedServices, service]);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[600] flex items-end justify-center px-4 pb-8">
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        exit={{ opacity: 0 }} 
+        onClick={onClose} 
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+      />
+      <motion.div 
+        initial={{ y: 200, opacity: 0 }} 
+        animate={{ y: 0, opacity: 1 }} 
+        exit={{ y: 200, opacity: 0 }} 
+        className={`w-full max-w-md rounded-[40px] p-8 shadow-2xl relative z-10 ${theme === 'dark' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black'}`}
+      >
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-2xl font-black">Trip Preferences</h2>
+          <button onClick={onClose} className="p-2 bg-gray-100 dark:bg-white/5 rounded-full"><X size={24} /></button>
+        </div>
+
+        <div className="space-y-8">
+          {/* Vehicle Selector */}
+          <div>
+            <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Select Vehicle</p>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { type: 'Car', icon: <CarIcon size={20} /> },
+                { type: 'Bike', icon: <BikeIcon size={20} /> },
+                { type: 'Scooter', icon: <Zap size={20} /> }
+              ].map(v => (
+                <button 
+                  key={v.type}
+                  onClick={() => setVehicleType(v.type as any)}
+                  className={`p-4 rounded-2xl flex flex-col items-center gap-2 border-2 transition-all ${vehicleType === v.type ? 'border-blue-500 bg-blue-500/10 text-blue-500' : 'border-transparent bg-gray-50 dark:bg-white/5'}`}
+                >
+                  {v.icon}
+                  <span className="text-[10px] font-black uppercase tracking-tight">{v.type}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Services Selector */}
+          <div>
+            <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Earning Method</p>
+            <div className="space-y-3">
+              {[
+                { id: 'delivery', label: 'Uber Eats', desc: 'Food and grocery delivery', icon: <Coffee size={20} /> },
+                { id: 'ride', label: 'UberX', desc: 'Passenger trips', icon: <User size={20} />, disabled: vehicleType !== 'Car' }
+              ].map(s => (
+                <button 
+                  key={s.id}
+                  disabled={s.disabled}
+                  onClick={() => toggleService(s.id as JobType)}
+                  className={`w-full p-4 rounded-3xl flex items-center justify-between border-2 transition-all ${s.disabled ? 'opacity-30 cursor-not-allowed grayscale' : 'active:scale-[0.98]'} ${selectedServices.includes(s.id as JobType) ? 'border-blue-500 bg-blue-500/5' : 'border-transparent bg-gray-50 dark:bg-white/5'}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-2xl bg-white dark:bg-black shadow-sm">{s.icon}</div>
+                    <div className="text-left">
+                      <p className="font-black leading-none mb-1">{s.label}</p>
+                      <p className="text-[10px] font-bold text-gray-400">{s.desc}</p>
+                    </div>
+                  </div>
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedServices.includes(s.id as JobType) ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300'}`}>
+                    {selectedServices.includes(s.id as JobType) && <Check size={14} strokeWidth={4} />}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <button 
+          onClick={onClose}
+          className="w-full mt-10 py-5 bg-black dark:bg-white dark:text-black text-white rounded-[32px] font-black text-xl active:scale-95 transition-transform"
+        >
+          SAVE PREFERENCES
+        </button>
+      </motion.div>
+    </div>
   );
 };
 
@@ -1093,30 +1142,37 @@ export default function App() {
   const [earningsTab, setEarningsTab] = useState<'today' | 'weekly' | 'recent'>('today');
   
   // User Profile State
-  const DEFAULT_USER: UserProfile = {
-    name: "Hassen Nabeel",
-    rating: 4.95,
-    tier: 'Blue',
-    points: 120,
-    deliveries: 8,
-    isOnline: false,
-    documentsUploaded: false,
-    faceVerified: false,
-    walletBalance: 0,
-    documentExpiries: {
-      "Driving Licence": "2026-05-01",
-      "Vehicle Insurance": "2026-06-15",
-      "Bank Statement": "2026-04-10"
-    }
-  };
-
   const [user, setUser] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('uber_eats_user');
+    const baseUser: UserProfile = {
+      name: "Hassen Nabeel",
+      rating: 4.98,
+      tier: 'Platinum',
+      points: 850,
+      deliveries: 124,
+      rides: 56,
+      isOnline: false,
+      documentsUploaded: true,
+      faceVerified: true,
+      walletBalance: 1250.40,
+      vehicleInfo: {
+        make: "Tesla",
+        model: "Model 3",
+        year: 2023,
+        plate: "UB3R 123",
+        type: "UberX"
+      },
+      documentExpiries: {
+        "Driving Licence": "2027-05-01",
+        "Vehicle Insurance": "2026-12-15",
+        "Bank Statement": "Verified"
+      }
+    };
     if (saved) {
       const parsed = JSON.parse(saved);
-      return { ...DEFAULT_USER, ...parsed, isOnline: false }; // Always start offline
+      return { ...baseUser, ...parsed, isOnline: false };
     }
-    return DEFAULT_USER;
+    return baseUser;
   });
 
   // Persist user profile
@@ -1138,6 +1194,18 @@ export default function App() {
   const [location, setLocation] = useState<Location | null>({ latitude: 51.5074, longitude: -0.1278 }); // Default to London
   const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const [vehicleType, setVehicleType] = useState<'Car' | 'Bike' | 'Scooter'>(() => {
+    const saved = localStorage.getItem('uber_vehicle_type');
+    return (saved as any) || 'Car';
+  });
+  const [isVehicleSettingsOpen, setIsVehicleSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('uber_vehicle_type', vehicleType);
+    if (vehicleType === 'Bike' || vehicleType === 'Scooter') {
+      setSelectedServices(prev => prev.filter(s => s !== 'ride'));
+    }
+  }, [vehicleType]);
   const MAP_SCALE = 50000 * zoom;
   const LABEL_SCALE = 10000 * zoom;
   const BUILDING_SCALE = 6000 * zoom;
@@ -1157,6 +1225,10 @@ export default function App() {
     const saved = localStorage.getItem('uber_purchased_items');
     return saved ? JSON.parse(saved) : [];
   });
+  const [completedTrips, setCompletedTrips] = useState<CompletedTrip[]>(() => {
+    const saved = localStorage.getItem('uber_completed_trips');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // Persist theme and earnings
   useEffect(() => {
@@ -1174,9 +1246,21 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('uber_purchased_items', JSON.stringify(purchasedItems));
   }, [purchasedItems]);
+
+  useEffect(() => {
+    localStorage.setItem('uber_completed_trips', JSON.stringify(completedTrips));
+  }, [completedTrips]);
   
   // Chat & Notifications
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'accepted' | 'picked_up'>('all');
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const saved = localStorage.getItem('uber_chat_messages');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('uber_chat_messages', JSON.stringify(messages));
+  }, [messages]);
   const [activeChatOrderId, setActiveChatOrderId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState("");
   const [isCustomerTyping, setIsCustomerTyping] = useState(false);
@@ -1208,16 +1292,36 @@ export default function App() {
   const [hotspots, setHotspots] = useState<{ latitude: number, longitude: number, intensity: number, size: number }[]>([]);
   
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const chatInputRef = useRef<HTMLInputElement | null>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ 
+        behavior, 
+        block: "end" 
+      });
+    });
   };
 
   useEffect(() => {
     if (currentScreen === 'chat') {
-      scrollToBottom();
+      const timer = setTimeout(() => {
+        scrollToBottom("smooth");
+        chatInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
     }
   }, [messages, currentScreen, isCustomerTyping]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (currentScreen === 'chat') {
+        scrollToBottom("auto");
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [currentScreen]);
 
   const [jobTypePreference, setJobTypePreference] = useState<'normal' | 'matching' | 'both'>(() => {
     const saved = localStorage.getItem('uber_job_preference');
@@ -1228,11 +1332,6 @@ export default function App() {
     localStorage.setItem('uber_job_preference', jobTypePreference);
   }, [jobTypePreference]);
 
-  // New Maintenance/Update States
-  const [isUpdating, setIsUpdating] = useState(true);
-  const [updateProgress, setUpdateProgress] = useState(0);
-  const [isScanning, setIsScanning] = useState(false);
-  const [isUnderMaintenance, setIsUnderMaintenance] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<typeof MOCK_RESTAURANTS[0] | null>(null);
   const [rewards, setRewards] = useState<{ completed: number, target: number, reward: string }[]>([
     { completed: 0, target: 5, reward: "£10 Bonus" },
@@ -1355,6 +1454,7 @@ export default function App() {
     }
   }, [location === null]);
   
+  const [selectedServices, setSelectedServices] = useState<JobType[]>(['delivery', 'ride']);
   const currentCity = useMemo(() => {
     if (!location) return "London";
     const lat = location.latitude;
@@ -1391,6 +1491,50 @@ export default function App() {
   }, [pendingOrder, orderExpiryTimer]);
 
   const [isBackgrounded, setIsBackgrounded] = useState(false);
+
+  // Simulated Map Movement
+  useEffect(() => {
+    if (!isNavigating || !user.isOnline || activeOrders.length === 0 || !location) {
+      if (isNavigating && activeOrders.length === 0) setIsNavigating(false);
+      return;
+    }
+
+    const moveInterval = setInterval(() => {
+      const order = activeOrders[0];
+      const target = order.status === 'accepted' ? order.restaurantLocation : order.customerLocation;
+      
+      const dLat = target.latitude - location.latitude;
+      const dLng = target.longitude - location.longitude;
+      const distance = Math.sqrt(dLat * dLat + dLng * dLng);
+      
+      // Speed factor: approx 30mph in degrees/sec
+      // 1 degree lat is ~69 miles. 30mph = 30/3600 miles/sec = 0.0083 mps
+      // 0.0083/69 = 0.00012 degrees per second
+      const speed = 0.00015; 
+
+      if (distance < speed * 1.5) {
+        // We have arrived or are very close
+        setLocation(target);
+        setIsNavigating(false);
+        sendNotification("Arrived", `You have arrived at ${order.status === 'accepted' ? order.restaurantName : order.customerName}`);
+        return;
+      }
+
+      const moveRatio = speed / distance;
+      const moveLat = dLat * moveRatio;
+      const moveLng = dLng * moveRatio;
+
+      setLocation(prev => {
+        if (!prev) return prev;
+        return {
+          latitude: prev.latitude + moveLat,
+          longitude: prev.longitude + moveLng
+        };
+      });
+    }, 1000);
+
+    return () => clearInterval(moveInterval);
+  }, [isNavigating, user.isOnline, activeOrders, location === null]);
 
   // Customer Response Timer Logic
   useEffect(() => {
@@ -1528,29 +1672,6 @@ export default function App() {
 
   const [isSimulatingMovement, setIsSimulatingMovement] = useState(false);
 
-  // Simulated Update and Scan Sequence
-  useEffect(() => {
-    const runSequence = async () => {
-      // 1. Update Progress
-      for (let i = 0; i <= 100; i += 5) {
-        setUpdateProgress(i);
-        await new Promise(r => setTimeout(r, 100));
-      }
-      setIsUpdating(false);
-      
-      // 2. Scanning for Bugs
-      setIsScanning(true);
-      await new Promise(r => setTimeout(r, 2000));
-      
-      // 3. Randomly decide if maintenance is needed (simulated bug)
-      const hasBug = Math.random() > 0.95; // 5% chance of maintenance
-      if (hasBug) {
-        setIsUnderMaintenance(true);
-      }
-      setIsScanning(false);
-    };
-    runSequence();
-  }, []);
 
   // Screen Wake Lock
   useEffect(() => {
@@ -1754,14 +1875,25 @@ export default function App() {
   const [toasts, setToasts] = useState<{ id: string, title: string, body: string }[]>([]);
 
   const addToast = (title: string, body: string) => {
-    const id = Math.random().toString(36).substr(2, 9);
-    setToasts(prev => [...prev, { id, title, body }]);
+    const id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    setToasts(prev => [{ id, title, body }, ...prev.slice(0, 2)]); // Keep max 3 at a time, newest at top
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 5000);
+    }, 4000);
   };
 
+  const lastNoteRef = useRef<{ title: string, body: string, time: number } | null>(null);
+
   const sendNotification = (title: string, body: string) => {
+    const now = Date.now();
+    if (lastNoteRef.current && 
+        lastNoteRef.current.title === title && 
+        lastNoteRef.current.body === body && 
+        now - lastNoteRef.current.time < 2000) {
+      return; // Skip rapid duplicates
+    }
+    lastNoteRef.current = { title, body, time: now };
+    
     if ("Notification" in window && Notification.permission === "granted") {
       try {
         new Notification(title, { body, icon: "https://picsum.photos/seed/uber/100/100" });
@@ -1770,7 +1902,7 @@ export default function App() {
       }
     }
     addToast(title, body);
-    setNotifications(prev => [body, ...prev]);
+    setNotifications(prev => [body, ...prev.slice(0, 49)]); // Keep history bounded
   };
 
   const [uploadedDocs, setUploadedDocs] = useState<string[]>([]);
@@ -1791,131 +1923,131 @@ export default function App() {
   const allDocsUploaded = uploadedDocs.length === 3;
 
   // Surge Pricing Configuration
+  const [activeSurgeAreas, setActiveSurgeAreas] = useState([
+    { id: '1', name: "Shoreditch", lat: 0.005, lng: 0.005, radius: 0.008, multiplier: 1.8, trend: 'stable' as const },
+    { id: '2', name: "Soho", lat: -0.005, lng: -0.008, radius: 0.006, multiplier: 1.5, trend: 'rising' as const },
+    { id: '3', name: "King's Cross", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.6, trend: 'falling' as const }
+  ]);
   const [surgeMultiplier, setSurgeMultiplier] = useState(1.0);
-  const SURGE_AREAS = useMemo(() => [
-    { name: "Shoreditch", lat: 0.005, lng: 0.005, radius: 0.008, multiplier: 1.8 },
-    { name: "Soho", lat: -0.005, lng: -0.008, radius: 0.006, multiplier: 1.5 },
-    { name: "King's Cross", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.6 }
-  ], []);
+
+  // Periodic surge area updates
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveSurgeAreas(prev => prev.map(area => {
+        // Randomly adjust multiplier slightly
+        let newMultiplier = area.multiplier + (Math.random() - 0.5) * 0.1;
+        newMultiplier = Math.max(1.1, Math.min(2.5, newMultiplier));
+        
+        // Randomly shift position slightly to simulate demand movement
+        const newLat = area.lat + (Math.random() - 0.5) * 0.0005;
+        const newLng = area.lng + (Math.random() - 0.5) * 0.0005;
+
+        // Determine trend
+        const trend: 'rising' | 'falling' | 'stable' = 
+          newMultiplier > area.multiplier + 0.02 ? 'rising' : 
+          newMultiplier < area.multiplier - 0.02 ? 'falling' : 'stable';
+
+        return { ...area, multiplier: Number(newMultiplier.toFixed(2)), lat: newLat, lng: newLng, trend };
+      }));
+    }, 15000); // Update every 15 seconds
+
+    return () => clearInterval(timer);
+  }, []);
 
   // Update surge based on current location
   useEffect(() => {
     if (location) {
-      // Find the highest surge zone the driver is currently in
       let maxSurge = 1.0;
-      
-      // Calculate local offset relative to starting point (simplification)
       const localLat = location.latitude - 51.5074;
       const localLng = location.longitude - (-0.1278);
 
-      SURGE_AREAS.forEach(area => {
+      activeSurgeAreas.forEach(area => {
         const d = Math.sqrt(Math.pow(localLat - area.lat, 2) + Math.pow(localLng - area.lng, 2));
         if (d < area.radius) {
           maxSurge = Math.max(maxSurge, area.multiplier);
         }
       });
       
-      // Also apply time-based surge modifier
       const hour = new Date().getHours();
       const isPeak = (hour >= 11 && hour <= 14) || (hour >= 18 && hour <= 21);
       
       if (isPeak && maxSurge === 1.0) {
-        maxSurge = 1.2; // Baseline surge during peak everywhere
+        maxSurge = 1.2;
       }
 
       setSurgeMultiplier(maxSurge);
     }
-  }, [location, SURGE_AREAS]);
+  }, [location, activeSurgeAreas]);
 
   // Improved Order Matching Algorithm with Surge
   const generateSmartOrder = () => {
     if (!location) return null;
 
+    // Filter services based on vehicle type
+    const availableServices = selectedServices.filter(service => {
+      if (vehicleType === 'Bike' || vehicleType === 'Scooter') {
+        return service === 'delivery';
+      }
+      return true; // Car can do both
+    });
+
+    if (availableServices.length === 0) return null;
+
     // 1. Generate 5 candidate orders
     const candidates = Array.from({ length: 5 }).map(() => {
-      const randomRest = MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)];
+      const type = availableServices[Math.floor(Math.random() * availableServices.length)];
       const customerName = MOCK_CUSTOMERS[Math.floor(Math.random() * MOCK_CUSTOMERS.length)];
       
-      const restLat = location.latitude + randomRest.offset.lat;
-      const restLng = location.longitude + randomRest.offset.lng;
-      const custLat = restLat + (Math.random() - 0.5) * 0.01;
-      const custLng = restLng + (Math.random() - 0.5) * 0.01;
+      const restOffset = MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)].offset;
+      const pickupLat = location.latitude + restOffset.lat;
+      const pickupLng = location.longitude + restOffset.lng;
+      const custLat = pickupLat + (Math.random() - 0.5) * 0.02;
+      const custLng = pickupLng + (Math.random() - 0.5) * 0.02;
 
-      const distToRest = Math.sqrt(Math.pow(restLat - location.latitude, 2) + Math.pow(restLng - location.longitude, 2)) * MILES_PER_DEGREE;
-      const tripDist = Math.sqrt(Math.pow(custLat - restLat, 2) + Math.pow(custLng - restLng, 2)) * MILES_PER_DEGREE;
+      const distToPickup = Math.sqrt(Math.pow(pickupLat - location.latitude, 2) + Math.pow(pickupLng - location.longitude, 2)) * MILES_PER_DEGREE;
+      const tripDist = Math.sqrt(Math.pow(custLat - pickupLat, 2) + Math.pow(custLng - pickupLng, 2)) * MILES_PER_DEGREE;
       
-      // Check if restaurant is in a surge area
       let activeSurge = surgeMultiplier;
-      SURGE_AREAS.forEach(area => {
-        const d = Math.sqrt(Math.pow(randomRest.offset.lat - area.lat, 2) + Math.pow(randomRest.offset.lng - area.lng, 2));
+      activeSurgeAreas.forEach(area => {
+        const d = Math.sqrt(Math.pow(pickupLat - 51.5074 - area.lat, 2) + Math.pow(pickupLng - (-0.1278) - area.lng, 2));
         if (d < area.radius) {
           activeSurge = Math.max(activeSurge, area.multiplier);
         }
       });
 
-      const basePay = 3.50 + (tripDist * 1.5) + (Math.random() * 2);
-      const pay = basePay * activeSurge;
+      const basePay = type === 'ride' ? 5.00 + (tripDist * 2.0) : 3.50 + (tripDist * 1.5);
+      const pay = (basePay + (Math.random() * 2)) * activeSurge;
 
       return {
         id: Math.random().toString(36).substr(2, 9),
-        restaurantName: randomRest.name,
+        type,
+        restaurantName: type === 'delivery' ? MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)].name : undefined,
         customerName,
-        restaurantLocation: { latitude: restLat, longitude: restLng },
+        restaurantLocation: type === 'delivery' ? { latitude: pickupLat, longitude: pickupLng } : undefined,
+        pickupLocation: type === 'ride' ? { latitude: pickupLat, longitude: pickupLng } : undefined,
         customerLocation: { latitude: custLat, longitude: custLng },
         estimatedPay: pay,
         estimatedDistance: tripDist,
         estimatedTime: Math.floor(tripDist * 5 + 5),
         status: 'pending' as const,
-        items: ["Meal Deal", "Extra Fries", "Coke Zero"],
-        distToRest,
+        items: type === 'delivery' ? ["Meal Deal", "Extra Fries", "Coke Zero"] : undefined,
+        distToPickup,
         pin: Math.floor(1000 + Math.random() * 9000).toString(),
         isMatching: activeOrders.length > 0 || Math.random() < 0.3,
-        surge: activeSurge > 1.0 ? activeSurge : undefined
-      };
+        surge: activeSurge > 1.0 ? activeSurge : undefined,
+        riderRating: type === 'ride' ? Number((4.5 + Math.random() * 0.5).toFixed(2)) : undefined,
+        isUberX: type === 'ride'
+      } as Order;
     });
 
-    // 2. Score each candidate
     const scoredCandidates = candidates.map(order => {
       let score = 0;
-
-      // Factor 1: Proximity to driver (Closer is better)
-      score += (10 / (order.distToRest + 0.5));
-
-      // Factor 2: Pay (Higher is better)
+      score += (10 / (order.type === 'ride' ? order.id.length : 1)); // Mock dist
       score += (order.estimatedPay * 2);
-
-      // Factor 3: Route Alignment (Stacked orders)
-      if (activeOrders.length > 0) {
-        activeOrders.forEach(active => {
-          const target = active.status === 'accepted' ? active.restaurantLocation : active.customerLocation;
-          
-          // Check if new restaurant is near current target
-          const distToRestFromActive = Math.sqrt(
-            Math.pow(order.restaurantLocation.latitude - target.latitude, 2) + 
-            Math.pow(order.restaurantLocation.longitude - target.longitude, 2)
-          ) * MILES_PER_DEGREE;
-
-          // Check if new customer is near current target
-          const distToCustFromActive = Math.sqrt(
-            Math.pow(order.customerLocation.latitude - target.latitude, 2) + 
-            Math.pow(order.customerLocation.longitude - target.longitude, 2)
-          ) * MILES_PER_DEGREE;
-          
-          // Boost score if either restaurant or customer is nearby
-          if (distToRestFromActive < 0.5) score += 40;
-          if (distToCustFromActive < 0.5) score += 20;
-          
-          // Extra boost if both are somewhat aligned (efficient route)
-          if (distToRestFromActive < 1 && distToCustFromActive < 1) score += 15;
-        });
-      }
-
       return { order, score };
     });
 
-    // 3. Pick the best one
-    const best = scoredCandidates.sort((a, b) => b.score - a.score)[0].order;
-    return best;
+    return scoredCandidates.sort((a, b) => b.score - a.score)[0].order;
   };
 
   // Simulate incoming orders when online
@@ -2031,6 +2163,7 @@ export default function App() {
 
     setMessages(prev => [...prev, newMessage]);
     setChatInput("");
+    chatInputRef.current?.focus();
 
     // Start response timer if not already active
     setCustomerTimers(prev => ({ 
@@ -2082,10 +2215,15 @@ export default function App() {
 
     if (order.status === 'accepted') {
       setActiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'picked_up' } : o));
-      sendNotification("Order Picked Up", `Head to ${order.customerName}'s location`);
+      const msg = order.type === 'ride' ? `Rider ${order.customerName} picked up` : `Order from ${order.restaurantName} picked up`;
+      sendNotification(order.type === 'ride' ? "Trip Started" : "Order Picked Up", msg);
       playUberSound('accept');
     } else if (order.status === 'picked_up') {
-      setVerifyingDeliveryId(orderId);
+      if (order.type === 'ride') {
+        handleCompleteDelivery(orderId); // Rides don't usually need PIN/Photo for this demo
+      } else {
+        setVerifyingDeliveryId(orderId);
+      }
     }
   };
 
@@ -2094,6 +2232,25 @@ export default function App() {
     if (!order) return;
 
     setEarnings(prev => prev + order.estimatedPay);
+    setCompletedTrips(prev => [
+      {
+        id: order.id,
+        type: order.type,
+        restaurantName: order.restaurantName || "UberX Trip",
+        customerName: order.customerName,
+        earnings: order.estimatedPay,
+        distance: order.estimatedDistance,
+        timestamp: Date.now()
+      },
+      ...prev
+    ]);
+    
+    if (order.type === 'ride') {
+      setUser(u => ({ ...u, rides: (u.rides || 0) + 1 }));
+    } else {
+      setUser(u => ({ ...u, deliveries: u.deliveries + 1 }));
+    }
+
     setActiveOrders(prev => prev.filter(o => o.id !== orderId));
 
     // Remote Cleanup
@@ -2117,11 +2274,11 @@ export default function App() {
       return updated;
     });
     
-    sendNotification("Delivery Complete", `You earned £${order.estimatedPay.toFixed(2)}`);
+    sendNotification(order.type === 'ride' ? "Trip Complete" : "Delivery Complete", `You earned £${order.estimatedPay.toFixed(2)}`);
     setLastTrip({
       amount: order.estimatedPay,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type: "Uber Eats"
+      type: order.type === 'ride' ? "UberX" : "Uber Eats"
     });
     setShowLastTripCard(true);
     playUberSound('accept');
@@ -2275,7 +2432,7 @@ export default function App() {
   return (
     <div className={`h-[100dvh] w-full font-sans overflow-hidden flex flex-col select-none relative transition-all duration-500 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-gray-100 text-black'}`}>
       {/* In-App Toasts */}
-      <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-[380px] px-4 pointer-events-none">
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-[380px] px-4 pointer-events-none flex flex-col items-center gap-2">
         <AnimatePresence>
           {toasts.map(toast => (
             <motion.div 
@@ -2303,26 +2460,6 @@ export default function App() {
         </AnimatePresence>
       </div>
 
-      <AnimatePresence>
-        {isUpdating && <UpdateScreen progress={updateProgress} />}
-        {isScanning && <ScanningScreen />}
-        {isUnderMaintenance && <MaintenanceScreen onRetry={() => setIsUnderMaintenance(false)} />}
-      </AnimatePresence>
-
-      {/* Desktop Notch */}
-      <div className="hidden md:block absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-black rounded-b-2xl z-[200]" />
-      
-      {/* Status Bar */}
-      <div className={`h-8 w-full flex justify-between items-center px-6 pt-2 text-[10px] font-medium opacity-80 z-[110] ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
-        <span>{formatTime(currentTime).replace(' AM', '').replace(' PM', '')}</span>
-        <div className="flex gap-1 items-center">
-          <Zap size={10} fill="currentColor" />
-          <span>5G</span>
-          <div className={`w-4 h-2 border rounded-[2px] relative ${theme === 'dark' ? 'border-white/40' : 'border-black/40'}`}>
-            <div className={`absolute left-0 top-0 h-full w-3/4 rounded-[1px] ${theme === 'dark' ? 'bg-white' : 'bg-black'}`} />
-          </div>
-        </div>
-      </div>
 
       <AnimatePresence>
         {isSideMenuOpen && (
@@ -2567,9 +2704,15 @@ export default function App() {
                       <div className="flex justify-between items-start mb-8">
                         <div>
                           <div className="flex items-center gap-2 mb-2">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase ${pendingOrder.isMatching ? 'bg-orange-500 text-white' : 'bg-blue-600 text-white'}`}>
-                              {pendingOrder.isMatching ? 'Matching Trip' : 'New Trip'}
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase ${pendingOrder.type === 'ride' ? 'bg-black text-white' : pendingOrder.isMatching ? 'bg-orange-500 text-white' : 'bg-blue-600 text-white'}`}>
+                              {pendingOrder.type === 'ride' ? 'UberX' : pendingOrder.isMatching ? 'Matching Trip' : 'New Trip'}
                             </span>
+                            {pendingOrder.type === 'ride' && pendingOrder.riderRating && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase bg-yellow-500 text-white flex items-center gap-1">
+                                <Star size={8} fill="currentColor" />
+                                {pendingOrder.riderRating} RATING
+                              </span>
+                            )}
                             {pendingOrder.pin && (
                               <span className="px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase bg-green-500 text-white flex items-center gap-1">
                                 <ShieldCheck size={8} fill="currentColor" />
@@ -2594,21 +2737,21 @@ export default function App() {
 
                       <div className="space-y-6 mb-12">
                         <div className="flex items-start gap-4">
-                          <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-500 shrink-0">
-                            <Coffee size={20} />
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${pendingOrder.type === 'ride' ? 'bg-blue-500/20 text-blue-500' : 'bg-orange-500/20 text-orange-500'}`}>
+                            {pendingOrder.type === 'ride' ? <User size={20} /> : <Coffee size={20} />}
                           </div>
                           <div>
-                            <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Pickup</p>
-                            <p className="text-xl font-bold">{pendingOrder.restaurantName}</p>
+                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${pendingOrder.type === 'ride' ? 'text-blue-500' : 'text-orange-500'}`}>{pendingOrder.type === 'ride' ? 'Rider Pickup' : 'Restaurant Pickup'}</p>
+                            <p className="text-xl font-bold">{pendingOrder.type === 'ride' ? `${pendingOrder.customerName} • ${pendingOrder.riderRating} ★` : pendingOrder.restaurantName}</p>
                           </div>
                         </div>
                         <div className="flex items-start gap-4">
-                          <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-500 shrink-0">
-                            <User size={20} />
+                          <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 shrink-0">
+                            <Navigation size={20} />
                           </div>
                           <div>
-                            <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Dropoff</p>
-                            <p className="text-xl font-bold">{pendingOrder.customerName}</p>
+                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Trip Destination</p>
+                            <p className="text-xl font-bold">{pendingOrder.type === 'ride' ? 'Dropoff Location' : pendingOrder.customerName}</p>
                           </div>
                         </div>
                       </div>
@@ -2814,7 +2957,7 @@ export default function App() {
                 }} />
 
                 {/* Surge Zones Visualization */}
-                {location && SURGE_AREAS.map((area, i) => {
+                {location && activeSurgeAreas.map((area, i) => {
                   const x = area.lng * MAP_SCALE + mapOffset.x;
                   const y = -area.lat * MAP_SCALE + mapOffset.y;
                   return (
@@ -2968,7 +3111,7 @@ export default function App() {
                 </svg>
 
                 {/* Active Order Pins */}
-                {location && activeOrders.map((order, i) => {
+                {location && activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, i) => {
                   const target = order.status === 'accepted' ? order.restaurantLocation : order.customerLocation;
                   const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
                   const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
@@ -3092,7 +3235,7 @@ export default function App() {
                     )}
 
                     {/* Restaurant and Customer markers */}
-                    {activeOrders.map(order => {
+                    {activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map(order => {
                       const isPickup = order.status === 'accepted';
                       const target = isPickup ? order.restaurantLocation : order.customerLocation;
                       const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
@@ -3196,33 +3339,46 @@ export default function App() {
                       {isNightMode ? <Sun size={24} /> : <Moon size={24} />}
                     </button>
                     <div className="flex justify-between items-center w-full">
-                      <button 
-                        onClick={() => setIsSafetyToolkitOpen(true)}
-                        className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 pointer-events-auto active:scale-90 transition-transform"
-                      >
-                        <Shield size={24} />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          // Re-center logic
-                          setMapOffset({ x: 0, y: 0 });
-                          sendNotification("GPS Centered", "Map view reset to your current location.");
-                        }}
-                        className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 pointer-events-auto active:scale-90 transition-transform"
-                      >
-                        <Target size={24} />
-                      </button>
-                      <button 
-                        onClick={() => setIsInboxOpen(true)}
-                        className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 pointer-events-auto active:scale-90 transition-transform"
-                      >
-                        <Bell size={24} />
-                        {notifications.length > 0 && (
-                          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white">
-                            {notifications.length}
-                          </span>
-                        )}
-                      </button>
+                      <div className="flex gap-2 pointer-events-auto">
+                        <button 
+                          onClick={() => setIsSafetyToolkitOpen(true)}
+                          className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 active:scale-90 transition-transform"
+                        >
+                          <Shield size={24} />
+                        </button>
+                        <button 
+                          onClick={() => setIsVehicleSettingsOpen(true)}
+                          className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 active:scale-90 transition-transform relative"
+                        >
+                          <Settings2 size={24} />
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center border-2 border-white">
+                            <div className="w-1 h-1 bg-white rounded-full" />
+                          </div>
+                        </button>
+                      </div>
+                      <div className="flex gap-2 pointer-events-auto">
+                        <button 
+                          onClick={() => {
+                            // Re-center logic
+                            setMapOffset({ x: 0, y: 0 });
+                            sendNotification("GPS Centered", "Map view reset to your current location.");
+                          }}
+                          className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 active:scale-90 transition-transform"
+                        >
+                          <Target size={24} />
+                        </button>
+                        <button 
+                          onClick={() => setIsInboxOpen(true)}
+                          className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 active:scale-90 transition-transform"
+                        >
+                          <Bell size={24} />
+                          {notifications.length > 0 && (
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white">
+                              {notifications.length}
+                            </span>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -3539,47 +3695,119 @@ export default function App() {
                     </motion.div>
                   ) : (
                     <div className="flex flex-col items-center w-full">
+                      <button 
+                        onClick={() => setIsVehicleSettingsOpen(true)}
+                        className={`absolute top-6 left-6 z-[120] p-3 rounded-full shadow-2xl backdrop-blur-md border border-white/10 ${theme === 'dark' ? 'bg-black/80 text-white' : 'bg-white/90 text-black shadow-black/5'}`}
+                      >
+                        <Settings size={20} />
+                      </button>
                       {/* GO Button */}
-                      <motion.button
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => {
-                          if (checkDocsExpired()) {
-                            sendNotification("Documents Expired", "Please update your documents to go online.");
-                            setCurrentScreen('documents');
-                            return;
-                          }
-                          if (user.faceVerified) {
-                            setUser(u => ({ ...u, isOnline: true }));
-                            playUberSound('accept');
-                          } else {
-                            setIsVerifyingToOnline(true);
-                            playUberSound('order');
-                            setCurrentScreen('face_verification');
-                          }
-                        }}
-                        className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(37,99,235,0.4)] border-4 border-white mb-6 active:scale-95 transition-transform z-50"
-                      >
-                        <span className="text-white font-black text-xl tracking-widest">GO</span>
-                      </motion.button>
+                      {/* Dashboard Feed (Authentic Uber Experience) */}
+                      <div className="absolute inset-x-0 bottom-0 max-h-[60%] overflow-y-auto no-scrollbar pb-10">
+                        <motion.div 
+                          initial={{ y: 200 }}
+                          animate={{ y: 0 }}
+                          className={`w-full ${theme === 'dark' ? 'bg-[#0a0a0a]' : 'bg-gray-50'} rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.15)] border-t border-white/5 p-6 space-y-4`}
+                        >
+                          <div className="flex justify-center mb-2">
+                            <div className={`w-12 h-1.5 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-200'}`} />
+                          </div>
 
-                      {/* Bottom Status Bar */}
-                      <motion.div 
-                        initial={{ y: 100 }}
-                        animate={{ y: 0 }}
-                        className="w-full bg-white px-6 py-5 flex items-center justify-between shadow-[0_-10px_40px_rgba(0,0,0,0.1)] rounded-t-[32px] border-t border-gray-100"
-                      >
-                        <button onClick={() => setIsBottomMenuOpen(true)} className="text-gray-400">
-                          <Menu size={24} />
-                        </button>
-                        <div className="flex flex-col items-center">
-                          <span className="text-lg font-black text-black">You're offline</span>
-                        </div>
-                        <button onClick={() => setIsBottomMenuOpen(true)} className="text-gray-400">
-                          <List size={24} />
-                        </button>
-                      </motion.div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div 
+                              onClick={() => setCurrentScreen('earnings')}
+                              className={`p-6 rounded-[30px] border-2 transition-all active:scale-95 ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-100 shadow-sm'}`}
+                            >
+                              <div className="text-gray-400 font-black text-[10px] uppercase tracking-widest mb-1">Today</div>
+                              <div className="text-2xl font-black">£{earnings.toFixed(2)}</div>
+                              <div className="flex items-center gap-1 text-[10px] font-bold text-blue-600 mt-2">
+                                <TrendingUp size={12} />
+                                View Earnings
+                              </div>
+                            </div>
+                            <div 
+                              onClick={() => setCurrentScreen('ratings')}
+                              className={`p-6 rounded-[30px] border-2 transition-all active:scale-95 ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-100 shadow-sm'}`}
+                            >
+                              <div className="text-gray-400 font-black text-[10px] uppercase tracking-widest mb-1">Rating</div>
+                              <div className="text-2xl font-black">{user.rating.toFixed(2)} ★</div>
+                              <div className="flex items-center gap-1 text-[10px] font-bold text-green-600 mt-2">
+                                <Star size={12} fill="currentColor" />
+                                Top Partner
+                              </div>
+                            </div>
+                          </div>
+
+                          <div 
+                            onClick={() => setIsVehicleSettingsOpen(true)}
+                            className={`p-6 rounded-[32px] border-2 transition-all active:scale-[0.98] flex items-center justify-between col-span-2 ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-100 shadow-sm'}`}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="p-3 bg-blue-600/10 text-blue-600 rounded-2xl">
+                                {vehicleType === 'Car' ? <CarIcon size={24} /> : vehicleType === 'Bike' ? <BikeIcon size={24} /> : <Zap size={24} />}
+                              </div>
+                              <div>
+                                <h3 className="font-black">Trip Preferences</h3>
+                                <p className="text-xs font-bold text-gray-400">Mode: {vehicleType} • {selectedServices.length} Selected</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center">
+                                <Settings size={16} className="text-gray-400" />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div 
+                            onClick={() => setCurrentScreen('uber_services')}
+                            className={`p-6 rounded-[32px] border-2 transition-all active:scale-[0.98] flex items-center justify-between ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-100 shadow-sm'}`}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="p-3 bg-blue-600/10 text-blue-600 rounded-2xl">
+                                <Zap size={24} />
+                              </div>
+                              <div>
+                                <h3 className="font-black">Work Hub</h3>
+                                <p className="text-xs font-bold text-gray-400">Choose how to earn</p>
+                              </div>
+                            </div>
+                            <ArrowRight size={20} className="text-gray-300" />
+                          </div>
+
+                          <div 
+                            onClick={() => setCurrentScreen('opportunities')}
+                            className={`p-6 rounded-[32px] border-2 transition-all active:scale-[0.98] ${theme === 'dark' ? 'bg-blue-900/20 border-white/5' : 'bg-blue-50 border-blue-100 shadow-sm'}`}
+                          >
+                            <div className="flex items-center gap-3 mb-2 text-blue-600">
+                              <TrendingUp size={20} />
+                              <span className="font-black">High Demand Area</span>
+                            </div>
+                            <p className={`font-black ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Surge is rising in {currentCity}</p>
+                            <p className="text-xs text-gray-400 font-bold mt-1">Earn more on every trip</p>
+                          </div>
+
+                          <button 
+                            onClick={() => {
+                              if (checkDocsExpired()) {
+                                sendNotification("Documents Expired", "Please update your documents to go online.");
+                                setCurrentScreen('documents');
+                                return;
+                              }
+                              if (user.faceVerified) {
+                                setUser(u => ({ ...u, isOnline: true }));
+                                playUberSound('accept');
+                              } else {
+                                setIsVerifyingToOnline(true);
+                                playUberSound('order');
+                                setCurrentScreen('face_verification');
+                              }
+                            }}
+                            className="w-full py-5 bg-blue-600 text-white rounded-[32px] font-black text-xl shadow-xl shadow-blue-600/30 active:scale-95 transition-all"
+                          >
+                            GO ONLINE
+                          </button>
+                        </motion.div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -3748,8 +3976,25 @@ export default function App() {
                           {/* Active Orders in Menu */}
                           {activeOrders.length > 0 ? (
                             <div className="space-y-3 mb-6">
-                              <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Active Trips</p>
-                              {activeOrders.map((order, idx) => (
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Active Trips</p>
+                                <div className={`flex p-0.5 rounded-lg ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}>
+                                  {(['all', 'accepted', 'picked_up'] as const).map((f) => (
+                                    <button
+                                      key={f}
+                                      onClick={(e) => { e.stopPropagation(); setOrderStatusFilter(f); }}
+                                      className={`px-3 py-1 rounded-md text-[8px] font-black uppercase tracking-wider transition-all ${
+                                        orderStatusFilter === f 
+                                          ? (theme === 'dark' ? 'bg-white text-black shadow-sm' : 'bg-black text-white shadow-sm')
+                                          : 'text-gray-400 opacity-60 hover:opacity-100'
+                                      }`}
+                                    >
+                                      {f === 'all' ? 'All' : f === 'accepted' ? 'Pickup' : 'Drop'}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              {activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, idx) => (
                                 <motion.div 
                                   key={order.id} 
                                   initial={{ x: -20, opacity: 0 }} 
@@ -3770,9 +4015,22 @@ export default function App() {
                                       <p className="text-xs text-gray-400 font-bold">{order.items.length} items • £{order.estimatedPay.toFixed(2)}</p>
                                     </div>
                                   </div>
-                                  <div className="text-right">
-                                    <p className="text-sm font-black">£{order.estimatedPay.toFixed(2)}</p>
-                                    <p className="text-[10px] font-bold text-gray-400">{order.status === 'accepted' ? 'Pickup' : 'Dropoff'}</p>
+                                  <div className="flex items-center gap-2">
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveChatOrderId(order.id);
+                                        setIsBottomMenuOpen(false);
+                                        setCurrentScreen('chat');
+                                      }}
+                                      className={`p-2 rounded-xl border ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}
+                                    >
+                                      <MessageSquare size={18} />
+                                    </button>
+                                    <div className="text-right">
+                                      <p className="text-sm font-black">£{order.estimatedPay.toFixed(2)}</p>
+                                      <p className="text-[10px] font-bold text-gray-400">{order.status === 'accepted' ? 'Pickup' : 'Dropoff'}</p>
+                                    </div>
                                   </div>
                                 </motion.div>
                               ))}
@@ -3826,7 +4084,7 @@ export default function App() {
               {/* Bottom Cards */}
               <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2 pointer-events-none">
                 <AnimatePresence>
-                  {activeOrders.map((order, idx) => (
+                  {activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, idx) => (
                     <motion.div 
                       key={order.id} 
                       initial={{ y: 100 }} 
@@ -4087,7 +4345,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50 scroll-smooth no-scrollbar">
                 <div className="flex justify-center p-4">
                   <div className="bg-white px-4 py-2 rounded-full border border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest shadow-sm">
                     Today • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -4109,9 +4367,19 @@ export default function App() {
                         <div className={`p-4 rounded-2xl font-bold text-sm shadow-sm ${
                           msg.sender === 'driver' 
                             ? 'bg-blue-600 text-white rounded-tr-none' 
-                            : 'bg-white text-black border border-gray-100 rounded-tl-none'
+                            : msg.text.includes('PIN is') 
+                              ? 'bg-green-50 text-green-700 border-2 border-green-200' 
+                              : 'bg-white text-black border border-gray-100 rounded-tl-none'
                         }`}>
-                          {msg.text}
+                          {msg.text.includes('PIN is') ? (
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-green-600 opacity-60">
+                                <ShieldCheck size={12} />
+                                Security Code Received
+                              </div>
+                              <div className="text-lg font-black tracking-tight">{msg.text}</div>
+                            </div>
+                          ) : msg.text}
                         </div>
                         {showTime && (
                           <span className={`text-[8px] font-black mt-1 text-gray-400 uppercase tracking-widest ${msg.sender === 'driver' ? 'text-right' : 'text-left'}`}>
@@ -4154,7 +4422,14 @@ export default function App() {
               </div>
               
               <div className="bg-white border-t border-gray-100 p-2 overflow-x-auto no-scrollbar flex gap-2">
-                {["I've arrived", "I'm outside", "What's the PIN?", "Please send PIN", "Can't find you"].map(text => (
+                <button 
+                  onClick={() => handleSendMessage("Could you please send the delivery PIN?")}
+                  className="whitespace-nowrap px-4 py-2 bg-blue-50 text-blue-600 border border-blue-100 rounded-full text-xs font-black uppercase tracking-wider hover:bg-blue-100 active:scale-95 transition-all shadow-sm flex items-center gap-2"
+                >
+                  <ShieldCheck size={14} />
+                  Request PIN
+                </button>
+                {["I've arrived", "I'm outside", "Can't find you"].map(text => (
                   <button 
                     key={text}
                     onClick={() => handleSendMessage(text)}
@@ -4168,6 +4443,7 @@ export default function App() {
               <div className="p-4 bg-white border-t border-gray-100 flex gap-2 pb-10">
                 <div className="flex-1 bg-gray-100 rounded-[28px] focus-within:bg-white focus-within:ring-2 focus-within:ring-black transition-all flex items-center px-4">
                   <input 
+                    ref={chatInputRef}
                     type="text" 
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
@@ -4334,21 +4610,28 @@ export default function App() {
                 <h1 className="text-3xl font-black">Opportunities</h1>
               </div>
               <div className="space-y-4">
-                <div className="p-6 bg-blue-50 rounded-3xl border-2 border-blue-100">
-                  <div className="flex items-center gap-3 mb-2 text-blue-600">
-                    <TrendingUp size={20} />
-                    <span className="font-black">1.5x Surge</span>
+                {activeSurgeAreas.map((area) => (
+                  <div key={area.id} className={`p-6 rounded-3xl border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-blue-50 border-blue-100'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3 text-blue-600">
+                        <TrendingUp size={20} />
+                        <span className="font-black">{area.multiplier}x Surge</span>
+                      </div>
+                      {area.trend === 'rising' && <div className="flex items-center gap-1 text-green-500 text-[10px] font-black uppercase tracking-widest"><ArrowUp size={10} /> Rising</div>}
+                      {area.trend === 'falling' && <div className="flex items-center gap-1 text-red-500 text-[10px] font-black uppercase tracking-widest"><ArrowDown size={10} /> Falling</div>}
+                    </div>
+                    <p className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>{area.name} is busy.</p>
+                    <p className="text-sm text-gray-500 font-bold mt-1">Head towards {area.name} for higher earnings potential.</p>
                   </div>
-                  <p className="font-bold text-lg">Central London is busy right now.</p>
-                  <p className="text-sm text-gray-500 font-bold mt-1">Expected earnings are higher than usual.</p>
-                </div>
-                <div className="p-6 bg-gray-50 rounded-3xl">
+                ))}
+
+                <div className={`p-6 rounded-3xl ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
                   <div className="flex items-center gap-3 mb-2 text-green-600">
                     <Gift size={20} />
                     <span className="font-black">Quest: £20 Bonus</span>
                   </div>
-                  <p className="font-bold">Complete 10 more trips today.</p>
-                  <div className="w-full h-2 bg-gray-200 rounded-full mt-3 overflow-hidden">
+                  <p className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Complete 10 more trips today.</p>
+                  <div className={`w-full h-2 rounded-full mt-3 overflow-hidden ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-200'}`}>
                     <div className="h-full bg-green-500" style={{ width: '80%' }} />
                   </div>
                   <p className="text-xs text-gray-400 font-bold mt-2">8/10 completed</p>
@@ -4357,7 +4640,125 @@ export default function App() {
             </motion.div>
           )}
 
-          {currentScreen === 'rewards' && (
+          {currentScreen === 'uber_services' && (
+            <motion.div key="uber_services" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
+              <div className="flex items-center gap-4 mb-8">
+                <button onClick={() => setCurrentScreen('home')} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><X size={24} /></button>
+                <h1 className="text-3xl font-black">Work Hub</h1>
+              </div>
+              <div className="space-y-4">
+                <div className={`p-6 rounded-[32px] border-2 transition-all ${selectedServices.includes('ride') ? 'bg-black border-black text-white' : 'bg-white border-gray-100 text-black'}`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${selectedServices.includes('ride') ? 'bg-white/10' : 'bg-gray-100'}`}>
+                        <Car size={32} />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black">UberX</h3>
+                        <p className="text-xs font-bold opacity-60 italic">Accept passenger requests</p>
+                      </div>
+                    </div>
+                    <div 
+                      onClick={() => {
+                        setSelectedServices(prev => 
+                          prev.includes('ride') ? prev.filter(s => s !== 'ride') : [...prev, 'ride']
+                        );
+                      }}
+                      className={`w-14 h-8 rounded-full p-1 transition-colors relative cursor-pointer ${selectedServices.includes('ride') ? 'bg-blue-500' : 'bg-gray-300'}`}
+                    >
+                      <motion.div animate={{ x: selectedServices.includes('ride') ? 24 : 0 }} className="w-6 h-6 bg-white rounded-full shadow-md" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-black uppercase tracking-widest">Insurance Verified</span>
+                    <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-black uppercase tracking-widest">UberX Eligible</span>
+                  </div>
+                </div>
+
+                <div className={`p-6 rounded-[32px] border-2 transition-all ${selectedServices.includes('delivery') ? 'bg-green-600 border-green-600 text-white' : 'bg-white border-gray-100 text-black'}`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${selectedServices.includes('delivery') ? 'bg-white/10' : 'bg-gray-100'}`}>
+                        <ShoppingBag size={32} />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black">Uber Eats</h3>
+                        <p className="text-xs font-bold opacity-60 italic">Accept food delivery requests</p>
+                      </div>
+                    </div>
+                    <div 
+                      onClick={() => {
+                        setSelectedServices(prev => 
+                          prev.includes('delivery') ? prev.filter(s => s !== 'delivery') : [...prev, 'delivery']
+                        );
+                      }}
+                      className={`w-14 h-8 rounded-full p-1 transition-colors relative cursor-pointer ${selectedServices.includes('delivery') ? 'bg-white/20' : 'bg-gray-300'}`}
+                    >
+                      <motion.div animate={{ x: selectedServices.includes('delivery') ? 24 : 0 }} className="w-6 h-6 bg-white rounded-full shadow-md" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-black uppercase tracking-widest">Active</span>
+                    <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-black uppercase tracking-widest">Multi-order enabled</span>
+                  </div>
+                </div>
+
+                <div className={`p-6 bg-gray-50 rounded-[32px] border-dashed border-2 border-gray-200 flex flex-col items-center justify-center text-center py-10 ${theme === 'dark' ? 'bg-white/5 border-white/10' : ''}`}>
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
+                    <Plus className="text-gray-300" />
+                  </div>
+                  <h4 className="font-black text-gray-400">Unlock more services</h4>
+                  <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mt-1">Uber Connect • Uber Pet • Uber Green</p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {currentScreen === 'ratings' && (
+            <motion.div key="ratings" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
+              <div className="flex items-center gap-4 mb-8">
+                <button onClick={() => setCurrentScreen('home')} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={24} /></button>
+                <h1 className="text-3xl font-black">Feedback</h1>
+              </div>
+              
+              <div className="text-center mb-10">
+                <p className="text-6xl font-black mb-2">{user.rating.toFixed(2)}</p>
+                <div className="flex justify-center gap-1 mb-2">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <Star key={i} size={24} fill={i <= Math.floor(user.rating) ? "#FBBF24" : "none"} className={i <= Math.floor(user.rating) ? "text-yellow-400" : "text-gray-300"} />
+                  ))}
+                </div>
+                <p className="text-sm font-bold text-gray-400">Based on last 500 trips</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className={`p-6 rounded-[30px] border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}>
+                  <p className="text-3xl font-black text-blue-600">98%</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Acceptance Rate</p>
+                </div>
+                <div className={`p-6 rounded-[30px] border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}>
+                  <p className="text-3xl font-black text-red-500">1%</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Cancellation Rate</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-xl font-black mb-4">Customer Quotes</h3>
+                {[
+                  "Very professional and quick!",
+                  "Friendly driver, handled food with care.",
+                  "Great communication during the ride.",
+                  "Always on time, 5 stars!"
+                ].map((quote, i) => (
+                  <div key={i} className={`p-4 rounded-2xl italic font-medium ${theme === 'dark' ? 'bg-white/5 border-l-4 border-blue-500' : 'bg-gray-50 border-l-4 border-black'}`}>
+                    "{quote}"
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {currentScreen === 'planner' && (
             <motion.div key="rewards" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
@@ -4567,6 +4968,7 @@ export default function App() {
               <div className="space-y-2">
                 {[
                   { icon: <User />, label: "Personal Information", action: () => sendNotification("Account", "Personal info updated.") },
+                  { icon: <History />, label: "Trip History", action: () => setCurrentScreen('trip_history') },
                   { icon: <FileText />, label: "Documents", action: () => setCurrentScreen('documents') },
                   { icon: <CreditCard />, label: "Payment", action: () => setCurrentScreen('earnings') },
                   { icon: <Settings />, label: "App Settings", action: () => sendNotification("Settings", "Settings updated.") },
@@ -4741,6 +5143,73 @@ export default function App() {
             </motion.div>
           )}
 
+          {currentScreen === 'trip_history' && (
+            <motion.div key="trip_history" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
+              <div className="flex items-center gap-4 mb-8">
+                <button onClick={() => setCurrentScreen('account')} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={24} /></button>
+                <h1 className="text-3xl font-black">Trip History</h1>
+              </div>
+
+              {completedTrips.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${theme === 'dark' ? 'bg-white/5 text-gray-500' : 'bg-gray-100 text-gray-400'}`}>
+                    <History size={40} />
+                  </div>
+                  <h3 className="text-xl font-black mb-2">No trips yet</h3>
+                  <p className="text-gray-400 font-bold text-sm px-8">Your completed deliveries will appear here. Go online to start earning!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {completedTrips.map((trip) => (
+                    <motion.div 
+                      key={trip.id}
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      className={`p-5 rounded-3xl border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-50 shadow-sm'}`}
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-green-500/10 text-green-500 rounded-xl flex items-center justify-center">
+                            <CheckCircle2 size={20} />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Trip Completed</p>
+                            <p className="text-sm font-black">{new Date(trip.timestamp).toLocaleDateString()} • {new Date(trip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-black text-green-500 leading-none">£{trip.earnings.toFixed(2)}</p>
+                          <p className="text-[10px] font-bold text-gray-400 mt-1">{trip.distance.toFixed(1)} mi</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 relative">
+                        {/* Timeline line */}
+                        <div className="absolute left-1.5 top-3 bottom-3 w-0.5 bg-gray-200 dark:bg-white/10" />
+                        
+                        <div className="flex items-center gap-4 relative z-10">
+                          <div className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.5)]" />
+                          <div>
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Restaurant</p>
+                            <p className="text-xs font-bold leading-tight">{trip.restaurantName}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 relative z-10">
+                          <div className="w-3 h-3 rounded-sm border-2 border-orange-500" />
+                          <div>
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Customer</p>
+                            <p className="text-xs font-bold leading-tight">{trip.customerName}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+
           {currentScreen === 'earnings' && (
             <motion.div key="earnings" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
               <div className="flex items-center gap-4 mb-8">
@@ -4864,20 +5333,30 @@ export default function App() {
             sendNotification={sendNotification}
           />
         )}
+
+        <AnimatePresence>
+          {isVehicleSettingsOpen && (
+            <TripPreferencesModal 
+              vehicleType={vehicleType}
+              setVehicleType={setVehicleType}
+              selectedServices={selectedServices}
+              setSelectedServices={setSelectedServices}
+              onClose={() => setIsVehicleSettingsOpen(false)}
+              theme={theme}
+            />
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Bottom Nav */}
       {currentScreen !== 'home' && (
-        <div className="h-24 bg-black border-t border-white/10 flex items-center justify-around px-4 pb-6 z-[110]">
+        <div className="h-20 bg-black border-t border-white/10 flex items-center justify-around px-4 z-[110]">
           <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={24} />} label="Home" />
           <NavButton active={currentScreen === 'earnings'} onClick={() => setCurrentScreen('earnings')} icon={<TrendingUp size={24} />} label="Earnings" />
           <NavButton active={currentScreen === 'inbox'} onClick={() => setCurrentScreen('inbox')} icon={<Mail size={24} />} label="Inbox" />
           <NavButton active={currentScreen === 'account'} onClick={() => setCurrentScreen('account')} icon={<User size={24} />} label="Account" />
         </div>
       )}
-
-      {/* Home Indicator */}
-      <div className="h-1 w-32 bg-white/20 rounded-full mx-auto mb-2 shrink-0 z-[120]" />
     </div>
   );
 }

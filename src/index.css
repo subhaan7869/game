@@ -23,10 +23,10 @@ html, body {
   align-items: center;
 }
 
-.custom-scrollbar::-webkit-scrollbar {
+.custom-scrollbar::-webkit-scrollbar, .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
-.custom-scrollbar {
+.custom-scrollbar, .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
