@@ -2591,95 +2591,83 @@ export default function App() {
 
   // Simulate incoming orders when online
   useEffect(() => {
+    if (!user.isOnline) return;
+
     let timer: NodeJS.Timeout;
     const scheduleNextOrder = () => {
-      const waitTime = user.isOnline 
-        ? (8000 + Math.random() * 8000) // 8-16 seconds when online
-        : (15000 + Math.random() * 10000); // 15-25 seconds (usually shouldn't matter as we check user.isOnline)
+      // Faster matching for better engagement: 2-5 seconds
+      const waitTime = 2000 + Math.random() * 3000;
 
       timer = setTimeout(() => {
-        if (!user.isOnline || activeOrders.length >= 3 || pendingOrder || !location) {
-          scheduleNextOrder();
+        // Validation check before attempting generation
+        const canReceive = user.isOnline && activeOrders.length < 3 && !pendingOrder && location;
+        
+        if (!canReceive) {
+          if (user.isOnline) scheduleNextOrder();
           return;
         }
 
-        // 20% chance to pick a scheduled order if available
-        const shouldPickScheduled = Math.random() < 0.2 && scheduledOrders.length > 0;
+        // Ensure service types are available
+        const services = selectedServices.length > 0 ? selectedServices : ['delivery', 'ride'] as JobType[];
+
+        // 15% chance for a scheduled trip if any exist
+        const shouldPickScheduled = Math.random() < 0.15 && scheduledOrders.length > 0;
         
         let newOrder: Order | null = null;
         
         if (shouldPickScheduled) {
-          const sch = scheduledOrders[Math.floor(Math.random() * scheduledOrders.length)];
-          // Convert scheduled order to a real order
+          const sch = scheduledOrders[0];
           newOrder = {
             id: sch.id,
             type: 'delivery',
             restaurantName: sch.restaurantName,
-            customerName: "Scheduled Customer",
+            customerName: "Scheduled Pickup",
             restaurantLocation: { 
-              latitude: location.latitude + (Math.random() - 0.5) * 0.02, 
-              longitude: location.longitude + (Math.random() - 0.5) * 0.02 
+              latitude: location.latitude + (Math.random() - 0.5) * 0.01, 
+              longitude: location.longitude + (Math.random() - 0.5) * 0.01 
             },
             customerLocation: { 
-              latitude: location.latitude + (Math.random() - 0.5) * 0.04, 
-              longitude: location.longitude + (Math.random() - 0.5) * 0.04 
+              latitude: location.latitude + (Math.random() - 0.5) * 0.03, 
+              longitude: location.longitude + (Math.random() - 0.5) * 0.03 
             },
             estimatedPay: sch.estimatedPay,
             estimatedDistance: 2.5,
-            estimatedTime: 15,
+            estimatedTime: 12,
             status: 'pending',
-            items: ["Scheduled Meal"],
+            items: ["Scheduled Group Order"],
             pin: Math.floor(1000 + Math.random() * 9000).toString(),
             isMatching: activeOrders.length > 0 || Math.random() < 0.2
           };
-
-          // Check preference for scheduled as well
-          const matchesPref = jobTypePreference === 'both' || 
-            (jobTypePreference === 'matching' && newOrder.isMatching) || 
-            (jobTypePreference === 'normal' && !newOrder.isMatching);
-
-          if (!matchesPref) {
-            scheduleNextOrder();
-            return;
-          }
-
-          // Remove from scheduled list so it doesn't pop up again
           setScheduledOrders(prev => prev.filter(s => s.id !== sch.id));
         } else {
           newOrder = generateSmartOrder();
-          
-          // Check preference before showing
-          if (newOrder) {
-            const matchesPref = jobTypePreference === 'both' || 
-              (jobTypePreference === 'matching' && newOrder.isMatching) || 
-              (jobTypePreference === 'normal' && !newOrder.isMatching);
-
-            if (!matchesPref) {
-              scheduleNextOrder();
-              return;
-            }
-          }
         }
 
+        // Apply final job preference filter
         if (newOrder) {
-          setPendingOrder(newOrder);
-          setOrderExpiryTimer(15); // Increased for professional feel
-          const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
-          const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
-          sendNotification(prefix + (shouldPickScheduled ? "Scheduled Trip" : "High Priority") + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "UberX"}`);
-          playUberSound('order');
+          const isMatchPref = jobTypePreference === 'both' || 
+            (jobTypePreference === 'matching' && newOrder.isMatching) || 
+            (jobTypePreference === 'normal' && !newOrder.isMatching);
+
+          if (isMatchPref) {
+            setPendingOrder(newOrder);
+            setOrderExpiryTimer(18); // Give 18 seconds to decide
+            const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
+            const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
+            sendNotification(prefix + (shouldPickScheduled ? "Scheduled" : "High Priority") + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "UberX"}`);
+            playUberSound('order');
+          } else {
+            scheduleNextOrder();
+          }
         } else {
           scheduleNextOrder();
         }
       }, waitTime);
     };
 
-    if (user.isOnline && activeOrders.length < 3 && !pendingOrder && location) {
-      scheduleNextOrder();
-    }
-
+    scheduleNextOrder();
     return () => clearTimeout(timer);
-  }, [user.isOnline, activeOrders.length, pendingOrder === null, location, scheduledOrders.length, jobTypePreference]);
+  }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference]);
 
   const handleAcceptOrder = () => {
     if (pendingOrder) {
@@ -4320,7 +4308,33 @@ export default function App() {
                           <div className="absolute inset-0 bg-gradient-to-tr from-blue-700 to-blue-400 rounded-full opacity-50" />
                         </button>
                       </motion.div>
-                      {/* Dashboard Feed (Authentic Uber Experience) */}
+                      {/* Searching Pulse for Feedback */}
+                  {user.isOnline && !isNavigating && !pendingOrder && (
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-none">
+                      <motion.div 
+                        animate={{ scale: [1, 2], opacity: [0.5, 0] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="w-40 h-40 rounded-full border-2 border-blue-500/30"
+                      />
+                      <motion.div 
+                        animate={{ scale: [1, 1.5], opacity: [0.3, 0] }}
+                        transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                        className="w-40 h-40 rounded-full border-2 border-blue-500/20 absolute top-0 left-0"
+                      />
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-600/10 backdrop-blur-sm px-4 py-1.5 rounded-full border border-blue-500/20 whitespace-nowrap">
+                        <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                          <motion.span 
+                            animate={{ opacity: [1, 0, 1] }} 
+                            transition={{ duration: 1, repeat: Infinity }}
+                            className="w-1.5 h-1.5 rounded-full bg-blue-500"
+                          />
+                          Finding Trip
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dashboard Feed (Authentic Uber Experience) */}
                       <div className="absolute inset-x-0 bottom-20 max-h-[60%] overflow-y-auto no-scrollbar pb-10 z-[120]">
                         <motion.div 
                           initial={{ y: 200 }}
@@ -5090,7 +5104,7 @@ export default function App() {
                         key={pref.id}
                         onClick={() => {
                           setJobTypePreference(pref.id as any);
-                          localStorage.setItem('jobTypePreference', pref.id);
+                          localStorage.setItem('uber_job_preference', pref.id);
                           sendNotification("Preferences Updated", `Now receiving ${pref.label}`);
                         }}
                         className={`w-full p-4 rounded-2xl text-left transition-all border-2 ${
