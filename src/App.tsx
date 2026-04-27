@@ -62,6 +62,7 @@ import {
   Truck,
   Bike,
   Car,
+  Utensils,
   SlidersHorizontal,
   List,
   Shield,
@@ -1788,6 +1789,7 @@ export default function App() {
   
   const [isBottomMenuOpen, setIsBottomMenuOpen] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [heading, setHeading] = useState(0);
   const [isSafetyToolkitOpen, setIsSafetyToolkitOpen] = useState(false);
   const [isDestFilterOpen, setIsDestFilterOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -2057,6 +2059,9 @@ export default function App() {
       const moveRatio = speed / distance;
       const moveLat = dLat * moveRatio;
       const moveLng = dLng * moveRatio;
+
+      const angle = Math.atan2(dLng, dLat) * (180 / Math.PI);
+      setHeading(angle);
 
       setLocation(prev => {
         if (!prev) return prev;
@@ -2563,11 +2568,11 @@ export default function App() {
 
     if (availableServices.length === 0) return null;
 
-    // Strict priority for UberX (ride) if user has a vehicle that supports it
+    // High priority for UberX (ride) if user has a vehicle that supports it
     const getJobType = () => {
+      // If user has a car, 95% chance for UberX to ensure they are an "UberX Driver"
       if (vehicleType === 'Car' && availableServices.includes('ride')) {
-        // High chance for UberX if car is used - user is explicitly an UberX driver
-        return Math.random() < 0.9 ? 'ride' : 'delivery';
+        return Math.random() < 0.95 ? 'ride' : 'delivery';
       }
       return availableServices[Math.floor(Math.random() * availableServices.length)];
     };
@@ -3288,13 +3293,19 @@ export default function App() {
           )}
 
           {currentScreen === 'home' && (
-            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#101010]">
-              {/* Grid background for map depth and to ensure screen isn't perfectly black */}
-              <div className="absolute inset-0 opacity-10 pointer-events-none">
+            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#0d0d0d]">
+              {/* Enhanced Map Background Texture */}
+              <div className="absolute inset-0 pointer-events-none z-0">
                 <div 
-                  className="absolute inset-0" 
+                  className="absolute inset-0 opacity-[0.05]" 
                   style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }}
                 />
+                <div 
+                  className="absolute inset-0 opacity-[0.03]" 
+                  style={{ backgroundImage: 'linear-gradient(to right, #ffffff1a 1px, transparent 1px), linear-gradient(to bottom, #ffffff1a 1px, transparent 1px)', backgroundSize: '200px 200px' }}
+                />
+                {/* Scanline Effect */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-[100] pointer-events-none bg-[length:100%_2px,3px_100%]" />
               </div>
               
               {/* Heatmap Simulation */}
@@ -3498,22 +3509,22 @@ export default function App() {
                 
                 {/* Traffic Lines (Simulated) */}
                 {location && trafficSegments.map((seg, i) => {
-                  const x1 = (seg.start.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
-                  const y1 = (location.latitude - seg.start.latitude) * MAP_SCALE + mapOffset.y;
-                  const x2 = (seg.end.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
-                  const y2 = (location.latitude - seg.end.latitude) * MAP_SCALE + mapOffset.y;
+                  const x1 = (seg.start.longitude - location.longitude) * MAP_SCALE;
+                  const y1 = (location.latitude - seg.start.latitude) * MAP_SCALE;
+                  const x2 = (seg.end.longitude - location.longitude) * MAP_SCALE;
+                  const y2 = (location.latitude - seg.end.latitude) * MAP_SCALE;
                   
                   return (
                     <svg key={`traffic-${i}`} className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
                       <line 
-                        x1={centerX + x1} 
-                        y1={centerY + y1} 
-                        x2={centerX + x2} 
-                        y2={centerY + y2} 
+                        x1={centerX + x1 + mapOffset.x} 
+                        y1={centerY + y1 + mapOffset.y} 
+                        x2={centerX + x2 + mapOffset.x} 
+                        y2={centerY + y2 + mapOffset.y} 
                         stroke={seg.intensity === 'high' ? '#ef4444' : seg.intensity === 'medium' ? '#f59e0b' : '#10b981'} 
-                        strokeWidth={4 * zoom} 
+                        strokeWidth={3 * zoom} 
                         strokeLinecap="round"
-                        opacity="0.6"
+                        opacity="0.4"
                       />
                     </svg>
                   );
@@ -3727,62 +3738,51 @@ export default function App() {
                   />
                 </svg>
 
-                {/* Active Order Pins */}
-                {location && activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, i) => {
-                  const target = order.status === 'accepted' 
-                    ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
-                    : order.customerLocation;
-                  
-                  if (!target) return null;
-                  
-                  const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
-                  const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
-                  
-                  return (
-                    <motion.div 
-                      key={`order-pin-${order.id}`}
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="absolute flex flex-col items-center z-[200]"
-                      style={{ 
-                        left: '50%', 
-                        top: '50%', 
-                        transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))` 
-                      }}
-                    >
-                      <div className={`w-10 h-10 rounded-full shadow-2xl flex items-center justify-center border-4 border-white ${order.status === 'accepted' ? 'bg-green-600' : 'bg-blue-600'}`}>
-                        {order.status === 'accepted' ? <ShoppingBag size={20} className="text-white" /> : <User size={20} className="text-white" />}
-                      </div>
-                      <div className="mt-2 px-3 py-1 bg-white rounded-full shadow-lg">
-                        <span className="text-[10px] font-black text-black whitespace-nowrap">
-                          {order.status === 'accepted' ? order.restaurantName : order.customerName}
-                        </span>
-                      </div>
-                      <div className={`w-1 h-4 ${order.status === 'accepted' ? 'bg-green-600' : 'bg-blue-600'} mt-[-4px]`} />
-                    </motion.div>
-                  );
-                })}
+                {/* Driver Marker */}
+                <motion.div 
+                  className="absolute z-[220]"
+                  animate={{ 
+                    left: centerX + mapOffset.x,
+                    top: centerY + mapOffset.y,
+                    rotate: heading 
+                  }}
+                  transition={{ type: "spring", stiffness: 60, damping: 20 }}
+                >
+                  <div className="relative group -translate-x-1/2 -translate-y-1/2">
+                    <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity rounded-full scale-150" />
+                    <div className="w-12 h-12 bg-[#0a0a0a] rounded-2xl border-2 border-blue-500 shadow-[0_0_25px_0_rgba(59,130,246,0.6)] flex items-center justify-center p-2 relative overflow-hidden transition-transform hover:scale-110">
+                      <CarIcon className="text-blue-500 w-full h-full fill-blue-500/10" strokeWidth={2.5} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-blue-500/10 to-transparent" />
+                    </div>
+                    {/* Animated Heading Arrow */}
+                    <div className="absolute -top-5 left-1/2 -translate-x-1/2">
+                      <motion.div 
+                        animate={{ y: [0, -4, 0] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                        className="w-3 h-3 bg-blue-500 rotate-45 shadow-[0_0_10px_rgba(59,130,246,0.5)] border border-white/20"
+                      />
+                    </div>
+                  </div>
+                </motion.div>
 
-                {/* Active Route Path */}
+                {/* Active Trip Path */}
                 {isNavigating && location && routeWaypoints.length > 0 && (
-                  <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+                  <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-[100]">
                     <motion.path 
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1 }}
-                      transition={{ duration: 1 }}
-                      d={`M ${centerX} ${centerY} ${routeWaypoints.map(wp => {
-                        const x = (wp.longitude - location.longitude) * MAP_SCALE;
-                        const y = (location.latitude - wp.latitude) * MAP_SCALE;
+                      initial={{ pathLength: 0, opacity: 0 }}
+                      animate={{ pathLength: 1, opacity: 1 }}
+                      transition={{ duration: 0.8 }}
+                      d={`M ${centerX + mapOffset.x} ${centerY + mapOffset.y} ${routeWaypoints.map(wp => {
+                        const x = (wp.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
+                        const y = (location.latitude - wp.latitude) * MAP_SCALE + mapOffset.y;
                         return `L ${centerX + x} ${centerY + y}`;
                       }).join(' ')}`}
                       fill="none" 
-                      stroke="#3b82f6" 
-                      strokeWidth={6 * zoom} 
-                      strokeLinecap="round"
+                      stroke="#2563eb" 
+                      strokeWidth={8 * zoom} 
+                      strokeLinecap="round" 
                       strokeLinejoin="round"
-                      opacity="0.8"
                     />
-                    {/* Animated path overlay */}
                     <motion.path 
                       d={`M ${centerX + mapOffset.x} ${centerY + mapOffset.y} ${routeWaypoints.map(wp => {
                         const x = (wp.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
@@ -3792,13 +3792,67 @@ export default function App() {
                       fill="none" 
                       stroke="white" 
                       strokeWidth={2 * zoom} 
-                      strokeDasharray={`${10 * zoom},${10 * zoom}`}
-                      animate={{ strokeDashoffset: -20 * zoom }}
+                      strokeDasharray="4,12"
+                      strokeLinecap="round"
+                      animate={{ strokeDashoffset: [-16, 0] }}
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      opacity="0.5"
                     />
                   </svg>
                 )}
+
+                {/* All Active Trip Markers (Pickup/Dropoff) */}
+                {location && activeOrders.map((order, i) => {
+                  const target = order.status === 'accepted' 
+                    ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
+                    : order.customerLocation;
+                  
+                  if (!target) return null;
+                  
+                  const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
+                  const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
+                  
+                  const isCurrentTarget = isNavigating && activeOrders[0]?.id === order.id;
+
+                  return (
+                    <motion.div 
+                      key={`trip-pin-${order.id}`}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: isCurrentTarget ? 1.2 : 1 }}
+                      className="absolute z-[210] flex flex-col items-center"
+                      style={{ 
+                        left: centerX + x,
+                        top: centerY + y,
+                        transform: 'translate(-50%, -100%)'
+                      }}
+                    >
+                      <div className={`relative ${isCurrentTarget ? 'z-[250]' : 'z-[210]'}`}>
+                        <div className={`w-10 h-10 rounded-full shadow-2xl flex items-center justify-center border-4 border-[#1a1a1a] transition-all ${
+                          order.status === 'accepted' ? 'bg-blue-600 scale-110 shadow-blue-600/30' : 'bg-green-600 shadow-green-600/30'
+                        }`}>
+                          {order.type === 'delivery' ? (
+                            order.status === 'accepted' ? <Utensils size={18} className="text-white" /> : <MapPin size={18} className="text-white" />
+                          ) : (
+                            order.status === 'accepted' ? <User size={18} className="text-white" /> : <MapPin size={18} className="text-white" />
+                          )}
+                        </div>
+                        {isCurrentTarget && (
+                          <motion.div 
+                            animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                            className="absolute -inset-2 bg-blue-500 rounded-full blur-md -z-10"
+                          />
+                        )}
+                        <div className="absolute top-1/2 left-full ml-3 -translate-y-1/2 px-3 py-1.5 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 shadow-2xl whitespace-nowrap">
+                          <p className="text-[10px] font-black text-white uppercase tracking-wider">
+                            {order.status === 'accepted' ? (order.type === 'delivery' ? order.restaurantName : 'Rider Pickup') : 'Final Destination'}
+                          </p>
+                          <p className="text-[8px] font-bold text-gray-400 capitalize">{order.type} • £{order.estimatedPay.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <div className={`w-1.5 h-6 ${order.status === 'accepted' ? 'bg-blue-600' : 'bg-green-600'} rounded-full mt-[-2px] border border-[#1a1a1a]`} />
+                    </motion.div>
+                  );
+                })}
 
                 {location && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
