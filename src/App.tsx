@@ -1798,7 +1798,14 @@ export default function App() {
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
   const [selectedCancelReason, setSelectedCancelReason] = useState<string | null>(null);
   const [viewingOrderDetailsId, setViewingOrderDetailsId] = useState<string | null>(null);
-  const [earningsGoal, setEarningsGoal] = useState(50.00);
+  const [earningsGoal, setEarningsGoal] = useState(() => {
+    const saved = localStorage.getItem('uber_earnings_goal');
+    return saved ? parseFloat(saved) : 50.00;
+  });
+  
+  useEffect(() => {
+    localStorage.setItem('uber_earnings_goal', earningsGoal.toString());
+  }, [earningsGoal]);
   const [hotspots, setHotspots] = useState<{ latitude: number, longitude: number, intensity: number, size: number }[]>([]);
   
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -1965,7 +1972,14 @@ export default function App() {
     }
   }, [location === null]);
   
-  const [selectedServices, setSelectedServices] = useState<JobType[]>(['delivery', 'ride']);
+  const [selectedServices, setSelectedServices] = useState<JobType[]>(() => {
+    const saved = localStorage.getItem('uber_selected_services');
+    return saved ? JSON.parse(saved) : ['delivery', 'ride'];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('uber_selected_services', JSON.stringify(selectedServices));
+  }, [selectedServices]);
   const currentCity = useMemo(() => {
     if (!location) return "London";
     const lat = location.latitude;
@@ -2989,6 +3003,49 @@ export default function App() {
     if (user.points >= 500) return 'Gold';
     return 'Blue';
   }, [user.points]);
+
+  const wakeLock = useRef<any>(null);
+
+  const requestWakeLock = async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock.current = await (navigator as any).wakeLock.request('screen');
+      }
+    } catch (err) {
+      console.log('Wake Lock request failed');
+    }
+  };
+
+  const releaseWakeLock = async () => {
+    if (wakeLock.current !== null) {
+      try {
+        await wakeLock.current.release();
+        wakeLock.current = null;
+      } catch (err) {
+        console.log('Wake Lock release failed');
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (user.isOnline) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+
+    const handleVisibilityChange = async () => {
+      if (wakeLock.current !== null && document.visibilityState === 'visible' && user.isOnline) {
+        await requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      releaseWakeLock();
+    };
+  }, [user.isOnline]);
 
   return (
     <div className={`h-[100dvh] w-full font-sans overflow-hidden flex flex-col select-none relative transition-all duration-500 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-gray-100 text-black'}`}>
