@@ -38,6 +38,8 @@ import {
   Briefcase,
   Gift,
   Settings,
+  Edit2,
+  Trophy,
   ChevronRight,
   Send,
   Phone,
@@ -297,7 +299,10 @@ const SideMenu = ({
   theme,
   logout,
   isCarPlaySynced,
-  setIsCarPlaySynced
+  setIsCarPlaySynced,
+  earnings,
+  earningsGoal,
+  setEarningsGoal
 }: { 
   user: UserProfile, 
   setIsSideMenuOpen: (val: boolean) => void,
@@ -307,7 +312,10 @@ const SideMenu = ({
   theme: string,
   logout: () => void,
   isCarPlaySynced: boolean,
-  setIsCarPlaySynced: (val: boolean) => void
+  setIsCarPlaySynced: (val: boolean) => void,
+  earnings: number,
+  earningsGoal: number,
+  setEarningsGoal: (val: number) => void
 }) => (
   <motion.div 
     initial={{ x: '-100%' }}
@@ -321,7 +329,7 @@ const SideMenu = ({
         <X size={24} />
       </button>
       
-      <div className="flex items-center gap-6 mb-10">
+      <div className="flex items-center gap-6 mb-8">
         <div className="w-20 h-20 bg-white/10 rounded-full overflow-hidden border-2 border-white/20">
           <img src={user.profilePic || "https://picsum.photos/seed/driver/200/200"} alt="Me" className="w-full h-full object-cover" />
         </div>
@@ -332,6 +340,43 @@ const SideMenu = ({
             <p className="text-sm font-bold text-gray-400">{user.rating} ★</p>
           </div>
         </div>
+      </div>
+
+      {/* Goal Tracker inside Menu */}
+      <div className="mb-10 bg-white/5 p-5 rounded-[32px] border border-white/5 relative overflow-hidden group">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Daily Earnings Goal</p>
+            <div className="flex items-baseline gap-2">
+              <p className="text-3xl font-black">£{earnings.toFixed(2)}</p>
+              <p className="text-gray-500 text-sm font-bold">/ £{earningsGoal}</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => {
+              const newGoal = prompt("Set your daily earnings goal:", earningsGoal.toString());
+              if (newGoal && !isNaN(parseFloat(newGoal))) {
+                setEarningsGoal(parseFloat(newGoal));
+              }
+            }}
+            className="p-3 bg-white/10 rounded-2xl active:scale-90 transition-transform"
+          >
+            <Edit2 size={16} className="text-blue-400" />
+          </button>
+        </div>
+        <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.min(100, (earnings / earningsGoal) * 100)}%` }}
+            className={`h-full rounded-full ${earnings >= earningsGoal ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'bg-blue-600'}`}
+          />
+        </div>
+        {earnings >= earningsGoal && (
+          <p className="text-[10px] font-black text-green-500 mt-3 uppercase tracking-widest text-center flex items-center justify-center gap-2 underline underline-offset-4 decoration-green-500/30">
+            <Trophy size={12} />
+            Goal Achieved!
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-4 mb-10">
@@ -2856,6 +2901,9 @@ export default function App() {
             logout={logout}
             isCarPlaySynced={isCarPlaySynced}
             setIsCarPlaySynced={setIsCarPlaySynced}
+            earnings={earnings}
+            earningsGoal={earningsGoal}
+            setEarningsGoal={setEarningsGoal}
           />
         )}
       </AnimatePresence>
@@ -3164,47 +3212,6 @@ export default function App() {
                   </motion.div>
                 )}
               </AnimatePresence>
-
-              {/* Earnings Goal Tracker */}
-              {user.isOnline && !isNavigating && (
-                <motion.div 
-                  initial={{ y: -50, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  className={`absolute top-16 left-1/2 -translate-x-1/2 z-[100] w-[85%] max-w-sm p-4 rounded-3xl shadow-2xl border backdrop-blur-md ${theme === 'dark' ? 'bg-black/80 border-white/10' : 'bg-white/90 border-black/5'}`}
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Daily Earnings Goal</p>
-                      <div className="flex items-baseline gap-2">
-                        <p className="text-2xl font-black">£{earnings.toFixed(2)}</p>
-                        <p className="text-gray-400 text-sm font-bold">/ £{earningsGoal}</p>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        const newGoal = prompt("Set your daily earnings goal:", earningsGoal.toString());
-                        if (newGoal && !isNaN(parseFloat(newGoal))) {
-                          setEarningsGoal(parseFloat(newGoal));
-                          sendNotification("Goal Updated", `Your daily goal is now £${parseFloat(newGoal).toFixed(2)}`);
-                        }
-                      }}
-                      className="p-2 bg-blue-600/10 text-blue-600 rounded-xl hover:bg-blue-600/20 transition-colors"
-                    >
-                      <Settings size={16} />
-                    </button>
-                  </div>
-                  <div className="h-2 w-full bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min(100, (earnings / earningsGoal) * 100)}%` }}
-                      className={`h-full rounded-full ${earnings >= earningsGoal ? 'bg-green-500' : 'bg-blue-600'}`}
-                    />
-                  </div>
-                  {earnings >= earningsGoal && (
-                    <p className="text-[10px] font-black text-green-500 mt-2 uppercase tracking-widest text-center">Goal Achieved! 🏆</p>
-                  )}
-                </motion.div>
-              )}
 
               {/* Background Mode Indicator */}
               {user.isOnline && !isNavigating && (
