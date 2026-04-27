@@ -338,7 +338,7 @@ const SideMenu = ({
             <div>
               <h2 className="font-display font-black text-3xl mb-1">{user.name}</h2>
               <div className="flex items-center gap-2">
-                <span className="bg-gradient-to-r from-blue-600 to-blue-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest text-white shadow-lg shadow-blue-500/20">Diamond Partner</span>
+                <span className="bg-gradient-to-r from-blue-600 to-blue-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest text-white shadow-lg shadow-blue-500/20">Diamond Pro</span>
                 <p className="text-sm font-bold text-gray-400">{user.rating} ★</p>
               </div>
             </div>
@@ -2029,12 +2029,13 @@ export default function App() {
 
     const moveInterval = setInterval(() => {
       const order = activeOrders[0];
-      if (!order) return;
-      const target = order.status === 'accepted' 
-        ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
+      if (!order || !location) return;
+      
+      const target = order.status === 'accepted' || order.status === 'en_route_to_pickup'
+        ? (order.restaurantLocation || order.pickupLocation) 
         : order.customerLocation;
       
-      if (!target || !location) return;
+      if (!target) return;
 
       const dLat = target.latitude - location.latitude;
       const dLng = target.longitude - location.longitude;
@@ -2526,14 +2527,9 @@ export default function App() {
 
   useEffect(() => {
     const updateSize = () => {
-      if (mapContainerRef.current) {
-        setScreenSize({
-          width: mapContainerRef.current.clientWidth,
-          height: mapContainerRef.current.clientHeight
-        });
-      } else {
-        setScreenSize({ width: window.innerWidth, height: window.innerHeight });
-      }
+      const width = mapContainerRef.current?.clientWidth || window.innerWidth;
+      const height = mapContainerRef.current?.clientHeight || window.innerHeight;
+      setScreenSize({ width, height });
     };
 
     updateSize();
@@ -2543,6 +2539,15 @@ export default function App() {
 
   const centerX = screenSize.width / 2;
   const centerY = screenSize.height / 2;
+
+  // Map Background Component for depth and to prevent "black screen" feel
+  const MapGrid = () => (
+    <div className="absolute inset-x-0 inset-y-0 opacity-[0.08] pointer-events-none overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:40px_40px]" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff1a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff1a_1px,transparent_1px)] [background-size:200px_200px]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-900/5 to-transparent" />
+    </div>
+  );
 
   // Improved Order Matching Algorithm with Surge
   const generateSmartOrder = () => {
@@ -2558,11 +2563,11 @@ export default function App() {
 
     if (availableServices.length === 0) return null;
 
-    // Weighted selection: favor UberX (ride) if user has a car
+    // Strict priority for UberX (ride) if user has a vehicle that supports it
     const getJobType = () => {
       if (vehicleType === 'Car' && availableServices.includes('ride')) {
-        // 70% chance for UberX if car is used
-        return Math.random() < 0.7 ? 'ride' : 'delivery';
+        // High chance for UberX if car is used - user is explicitly an UberX driver
+        return Math.random() < 0.9 ? 'ride' : 'delivery';
       }
       return availableServices[Math.floor(Math.random() * availableServices.length)];
     };
@@ -2589,27 +2594,26 @@ export default function App() {
         }
       });
 
-      const basePay = type === 'ride' ? 5.00 + (tripDist * 2.0) : 3.50 + (tripDist * 1.5);
-      const pay = (basePay + (Math.random() * 2)) * activeSurge;
+      const basePay = type === 'ride' ? 6.50 + (tripDist * 2.5) : 4.50 + (tripDist * 1.8);
+      const pay = (basePay + (Math.random() * 3)) * activeSurge;
 
       return {
-        id: Math.random().toString(36).substr(2, 9),
+        id: Math.random().toString(36).substring(2, 11),
         type,
-        restaurantName: type === 'delivery' ? MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)].name : undefined,
         customerName,
-        restaurantLocation: type === 'delivery' ? { latitude: pickupLat, longitude: pickupLng } : undefined,
-        pickupLocation: type === 'ride' ? { latitude: pickupLat, longitude: pickupLng } : undefined,
+        restaurantName: type === 'delivery' ? MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)].name : "UberX",
+        restaurantLocation: { latitude: pickupLat, longitude: pickupLng },
+        pickupLocation: { latitude: pickupLat, longitude: pickupLng },
         customerLocation: { latitude: custLat, longitude: custLng },
         estimatedPay: pay,
-        estimatedDistance: tripDist,
-        estimatedTime: Math.floor(tripDist * 5 + 5),
+        estimatedDistance: Number((tripDist + distToPickup).toFixed(1)),
+        estimatedTime: Math.floor((tripDist + distToPickup) * 5 + 4),
         status: 'pending' as const,
-        items: type === 'delivery' ? ["Meal Deal", "Extra Fries", "Coke Zero"] : undefined,
-        distToPickup,
+        items: type === 'delivery' ? ["Meal Deal", "UberEats Order"] : undefined,
         pin: Math.floor(1000 + Math.random() * 9000).toString(),
-        isMatching: activeOrders.length > 0 || Math.random() < 0.3,
+        isMatching: activeOrders.length > 0 || Math.random() < 0.25,
         surge: activeSurge > 1.0 ? activeSurge : undefined,
-        riderRating: type === 'ride' ? Number((4.5 + Math.random() * 0.5).toFixed(2)) : undefined,
+        riderRating: type === 'ride' ? Number((4.6 + Math.random() * 0.4).toFixed(2)) : undefined,
         isUberX: type === 'ride'
       } as Order;
     });
@@ -2624,17 +2628,16 @@ export default function App() {
     return scoredCandidates.sort((a, b) => b.score - a.score)[0].order;
   };
 
-  // Simulate incoming orders when online
+  // Simulating incoming orders when online
   useEffect(() => {
     if (!user.isOnline) return;
 
     let timer: NodeJS.Timeout;
     const scheduleNextOrder = () => {
-      // Faster matching for better engagement: 2-5 seconds
-      const waitTime = 2000 + Math.random() * 3000;
+      // Very fast matching for interactive feel: 1.5 - 4 seconds
+      const waitTime = 1500 + Math.random() * 2500;
 
       timer = setTimeout(() => {
-        // Validation check before attempting generation
         const canReceive = user.isOnline && activeOrders.length < 3 && !pendingOrder && location;
         
         if (!canReceive) {
@@ -2642,7 +2645,6 @@ export default function App() {
           return;
         }
 
-        // Ensure service types are available
         const services = selectedServices.length > 0 ? selectedServices : ['delivery', 'ride'] as JobType[];
 
         // 15% chance for a scheduled trip if any exist
@@ -3286,7 +3288,15 @@ export default function App() {
           )}
 
           {currentScreen === 'home' && (
-            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-black">
+            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#101010]">
+              {/* Grid background for map depth and to ensure screen isn't perfectly black */}
+              <div className="absolute inset-0 opacity-10 pointer-events-none">
+                <div 
+                  className="absolute inset-0" 
+                  style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }}
+                />
+              </div>
+              
               {/* Heatmap Simulation */}
               {user.isOnline && !isNavigating && <Heatmap />}
               {/* Matching / Trip Request Overlay */}
