@@ -522,15 +522,19 @@ const ScheduledOrdersScreen = ({
                 <p className="font-black text-xl text-green-600">£{order.estimatedPay.toFixed(2)}</p>
                 <button 
                   onClick={async () => {
+                    if (!firebaseUser) {
+                      sendNotification("Auth Required", "Please sign in to delete orders.");
+                      return;
+                    }
                     try {
                       await deleteDoc(doc(db, 'scheduled_orders', order.id));
                     } catch (error) {
                       handleFirestoreError(error, OperationType.DELETE, `scheduled_orders/${order.id}`);
                     }
                   }}
-                  className="mt-2 text-red-500"
+                  className="mt-2 text-red-500 p-2"
                 >
-                  <X size={16} />
+                  <X size={20} />
                 </button>
               </div>
             </div>
@@ -899,11 +903,11 @@ const CarPlayDashboard = ({
                 <div className="flex-1 bg-white/5 rounded-[32px] p-6 border border-white/10 flex flex-col justify-center">
                   <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Order Items</p>
                   <div className="space-y-1">
-                    {activeOrder.items.slice(0, 3).map((item, i) => (
+                    {(activeOrder.items || []).slice(0, 3).map((item, i) => (
                       <p key={i} className="text-lg font-bold truncate">• {item}</p>
                     ))}
-                    {activeOrder.items.length > 3 && (
-                      <p className="text-sm text-gray-500 font-bold">+{activeOrder.items.length - 3} more items</p>
+                    {(activeOrder.items?.length || 0) > 3 && (
+                      <p className="text-sm text-gray-500 font-bold">+{(activeOrder.items?.length || 0) - 3} more items</p>
                     )}
                   </div>
                 </div>
@@ -1850,6 +1854,15 @@ export default function App() {
     return (saved as any) || 'both';
   });
 
+  const [busynessMode, setBusynessMode] = useState<'Low' | 'Medium' | 'High'>(() => {
+    const saved = localStorage.getItem('uber_busyness_mode');
+    return (saved as any) || 'High';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('uber_busyness_mode', busynessMode);
+  }, [busynessMode]);
+
   useEffect(() => {
     localStorage.setItem('uber_job_preference', jobTypePreference);
   }, [jobTypePreference]);
@@ -2568,14 +2581,14 @@ export default function App() {
 
     if (availableServices.length === 0) return null;
 
-    // High priority for UberX (ride) if user has a vehicle that supports it
-    const getJobType = () => {
-      // If user has a car, 95% chance for UberX to ensure they are an "UberX Driver"
-      if (vehicleType === 'Car' && availableServices.includes('ride')) {
-        return Math.random() < 0.95 ? 'ride' : 'delivery';
-      }
-      return availableServices[Math.floor(Math.random() * availableServices.length)];
-    };
+      const getJobType = () => {
+        // Absolute priority for UberX (ride) if user has a Car and ride service is enabled
+        if (vehicleType === 'Car' && availableServices.includes('ride')) {
+          const isRideSelected = selectedServices.length === 0 || selectedServices.includes('ride');
+          if (isRideSelected) return 'ride';
+        }
+        return availableServices[Math.floor(Math.random() * availableServices.length)];
+      };
 
     // 1. Generate 5 candidate orders
     const candidates = Array.from({ length: 5 }).map(() => {
@@ -2639,8 +2652,23 @@ export default function App() {
 
     let timer: NodeJS.Timeout;
     const scheduleNextOrder = () => {
-      // Very fast matching for interactive feel: 1.5 - 4 seconds
-      const waitTime = 1500 + Math.random() * 2500;
+      // Adjusted wait time based on busyness mode
+      let baseWait = 1500;
+      let randomRange = 2500;
+
+      if (busynessMode === 'Low') {
+        baseWait = 15000;
+        randomRange = 30000; // 15s to 45s
+      } else if (busynessMode === 'Medium') {
+        baseWait = 5000;
+        randomRange = 10000; // 5s to 15s
+      } else {
+        // High
+        baseWait = 1500;
+        randomRange = 2500; // 1.5s to 4s
+      }
+
+      const waitTime = baseWait + Math.random() * randomRange;
 
       timer = setTimeout(() => {
         const canReceive = user.isOnline && activeOrders.length < 3 && !pendingOrder && location;
@@ -2709,7 +2737,7 @@ export default function App() {
 
     scheduleNextOrder();
     return () => clearTimeout(timer);
-  }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference]);
+  }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference, busynessMode]);
 
   const handleAcceptOrder = () => {
     if (pendingOrder) {
@@ -2723,6 +2751,7 @@ export default function App() {
       setPendingOrder(null);
       setOrderExpiryTimer(10);
       setIsNavigating(true);
+      setMapOffset({ x: 0, y: 0 }); // Snap map back to driver on acceptance
       playUberSound('accept');
     }
   };
@@ -2991,6 +3020,12 @@ export default function App() {
     const simulatedSignature = "face_sig_" + capturedPic.length % 100;
     
     try {
+      if (!firebaseUser) {
+        setIsVerifying(false);
+        sendNotification("Sign in Required", "Please sign in with Google first.");
+        signInWithGoogle().catch(console.error);
+        return;
+      }
       // Search for user with this face signature
       const q = query(collection(db, 'users'), where('faceSignature', '==', simulatedSignature));
       const querySnapshot = await getDocs(q);
@@ -3223,24 +3258,42 @@ export default function App() {
               <h1 className="text-2xl font-black mt-12 mb-4">Face Verification</h1>
               <p className="text-center text-gray-400 mb-12">Position your face in the circle to verify your identity.</p>
               
-              <div className="w-72 h-72 rounded-full border-4 border-blue-500 overflow-hidden relative mb-12 shadow-[0_0_30px_rgba(59,130,246,0.5)]">
+              <div className="w-72 h-72 rounded-full border-4 border-blue-500 overflow-hidden relative mb-12 shadow-[0_0_30px_rgba(59,130,246,0.5)] bg-gray-900 border-dashed">
                 {lockoutUntil && Date.now() < lockoutUntil ? (
                   <div className="absolute inset-0 bg-red-950/80 flex flex-col items-center justify-center p-8 text-center">
-                    <Lock size={48} className="text-red-500 mb-4" />
+                    <ShieldAlert size={48} className="text-red-500 mb-4" />
                     <h3 className="font-black text-xl mb-2">LOCKED OUT</h3>
                     <p className="text-sm text-red-200">Too many failed attempts. Try again in {Math.ceil((lockoutUntil - Date.now()) / 1000)}s</p>
                   </div>
                 ) : (
                   <>
                     <video 
-                      ref={(el) => {
-                        videoRef.current = el;
-                        if (el && !el.srcObject) startCamera();
-                      }} 
+                      ref={videoRef}
                       autoPlay 
                       playsInline 
                       className="w-full h-full object-cover scale-x-[-1]" 
                     />
+                    
+                    {!videoRef.current?.srcObject && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-black/60">
+                        <Camera size={48} className="text-blue-500 mb-4 animate-pulse" />
+                        <button 
+                          onClick={() => {
+                            if (!firebaseUser) {
+                              signInWithGoogle().then(() => startCamera()).catch(console.error);
+                            } else {
+                              startCamera();
+                            }
+                          }}
+                          className="px-6 py-2 bg-blue-600 text-white rounded-full font-black text-sm shadow-xl active:scale-95 transition-transform"
+                        >
+                          {firebaseUser ? "START CAMERA" : "SIGN IN & START"}
+                        </button>
+                        <p className="text-[10px] text-gray-500 mt-4 leading-tight">
+                          We need camera access for face verification. Please click to allow.
+                        </p>
+                      </div>
+                    )}
                     
                     {/* Scanning Animation Overlay */}
                     <motion.div 
@@ -3293,23 +3346,18 @@ export default function App() {
           )}
 
           {currentScreen === 'home' && (
-            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#0d0d0d]">
-              {/* Enhanced Map Background Texture */}
-              <div className="absolute inset-0 pointer-events-none z-0">
-                <div 
-                  className="absolute inset-0 opacity-[0.05]" 
-                  style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }}
-                />
+            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#111111]">
+              {/* Scanline Effect (Bottom Layer) */}
+              <div className="absolute inset-0 z-0 pointer-events-none">
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%)] bg-[length:100%_4px]" />
                 <div 
                   className="absolute inset-0 opacity-[0.03]" 
-                  style={{ backgroundImage: 'linear-gradient(to right, #ffffff1a 1px, transparent 1px), linear-gradient(to bottom, #ffffff1a 1px, transparent 1px)', backgroundSize: '200px 200px' }}
+                  style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '30px 30px' }}
                 />
-                {/* Scanline Effect */}
-                <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-[100] pointer-events-none bg-[length:100%_2px,3px_100%]" />
               </div>
               
-              {/* Heatmap Simulation */}
-              {user.isOnline && !isNavigating && <Heatmap />}
+                  {/* Heatmap Simulation */}
+                  {user.isOnline && !isNavigating && <Heatmap />}
               {/* Matching / Trip Request Overlay */}
               <AnimatePresence>
                 {pendingOrder && (
@@ -3475,12 +3523,13 @@ export default function App() {
                   setSelectedRestaurant(null);
                 }}
                 onPan={(e, info) => {
+                  if (isNaN(info.delta.x) || isNaN(info.delta.y)) return;
                   setMapOffset(prev => ({
-                    x: prev.x + info.delta.x,
-                    y: prev.y + info.delta.y
+                    x: (prev.x || 0) + info.delta.x,
+                    y: (prev.y || 0) + info.delta.y
                   }));
                 }}
-                className={`absolute inset-0 overflow-hidden cursor-grab active:cursor-grabbing ${isNightMode || theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-[#eef2f6]'} ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'blur-md grayscale opacity-50 pointer-events-none' : ''}`}
+                className={`absolute inset-0 overflow-hidden cursor-grab active:cursor-grabbing ${isNightMode || theme === 'dark' ? 'bg-[#181818]' : 'bg-[#f0f4f8]'} ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'blur-md grayscale opacity-50 pointer-events-none' : ''}`}
               >
                 {/* Background Layer (Roads/Blocks Optimized) */}
                 <div className="absolute inset-0 pointer-events-none" style={{ 
@@ -3738,14 +3787,14 @@ export default function App() {
                   />
                 </svg>
 
-                {/* Driver Marker */}
-                <motion.div 
-                  className="absolute z-[220]"
-                  animate={{ 
-                    left: centerX + mapOffset.x,
-                    top: centerY + mapOffset.y,
-                    rotate: heading 
-                  }}
+                  {/* Driver Marker */}
+                  <motion.div 
+                    className="absolute z-[220]"
+                    animate={{ 
+                      left: (centerX || window.innerWidth/2) + (mapOffset.x || 0),
+                      top: (centerY || window.innerHeight/2) + (mapOffset.y || 0),
+                      rotate: heading || 0
+                    }}
                   transition={{ type: "spring", stiffness: 60, damping: 20 }}
                 >
                   <div className="relative group -translate-x-1/2 -translate-y-1/2">
@@ -3772,10 +3821,10 @@ export default function App() {
                       initial={{ pathLength: 0, opacity: 0 }}
                       animate={{ pathLength: 1, opacity: 1 }}
                       transition={{ duration: 0.8 }}
-                      d={`M ${centerX + mapOffset.x} ${centerY + mapOffset.y} ${routeWaypoints.map(wp => {
-                        const x = (wp.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
-                        const y = (location.latitude - wp.latitude) * MAP_SCALE + mapOffset.y;
-                        return `L ${centerX + x} ${centerY + y}`;
+                      d={`M ${(centerX || window.innerWidth/2) + (mapOffset.x || 0)} ${(centerY || window.innerHeight/2) + (mapOffset.y || 0)} ${routeWaypoints.map(wp => {
+                        const x = (wp.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
+                        const y = (location.latitude - wp.latitude) * MAP_SCALE + (mapOffset.y || 0);
+                        return `L ${(centerX || window.innerWidth/2) + x} ${(centerY || window.innerHeight/2) + y}`;
                       }).join(' ')}`}
                       fill="none" 
                       stroke="#2563eb" 
@@ -3784,10 +3833,10 @@ export default function App() {
                       strokeLinejoin="round"
                     />
                     <motion.path 
-                      d={`M ${centerX + mapOffset.x} ${centerY + mapOffset.y} ${routeWaypoints.map(wp => {
-                        const x = (wp.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
-                        const y = (location.latitude - wp.latitude) * MAP_SCALE + mapOffset.y;
-                        return `L ${centerX + x} ${centerY + y}`;
+                      d={`M ${(centerX || window.innerWidth/2) + (mapOffset.x || 0)} ${(centerY || window.innerHeight/2) + (mapOffset.y || 0)} ${routeWaypoints.map(wp => {
+                        const x = (wp.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
+                        const y = (location.latitude - wp.latitude) * MAP_SCALE + (mapOffset.y || 0);
+                        return `L ${(centerX || window.innerWidth/2) + x} ${(centerY || window.innerHeight/2) + y}`;
                       }).join(' ')}`}
                       fill="none" 
                       stroke="white" 
@@ -3808,8 +3857,8 @@ export default function App() {
                   
                   if (!target) return null;
                   
-                  const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
-                  const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
+                  const x = (target.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
+                  const y = (location.latitude - target.latitude) * MAP_SCALE + (mapOffset.y || 0);
                   
                   const isCurrentTarget = isNavigating && activeOrders[0]?.id === order.id;
 
@@ -3820,8 +3869,8 @@ export default function App() {
                       animate={{ scale: isCurrentTarget ? 1.2 : 1 }}
                       className="absolute z-[210] flex flex-col items-center"
                       style={{ 
-                        left: centerX + x,
-                        top: centerY + y,
+                        left: (centerX || window.innerWidth/2) + x,
+                        top: (centerY || window.innerHeight/2) + y,
                         transform: 'translate(-50%, -100%)'
                       }}
                     >
@@ -4608,6 +4657,10 @@ export default function App() {
                                 whileTap={{ scale: 0.9 }}
                                 disabled={(lockoutUntil ? Date.now() < lockoutUntil : false) || Object.values(customerTimers).some(t => Number(t) > 0)}
                                 onClick={() => {
+                                  if (!firebaseUser) {
+                                    signInWithGoogle().catch(console.error);
+                                    return;
+                                  }
                                   if (user.faceVerified) {
                                     setUser(u => ({ ...u, isOnline: true }));
                                     setIsBottomMenuOpen(false);
@@ -4734,7 +4787,7 @@ export default function App() {
                                     </div>
                                     <div>
                                       <h3 className="font-black text-lg leading-tight">{order.status === 'accepted' ? order.restaurantName : order.customerName}</h3>
-                                      <p className="text-xs text-gray-400 font-bold">{order.items.length} items • £{order.estimatedPay.toFixed(2)}</p>
+                                      <p className="text-xs text-gray-400 font-bold">{(order.items?.length || 0)} items • £{order.estimatedPay.toFixed(2)}</p>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -4833,7 +4886,7 @@ export default function App() {
                           </div>
                           <div>
                             <h3 className="font-bold text-sm leading-tight">{order.status === 'accepted' ? order.restaurantName : order.customerName}</h3>
-                            <p className="text-[10px] text-gray-500">{order.items.length} items • £{order.estimatedPay.toFixed(2)}</p>
+                            <p className="text-[10px] text-gray-500">{(order.items?.length || 0)} items • £{order.estimatedPay.toFixed(2)}</p>
                           </div>
                         </div>
                         <div className="flex gap-1.5 items-center" onClick={(e) => e.stopPropagation()}>
@@ -5332,6 +5385,30 @@ export default function App() {
                 <h1 className="text-3xl font-black">Opportunities</h1>
               </div>
               <div className="space-y-4">
+                <div className={`p-6 rounded-3xl ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'} mb-8`}>
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Area Demand (Timer Control)</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {['Low', 'Medium', 'High'].map((mode) => (
+                      <button 
+                        key={mode}
+                        onClick={() => setBusynessMode(mode as any)}
+                        className={`py-4 rounded-2xl font-black text-sm transition-all border-2 ${
+                          busynessMode === mode 
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
+                            : theme === 'dark' ? 'bg-white/5 border-transparent text-gray-400' : 'bg-white border-gray-100 text-black'
+                        }`}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-500 font-bold mt-4 leading-tight">
+                    {busynessMode === 'Low' && "Quiet period. Orders will be rare (15-45s wait)."}
+                    {busynessMode === 'Medium' && "Steady demand. Orders every 5-15s."}
+                    {busynessMode === 'High' && "Peak time! Rapid-fire orders (1.5-4s wait)."}
+                  </p>
+                </div>
+
                 {activeSurgeAreas.map((area) => (
                   <div key={area.id} className={`p-6 rounded-3xl border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-blue-50 border-blue-100'}`}>
                     <div className="flex items-center justify-between mb-2">

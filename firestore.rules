@@ -68,7 +68,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isAuthenticated();
-      allow list: if isAdmin();
+      allow list: if isAuthenticated() || isAdmin();
       
       allow create: if isOwner(userId) && isValidUser(incoming()) && 
                     incoming().keys().hasAll(['uid', 'name']) && 
@@ -80,16 +80,7 @@ service cloud.firestore {
     }
 
     match /scheduled_orders/{orderId} {
-      allow get: if isAuthenticated() && (existing().driverUid == request.auth.uid || isAdmin());
-      allow list: if isAuthenticated() && (resource.data.driverUid == request.auth.uid || isAdmin());
-      
-      allow create: if isAuthenticated() && isValidScheduledOrder(incoming());
-      
-      allow update: if isAuthenticated() && (existing().driverUid == request.auth.uid || isAdmin()) && 
-                    isValidScheduledOrder(incoming()) &&
-                    !affectedKeys().hasAny(['driverUid']);
-      
-      allow delete: if isAuthenticated() && (existing().driverUid == request.auth.uid || isAdmin());
+      allow get, list, create, update, delete: if isAuthenticated() || isAdmin();
     }
 
     match /carplay_sync/{userId} {
