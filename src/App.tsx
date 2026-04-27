@@ -338,7 +338,7 @@ const SideMenu = ({
             <div>
               <h2 className="font-display font-black text-3xl mb-1">{user.name}</h2>
               <div className="flex items-center gap-2">
-                <span className="bg-blue-600 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest text-white">Diamond Partner</span>
+                <span className="bg-gradient-to-r from-blue-600 to-blue-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest text-white shadow-lg shadow-blue-500/20">Diamond Partner</span>
                 <p className="text-sm font-bold text-gray-400">{user.rating} ★</p>
               </div>
             </div>
@@ -1634,7 +1634,9 @@ export default function App() {
   };
 
   const getArrivalTime = (mins: number) => {
-    const arrival = new Date(currentTime.getTime() + mins * 60000);
+    // Ensure mins is a valid number and handle potential edge cases
+    const validMins = typeof mins === 'number' && !isNaN(mins) ? Math.max(1, Math.round(mins)) : 5;
+    const arrival = new Date(currentTime.getTime() + validMins * 60000);
     return formatTime(arrival);
   };
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
@@ -1651,19 +1653,20 @@ export default function App() {
     const baseUser: UserProfile = {
       name: "Hassen Nabeel",
       rating: 4.98,
-      tier: 'Platinum',
-      points: 850,
-      deliveries: 124,
-      rides: 56,
+      tier: 'Diamond',
+      points: 1550,
+      deliveries: 452,
+      rides: 890,
       isOnline: false,
       documentsUploaded: true,
       faceVerified: true,
       walletBalance: 1250.40,
+      profilePic: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop",
       vehicleInfo: {
         make: "Tesla",
-        model: "Model 3",
-        year: 2023,
-        plate: "UB3R 123",
+        model: "Model 3 Performance",
+        year: 2024,
+        plate: "UB3R DRV",
         type: "UberX"
       },
       documentExpiries: {
@@ -2518,6 +2521,29 @@ export default function App() {
     }
   }, [location, activeSurgeAreas]);
 
+  const [screenSize, setScreenSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const updateSize = () => {
+      if (mapContainerRef.current) {
+        setScreenSize({
+          width: mapContainerRef.current.clientWidth,
+          height: mapContainerRef.current.clientHeight
+        });
+      } else {
+        setScreenSize({ width: window.innerWidth, height: window.innerHeight });
+      }
+    };
+
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
+
+  const centerX = screenSize.width / 2;
+  const centerY = screenSize.height / 2;
+
   // Improved Order Matching Algorithm with Surge
   const generateSmartOrder = () => {
     if (!location) return null;
@@ -2532,9 +2558,18 @@ export default function App() {
 
     if (availableServices.length === 0) return null;
 
+    // Weighted selection: favor UberX (ride) if user has a car
+    const getJobType = () => {
+      if (vehicleType === 'Car' && availableServices.includes('ride')) {
+        // 70% chance for UberX if car is used
+        return Math.random() < 0.7 ? 'ride' : 'delivery';
+      }
+      return availableServices[Math.floor(Math.random() * availableServices.length)];
+    };
+
     // 1. Generate 5 candidate orders
     const candidates = Array.from({ length: 5 }).map(() => {
-      const type = availableServices[Math.floor(Math.random() * availableServices.length)];
+      const type = getJobType();
       const customerName = MOCK_CUSTOMERS[Math.floor(Math.random() * MOCK_CUSTOMERS.length)];
       
       const restOffset = MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)].offset;
@@ -3251,7 +3286,7 @@ export default function App() {
           )}
 
           {currentScreen === 'home' && (
-            <motion.div key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative">
+            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-black">
               {/* Heatmap Simulation */}
               {user.isOnline && !isNavigating && <Heatmap />}
               {/* Matching / Trip Request Overlay */}
@@ -3313,9 +3348,15 @@ export default function App() {
                       <div className="flex justify-between items-start mb-8">
                         <div>
                           <div className="flex items-center gap-2 mb-3">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${pendingOrder.type === 'ride' ? 'bg-white text-black' : pendingOrder.isMatching ? 'bg-orange-500 text-white' : 'bg-blue-600 text-white'}`}>
-                              {pendingOrder.type === 'ride' ? 'UberX' : pendingOrder.isMatching ? 'Matching Trip' : 'New Trip'}
-                            </span>
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${pendingOrder.type === 'ride' ? 'bg-white text-black' : pendingOrder.isMatching ? 'bg-orange-500 text-white' : 'bg-blue-600 text-white shadow-[0_5px_15px_rgba(37,99,235,0.3)]'}`}>
+                          {pendingOrder.type === 'ride' ? 'UberX' : pendingOrder.isMatching ? 'Matching Trip' : 'New Trip'}
+                        </span>
+                        {pendingOrder.type === 'ride' && (
+                          <span className="px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-blue-600 text-white flex items-center gap-1 shadow-[0_5px_15px_rgba(37,99,235,0.3)]">
+                            <CarIcon size={12} fill="currentColor" />
+                            UBERX EXCLUSIVE
+                          </span>
+                        )}
                             {pendingOrder.type === 'ride' && pendingOrder.riderRating && (
                               <span className="px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-yellow-400 text-black flex items-center gap-1">
                                 <Star size={10} fill="currentColor" />
@@ -3455,10 +3496,10 @@ export default function App() {
                   return (
                     <svg key={`traffic-${i}`} className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
                       <line 
-                        x1={`calc(50% + ${x1}px)`} 
-                        y1={`calc(50% + ${y1}px)`} 
-                        x2={`calc(50% + ${x2}px)`} 
-                        y2={`calc(50% + ${y2}px)`} 
+                        x1={centerX + x1} 
+                        y1={centerY + y1} 
+                        x2={centerX + x2} 
+                        y2={centerY + y2} 
                         stroke={seg.intensity === 'high' ? '#ef4444' : seg.intensity === 'medium' ? '#f59e0b' : '#10b981'} 
                         strokeWidth={4 * zoom} 
                         strokeLinecap="round"
@@ -3478,20 +3519,24 @@ export default function App() {
                       className="absolute top-0 left-0 right-0 z-[150] bg-[#1a1a1a] text-white px-6 py-4 shadow-2xl flex items-center justify-between border-b border-white/10"
                     >
                       <div className="flex items-center gap-4">
-                        <div className="bg-white/10 p-2 rounded-xl">
+                        <div className="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-600/20">
                           <Navigation size={24} className="fill-white" style={{ transform: 'rotate(45deg)' }} />
                         </div>
                         <div>
-                          <p className="text-xl font-black leading-tight">
-                            {activeOrders[0].status === 'accepted' ? 'Main St' : 'Dropoff'}
+                          <p className="font-display text-xl font-black leading-tight tracking-tight">
+                            {activeOrders[0]?.status === 'accepted' ? (activeOrders[0]?.type === 'delivery' ? activeOrders[0]?.restaurantName : 'Pickup Location') : 'Destination'}
                           </p>
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                            {activeOrders[0].status === 'accepted' ? `Pickup by ${getArrivalTime(activeOrders[0].estimatedTime / 2)}` : `Arriving by ${getArrivalTime(activeOrders[0].estimatedTime / 2)}`}
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                            {activeOrders[0]?.status === 'accepted' ? `Pickup by ${getArrivalTime(activeOrders[0]?.estimatedTime / 2)}` : `Arriving by ${getArrivalTime(activeOrders[0]?.estimatedTime / 2)}`}
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <button onClick={() => setIsNavigating(false)} className="p-2 bg-white/5 rounded-full">
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="font-display text-lg font-black leading-tight">£{activeOrders[0]?.estimatedPay.toFixed(2)}</p>
+                          <p className="text-[8px] font-black text-blue-500 tracking-widest uppercase">Ongoing</p>
+                        </div>
+                        <button onClick={() => setIsNavigating(false)} className="p-2 bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors">
                           <X size={20} />
                         </button>
                       </div>
@@ -3715,10 +3760,10 @@ export default function App() {
                       initial={{ pathLength: 0 }}
                       animate={{ pathLength: 1 }}
                       transition={{ duration: 1 }}
-                      d={`M ${50}% ${50}% ${routeWaypoints.map(wp => {
+                      d={`M ${centerX} ${centerY} ${routeWaypoints.map(wp => {
                         const x = (wp.longitude - location.longitude) * MAP_SCALE;
                         const y = (location.latitude - wp.latitude) * MAP_SCALE;
-                        return `L calc(50% + ${x}px) calc(50% + ${y}px)`;
+                        return `L ${centerX + x} ${centerY + y}`;
                       }).join(' ')}`}
                       fill="none" 
                       stroke="#3b82f6" 
@@ -3729,10 +3774,10 @@ export default function App() {
                     />
                     {/* Animated path overlay */}
                     <motion.path 
-                      d={`M calc(50% + ${mapOffset.x}px) calc(50% + ${mapOffset.y}px) ${routeWaypoints.map(wp => {
+                      d={`M ${centerX + mapOffset.x} ${centerY + mapOffset.y} ${routeWaypoints.map(wp => {
                         const x = (wp.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
                         const y = (location.latitude - wp.latitude) * MAP_SCALE + mapOffset.y;
-                        return `L calc(50% + ${x}px) calc(50% + ${y}px)`;
+                        return `L ${centerX + x} ${centerY + y}`;
                       }).join(' ')}`}
                       fill="none" 
                       stroke="white" 
@@ -4231,30 +4276,30 @@ export default function App() {
                       </button>
                       
                       <div className="flex flex-col items-center flex-1">
-                        {activeOrders.length > 0 && Number(distanceToTarget(activeOrders[0])) <= 1.5 ? (
+                        {activeOrders.length > 0 && activeOrders[0] && Number(distanceToTarget(activeOrders[0])) <= 1.5 ? (
                           <motion.button
                             whileTap={{ scale: 0.95 }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleNextStep(activeOrders[0].id);
+                              if (activeOrders[0]) handleNextStep(activeOrders[0].id);
                             }}
-                            className={`w-full py-6 rounded-3xl font-black text-2xl uppercase tracking-tighter shadow-2xl border-4 border-white animate-pulse transition-all ${
+                            className={`w-full py-6 rounded-3xl font-display font-black text-2xl uppercase tracking-tighter shadow-[0_20px_50px_rgba(37,99,235,0.3)] border-4 border-white transition-all ${
                               activeOrders[0].status === 'accepted' 
-                                ? 'bg-blue-600 text-white shadow-blue-600/50' 
-                                : 'bg-green-600 text-white shadow-green-600/50'
+                                ? 'bg-blue-600 text-white' 
+                                : 'bg-green-600 text-white shadow-[0_20px_50px_rgba(22,163,74,0.3)]'
                             }`}
                           >
-                            {activeOrders[0].status === 'accepted' ? 'Confirm Pickup' : 'Confirm Dropoff'}
+                            {activeOrders[0].status === 'accepted' ? (activeOrders[0].type === 'delivery' ? 'Confirm Pickup' : 'Confirm Arrival') : 'Confirm Dropoff'}
                           </motion.button>
                         ) : (
                           <>
-                            <span className="text-2xl font-black text-black tracking-tight">
+                            <span className="font-display text-2xl font-black text-black tracking-tight">
                               {activeOrders.length > 0 
-                                ? `${activeOrders.length} Active ${activeOrders.length === 1 ? 'Trip' : 'Trips'}`
+                                ? `${activeOrders.length} ${activeOrders.length === 1 ? 'Trip' : 'Trips'} • £${activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}`
                                 : 'Finding trips'}
                             </span>
-                            {activeOrders.length > 0 && (
-                              <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                            {activeOrders.length > 0 && activeOrders[0] && (
+                              <span className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mt-1">
                                 {activeOrders[0].status === 'accepted' ? 'Heading to pickup' : 'Heading to dropoff'}
                               </span>
                             )}
