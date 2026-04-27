@@ -2088,6 +2088,27 @@ export default function App() {
     return () => clearInterval(moveInterval);
   }, [isNavigating, user.isOnline, activeOrders, location === null]);
 
+  // GPS Drift Effect (Subtle jitter when online but stationary)
+  useEffect(() => {
+    if (!user.isOnline || isNavigating || !location) return;
+
+    const driftInterval = setInterval(() => {
+      // Very small drift: ~0.000005 degrees is approx 0.5 meters
+      const latDrift = (Math.random() - 0.5) * 0.00001;
+      const lngDrift = (Math.random() - 0.5) * 0.00001;
+
+      setLocation(prev => {
+        if (!prev) return prev;
+        return {
+          latitude: prev.latitude + latDrift,
+          longitude: prev.longitude + lngDrift
+        };
+      });
+    }, 3000); // Drift every 3 seconds
+
+    return () => clearInterval(driftInterval);
+  }, [user.isOnline, isNavigating, location === null]);
+
   // Customer Response Timer Logic
   useEffect(() => {
     const interval = setInterval(() => {
@@ -3375,15 +3396,15 @@ export default function App() {
                         backgroundSize: '20px 20px'
                       }} />
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="relative w-full h-full">
+                        <div className="relative w-full h-full max-w-[500px]">
                           {/* Driver to Restaurant line */}
-                          <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 500 300" preserveAspectRatio="xMidYMid meet">
                             <motion.path 
                               d="M 50 150 Q 150 50 250 150" 
                               fill="none" 
                               stroke="#3b82f6" 
-                              strokeWidth="4" 
-                              strokeDasharray="8,8"
+                              strokeWidth="8" 
+                              strokeDasharray="12,12"
                               initial={{ strokeDashoffset: 100 }}
                               animate={{ strokeDashoffset: 0 }}
                               transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
@@ -3392,19 +3413,19 @@ export default function App() {
                               d="M 250 150 Q 350 250 450 150" 
                               fill="none" 
                               stroke="#10b981" 
-                              strokeWidth="4" 
-                              strokeDasharray="8,8"
+                              strokeWidth="8" 
+                              strokeDasharray="12,12"
                               initial={{ strokeDashoffset: 100 }}
                               animate={{ strokeDashoffset: 0 }}
                               transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                             />
                           </svg>
-                          <div className="absolute left-[50px] top-[150px] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg" />
-                          <div className="absolute left-[250px] top-[150px] -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-                            <Coffee size={12} className="text-white" />
+                          <div className="absolute left-[10%] top-[150px] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg" />
+                          <div className="absolute left-[50%] top-[150px] -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-green-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+                            <Coffee size={16} className="text-white" />
                           </div>
-                          <div className="absolute left-[450px] top-[150px] -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-                            <User size={12} className="text-white" />
+                          <div className="absolute left-[90%] top-[150px] -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+                            <User size={16} className="text-white" />
                           </div>
                         </div>
                       </div>
@@ -3814,39 +3835,95 @@ export default function App() {
                   </div>
                 </motion.div>
 
-                {/* Active Trip Path */}
-                {isNavigating && location && routeWaypoints.length > 0 && (
+                {/* Active and Pending Trip Paths */}
+                {location && (isNavigating || pendingOrder) && (
                   <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-[100]">
-                    <motion.path 
-                      initial={{ pathLength: 0, opacity: 0 }}
-                      animate={{ pathLength: 1, opacity: 1 }}
-                      transition={{ duration: 0.8 }}
-                      d={`M ${(centerX || window.innerWidth/2) + (mapOffset.x || 0)} ${(centerY || window.innerHeight/2) + (mapOffset.y || 0)} ${routeWaypoints.map(wp => {
-                        const x = (wp.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
-                        const y = (location.latitude - wp.latitude) * MAP_SCALE + (mapOffset.y || 0);
-                        return `L ${(centerX || window.innerWidth/2) + x} ${(centerY || window.innerHeight/2) + y}`;
-                      }).join(' ')}`}
-                      fill="none" 
-                      stroke="#2563eb" 
-                      strokeWidth={8 * zoom} 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round"
-                    />
-                    <motion.path 
-                      d={`M ${(centerX || window.innerWidth/2) + (mapOffset.x || 0)} ${(centerY || window.innerHeight/2) + (mapOffset.y || 0)} ${routeWaypoints.map(wp => {
-                        const x = (wp.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
-                        const y = (location.latitude - wp.latitude) * MAP_SCALE + (mapOffset.y || 0);
-                        return `L ${(centerX || window.innerWidth/2) + x} ${(centerY || window.innerHeight/2) + y}`;
-                      }).join(' ')}`}
-                      fill="none" 
-                      stroke="white" 
-                      strokeWidth={2 * zoom} 
-                      strokeDasharray="4,12"
-                      strokeLinecap="round"
-                      animate={{ strokeDashoffset: [-16, 0] }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    />
+                    {/* Path for Pending Order */}
+                    {pendingOrder && !isNavigating && (
+                      <>
+                        <motion.path 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 0.4 }}
+                          d={`M ${(centerX || window.innerWidth/2) + (mapOffset.x || 0)} ${(centerY || window.innerHeight/2) + (mapOffset.y || 0)} L ${((centerX || window.innerWidth/2) + (pendingOrder.pickupLocation.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0))} ${((centerY || window.innerHeight/2) + (location.latitude - pendingOrder.pickupLocation.latitude) * MAP_SCALE + (mapOffset.y || 0))} L ${((centerX || window.innerWidth/2) + (pendingOrder.customerLocation.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0))} ${((centerY || window.innerHeight/2) + (location.latitude - pendingOrder.customerLocation.latitude) * MAP_SCALE + (mapOffset.y || 0))}`}
+                          fill="none" 
+                          stroke="#3b82f6" 
+                          strokeWidth={6 * zoom} 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round"
+                          strokeDasharray="12,12"
+                        />
+                      </>
+                    )}
+                    
+                    {/* Main Nav Path */}
+                    {isNavigating && routeWaypoints.length > 0 && (
+                      <>
+                        <motion.path 
+                          initial={{ pathLength: 0, opacity: 0 }}
+                          animate={{ pathLength: 1, opacity: 1 }}
+                          transition={{ duration: 0.8 }}
+                          d={`M ${(centerX || window.innerWidth/2) + (mapOffset.x || 0)} ${(centerY || window.innerHeight/2) + (mapOffset.y || 0)} ${routeWaypoints.map(wp => {
+                            const x = (wp.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
+                            const y = (location.latitude - wp.latitude) * MAP_SCALE + (mapOffset.y || 0);
+                            return `L ${(centerX || window.innerWidth/2) + x} ${(centerY || window.innerHeight/2) + y}`;
+                          }).join(' ')}`}
+                          fill="none" 
+                          stroke="#2563eb" 
+                          strokeWidth={8 * zoom} 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round"
+                        />
+                        <motion.path 
+                          d={`M ${(centerX || window.innerWidth/2) + (mapOffset.x || 0)} ${(centerY || window.innerHeight/2) + (mapOffset.y || 0)} ${routeWaypoints.map(wp => {
+                            const x = (wp.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
+                            const y = (location.latitude - wp.latitude) * MAP_SCALE + (mapOffset.y || 0);
+                            return `L ${(centerX || window.innerWidth/2) + x} ${(centerY || window.innerHeight/2) + y}`;
+                          }).join(' ')}`}
+                          fill="none" 
+                          stroke="white" 
+                          strokeWidth={2 * zoom} 
+                          strokeDasharray="4,12"
+                          strokeLinecap="round"
+                          animate={{ strokeDashoffset: [-16, 0] }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        />
+                      </>
+                    )}
                   </svg>
+                )}
+
+                {/* Pending Order Pins on Main Map */}
+                {location && pendingOrder && (
+                   <div className="absolute inset-0 pointer-events-none z-[220]">
+                      {[
+                        { loc: pendingOrder.pickupLocation, type: 'pickup', name: pendingOrder.type === 'delivery' ? pendingOrder.restaurantName : 'Rider Pickup' },
+                        { loc: pendingOrder.customerLocation, type: 'dropoff', name: pendingOrder.type === 'delivery' ? 'Customer' : 'Dropoff' }
+                      ].map((pin, pidx) => {
+                        const x = (pin.loc.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
+                        const y = (location.latitude - pin.loc.latitude) * MAP_SCALE + (mapOffset.y || 0);
+                        return (
+                          <motion.div
+                            key={`pending-pin-${pidx}`}
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="absolute flex flex-col items-center"
+                            style={{ 
+                              left: (centerX || window.innerWidth/2) + x,
+                              top: (centerY || window.innerHeight/2) + y,
+                              transform: 'translate(-50%, -100%)'
+                            }}
+                          >
+                            <div className="bg-orange-500 p-2 rounded-full border-2 border-white shadow-xl">
+                              {pin.type === 'pickup' ? <Coffee size={14} className="text-white" /> : <Navigation size={14} className="text-white" />}
+                            </div>
+                            <div className="mt-1 px-2 py-0.5 bg-black/80 rounded text-[8px] font-black text-white whitespace-nowrap">
+                              {pin.name}
+                            </div>
+                            <div className="w-0.5 h-3 bg-orange-500" />
+                          </motion.div>
+                        );
+                      })}
+                   </div>
                 )}
 
                 {/* All Active Trip Markers (Pickup/Dropoff) */}
