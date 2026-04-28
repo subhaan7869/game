@@ -303,7 +303,8 @@ const SideMenu = ({
   setIsCarPlaySynced,
   earnings,
   earningsGoal,
-  setEarningsGoal
+  setEarningsGoal,
+  busynessMode
 }: { 
   user: UserProfile, 
   setIsSideMenuOpen: (val: boolean) => void,
@@ -316,7 +317,8 @@ const SideMenu = ({
   setIsCarPlaySynced: (val: boolean) => void,
   earnings: number,
   earningsGoal: number,
-  setEarningsGoal: (val: number) => void
+  setEarningsGoal: (val: number) => void,
+  busynessMode: 'Low' | 'Medium' | 'High'
 }) => (
   <motion.div 
     initial={{ x: '-100%' }}
@@ -357,6 +359,16 @@ const SideMenu = ({
             <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Points</p>
             <p className="text-lg font-black">{user.points}</p>
           </div>
+        </div>
+
+        <div className="mt-4 p-3 bg-white/5 rounded-2xl flex items-center justify-between border border-white/5">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full animate-pulse ${busynessMode === 'High' ? 'bg-orange-500' : 'bg-blue-500'}`} />
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Demand</span>
+          </div>
+          <span className={`text-[10px] font-black uppercase tracking-widest ${busynessMode === 'High' ? 'text-orange-500' : busynessMode === 'Medium' ? 'text-blue-400' : 'text-gray-500'}`}>
+            {busynessMode}
+          </span>
         </div>
       </div>
 
@@ -1689,6 +1701,30 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Dynamic Busyness Rotation
+  useEffect(() => {
+    const rotateBusyness = () => {
+      const modes: ('Low' | 'Medium' | 'High')[] = ['Low', 'Medium', 'High'];
+      // Randomly pick a new mode that is different from current if possible
+      const newMode = modes[Math.floor(Math.random() * modes.length)];
+      setBusynessMode(newMode);
+    };
+
+    // Change every 5 to 10 minutes (300k to 600k ms)
+    const getNextInterval = () => Math.floor(Math.random() * (600000 - 300000 + 1) + 300000);
+    
+    let timerId: NodeJS.Timeout;
+    const scheduleNext = () => {
+      timerId = setTimeout(() => {
+        rotateBusyness();
+        scheduleNext();
+      }, getNextInterval());
+    };
+
+    scheduleNext();
+    return () => clearTimeout(timerId);
+  }, []);
+
   // Location & Orders
   const [location, setLocation] = useState<Location | null>({ latitude: 51.5074, longitude: -0.1278 }); // Default to London
   const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
@@ -2243,7 +2279,12 @@ export default function App() {
     const requestWakeLock = async () => {
       if (user.isOnline && 'wakeLock' in navigator) {
         try {
+          if (wakeLockRef.current) return;
           wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+          
+          wakeLockRef.current.addEventListener('release', () => {
+             wakeLockRef.current = null;
+          });
         } catch (err) {
           // Silent fail for wake lock as it's often blocked in iframes
         }
@@ -2252,7 +2293,16 @@ export default function App() {
         wakeLockRef.current = null;
       }
     };
+
+    const handleVisibilityChange = () => {
+      if (wakeLockRef.current !== null && document.visibilityState === 'visible') {
+        requestWakeLock();
+      }
+    };
+
     requestWakeLock();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [user.isOnline]);
 
   const routeRef = useRef<Location[]>([]);
@@ -2958,44 +3008,37 @@ export default function App() {
   const playUberSound = (type: 'order' | 'accept' | 'message' | 'complete') => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
+      
+      const playTone = (freq: number, startTime: number, duration: number, type: OscillatorType = 'sine', volume = 0.1) => {
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(freq, startTime);
+        gainNode.gain.setValueAtTime(volume, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration);
+      };
 
       if (type === 'order') {
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.5);
-        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.5);
+        const now = audioCtx.currentTime;
+        for (let i = 0; i < 3; i++) {
+          playTone(880, now + i * 0.4, 0.3, 'sine', 0.15);
+          playTone(1760, now + i * 0.4 + 0.05, 0.1, 'sine', 0.05);
+        }
       } else if (type === 'accept') {
-        oscillator.type = 'square';
-        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.2);
-        gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.2);
+        playTone(440, audioCtx.currentTime, 0.1, 'sine', 0.1);
+        playTone(880, audioCtx.currentTime + 0.1, 0.2, 'sine', 0.05);
       } else if (type === 'message') {
-        oscillator.type = 'triangle';
-        oscillator.frequency.setValueAtTime(660, audioCtx.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
-        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.1);
+        playTone(523.25, audioCtx.currentTime, 0.1, 'sine', 0.1);
+        playTone(523.25, audioCtx.currentTime + 0.15, 0.1, 'sine', 0.1);
       } else if (type === 'complete') {
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(1046.5, audioCtx.currentTime + 0.3);
-        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.3);
+        const now = audioCtx.currentTime;
+        playTone(523.25, now, 0.1);
+        playTone(659.25, now + 0.1, 0.1);
+        playTone(783.99, now + 0.2, 0.3);
       }
     } catch (e) {
       console.warn("Audio not supported or blocked", e);
@@ -3175,6 +3218,7 @@ export default function App() {
               earnings={earnings}
               earningsGoal={earningsGoal}
               setEarningsGoal={setEarningsGoal}
+              busynessMode={busynessMode}
             />
           </>
         )}
@@ -4766,7 +4810,13 @@ export default function App() {
                                 <div className="w-2 h-2 bg-red-500 rounded-full" />
                                 <div className="flex flex-col">
                                   <span className="font-bold text-sm">You're offline</span>
-                                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{user.deliveriesToday} deliveries today</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{user.deliveriesToday} deliveries today</span>
+                                    <span className="text-[10px] opacity-30 text-white">•</span>
+                                    <span className={`text-[10px] font-black uppercase tracking-widest ${busynessMode === 'High' ? 'text-orange-500' : busynessMode === 'Medium' ? 'text-blue-400' : 'text-gray-500'}`}>
+                                      {busynessMode} Demand
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                               <span className="text-xs text-gray-400 font-bold">{currentCity}</span>
