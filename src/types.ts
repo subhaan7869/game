@@ -62,6 +62,7 @@ export interface UserProfile {
   tier: UberProTier;
   points: number;
   deliveries: number;
+  deliveriesToday: number;
   rides: number;
   isOnline: boolean;
   documentsUploaded: boolean;

@@ -322,134 +322,99 @@ const SideMenu = ({
     initial={{ x: '-100%' }}
     animate={{ x: 0 }}
     exit={{ x: '-100%' }}
-    className="absolute inset-0 z-[100] bg-black text-white flex flex-col pb-12"
+    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+    className="fixed left-0 top-0 bottom-0 w-[85%] max-w-[320px] z-[100] bg-black text-white flex flex-col shadow-[20px_0_60px_rgba(0,0,0,0.5)] border-r border-white/10"
     onClick={(e) => e.stopPropagation()}
   >
-    <div className="p-6 pt-12">
-      <button onClick={() => setIsSideMenuOpen(false)} className="p-2 bg-white/10 rounded-full mb-8">
-        <X size={24} />
-      </button>
-      
-      <div className="flex items-center gap-6 mb-8">
-            <div className="w-20 h-20 bg-white/10 rounded-full overflow-hidden border-2 border-white/20 p-1">
-              <div className="w-full h-full rounded-full overflow-hidden">
-                <img src={user.profilePic || "https://picsum.photos/seed/driver/200/200"} alt="Me" className="w-full h-full object-cover" />
-              </div>
-            </div>
-            <div>
-              <h2 className="font-display font-black text-3xl mb-1">{user.name}</h2>
-              <div className="flex items-center gap-2">
-                <span className="bg-gradient-to-r from-blue-600 to-blue-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest text-white shadow-lg shadow-blue-500/20">Diamond Pro</span>
-                <p className="text-sm font-bold text-gray-400">{user.rating} ★</p>
-              </div>
-            </div>
-      </div>
-
-      {/* Goal Tracker inside Menu */}
-      <div className="mb-10 bg-white/5 p-5 rounded-[32px] border border-white/5 relative overflow-hidden group">
-        <div className="flex justify-between items-start mb-4">
+    <div className="p-8 pt-12 flex-1 overflow-y-auto custom-scrollbar">
+      {/* User Card */}
+      <div className="bg-white/5 rounded-[40px] p-6 mb-8 border border-white/5">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-16 h-16 rounded-full border-2 border-blue-500 p-0.5 shadow-lg shadow-blue-500/20">
+            <img src={user.profilePic || "https://picsum.photos/seed/driver/100/100"} alt="Profile" className="w-full h-full object-cover rounded-full" />
+          </div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Daily Earnings Goal</p>
-            <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-black">£{earnings.toFixed(2)}</p>
-              <p className="text-gray-500 text-sm font-bold">/ £{earningsGoal}</p>
+            <h3 className="font-display text-2xl font-black tracking-tight">{user.name}</h3>
+            <div className="flex items-center gap-1 text-xs font-black text-blue-500 uppercase tracking-widest mt-1">
+              <Star size={12} fill="currentColor" />
+              <span>{user.rating}</span>
+              <span className="mx-1 opacity-30 text-white">•</span>
+              <span>{user.tier}</span>
             </div>
           </div>
-          <button 
-            onClick={() => {
-              const newGoal = prompt("Set your daily earnings goal:", earningsGoal.toString());
-              if (newGoal && !isNaN(parseFloat(newGoal))) {
-                setEarningsGoal(parseFloat(newGoal));
-              }
-            }}
-            className="p-3 bg-white/10 rounded-2xl active:scale-90 transition-transform"
-          >
-            <Edit2 size={16} className="text-blue-400" />
-          </button>
         </div>
-        <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-          <motion.div 
-            initial={{ width: 0 }}
-            animate={{ width: `${Math.min(100, (earnings / earningsGoal) * 100)}%` }}
-            className={`h-full rounded-full ${earnings >= earningsGoal ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'bg-blue-600'}`}
-          />
+        
+        <div className="grid grid-cols-3 gap-2">
+          <div className="p-3 bg-white/5 rounded-2xl text-center">
+            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Today</p>
+            <p className="text-lg font-black">{user.deliveriesToday || 0}</p>
+          </div>
+          <div className="p-3 bg-white/5 rounded-2xl text-center">
+            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Total</p>
+            <p className="text-lg font-black">{user.deliveries}</p>
+          </div>
+          <div className="p-3 bg-white/5 rounded-2xl text-center">
+            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Points</p>
+            <p className="text-lg font-black">{user.points}</p>
+          </div>
         </div>
-        {earnings >= earningsGoal && (
-          <p className="text-[10px] font-black text-green-500 mt-3 uppercase tracking-widest text-center flex items-center justify-center gap-2 underline underline-offset-4 decoration-green-500/30">
-            <Trophy size={12} />
-            Goal Achieved!
-          </p>
-        )}
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-10">
-        <button onClick={() => { setCurrentScreen('earnings'); setIsSideMenuOpen(false); }} className="flex flex-col items-center gap-2 p-4 bg-white/5 rounded-3xl active:scale-95 transition-transform">
-          <TrendingUp size={24} className="text-blue-400" />
+      {/* Quick Stats Grid */}
+      <div className="grid grid-cols-2 gap-3 mb-10">
+        <button onClick={() => { setCurrentScreen('earnings'); setIsSideMenuOpen(false); }} className="flex flex-col items-center justify-center gap-2 p-5 bg-white/5 rounded-3xl active:scale-95 transition-all border border-white/5 hover:bg-white/10 text-center">
+          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-600/20">
+            <TrendingUp size={20} />
+          </div>
           <span className="text-[10px] font-black uppercase tracking-widest">Earnings</span>
         </button>
-        <button onClick={() => { setIsInboxOpen(true); setIsSideMenuOpen(false); }} className="flex flex-col items-center gap-2 p-4 bg-white/5 rounded-3xl active:scale-95 transition-transform">
-          <Mail size={24} className="text-blue-400" />
-          <span className="text-[10px] font-black uppercase tracking-widest">Inbox</span>
-        </button>
-        <button onClick={() => { setCurrentScreen('account'); setIsSideMenuOpen(false); }} className="flex flex-col items-center gap-2 p-4 bg-white/5 rounded-3xl active:scale-95 transition-transform">
-          <User size={24} className="text-blue-400" />
+        <button onClick={() => { setCurrentScreen('account'); setIsSideMenuOpen(false); }} className="flex flex-col items-center justify-center gap-2 p-5 bg-white/5 rounded-3xl active:scale-95 transition-all border border-white/5 hover:bg-white/10 text-center">
+          <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-600/20">
+            <User size={20} />
+          </div>
           <span className="text-[10px] font-black uppercase tracking-widest">Account</span>
         </button>
       </div>
+
+      {/* Menu Items */}
+      <div className="space-y-1 mb-10">
+        {[
+          { icon: <Zap size={20} />, label: "Work Hub", screen: 'uber_services' },
+          { icon: <Mail size={20} />, label: "Inbox", screen: 'inbox' },
+          { icon: <Clock size={20} />, label: "Scheduled", screen: 'scheduled_orders' },
+          { icon: <History size={20} />, label: "Trip History", screen: 'trip_history' },
+          { icon: <Target size={20} />, label: "Rewards", screen: 'uber_pro' },
+          { icon: <Gift size={20} />, label: "Promotions", screen: 'opportunities' },
+          { icon: <Shield size={20} />, label: "Safety", screen: 'safety' },
+          { icon: <Smartphone size={20} />, label: isCarPlaySynced ? "CarPlay Active" : "Sync CarPlay", action: () => setIsCarPlaySynced(!isCarPlaySynced), active: isCarPlaySynced },
+        ].map((item, i) => (
+          <button 
+            key={i}
+            onClick={() => {
+              if (item.action) {
+                item.action();
+              } else if (item.screen) {
+                setCurrentScreen(item.screen as AppScreen);
+                setIsSideMenuOpen(false);
+              }
+            }}
+            className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all active:scale-98 ${item.active ? 'bg-blue-600 text-white' : 'hover:bg-white/5 text-gray-300 hover:text-white'}`}
+          >
+            <div className={`${item.active ? 'text-white' : 'text-blue-500'}`}>{item.icon}</div>
+            <span className="font-bold text-sm">{item.label}</span>
+            {item.label === "Inbox" && <div className="ml-auto w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center text-[10px] font-black">2</div>}
+          </button>
+        ))}
+      </div>
     </div>
 
-    <div className="flex-1 overflow-y-auto px-6 space-y-1">
-      {[
-        { icon: <Zap size={20} />, label: "Work Hub", screen: 'uber_services' },
-        { icon: <Star size={20} />, label: "Feedback", screen: 'ratings' },
-        { icon: <Briefcase size={20} />, label: "Opportunities", screen: 'opportunities' },
-        { icon: <Clock size={20} />, label: "Scheduled Orders", screen: 'scheduled_orders' },
-        { icon: <Gift size={20} />, label: "Uber Pro", screen: 'uber_pro' },
-        { icon: <Target size={20} />, label: "Rewards & Quests", screen: 'rewards' },
-        { icon: <ShieldCheck size={20} />, label: "Safety Toolkit", action: () => setIsSafetyToolkitOpen(true) },
-        { 
-          icon: <Smartphone size={20} />, 
-          label: isCarPlaySynced ? "CarPlay Dashboard" : "Sync to CarPlay", 
-          action: () => {
-            if (!isCarPlaySynced) {
-              setIsCarPlaySynced(true);
-            }
-            setCurrentScreen('carplay_dashboard');
-          }
-        },
-        { icon: <Settings size={20} />, label: "App Settings", screen: 'account' },
-      ].map((item, idx) => (
-        <button 
-          key={idx} 
-          onClick={() => { 
-            if ('action' in item) {
-              item.action();
-            } else {
-              setCurrentScreen(item.screen as AppScreen);
-            }
-            setIsSideMenuOpen(false); 
-          }}
-          className="w-full flex items-center gap-6 py-4 active:opacity-50 transition-opacity border-b border-white/5"
-        >
-          <div className="text-gray-500">{item.icon}</div>
-          <span className="font-black text-lg">{item.label}</span>
-          {item.label === "CarPlay Dashboard" && isCarPlaySynced && (
-            <div className="ml-auto w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          )}
-        </button>
-      ))}
-    </div>
-
-    <div className="p-6 border-t border-white/10">
-      <button 
-        onClick={() => {
-          localStorage.clear();
-          window.location.reload();
-        }} 
-        className="flex items-center gap-4 text-red-500 font-black active:scale-95 transition-transform"
-      >
-        <LogOut size={24} />
-        <span>Log out</span>
+    <div className="p-8 border-t border-white/5 flex items-center justify-between gap-4">
+      <button onClick={logout} className="flex items-center gap-3 text-red-500 font-black tracking-tighter hover:opacity-80 transition-opacity">
+        <LogOut size={20} />
+        <span>SIGN OUT</span>
+      </button>
+      <button onClick={() => setIsSideMenuOpen(false)} className="p-3 bg-white/10 rounded-full active:scale-90 transition-transform">
+        <X size={20} />
       </button>
     </div>
   </motion.div>
@@ -1657,15 +1622,16 @@ export default function App() {
     const saved = localStorage.getItem('uber_eats_user');
     const baseUser: UserProfile = {
       name: "Hassen Nabeel",
-      rating: 4.98,
-      tier: 'Diamond',
-      points: 1550,
-      deliveries: 452,
-      rides: 890,
+      rating: 5.00,
+      tier: 'Blue',
+      points: 0,
+      deliveries: 0,
+      deliveriesToday: 0,
+      rides: 0,
       isOnline: false,
       documentsUploaded: true,
       faceVerified: true,
-      walletBalance: 1250.40,
+      walletBalance: 0.00,
       profilePic: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop",
       vehicleInfo: {
         make: "Tesla",
@@ -1700,6 +1666,27 @@ export default function App() {
     if (user.documentsUploaded && user.faceVerified && currentScreen === 'onboarding') {
       setCurrentScreen('home');
     }
+  }, []);
+
+  // Daily Reset Logic
+  useEffect(() => {
+    const checkReset = () => {
+      const now = new Date();
+      const lastResetDate = localStorage.getItem('last_reset_date');
+      const todayDate = now.toDateString();
+
+      if (lastResetDate !== todayDate) {
+        setUser(prev => ({
+          ...prev,
+          deliveriesToday: 0
+        }));
+        localStorage.setItem('last_reset_date', todayDate);
+      }
+    };
+
+    checkReset();
+    const interval = setInterval(checkReset, 60000); // Check every minute
+    return () => clearInterval(interval);
   }, []);
 
   // Location & Orders
@@ -2896,9 +2883,9 @@ export default function App() {
     ]);
     
     if (order.type === 'ride') {
-      setUser(u => ({ ...u, rides: (u.rides || 0) + 1 }));
+      setUser(u => ({ ...u, rides: (u.rides || 0) + 1, deliveriesToday: (u.deliveriesToday || 0) + 1, points: u.points + 10 }));
     } else {
-      setUser(u => ({ ...u, deliveries: u.deliveries + 1 }));
+      setUser(u => ({ ...u, deliveries: u.deliveries + 1, deliveriesToday: (u.deliveriesToday || 0) + 1, points: u.points + 10 }));
     }
 
     setActiveOrders(prev => prev.filter(o => o.id !== orderId));
@@ -3167,20 +3154,29 @@ export default function App() {
 
       <AnimatePresence>
         {isSideMenuOpen && (
-          <SideMenu 
-            user={user} 
-            setIsSideMenuOpen={setIsSideMenuOpen}
-            setCurrentScreen={setCurrentScreen}
-            setIsInboxOpen={setIsInboxOpen}
-            setIsSafetyToolkitOpen={setIsSafetyToolkitOpen}
-            theme={theme}
-            logout={logout}
-            isCarPlaySynced={isCarPlaySynced}
-            setIsCarPlaySynced={setIsCarPlaySynced}
-            earnings={earnings}
-            earningsGoal={earningsGoal}
-            setEarningsGoal={setEarningsGoal}
-          />
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSideMenuOpen(false)}
+              className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm"
+            />
+            <SideMenu 
+              user={user} 
+              setIsSideMenuOpen={setIsSideMenuOpen}
+              setCurrentScreen={setCurrentScreen}
+              setIsInboxOpen={setIsInboxOpen}
+              setIsSafetyToolkitOpen={setIsSafetyToolkitOpen}
+              theme={theme}
+              logout={logout}
+              isCarPlaySynced={isCarPlaySynced}
+              setIsCarPlaySynced={setIsCarPlaySynced}
+              earnings={earnings}
+              earningsGoal={earningsGoal}
+              setEarningsGoal={setEarningsGoal}
+            />
+          </>
         )}
       </AnimatePresence>
 
@@ -4768,7 +4764,10 @@ export default function App() {
                             <div className={`w-full p-4 rounded-2xl flex items-center justify-between mb-4 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
                               <div className="flex items-center gap-3">
                                 <div className="w-2 h-2 bg-red-500 rounded-full" />
-                                <span className="font-bold text-sm">You're offline</span>
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-sm">You're offline</span>
+                                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{user.deliveriesToday} deliveries today</span>
+                                </div>
                               </div>
                               <span className="text-xs text-gray-400 font-bold">{currentCity}</span>
                             </div>
@@ -6090,6 +6089,15 @@ export default function App() {
                 </div>
                 <h2 className="font-display text-5xl font-black mb-6 tracking-tighter">£{(earningsTab === 'today' ? earnings * 0.15 : earnings).toFixed(2)}</h2>
                 
+                {earnings > 0 && (
+                  <button 
+                    onClick={() => setCurrentScreen('wallet')}
+                    className="mb-6 w-full py-4 bg-white text-black rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-transform"
+                  >
+                    CASH OUT £{earnings.toFixed(2)}
+                  </button>
+                )}
+                
                 {/* Goal Progress in Earnings Screen */}
                 <div className="mb-6">
                   <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2 opacity-60">
@@ -6164,6 +6172,29 @@ export default function App() {
               isCarPlaySynced={isCarPlaySynced}
               setIsCarPlaySynced={setIsCarPlaySynced}
             />
+          )}
+
+          {/* Safety Fallback for unhandled screens */}
+          {['rewards', 'work_hub', 'safety', 'planner'].includes(currentScreen) && (
+            <motion.div 
+              key="fallback" 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className={`h-full w-full flex flex-col items-center justify-center p-8 text-center ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
+            >
+              <div className="w-24 h-24 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mb-6">
+                <Target size={48} />
+              </div>
+              <h2 className="text-2xl font-black mb-2 tracking-tighter uppercase">Coming Soon</h2>
+              <p className="text-gray-400 font-bold mb-8 max-w-xs">This feature is currently being optimized for your region. Check back soon!</p>
+              <button 
+                onClick={() => setCurrentScreen('home')} 
+                className="px-12 py-4 bg-blue-600 text-white rounded-2xl font-black tracking-widest text-sm active:scale-95 transition-transform shadow-lg shadow-blue-500/20"
+              >
+                GO BACK
+              </button>
+            </motion.div>
           )}
         </AnimatePresence>
 
