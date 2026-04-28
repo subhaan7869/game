@@ -174,29 +174,51 @@ const ScanningScreen = () => (
 );
 
 
-const Heatmap = () => (
-  <div className="absolute inset-0 pointer-events-none overflow-hidden">
-    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px]">
-      <motion.div 
-        animate={{ 
-          scale: [1, 1.1, 1],
-          opacity: [0.3, 0.5, 0.3]
-        }}
-        transition={{ duration: 4, repeat: Infinity }}
-        className="absolute inset-0 rounded-full bg-orange-500 blur-[60px]"
-      />
-      <motion.div 
-        animate={{ 
-          scale: [1, 1.2, 1],
-          opacity: [0.4, 0.6, 0.4]
-        }}
-        transition={{ duration: 3, repeat: Infinity }}
-        className="absolute inset-[20%] rounded-full bg-red-500 blur-[40px]"
-      />
-      <div className="absolute inset-[40%] rounded-full bg-red-600 blur-[20px] opacity-60" />
+const Heatmap = ({ busynessMode }: { busynessMode: 'Low' | 'Medium' | 'High' }) => {
+  const intensity = busynessMode === 'High' ? 1 : busynessMode === 'Medium' ? 0.6 : 0.3;
+  if (intensity < 0.4) return null; // Don't show heatmap in low busyness
+
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden z-[5]">
+      {/* Cluster 1 */}
+      <div className="absolute left-[30%] top-[40%] -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px]">
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.1, 1],
+            opacity: [0.1 * intensity, 0.3 * intensity, 0.1 * intensity]
+          }}
+          transition={{ duration: 5, repeat: Infinity }}
+          className="absolute inset-0 rounded-full bg-orange-600 blur-[80px]"
+        />
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.2, 1],
+            opacity: [0.2 * intensity, 0.4 * intensity, 0.2 * intensity]
+          }}
+          transition={{ duration: 4, repeat: Infinity }}
+          className="absolute inset-[25%] rounded-full bg-red-600 blur-[50px]"
+        />
+      </div>
+
+      {/* Cluster 2 */}
+      <div className="absolute left-[70%] top-[60%] -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px]">
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.15, 1],
+            opacity: [0.1 * intensity, 0.25 * intensity, 0.1 * intensity]
+          }}
+          transition={{ duration: 6, repeat: Infinity }}
+          className="absolute inset-0 rounded-full bg-yellow-600 blur-[70px]"
+        />
+      </div>
+
+      {/* Center Surge Glow */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px]">
+        <div className={`absolute inset-0 rounded-full blur-[100px] transition-opacity duration-1000 ${busynessMode === 'High' ? 'bg-orange-500 opacity-20' : 'bg-transparent opacity-0'}`} />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const OrderDetailsModal = ({ 
   order, 
@@ -218,7 +240,7 @@ const OrderDetailsModal = ({
       initial={{ y: '100%' }}
       animate={{ y: 0 }}
       exit={{ y: '100%' }}
-      className={`absolute inset-0 z-[500] flex flex-col ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
+      className={`absolute inset-0 z-[2500] flex flex-col ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
     >
       <div className="p-6 flex items-center justify-between border-b border-white/5">
         <h2 className="text-2xl font-black">Trip Details</h2>
@@ -325,7 +347,7 @@ const SideMenu = ({
     animate={{ x: 0 }}
     exit={{ x: '-100%' }}
     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-    className="fixed left-0 top-0 bottom-0 w-[85%] max-w-[320px] z-[100] bg-black text-white flex flex-col shadow-[20px_0_60px_rgba(0,0,0,0.5)] border-r border-white/10"
+    className="fixed left-0 top-0 bottom-0 w-[85%] max-w-[320px] z-[2000] bg-black text-white flex flex-col shadow-[20px_0_60px_rgba(0,0,0,0.5)] border-r border-white/10"
     onClick={(e) => e.stopPropagation()}
   >
     <div className="p-8 pt-12 flex-1 overflow-y-auto custom-scrollbar">
@@ -2549,29 +2571,23 @@ export default function App() {
   ]);
   const [surgeMultiplier, setSurgeMultiplier] = useState(1.0);
 
-  // Periodic surge area updates
+  // Dynamic Surge and Busyness Control
   useEffect(() => {
-    const timer = setInterval(() => {
+    const updateSurge = () => {
+      const modeImpact = busynessMode === 'High' ? 0.4 : busynessMode === 'Medium' ? 0.1 : -0.2;
       setActiveSurgeAreas(prev => prev.map(area => {
-        // Randomly adjust multiplier slightly
-        let newMultiplier = area.multiplier + (Math.random() - 0.5) * 0.1;
-        newMultiplier = Math.max(1.1, Math.min(2.5, newMultiplier));
-        
-        // Randomly shift position slightly to simulate demand movement
-        const newLat = area.lat + (Math.random() - 0.5) * 0.0005;
-        const newLng = area.lng + (Math.random() - 0.5) * 0.0005;
-
-        // Determine trend
-        const trend: 'rising' | 'falling' | 'stable' = 
-          newMultiplier > area.multiplier + 0.02 ? 'rising' : 
-          newMultiplier < area.multiplier - 0.02 ? 'falling' : 'stable';
-
-        return { ...area, multiplier: Number(newMultiplier.toFixed(2)), lat: newLat, lng: newLng, trend };
+        const newMultiplier = Math.max(1.1, Number((area.multiplier + (Math.random() - 0.5) * 0.2 + modeImpact).toFixed(1)));
+        const trend = newMultiplier > area.multiplier ? 'rising' : (newMultiplier < area.multiplier ? 'falling' : 'stable');
+        const newLat = area.lat + (Math.random() - 0.5) * 0.001;
+        const newLng = area.lng + (Math.random() - 0.5) * 0.001;
+        return { ...area, multiplier: newMultiplier, trend, lat: newLat, lng: newLng };
       }));
-    }, 15000); // Update every 15 seconds
+    };
 
-    return () => clearInterval(timer);
-  }, []);
+    updateSurge();
+    const interval = setInterval(updateSurge, 60000); // More frequent updates for realism
+    return () => clearInterval(interval);
+  }, [busynessMode]);
 
   // Update surge based on current location
   useEffect(() => {
@@ -2602,15 +2618,19 @@ export default function App() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const updateSize = () => {
-      const width = mapContainerRef.current?.clientWidth || window.innerWidth;
-      const height = mapContainerRef.current?.clientHeight || window.innerHeight;
-      setScreenSize({ width, height });
-    };
+    if (!mapContainerRef.current) return;
+    
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setScreenSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height
+        });
+      }
+    });
 
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+    observer.observe(mapContainerRef.current);
+    return () => observer.disconnect();
   }, []);
 
   const centerX = screenSize.width / 2;
@@ -2618,10 +2638,27 @@ export default function App() {
 
   // Map Background Component for depth and to prevent "black screen" feel
   const MapGrid = () => (
-    <div className="absolute inset-x-0 inset-y-0 opacity-[0.08] pointer-events-none overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:40px_40px]" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff1a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff1a_1px,transparent_1px)] [background-size:200px_200px]" />
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-900/5 to-transparent" />
+    <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+      {/* Background base */}
+      <div className="absolute inset-0 bg-[#0c0c0d]" />
+      
+      {/* Major Roads Grid */}
+      <div className="absolute inset-0 opacity-[0.15]" style={{ 
+        backgroundImage: `linear-gradient(90deg, #3b82f6 1px, transparent 1px), linear-gradient(#3b82f6 1px, transparent 1px)`,
+        backgroundSize: '150px 150px'
+      }} />
+      
+      {/* Minor Roads Grid */}
+      <div className="absolute inset-0 opacity-[0.05]" style={{ 
+        backgroundImage: `linear-gradient(90deg, #ffffff 1px, transparent 1px), linear-gradient(#ffffff 1px, transparent 1px)`,
+        backgroundSize: '30px 30px'
+      }} />
+
+      {/* City Glows */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.05)_0%,transparent_70%)]" />
+      
+      {/* Dark Vignette */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]" />
     </div>
   );
 
@@ -2670,8 +2707,16 @@ export default function App() {
         }
       });
 
-      const basePay = type === 'ride' ? 6.50 + (tripDist * 2.5) : 4.50 + (tripDist * 1.8);
-      const pay = (basePay + (Math.random() * 3)) * activeSurge;
+      const baseFee = type === 'ride' ? 2.50 : 1.50;
+      const mileRate = type === 'ride' ? 1.45 : 1.10;
+      const minuteRate = 0.15;
+      const estTime = Math.floor((tripDist + distToPickup) * 4 + 3);
+      
+      const calculatedPay = baseFee + ((tripDist + distToPickup) * mileRate) + (estTime * minuteRate);
+      const minPay = type === 'ride' ? 5.00 : 4.00;
+      const finalBasePay = Math.max(calculatedPay, minPay);
+      
+      const pay = (finalBasePay + (Math.random() * 2)) * activeSurge;
 
       return {
         id: Math.random().toString(36).substring(2, 11),
@@ -3121,44 +3166,76 @@ export default function App() {
   }, [user.points]);
 
   const wakeLock = useRef<any>(null);
+  const hiddenVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const requestWakeLock = async () => {
-    try {
-      if ('wakeLock' in navigator) {
+    // Hidden video trick for extra persistence if allowed
+    if (!hiddenVideoRef.current && user.isOnline) {
+      const vid = document.createElement('video');
+      vid.loop = true;
+      vid.muted = true;
+      vid.playsInline = true;
+      vid.style.display = 'none';
+      vid.src = 'https://raw.githubusercontent.com/anars/blank-audio/master/10-seconds-of-silence.mp3'; // Small silent media
+      hiddenVideoRef.current = vid;
+      vid.play().catch(() => {});
+    }
+
+    if ('wakeLock' in navigator) {
+      try {
+        if (wakeLock.current) return;
         wakeLock.current = await (navigator as any).wakeLock.request('screen');
+        
+        wakeLock.current.addEventListener('release', () => {
+          wakeLock.current = null;
+        });
+      } catch (err) {
+        console.warn('Wake Lock request failed:', err);
       }
-    } catch (err) {
-      console.log('Wake Lock request failed');
     }
   };
 
   const releaseWakeLock = async () => {
+    if (hiddenVideoRef.current) {
+      hiddenVideoRef.current.pause();
+      hiddenVideoRef.current = null;
+    }
     if (wakeLock.current !== null) {
       try {
         await wakeLock.current.release();
         wakeLock.current = null;
       } catch (err) {
-        console.log('Wake Lock release failed');
+        console.warn('Wake Lock release failed:', err);
       }
     }
   };
 
   useEffect(() => {
-    if (user.isOnline) {
-      requestWakeLock();
-    } else {
-      releaseWakeLock();
-    }
-
     const handleVisibilityChange = async () => {
-      if (wakeLock.current !== null && document.visibilityState === 'visible' && user.isOnline) {
+      if (document.visibilityState === 'visible' && user.isOnline) {
         await requestWakeLock();
       }
     };
 
+    let interval: any;
+    if (user.isOnline) {
+      requestWakeLock();
+      interval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          requestWakeLock();
+        }
+      }, 30000); // Re-request every 30 seconds for extra persistence
+    } else {
+      releaseWakeLock();
+    }
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+      if (interval) clearInterval(interval);
       releaseWakeLock();
     };
   }, [user.isOnline]);
@@ -3407,7 +3484,8 @@ export default function App() {
           )}
 
           {currentScreen === 'home' && (
-            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#111111]">
+            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
+              <MapGrid />
               {/* Scanline Effect (Bottom Layer) */}
               <div className="absolute inset-0 z-0 pointer-events-none">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%)] bg-[length:100%_4px]" />
@@ -3418,7 +3496,7 @@ export default function App() {
               </div>
               
                   {/* Heatmap Simulation */}
-                  {user.isOnline && !isNavigating && <Heatmap />}
+                  {user.isOnline && !isNavigating && <Heatmap busynessMode={busynessMode} />}
               {/* Matching / Trip Request Overlay */}
               <AnimatePresence>
                 {pendingOrder && (
@@ -3427,7 +3505,7 @@ export default function App() {
                     animate={{ y: 0 }} 
                     exit={{ y: '100%' }} 
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="absolute inset-x-0 bottom-0 z-[200] h-[75vh] bg-black/95 text-white rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden border-t border-white/10"
+                    className="absolute inset-x-0 bottom-0 z-[1500] h-[75vh] bg-black/95 text-white rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden border-t border-white/10"
                   >
                     {/* Map Preview (Simulated) */}
                     <div className="h-48 w-full relative overflow-hidden bg-gray-900">
@@ -4493,53 +4571,69 @@ export default function App() {
                 <div className="absolute bottom-0 left-0 right-0 z-[150]">
                   {user.isOnline ? (
                     <motion.div 
+                      key="online-bar"
                       initial={{ y: 100 }}
                       animate={{ y: 0 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsBottomMenuOpen(true);
-                      }}
-                      className="w-full bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.1)] flex items-center justify-between px-8 py-6 cursor-pointer active:scale-[0.99] transition-transform rounded-t-[32px]"
+                      className="w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.2)] flex flex-col rounded-t-[32px] overflow-hidden"
                     >
-                      <button className="text-black" onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}>
-                        <Menu size={28} />
-                      </button>
-                      
-                      <div className="flex flex-col items-center flex-1">
-                        {activeOrders.length > 0 && activeOrders[0] && Number(distanceToTarget(activeOrders[0])) <= 1.5 ? (
-                          <motion.button
-                            whileTap={{ scale: 0.95 }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (activeOrders[0]) handleNextStep(activeOrders[0].id);
-                            }}
-                            className={`w-full py-6 rounded-3xl font-display font-black text-2xl uppercase tracking-tighter shadow-[0_20px_50px_rgba(37,99,235,0.3)] border-4 border-white transition-all ${
-                              activeOrders[0].status === 'accepted' 
-                                ? 'bg-blue-600 text-white' 
-                                : 'bg-green-600 text-white shadow-[0_20px_50px_rgba(22,163,74,0.3)]'
-                            }`}
-                          >
-                            {activeOrders[0].status === 'accepted' ? (activeOrders[0].type === 'delivery' ? 'Confirm Pickup' : 'Confirm Arrival') : 'Confirm Dropoff'}
-                          </motion.button>
-                        ) : (
-                          <>
-                            <span className="font-display text-2xl font-black text-black tracking-tight">
-                              {activeOrders.length > 0 
-                                ? `${activeOrders.length} ${activeOrders.length === 1 ? 'Trip' : 'Trips'} • £${activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}`
-                                : 'Finding trips'}
-                            </span>
-                            {activeOrders.length > 0 && activeOrders[0] && (
-                              <span className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mt-1">
-                                {activeOrders[0].status === 'accepted' ? 'Heading to pickup' : 'Heading to dropoff'}
+                      <div 
+                        onClick={() => setIsBottomMenuOpen(true)}
+                        className="flex items-center justify-between px-8 py-5 cursor-pointer active:bg-gray-50 transition-colors"
+                      >
+                        <button className="text-black" onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}>
+                          <Menu size={28} />
+                        </button>
+                        
+                        <div className="flex flex-col items-center flex-1">
+                          {activeOrders.length > 0 && activeOrders[0] && Number(distanceToTarget(activeOrders[0])) <= 1.5 ? (
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (activeOrders[0]) handleNextStep(activeOrders[0].id);
+                              }}
+                              className={`px-8 py-3 rounded-full font-display font-black text-lg uppercase tracking-tighter shadow-lg transition-all ${
+                                activeOrders[0].status === 'accepted' 
+                                  ? 'bg-blue-600 text-white' 
+                                  : 'bg-green-600 text-white shadow-green-500/20'
+                              }`}
+                            >
+                              {activeOrders[0].status === 'accepted' ? (activeOrders[0].type === 'delivery' ? 'Confirm Pickup' : 'Confirm Arrival') : 'Confirm Dropoff'}
+                            </motion.button>
+                          ) : (
+                            <div className="flex flex-col items-center">
+                              <span className="font-display text-2xl font-black text-black tracking-tight leading-none">
+                                {activeOrders.length > 0 
+                                  ? `${activeOrders.length} ${activeOrders.length === 1 ? 'Trip' : 'Trips'} • £${activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}`
+                                  : 'Finding trips'}
                               </span>
-                            )}
-                          </>
-                        )}
+                              <div className="flex items-center gap-3 mt-1.5">
+                                <div className="flex items-center gap-1">
+                                  <motion.div 
+                                    animate={{ opacity: [1, 0, 1] }}
+                                    transition={{ duration: 1.5, repeat: Infinity }}
+                                    className="w-1.5 h-1.5 rounded-full bg-blue-500"
+                                  />
+                                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                                    {activeOrders.length > 0 && activeOrders[0] 
+                                      ? (activeOrders[0].status === 'accepted' ? 'Heading to pickup' : 'Heading to dropoff')
+                                      : 'Online'}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-gray-300">•</span>
+                                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${busynessMode === 'High' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' : 'bg-blue-500/10 border-blue-500/20 text-blue-500'}`}>
+                                  <TrendingUp size={10} />
+                                  <span className="text-[9px] font-black uppercase tracking-wider">{busynessMode} Demand</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+  
+                        <button className="text-black p-2" onClick={(e) => { e.stopPropagation(); setIsBottomMenuOpen(true); }}>
+                          <List size={28} />
+                        </button>
                       </div>
-
-                      <button className="text-black" onClick={(e) => { e.stopPropagation(); setIsBottomMenuOpen(true); }}>
-                        <List size={28} />
-                      </button>
                     </motion.div>
                   ) : (
                     <div className="flex flex-col items-center w-full relative">
@@ -4549,11 +4643,13 @@ export default function App() {
                       >
                         <Settings size={20} />
                       </button>
-                      {/* GO Button Container */}
+
+                      {/* GO Button Container - Shifted for prominence */}
                       <motion.div 
+                        key="offline-go"
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        className="absolute bottom-44 left-1/2 -translate-x-1/2 z-[170]"
+                        className="absolute bottom-[280px] left-1/2 -translate-x-1/2 z-[170]"
                       >
                         <button 
                           onClick={(e) => {
@@ -4580,46 +4676,16 @@ export default function App() {
                             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                             className="absolute inset-0 bg-blue-400 rounded-full" 
                           />
-                          <div className="absolute inset-0 bg-gradient-to-tr from-blue-700 to-blue-400 rounded-full opacity-50" />
                         </button>
                       </motion.div>
-                      {/* Searching Pulse for Feedback */}
-                  {user.isOnline && !isNavigating && !pendingOrder && (
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-none">
-                      <motion.div 
-                        animate={{ scale: [1, 2], opacity: [0.5, 0] }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                        className="w-40 h-40 rounded-full border-2 border-blue-500/30"
-                      />
-                      <motion.div 
-                        animate={{ scale: [1, 1.5], opacity: [0.3, 0] }}
-                        transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-                        className="w-40 h-40 rounded-full border-2 border-blue-500/20 absolute top-0 left-0"
-                      />
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-600/10 backdrop-blur-sm px-4 py-1.5 rounded-full border border-blue-500/20 whitespace-nowrap">
-                        <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
-                          <motion.span 
-                            animate={{ opacity: [1, 0, 1] }} 
-                            transition={{ duration: 1, repeat: Infinity }}
-                            className="w-1.5 h-1.5 rounded-full bg-blue-500"
-                          />
-                          Finding Trip
-                        </p>
-                      </div>
-                    </div>
-                  )}
 
-                  {/* Dashboard Feed (Authentic Uber Experience) */}
-                      <div className="absolute inset-x-0 bottom-20 max-h-[60%] overflow-y-auto no-scrollbar pb-10 z-[120]">
-                        <motion.div 
-                          initial={{ y: 200 }}
-                          animate={{ y: 0 }}
-                          className={`w-full ${theme === 'dark' ? 'bg-[#0a0a0a]' : 'bg-gray-50'} rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.15)] border-t border-white/5 p-6 space-y-4`}
-                        >
-                          <div className="flex justify-center mb-2">
-                            <div className={`w-12 h-1.5 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-200'}`} />
-                          </div>
-
+                      {/* Dashboard Feed (Offline) */}
+                      <div className="w-full bg-[#0c0c0d] rounded-t-[40px] shadow-[0_-20px_80px_rgba(0,0,0,0.5)] border-t border-white/5 pt-6 pb-12 px-6 z-[120] max-h-[320px] overflow-y-auto no-scrollbar">
+                        <div className="flex justify-center mb-6">
+                          <div className="w-12 h-1.5 rounded-full bg-white/10" />
+                        </div>
+                        
+                        <div className="space-y-4">
                           <div className="grid grid-cols-2 gap-4">
                             <div 
                               onClick={() => setCurrentScreen('earnings')}
@@ -4627,9 +4693,9 @@ export default function App() {
                             >
                               <div className="text-gray-400 font-black text-[10px] uppercase tracking-widest mb-1">Today</div>
                               <div className="text-2xl font-black">£{earnings.toFixed(2)}</div>
-                              <div className="flex items-center gap-1 text-[10px] font-bold text-blue-600 mt-2">
+                              <div className="flex items-center gap-1 text-[10px] font-bold text-blue-600 mt-2 lowercase">
                                 <TrendingUp size={12} />
-                                View Earnings
+                                details
                               </div>
                             </div>
                             <div 
@@ -4638,63 +4704,29 @@ export default function App() {
                             >
                               <div className="text-gray-400 font-black text-[10px] uppercase tracking-widest mb-1">Rating</div>
                               <div className="text-2xl font-black">{user.rating.toFixed(2)} ★</div>
-                              <div className="flex items-center gap-1 text-[10px] font-bold text-green-600 mt-2">
+                              <div className="flex items-center gap-1 text-[10px] font-bold text-green-600 mt-2 lowercase">
                                 <Star size={12} fill="currentColor" />
-                                Top Partner
+                                partner
                               </div>
                             </div>
                           </div>
 
                           <div 
                             onClick={() => setIsVehicleSettingsOpen(true)}
-                            className={`p-6 rounded-[32px] border-2 transition-all active:scale-[0.98] flex items-center justify-between col-span-2 ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-100 shadow-sm'}`}
+                            className={`p-5 rounded-[32px] border-2 transition-all active:scale-[0.98] flex items-center justify-between col-span-2 ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-100 shadow-sm'}`}
                           >
                             <div className="flex items-center gap-4">
                               <div className="p-3 bg-blue-600/10 text-blue-600 rounded-2xl">
                                 {vehicleType === 'Car' ? <CarIcon size={24} /> : vehicleType === 'Bike' ? <BikeIcon size={24} /> : <Zap size={24} />}
                               </div>
                               <div>
-                                <h3 className="font-black">Trip Preferences</h3>
-                                <p className="text-xs font-bold text-gray-400">Mode: {vehicleType} • {selectedServices.length} Selected</p>
+                                <h3 className="font-black text-sm">Trip Preferences</h3>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{vehicleType} • {selectedServices.length} Active</p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center">
-                                <Settings size={16} className="text-gray-400" />
-                              </div>
-                            </div>
+                            <Settings size={18} className="text-gray-500" />
                           </div>
-
-                          <div 
-                            onClick={() => setCurrentScreen('uber_services')}
-                            className={`p-6 rounded-[32px] border-2 transition-all active:scale-[0.98] flex items-center justify-between ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-100 shadow-sm'}`}
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="p-3 bg-blue-600/10 text-blue-600 rounded-2xl">
-                                <Zap size={24} />
-                              </div>
-                              <div>
-                                <h3 className="font-black">Work Hub</h3>
-                                <p className="text-xs font-bold text-gray-400">Choose how to earn</p>
-                              </div>
-                            </div>
-                            <ArrowRight size={20} className="text-gray-300" />
-                          </div>
-
-                          <div 
-                            onClick={() => setCurrentScreen('opportunities')}
-                            className={`p-6 rounded-[32px] border-2 transition-all active:scale-[0.98] ${theme === 'dark' ? 'bg-blue-900/20 border-white/5' : 'bg-blue-50 border-blue-100 shadow-sm'}`}
-                          >
-                            <div className="flex items-center gap-3 mb-2 text-blue-600">
-                              <TrendingUp size={20} />
-                              <span className="font-black">High Demand Area</span>
-                            </div>
-                            <p className={`font-black ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>Surge is rising in {currentCity}</p>
-                            <p className="text-xs text-gray-400 font-bold mt-1">Earn more on every trip</p>
-                          </div>
-
-                          <div className="pt-10"></div>
-                        </motion.div>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -4754,50 +4786,53 @@ export default function App() {
                       animate={{ y: 0 }}
                       exit={{ y: '100%' }}
                       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                      className={`absolute bottom-0 left-0 right-0 rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] flex flex-col max-h-[70vh] overflow-hidden ${theme === 'dark' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black'}`}
+                      className={`absolute bottom-0 left-0 right-0 rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] flex flex-col max-h-[70vh] ${theme === 'dark' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black'}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="flex flex-col items-center pt-4 pb-2">
+                      <div className="flex flex-col items-center pt-4 pb-2 shrink-0">
                         <div className={`w-12 h-1.5 rounded-full mb-4 ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-200'}`} />
                       </div>
                       
-                      <div className="overflow-y-auto px-6 pb-20 custom-scrollbar flex-1">
-                        {!user.isOnline ? (
-                          <>
-                            <div className="flex justify-between w-full mb-8 px-4">
-                              <button onClick={() => { setIsSideMenuOpen(true); setIsBottomMenuOpen(false); }} className="flex flex-col items-center gap-2">
-                                <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Menu size={24} /></div>
-                                <span className="text-xs font-bold">Menu</span>
-                              </button>
-                              
-                              <motion.button
-                                whileTap={{ scale: 0.9 }}
-                                disabled={(lockoutUntil ? Date.now() < lockoutUntil : false) || Object.values(customerTimers).some(t => Number(t) > 0)}
-                                onClick={() => {
-                                  if (!firebaseUser) {
-                                    signInWithGoogle().catch(console.error);
-                                    return;
-                                  }
-                                  if (user.faceVerified) {
-                                    setUser(u => ({ ...u, isOnline: true }));
-                                    setIsBottomMenuOpen(false);
-                                    playUberSound('accept');
-                                  } else {
-                                    setIsVerifyingToOnline(true);
-                                    playUberSound('order');
-                                    setCurrentScreen('face_verification');
-                                    setIsBottomMenuOpen(false);
-                                  }
-                                }}
-                                className={`w-24 h-24 rounded-full border-4 border-white flex items-center justify-center shadow-[0_0_50px_rgba(37,99,235,0.5)] relative overflow-hidden transition-all -mt-16 ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'bg-gray-800 grayscale cursor-not-allowed' : 'bg-blue-600'}`}
-                              >
-                                <motion.div 
-                                  animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.1, 0.3] }} 
-                                  transition={{ duration: 2, repeat: Infinity }} 
-                                  className="absolute inset-0 bg-white rounded-full" 
-                                />
-                                <span className="text-xl font-black tracking-widest relative z-10 text-white">{(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'LOCKED' : 'GO'}</span>
-                              </motion.button>
+                      <div className="relative flex-1 flex flex-col min-h-0">
+                        <div className="overflow-y-auto px-6 pb-20 custom-scrollbar flex-1">
+                          {!user.isOnline ? (
+                            <>
+                              <div className="flex justify-between w-full mb-8 px-4 relative">
+                                <button onClick={() => { setIsSideMenuOpen(true); setIsBottomMenuOpen(false); }} className="flex flex-col items-center gap-2">
+                                  <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Menu size={24} /></div>
+                                  <span className="text-xs font-bold">Menu</span>
+                                </button>
+                                
+                                <div className="relative -mt-12">
+                                  <motion.button
+                                    whileTap={{ scale: 0.9 }}
+                                    disabled={(lockoutUntil ? Date.now() < lockoutUntil : false) || Object.values(customerTimers).some(t => Number(t) > 0)}
+                                    onClick={() => {
+                                      if (!firebaseUser) {
+                                        signInWithGoogle().catch(console.error);
+                                        return;
+                                      }
+                                      if (user.faceVerified) {
+                                        setUser(u => ({ ...u, isOnline: true }));
+                                        setIsBottomMenuOpen(false);
+                                        playUberSound('accept');
+                                      } else {
+                                        setIsVerifyingToOnline(true);
+                                        playUberSound('order');
+                                        setCurrentScreen('face_verification');
+                                        setIsBottomMenuOpen(false);
+                                      }
+                                    }}
+                                    className={`w-24 h-24 rounded-full border-4 border-white flex items-center justify-center shadow-[0_0_50px_rgba(37,99,235,0.5)] relative overflow-visible transition-all ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'bg-gray-800 grayscale cursor-not-allowed' : 'bg-blue-600'}`}
+                                  >
+                                    <motion.div 
+                                      animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.1, 0.3] }} 
+                                      transition={{ duration: 2, repeat: Infinity }} 
+                                      className="absolute inset-0 bg-white rounded-full" 
+                                    />
+                                    <span className="text-xl font-black tracking-widest relative z-10 text-white">{(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'LOCKED' : 'GO'}</span>
+                                  </motion.button>
+                                </div>
 
                               <button onClick={() => setIsSearchOpen(true)} className="flex flex-col items-center gap-2">
                                 <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Search size={24} /></div>
@@ -4858,8 +4893,20 @@ export default function App() {
                                   className="w-3 h-3 bg-blue-500 rounded-full" 
                                 />
                                 <div>
-                                  <p className={`font-black text-lg leading-none ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>Finding trips</p>
-                                  <p className="text-xs text-gray-400 font-bold mt-1">{currentCity}</p>
+                                  <div className="flex items-center gap-2">
+                                    <p className={`font-black text-lg leading-none ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>Finding trips</p>
+                                    <div className="flex items-center gap-1 bg-green-500/20 px-2 py-0.5 rounded-full border border-green-500/20">
+                                      <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
+                                      <span className="text-[8px] font-black text-green-500 uppercase tracking-widest">Awake</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <p className="text-[10px] font-bold text-gray-400">{currentCity}</p>
+                                    <span className="text-[10px] opacity-30 text-white">•</span>
+                                    <span className={`text-[10px] font-black uppercase tracking-widest ${busynessMode === 'High' ? 'text-orange-500' : busynessMode === 'Medium' ? 'text-blue-400' : 'text-gray-400'}`}>
+                                      {busynessMode} Demand
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                               <button 
@@ -4974,6 +5021,7 @@ export default function App() {
                               <p className="text-sm font-black">Earnings Trend</p>
                               <p className="text-[10px] text-gray-400 font-bold">Busy area nearby</p>
                             </div>
+                          </div>
                           </div>
                         </div>
                       </div>
