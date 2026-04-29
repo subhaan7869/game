@@ -1939,7 +1939,7 @@ export default function App() {
 
   // CarPlay Remote Sync
   useEffect(() => {
-    if (!user.uid || !db) return;
+    if (!user.uid || !firebaseUser || !db) return;
 
     const syncRef = doc(db, 'carplay_sync', user.uid);
     
@@ -1966,7 +1966,7 @@ export default function App() {
 
   // Listen for active orders in remote mode
   useEffect(() => {
-    if (!user.uid || !isCarPlayRemoteMode || !db) return;
+    if (!user.uid || !firebaseUser || !isCarPlayRemoteMode || !db) return;
 
     const q = query(collection(db, 'active_orders'), where('driverUid', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -1981,7 +1981,7 @@ export default function App() {
 
   // Push local changes to remote (only if NOT in remote display mode)
   useEffect(() => {
-    if (!user.uid || isCarPlayRemoteMode || !db) return;
+    if (!user.uid || !firebaseUser || isCarPlayRemoteMode || !db) return;
 
     const updateSync = async () => {
       try {
@@ -2870,7 +2870,7 @@ export default function App() {
     setActiveOrders(prev => prev.filter(o => o.id !== orderId));
     
     // Remote Cleanup
-    if (user.uid && db) {
+    if (user.uid && firebaseUser && db) {
       deleteDoc(doc(db, 'active_orders', orderId)).catch(() => {});
     }
 
@@ -2986,7 +2986,7 @@ export default function App() {
     setActiveOrders(prev => prev.filter(o => o.id !== orderId));
 
     // Remote Cleanup
-    if (user.uid && db) {
+    if (user.uid && firebaseUser && db) {
       deleteDoc(doc(db, 'active_orders', orderId)).catch(() => {});
     }
 

@@ -23,6 +23,10 @@ service cloud.firestore {
         (request.auth.token.email == "hassennabeel9@gmail.com" && request.auth.token.email_verified == true);
     }
 
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
     function incoming() {
       return request.resource.data;
     }
@@ -40,19 +44,18 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.uid == request.auth.uid &&
+      return data.uid == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              (!('email' in data) || (data.email is string && data.email.size() < 100)) &&
              (!('deliveries' in data) || (data.deliveries is number && data.deliveries >= 0)) &&
-             (!('walletBalance' in data) || (data.walletBalance is number && data.walletBalance >= 0)) &&
-             (!('role' in data) || data.role == 'driver');
+             (!('walletBalance' in data) || (data.walletBalance is number && data.walletBalance >= 0));
     }
 
     function isValidScheduledOrder(data) {
       return data.driverUid is string && data.driverUid == request.auth.uid &&
              data.restaurantName is string && data.restaurantName.size() > 0 && 
              data.restaurantName.size() < 200 &&
-             (data.scheduledTime is timestamp || (data.scheduledTime is string && data.scheduledTime.size() < 50)) &&
+             data.scheduledTime is string && data.scheduledTime.size() < 50 &&
              data.status in ['pending', 'active', 'completed'];
     }
 
@@ -62,17 +65,24 @@ service cloud.firestore {
              data.status in ['accepted', 'picked_up', 'arrived', 'completed', 'returning_to_restaurant'];
     }
 
+    function isValidCarPlaySync(data) {
+      return data.driverUid is string && data.driverUid == request.auth.uid &&
+             data.isActive is bool &&
+             (!('activeOrderId' in data) || (data.activeOrderId is string && data.activeOrderId.size() < 128)) &&
+             (!('isNavigating' in data) || (data.isNavigating is bool)) &&
+             (!('lastUpdated' in data) || (data.lastUpdated is string));
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
 
     match /users/{userId} {
       allow get: if isAuthenticated();
-      allow list: if isAuthenticated() || isAdmin();
+      allow list: if isAdmin();
       
       allow create: if isOwner(userId) && isValidUser(incoming()) && 
-                    incoming().keys().hasAll(['uid', 'name']) && 
-                    !('role' in incoming());
+                    incoming().keys().hasAll(['uid', 'name']);
       
       allow update: if (isOwner(userId) || isAdmin()) && 
                     isValidUser(incoming()) &&
@@ -80,13 +90,27 @@ service cloud.firestore {
     }
 
     match /scheduled_orders/{orderId} {
-      allow get, list, create, update, delete: if isAuthenticated() || isAdmin();
+      allow get: if isAuthenticated() && (existing().driverUid == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated() && (resource.data.driverUid == request.auth.uid || isAdmin());
+      
+      allow create: if isAuthenticated() && isValidScheduledOrder(incoming());
+      
+      allow update: if isAuthenticated() && (existing().driverUid == request.auth.uid || isAdmin()) && 
+                    isValidScheduledOrder(incoming()) &&
+                    !affectedKeys().hasAny(['driverUid']);
+      
+      allow delete: if isAuthenticated() && (existing().driverUid == request.auth.uid || isAdmin());
     }
 
     match /carplay_sync/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if isAdmin();
-      allow write: if isOwner(userId) && incoming().driverUid == userId;
+      allow get: if isOwner(userId) || isAdmin();
+      
+      allow create: if isOwner(userId) && isValidCarPlaySync(incoming());
+      
+      allow update: if isOwner(userId) && isValidCarPlaySync(incoming()) &&
+                    !affectedKeys().hasAny(['driverUid']);
+      
+      allow delete: if isAdmin();
     }
 
     match /active_orders/{orderId} {
