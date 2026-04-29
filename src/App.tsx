@@ -1623,13 +1623,38 @@ const DeliveryVerificationModal = ({
   );
 };
 
-const LoadingScreen = () => (
-  <div className="fixed inset-0 z-[10000] bg-black flex flex-col items-center justify-center p-8">
-    <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-6" />
-    <h1 className="text-white text-2xl font-black tracking-tighter uppercase italic">Uber Eats</h1>
-    <p className="text-gray-500 font-bold mt-2 animate-pulse">Initializing components...</p>
-  </div>
-);
+const LoadingScreen = () => {
+  useEffect(() => {
+    // If stuck for more than 8 seconds, something is likely wrong with auth/firebase
+    const timer = setTimeout(() => {
+      console.warn("Auth initialization taking too long. Attempting to force start...");
+      window.dispatchEvent(new CustomEvent('force-auth-ready'));
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[10000] bg-[#0a0a0a] flex flex-col items-center justify-center p-8">
+      <div className="relative mb-8">
+        <div className="w-16 h-16 border-[6px] border-blue-600/20 rounded-full" />
+        <motion.div 
+          animate={{ rotate: 360 }} 
+          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+          className="absolute inset-0 w-16 h-16 border-[6px] border-blue-600 border-t-transparent rounded-full" 
+        />
+      </div>
+      <h1 className="text-white text-3xl font-black tracking-tighter uppercase italic mb-2">Uber Eats</h1>
+      <div className="flex items-center gap-2 text-gray-500 font-bold text-xs uppercase tracking-[0.2em] animate-pulse">
+        <span>Initializing</span>
+        <div className="flex gap-1">
+          <motion.div animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1 h-1 bg-blue-500 rounded-full" />
+          <motion.div animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1 h-1 bg-blue-500 rounded-full" />
+          <motion.div animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1 h-1 bg-blue-500 rounded-full" />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -1658,23 +1683,40 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
   render() {
     if (this.state.hasError) {
       return (
-        <div className="h-screen w-screen bg-black text-white flex flex-col items-center justify-center p-8 text-center">
-          <div className="w-20 h-20 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mb-6">
-            <ShieldAlert size={48} />
+        <div className="h-screen w-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-8 text-center font-sans">
+          <div className="w-20 h-20 bg-red-600 shadow-[0_0_30px_rgba(220,38,38,0.5)] text-white rounded-full flex items-center justify-center mb-6">
+            <ShieldAlert size={40} strokeWidth={3} />
           </div>
-          <h1 className="text-2xl font-black mb-4">Something went wrong</h1>
-          <p className="text-gray-400 font-bold mb-8 max-w-xs">
-            The application encountered an error. We've logged the details and are working to fix it.
+          <h1 className="text-3xl font-black mb-2 tracking-tighter uppercase italic text-red-500">System Error</h1>
+          <p className="text-gray-400 font-bold mb-8 max-w-sm">
+            We encountered a critical error. This might be due to outdated cached data.
           </p>
-          <pre className="bg-white/5 p-4 rounded-xl text-left text-[10px] font-mono mb-8 w-full max-w-md overflow-auto border border-white/10">
-            {this.state.error?.message}
-          </pre>
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-12 py-4 bg-white text-black rounded-2xl font-black active:scale-95 transition-transform"
-          >
-            RELOAD APP
-          </button>
+          <div className="w-full max-w-md bg-black/40 border border-white/10 rounded-2xl p-4 mb-8 text-left overflow-hidden">
+            <div className="flex items-center gap-2 mb-2 text-red-400 opacity-80">
+              <Code size={14} />
+              <span className="text-[10px] font-black uppercase tracking-widest">Stack Trace Preview</span>
+            </div>
+            <pre className="text-[10px] font-mono text-gray-500 overflow-auto max-h-32">
+              {this.state.error?.stack || this.state.error?.message}
+            </pre>
+          </div>
+          <div className="flex flex-col w-full max-w-xs gap-3">
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black tracking-widest text-sm active:scale-95 transition-transform shadow-lg shadow-blue-500/20"
+            >
+              RELOAD APPLICATION
+            </button>
+            <button 
+              onClick={() => {
+                localStorage.clear();
+                window.location.reload();
+              }}
+              className="w-full py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black tracking-widest text-sm active:scale-95 transition-transform"
+            >
+              RESET APP DATA
+            </button>
+          </div>
         </div>
       );
     }
@@ -2265,6 +2307,9 @@ export default function App() {
 
   // Firebase Auth Listener
   useEffect(() => {
+    const handleForceReady = () => setIsAuthReady(true);
+    window.addEventListener('force-auth-ready', handleForceReady);
+
     const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
       setFirebaseUser(fUser);
       if (fUser) {
@@ -2280,14 +2325,24 @@ export default function App() {
           }
           setIsProfileLoaded(true);
         } catch (error) {
-          handleFirestoreError(error, OperationType.GET, `users/${fUser.uid}`);
+          console.error("Profile load failed:", error);
+          // Don't re-throw here to allow auth ready
         }
       } else {
         setIsProfileLoaded(false);
       }
       setIsAuthReady(true);
     });
-    return () => unsubscribe();
+    
+    // Request notification permission on mount
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+    
+    return () => {
+      unsubscribe();
+      window.removeEventListener('force-auth-ready', handleForceReady);
+    };
   }, []);
 
   // Sync User Profile to Firestore
@@ -2615,6 +2670,19 @@ export default function App() {
     }
     lastNoteRef.current = { title, body, time: now };
     
+    // Real Notifications
+    if ("Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(title, { 
+          body, 
+          icon: "https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png", // Or app icon 
+          tag: title // Group same titles
+        });
+      } catch (e) {
+        console.warn("Notification API failed");
+      }
+    }
+
     // Play sound based on type if needed
     if (type === 'success') playUberSound('complete');
     if (type === 'alert') playUberSound('order');
@@ -4068,7 +4136,7 @@ export default function App() {
                 {location && (isNavigating || pendingOrder) && (
                   <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-[100]">
                     {/* Path for Pending Order */}
-                    {pendingOrder && !isNavigating && (
+                    {pendingOrder && (
                       <>
                         <motion.path 
                           initial={{ opacity: 0 }}
@@ -4161,6 +4229,9 @@ export default function App() {
                   const y = (location.latitude - stop.location.latitude) * MAP_SCALE + (mapOffset.y || 0);
                   
                   const isCurrentTarget = i === 0 && isNavigating;
+                  const order = activeOrders.find(o => o.id === stop.orderId);
+                  
+                  if (!order) return null;
 
                   return (
                     <motion.div 
@@ -4178,7 +4249,11 @@ export default function App() {
                         <div className={`w-10 h-10 rounded-full shadow-2xl flex items-center justify-center border-4 border-[#1a1a1a] transition-all ${
                           stop.type === 'pickup' ? 'bg-blue-600 scale-110 shadow-blue-600/30' : 'bg-green-600 shadow-green-600/30'
                         }`}>
-                          {stop.type === 'pickup' ? <Utensils size={18} className="text-white" /> : <MapPin size={18} className="text-white" />}
+                          {stop.type === 'pickup' ? (
+                            activeOrders.find(o => o.id === stop.orderId)?.type === 'delivery' ? <Utensils size={18} className="text-white" /> : <User size={18} className="text-white" />
+                          ) : (
+                            <MapPin size={18} className="text-white" />
+                          )}
                         </div>
                         {isCurrentTarget && (
                           <motion.div 
@@ -5200,7 +5275,7 @@ export default function App() {
 
               {/* Order Details Modal */}
               <AnimatePresence>
-                {viewingOrderDetailsId && (
+                {viewingOrderDetailsId && activeOrders.find(o => o.id === viewingOrderDetailsId) && (
                   <OrderDetailsModal 
                     order={activeOrders.find(o => o.id === viewingOrderDetailsId)!}
                     theme={theme}
@@ -5282,7 +5357,7 @@ export default function App() {
 
               {/* Delivery Verification Modal */}
               <AnimatePresence>
-                {verifyingDeliveryId && (
+                {verifyingDeliveryId && activeOrders.find(o => o.id === verifyingDeliveryId) && (
                   <DeliveryVerificationModal 
                     order={activeOrders.find(o => o.id === verifyingDeliveryId)!}
                     enteredPin={enteredPin}
