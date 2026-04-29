@@ -55,7 +55,7 @@ service cloud.firestore {
       return data.driverUid is string && data.driverUid == request.auth.uid &&
              data.restaurantName is string && data.restaurantName.size() > 0 && 
              data.restaurantName.size() < 200 &&
-             data.scheduledTime is string && data.scheduledTime.size() < 50 &&
+             (data.scheduledTime is string || data.scheduledTime is timestamp) &&
              data.status in ['pending', 'active', 'completed'];
     }
 
@@ -68,9 +68,9 @@ service cloud.firestore {
     function isValidCarPlaySync(data) {
       return data.driverUid is string && data.driverUid == request.auth.uid &&
              data.isActive is bool &&
-             (!('activeOrderId' in data) || (data.activeOrderId is string && data.activeOrderId.size() < 128)) &&
+             (!('activeOrderId' in data) || (data.activeOrderId is string || data.activeOrderId == null)) &&
              (!('isNavigating' in data) || (data.isNavigating is bool)) &&
-             (!('lastUpdated' in data) || (data.lastUpdated is string));
+             (!('lastUpdated' in data) || (data.lastUpdated is timestamp));
     }
 
     // ===============================================================
@@ -104,6 +104,7 @@ service cloud.firestore {
 
     match /carplay_sync/{userId} {
       allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
       
       allow create: if isOwner(userId) && isValidCarPlaySync(incoming());
       

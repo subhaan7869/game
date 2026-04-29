@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useMemo, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, useMemo, ReactNode, Component } from 'react';
 import { 
   Navigation, 
   Menu, 
@@ -1623,6 +1623,66 @@ const DeliveryVerificationModal = ({
   );
 };
 
+const LoadingScreen = () => (
+  <div className="fixed inset-0 z-[10000] bg-black flex flex-col items-center justify-center p-8">
+    <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-6" />
+    <h1 className="text-white text-2xl font-black tracking-tighter uppercase italic">Uber Eats</h1>
+    <p className="text-gray-500 font-bold mt-2 animate-pulse">Initializing components...</p>
+  </div>
+);
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+// Error Boundary Component
+class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-screen w-screen bg-black text-white flex flex-col items-center justify-center p-8 text-center">
+          <div className="w-20 h-20 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mb-6">
+            <ShieldAlert size={48} />
+          </div>
+          <h1 className="text-2xl font-black mb-4">Something went wrong</h1>
+          <p className="text-gray-400 font-bold mb-8 max-w-xs">
+            The application encountered an error. We've logged the details and are working to fix it.
+          </p>
+          <pre className="bg-white/5 p-4 rounded-xl text-left text-[10px] font-mono mb-8 w-full max-w-md overflow-auto border border-white/10">
+            {this.state.error?.message}
+          </pre>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-12 py-4 bg-white text-black rounded-2xl font-black active:scale-95 transition-transform"
+          >
+            RELOAD APP
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export default function App() {
   // App State
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('onboarding');
@@ -1816,6 +1876,41 @@ export default function App() {
   
   // Chat & Notifications
   const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'accepted' | 'picked_up'>('all');
+  
+  // Trip Stop Logic for Multiple Orders
+  const currentStops = useMemo(() => {
+    if (activeOrders.length === 0) return [];
+    
+    const stops: { orderId: string, type: 'pickup' | 'dropoff', location: Location, label: string }[] = [];
+    
+    // Simple logic: Pickups first, then dropoffs
+    // In a more complex app, we'd sort by distance
+    activeOrders.forEach(order => {
+      if (order.status === 'accepted' || order.status === 'en_route_to_pickup') {
+        stops.push({
+          orderId: order.id,
+          type: 'pickup',
+          location: order.restaurantLocation || order.pickupLocation!,
+          label: order.type === 'ride' ? `Pickup: ${order.customerName}` : `Pickup: ${order.restaurantName}`
+        });
+      }
+    });
+    
+    activeOrders.forEach(order => {
+      if (order.status === 'picked_up' || order.status === 'arrived') {
+        stops.push({
+          orderId: order.id,
+          type: 'dropoff',
+          location: order.customerLocation,
+          label: order.type === 'ride' ? `Dropoff: Passenger` : `Deliver to: ${order.customerName}`
+        });
+      }
+    });
+
+    return stops;
+  }, [activeOrders]);
+
+  const currentStop = currentStops[0];
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = localStorage.getItem('uber_chat_messages');
     return saved ? JSON.parse(saved) : [];
@@ -1939,9 +2034,9 @@ export default function App() {
 
   // CarPlay Remote Sync
   useEffect(() => {
-    if (!user.uid || !firebaseUser || !db) return;
+    if (!firebaseUser || !db) return;
 
-    const syncRef = doc(db, 'carplay_sync', user.uid);
+    const syncRef = doc(db, 'carplay_sync', firebaseUser.uid);
     
     // Listen for remote changes
     const unsubscribe = onSnapshot(syncRef, (snapshot) => {
@@ -1958,35 +2053,35 @@ export default function App() {
         }
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'carplay_sync');
+      handleFirestoreError(error, OperationType.GET, `carplay_sync/${firebaseUser.uid}`);
     });
 
     return () => unsubscribe();
-  }, [user.uid, isCarPlayRemoteMode, currentScreen]);
+  }, [firebaseUser?.uid, isCarPlayRemoteMode, currentScreen]);
 
   // Listen for active orders in remote mode
   useEffect(() => {
-    if (!user.uid || !firebaseUser || !isCarPlayRemoteMode || !db) return;
+    if (!firebaseUser || !isCarPlayRemoteMode || !db) return;
 
-    const q = query(collection(db, 'active_orders'), where('driverUid', '==', user.uid));
+    const q = query(collection(db, 'active_orders'), where('driverUid', '==', firebaseUser.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const orders = snapshot.docs.map(doc => ({ ...doc.data() } as Order));
+      const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
       setActiveOrders(orders);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'active_orders');
     });
 
     return () => unsubscribe();
-  }, [user.uid, isCarPlayRemoteMode]);
+  }, [firebaseUser?.uid, isCarPlayRemoteMode]);
 
   // Push local changes to remote (only if NOT in remote display mode)
   useEffect(() => {
-    if (!user.uid || !firebaseUser || isCarPlayRemoteMode || !db) return;
+    if (!firebaseUser || isCarPlayRemoteMode || !db) return;
 
     const updateSync = async () => {
       try {
-        await setDoc(doc(db, 'carplay_sync', user.uid), {
-          driverUid: user.uid,
+        await setDoc(doc(db, 'carplay_sync', firebaseUser.uid), {
+          driverUid: firebaseUser.uid,
           isActive: isCarPlaySynced,
           activeOrderId: activeOrders[0]?.id || null,
           isNavigating: isNavigating,
@@ -1994,27 +2089,20 @@ export default function App() {
         }, { merge: true });
 
         // Also sync active orders to Firestore for remote display
-        // Note: In a real app, we'd handle individual order docs
-        // For this simulation, we'll just overwrite the driver's active orders
-        // (Simplified for demo purposes)
         for (const order of activeOrders) {
           await setDoc(doc(db, 'active_orders', order.id), {
             ...order,
-            driverUid: user.uid,
+            driverUid: firebaseUser.uid,
             lastUpdated: serverTimestamp()
-          });
+          }, { merge: true });
         }
-        
-        // Cleanup old orders (simplified)
-        // In a real app, handleCompleteDelivery would delete the doc
       } catch (error) {
-        // Silent fail for sync
+        handleFirestoreError(error, OperationType.WRITE, `carplay_sync/${firebaseUser.uid}`);
       }
     };
-
-    const timeout = setTimeout(updateSync, 500); // Debounce
-    return () => clearTimeout(timeout);
-  }, [isCarPlaySynced, activeOrders, isNavigating, user.uid, isCarPlayRemoteMode]);
+    
+    updateSync();
+  }, [firebaseUser?.uid, isCarPlaySynced, activeOrders, isNavigating, isCarPlayRemoteMode]);
 
   // Generate random hotspots around driver
   useEffect(() => {
@@ -2082,35 +2170,27 @@ export default function App() {
 
   // Simulated Map Movement
   useEffect(() => {
-    if (!isNavigating || !user.isOnline || activeOrders.length === 0 || !location) {
+    if (!isNavigating || !user.isOnline || activeOrders.length === 0 || !location || !currentStop) {
       if (isNavigating && activeOrders.length === 0) setIsNavigating(false);
       return;
     }
 
     const moveInterval = setInterval(() => {
-      const order = activeOrders[0];
-      if (!order || !location) return;
+      if (!currentStop || !location) return;
       
-      const target = order.status === 'accepted' || order.status === 'en_route_to_pickup'
-        ? (order.restaurantLocation || order.pickupLocation) 
-        : order.customerLocation;
+      const target = currentStop.location;
       
-      if (!target) return;
-
       const dLat = target.latitude - location.latitude;
       const dLng = target.longitude - location.longitude;
       const distance = Math.sqrt(dLat * dLat + dLng * dLng);
       
-      // Speed factor: approx 30mph in degrees/sec
-      // 1 degree lat is ~69 miles. 30mph = 30/3600 miles/sec = 0.0083 mps
-      // 0.0083/69 = 0.00012 degrees per second
       const speed = 0.00015; 
 
       if (distance < speed * 1.5) {
-        // We have arrived or are very close
         setLocation(target);
         setIsNavigating(false);
-        sendNotification("Arrived", `You have arrived at ${order.status === 'accepted' ? order.restaurantName : order.customerName}`);
+        const order = activeOrders.find(o => o.id === currentStop.orderId);
+        sendNotification("Arrived", `You have arrived at ${currentStop.label}`, "success");
         return;
       }
 
@@ -2131,7 +2211,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(moveInterval);
-  }, [isNavigating, user.isOnline, activeOrders, location === null]);
+  }, [isNavigating, user.isOnline, activeOrders, location === null, currentStop]);
 
   // GPS Drift Effect (Subtle jitter when online but stationary)
   useEffect(() => {
@@ -2513,37 +2593,35 @@ export default function App() {
     }
   }, []);
 
-  const [toasts, setToasts] = useState<{ id: string, title: string, body: string }[]>([]);
+  const [toasts, setToasts] = useState<{ id: string, title: string, body: string, type?: 'info' | 'success' | 'alert' | 'message' }[]>([]);
 
-  const addToast = (title: string, body: string) => {
+  const addToast = (title: string, body: string, type: 'info' | 'success' | 'alert' | 'message' = 'info') => {
     const id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-    setToasts(prev => [{ id, title, body }, ...prev.slice(0, 2)]); // Keep max 3 at a time, newest at top
+    setToasts(prev => [{ id, title, body, type }, ...prev.slice(0, 3)]); // Keep max 4
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 4000);
+    }, 5000);
   };
 
   const lastNoteRef = useRef<{ title: string, body: string, time: number } | null>(null);
 
-  const sendNotification = (title: string, body: string) => {
+  const sendNotification = (title: string, body: string, type: 'info' | 'success' | 'alert' | 'message' = 'info') => {
     const now = Date.now();
     if (lastNoteRef.current && 
         lastNoteRef.current.title === title && 
         lastNoteRef.current.body === body && 
-        now - lastNoteRef.current.time < 2000) {
-      return; // Skip rapid duplicates
+        now - lastNoteRef.current.time < 1000) {
+      return;
     }
     lastNoteRef.current = { title, body, time: now };
     
-    if ("Notification" in window && Notification.permission === "granted") {
-      try {
-        new Notification(title, { body, icon: "https://picsum.photos/seed/uber/100/100" });
-      } catch (e) {
-        console.warn("Notification API failed, falling back to in-app toast.");
-      }
-    }
-    addToast(title, body);
-    setNotifications(prev => [body, ...prev.slice(0, 49)]); // Keep history bounded
+    // Play sound based on type if needed
+    if (type === 'success') playUberSound('complete');
+    if (type === 'alert') playUberSound('order');
+    if (type === 'message') playUberSound('message');
+
+    addToast(title, body, type);
+    setNotifications(prev => [body, ...prev.slice(0, 49)]);
   };
 
   const [uploadedDocs, setUploadedDocs] = useState<string[]>([]);
@@ -2631,7 +2709,7 @@ export default function App() {
 
     observer.observe(mapContainerRef.current);
     return () => observer.disconnect();
-  }, []);
+  }, [currentScreen]);
 
   const centerX = screenSize.width / 2;
   const centerY = screenSize.height / 2;
@@ -2716,26 +2794,31 @@ export default function App() {
       const minPay = type === 'ride' ? 5.00 : 4.00;
       const finalBasePay = Math.max(calculatedPay, minPay);
       
-      const pay = (finalBasePay + (Math.random() * 2)) * activeSurge;
+      const isStacked = type === 'delivery' && Math.random() < 0.3; // 30% chance for double orders
+      let batchCount = isStacked ? 2 : 1;
+      
+      const pay = (finalBasePay + (Math.random() * 2)) * activeSurge * (isStacked ? 1.7 : 1);
 
       return {
         id: Math.random().toString(36).substring(2, 11),
         type,
-        customerName,
+        customerName: isStacked ? `${customerName} + 1 more` : customerName,
         restaurantName: type === 'delivery' ? MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)].name : "UberX",
         restaurantLocation: { latitude: pickupLat, longitude: pickupLng },
         pickupLocation: { latitude: pickupLat, longitude: pickupLng },
         customerLocation: { latitude: custLat, longitude: custLng },
         estimatedPay: pay,
-        estimatedDistance: Number((tripDist + distToPickup).toFixed(1)),
-        estimatedTime: Math.floor((tripDist + distToPickup) * 5 + 4),
+        estimatedDistance: Number(((tripDist + distToPickup) * (isStacked ? 1.4 : 1)).toFixed(1)),
+        estimatedTime: Math.floor(((tripDist + distToPickup) * 5 + 4) * (isStacked ? 1.5 : 1)),
         status: 'pending' as const,
         items: type === 'delivery' ? ["Meal Deal", "UberEats Order"] : undefined,
         pin: Math.floor(1000 + Math.random() * 9000).toString(),
         isMatching: activeOrders.length > 0 || Math.random() < 0.25,
         surge: activeSurge > 1.0 ? activeSurge : undefined,
         riderRating: type === 'ride' ? Number((4.6 + Math.random() * 0.4).toFixed(2)) : undefined,
-        isUberX: type === 'ride'
+        isUberX: type === 'ride',
+        isStacked,
+        batchCount
       } as Order;
     });
 
@@ -2867,7 +2950,11 @@ export default function App() {
 
   const handleCancelOrder = (orderId: string, reason: string) => {
     console.log(`Order ${orderId} cancelled. Reason: ${reason}`);
-    setActiveOrders(prev => prev.filter(o => o.id !== orderId));
+    setActiveOrders(prev => {
+      const remaining = prev.filter(o => o.id !== orderId);
+      if (remaining.length === 0) setIsNavigating(false);
+      return remaining;
+    });
     
     // Remote Cleanup
     if (user.uid && firebaseUser && db) {
@@ -2983,7 +3070,11 @@ export default function App() {
       setUser(u => ({ ...u, deliveries: u.deliveries + 1, deliveriesToday: (u.deliveriesToday || 0) + 1, points: u.points + 10 }));
     }
 
-    setActiveOrders(prev => prev.filter(o => o.id !== orderId));
+    setActiveOrders(prev => {
+      const remaining = prev.filter(o => o.id !== orderId);
+      if (remaining.length === 0) setIsNavigating(false);
+      return remaining;
+    });
 
     // Remote Cleanup
     if (user.uid && firebaseUser && db) {
@@ -3028,6 +3119,13 @@ export default function App() {
     const dLng = target.longitude - location.longitude;
     const dist = Math.sqrt(dLat * dLat + dLng * dLng) * MILES_PER_DEGREE;
     return dist.toFixed(1);
+  };
+
+  const distanceToStop = (stop: { location: Location }) => {
+    if (!location || !stop) return 0;
+    const dLat = stop.location.latitude - location.latitude;
+    const dLng = stop.location.longitude - location.longitude;
+    return Math.sqrt(dLat * dLat + dLng * dLng) * MILES_PER_DEGREE;
   };
 
   const startCamera = async () => {
@@ -3241,70 +3339,82 @@ export default function App() {
   }, [user.isOnline]);
 
   return (
-    <div className={`h-[100dvh] w-full font-sans overflow-hidden flex flex-col select-none relative transition-all duration-500 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-gray-100 text-black'}`}>
-      {/* In-App Toasts */}
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-[380px] px-4 pointer-events-none flex flex-col items-center gap-2">
-        <AnimatePresence>
-          {toasts.map(toast => (
-            <motion.div 
-              key={toast.id}
-              initial={{ y: -50, opacity: 0, scale: 0.9 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: -20, opacity: 0, scale: 0.9 }}
-              className="bg-black/90 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl mb-2 flex items-center gap-4 pointer-events-auto border border-white/10"
-            >
-              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center shrink-0">
-                <Bell size={20} />
-              </div>
-              <div className="flex-1">
-                <h4 className="font-black text-sm">{toast.title}</h4>
-                <p className="text-xs text-gray-400 font-bold">{toast.body}</p>
-              </div>
-              <button 
-                onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-                className="p-1 hover:bg-white/10 rounded-full"
+    <AppErrorBoundary>
+      {!isAuthReady ? (
+        <LoadingScreen />
+      ) : (
+        <div className={`h-[100dvh] w-full font-sans overflow-hidden flex flex-col select-none relative transition-all duration-500 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-gray-100 text-black'}`}>
+        {/* In-App Toasts */}
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-[400px] px-4 pointer-events-none flex flex-col items-center gap-3">
+          <AnimatePresence>
+            {toasts.map(toast => (
+              <motion.div 
+                key={toast.id}
+                layout
+                initial={{ y: -80, opacity: 0, scale: 0.8 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ x: 100, opacity: 0, scale: 0.8 }}
+                className="w-full bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-xl p-4 rounded-3xl shadow-2xl flex items-center gap-4 pointer-events-auto border border-black/5 dark:border-white/10"
               >
-                <X size={16} />
-              </button>
-            </motion.div>
-          ))}
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg ${
+                  toast.type === 'success' ? 'bg-green-500 text-white' :
+                  toast.type === 'alert' ? 'bg-orange-500 text-white' :
+                  toast.type === 'message' ? 'bg-blue-500 text-white' :
+                  'bg-black dark:bg-white dark:text-black text-white'
+                }`}>
+                  {toast.type === 'success' ? <Check size={24} /> :
+                   toast.type === 'alert' ? <Zap size={24} /> :
+                   toast.type === 'message' ? <MessageSquare size={24} /> :
+                   <Bell size={24} />}
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <h4 className="font-black text-sm tracking-tight leading-tight uppercase mb-0.5 dark:text-white">{toast.title}</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 font-bold truncate">{toast.body}</p>
+                </div>
+                <button 
+                  onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                  className="p-2 text-gray-300 dark:text-gray-500 hover:text-gray-500"
+                >
+                  <X size={16} />
+                </button>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+
+        <AnimatePresence>
+          {isSideMenuOpen && (
+            <>
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsSideMenuOpen(false)}
+                className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm"
+              />
+              <SideMenu 
+                user={user} 
+                setIsSideMenuOpen={setIsSideMenuOpen}
+                setCurrentScreen={setCurrentScreen}
+                setIsInboxOpen={setIsInboxOpen}
+                setIsSafetyToolkitOpen={setIsSafetyToolkitOpen}
+                theme={theme}
+                logout={logout}
+                isCarPlaySynced={isCarPlaySynced}
+                setIsCarPlaySynced={setIsCarPlaySynced}
+                earnings={earnings}
+                earningsGoal={earningsGoal}
+                setEarningsGoal={setEarningsGoal}
+                busynessMode={busynessMode}
+              />
+            </>
+          )}
         </AnimatePresence>
-      </div>
 
-
-      <AnimatePresence>
-        {isSideMenuOpen && (
-          <>
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsSideMenuOpen(false)}
-              className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm"
-            />
-            <SideMenu 
-              user={user} 
-              setIsSideMenuOpen={setIsSideMenuOpen}
-              setCurrentScreen={setCurrentScreen}
-              setIsInboxOpen={setIsInboxOpen}
-              setIsSafetyToolkitOpen={setIsSafetyToolkitOpen}
-              theme={theme}
-              logout={logout}
-              isCarPlaySynced={isCarPlaySynced}
-              setIsCarPlaySynced={setIsCarPlaySynced}
-              earnings={earnings}
-              earningsGoal={earningsGoal}
-              setEarningsGoal={setEarningsGoal}
-              busynessMode={busynessMode}
-            />
-          </>
-        )}
-      </AnimatePresence>
-
-      <div className="flex-1 relative overflow-hidden">
-        <AnimatePresence mode="wait">
-          {currentScreen === 'onboarding' && (
-            <motion.div key="onboarding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full w-full bg-white text-black p-8 flex flex-col justify-center pb-24">
+        <div className="flex-1 relative overflow-hidden flex flex-col">
+          <AnimatePresence>
+            {currentScreen === 'onboarding' && (
+              <motion.div key="onboarding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full w-full bg-white text-black p-8 flex flex-col justify-center pb-24">
               <div className="mb-12">
                 <div className="w-20 h-20 bg-black rounded-2xl flex items-center justify-center mb-6">
                   <span className="text-white text-4xl font-black">U</span>
@@ -3733,16 +3843,17 @@ export default function App() {
                         </div>
                         <div>
                           <p className="font-display text-xl font-black leading-tight tracking-tight">
-                            {activeOrders[0]?.status === 'accepted' ? (activeOrders[0]?.type === 'delivery' ? activeOrders[0]?.restaurantName : 'Pickup Location') : 'Destination'}
+                            {currentStop?.label || (activeOrders[0]?.status === 'accepted' ? (activeOrders[0]?.type === 'delivery' ? activeOrders[0]?.restaurantName : 'Pickup Location') : 'Destination')}
                           </p>
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                            {activeOrders.length > 1 ? `${activeOrders.length} Trips In Progress • ` : ''}
                             {activeOrders[0]?.status === 'accepted' ? `Pickup by ${getArrivalTime(activeOrders[0]?.estimatedTime / 2)}` : `Arriving by ${getArrivalTime(activeOrders[0]?.estimatedTime / 2)}`}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <p className="font-display text-lg font-black leading-tight">£{activeOrders[0]?.estimatedPay.toFixed(2)}</p>
+                          <p className="font-display text-lg font-black leading-tight">£{activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}</p>
                           <p className="text-[8px] font-black text-blue-500 tracking-widest uppercase">Ongoing</p>
                         </div>
                         <button onClick={() => setIsNavigating(false)} className="p-2 bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors">
@@ -4045,21 +4156,15 @@ export default function App() {
                 )}
 
                 {/* All Active Trip Markers (Pickup/Dropoff) */}
-                {location && activeOrders.map((order, i) => {
-                  const target = order.status === 'accepted' 
-                    ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
-                    : order.customerLocation;
+                {location && currentStops.map((stop, i) => {
+                  const x = (stop.location.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
+                  const y = (location.latitude - stop.location.latitude) * MAP_SCALE + (mapOffset.y || 0);
                   
-                  if (!target) return null;
-                  
-                  const x = (target.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
-                  const y = (location.latitude - target.latitude) * MAP_SCALE + (mapOffset.y || 0);
-                  
-                  const isCurrentTarget = isNavigating && activeOrders[0]?.id === order.id;
+                  const isCurrentTarget = i === 0 && isNavigating;
 
                   return (
                     <motion.div 
-                      key={`trip-pin-${order.id}`}
+                      key={`stop-pin-${stop.orderId}-${stop.type}`}
                       initial={{ scale: 0 }}
                       animate={{ scale: isCurrentTarget ? 1.2 : 1 }}
                       className="absolute z-[210] flex flex-col items-center"
@@ -4071,13 +4176,9 @@ export default function App() {
                     >
                       <div className={`relative ${isCurrentTarget ? 'z-[250]' : 'z-[210]'}`}>
                         <div className={`w-10 h-10 rounded-full shadow-2xl flex items-center justify-center border-4 border-[#1a1a1a] transition-all ${
-                          order.status === 'accepted' ? 'bg-blue-600 scale-110 shadow-blue-600/30' : 'bg-green-600 shadow-green-600/30'
+                          stop.type === 'pickup' ? 'bg-blue-600 scale-110 shadow-blue-600/30' : 'bg-green-600 shadow-green-600/30'
                         }`}>
-                          {order.type === 'delivery' ? (
-                            order.status === 'accepted' ? <Utensils size={18} className="text-white" /> : <MapPin size={18} className="text-white" />
-                          ) : (
-                            order.status === 'accepted' ? <User size={18} className="text-white" /> : <MapPin size={18} className="text-white" />
-                          )}
+                          {stop.type === 'pickup' ? <Utensils size={18} className="text-white" /> : <MapPin size={18} className="text-white" />}
                         </div>
                         {isCurrentTarget && (
                           <motion.div 
@@ -4088,12 +4189,11 @@ export default function App() {
                         )}
                         <div className="absolute top-1/2 left-full ml-3 -translate-y-1/2 px-3 py-1.5 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 shadow-2xl whitespace-nowrap">
                           <p className="text-[10px] font-black text-white uppercase tracking-wider">
-                            {order.status === 'accepted' ? (order.type === 'delivery' ? order.restaurantName : 'Rider Pickup') : 'Final Destination'}
+                            {stop.label}
                           </p>
-                          <p className="text-[8px] font-bold text-gray-400 capitalize">{order.type} • £{order.estimatedPay.toFixed(2)}</p>
                         </div>
                       </div>
-                      <div className={`w-1.5 h-6 ${order.status === 'accepted' ? 'bg-blue-600' : 'bg-green-600'} rounded-full mt-[-2px] border border-[#1a1a1a]`} />
+                      <div className={`w-1.5 h-6 ${stop.type === 'pickup' ? 'bg-blue-600' : 'bg-green-600'} rounded-full mt-[-2px] border border-[#1a1a1a]`} />
                     </motion.div>
                   );
                 })}
@@ -4585,20 +4685,20 @@ export default function App() {
                         </button>
                         
                         <div className="flex flex-col items-center flex-1">
-                          {activeOrders.length > 0 && activeOrders[0] && Number(distanceToTarget(activeOrders[0])) <= 1.5 ? (
+                          {currentStop && distanceToStop(currentStop) <= 0.1 ? (
                             <motion.button
                               whileTap={{ scale: 0.95 }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (activeOrders[0]) handleNextStep(activeOrders[0].id);
+                                handleNextStep(currentStop.orderId);
                               }}
                               className={`px-8 py-3 rounded-full font-display font-black text-lg uppercase tracking-tighter shadow-lg transition-all ${
-                                activeOrders[0].status === 'accepted' 
-                                  ? 'bg-blue-600 text-white' 
+                                currentStop.type === 'pickup' 
+                                  ? 'bg-blue-600 text-white shadow-blue-500/20' 
                                   : 'bg-green-600 text-white shadow-green-500/20'
                               }`}
                             >
-                              {activeOrders[0].status === 'accepted' ? (activeOrders[0].type === 'delivery' ? 'Confirm Pickup' : 'Confirm Arrival') : 'Confirm Dropoff'}
+                              {currentStop.type === 'pickup' ? (activeOrders.find(o => o.id === currentStop.orderId)?.type === 'delivery' ? 'Confirm Pickup' : 'Confirm Arrival') : 'Confirm Dropoff'}
                             </motion.button>
                           ) : (
                             <div className="flex flex-col items-center">
@@ -4615,9 +4715,7 @@ export default function App() {
                                     className="w-1.5 h-1.5 rounded-full bg-blue-500"
                                   />
                                   <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
-                                    {activeOrders.length > 0 && activeOrders[0] 
-                                      ? (activeOrders[0].status === 'accepted' ? 'Heading to pickup' : 'Heading to dropoff')
-                                      : 'Online'}
+                                    {currentStop ? `${currentStop.label} • ${distanceToStop(currentStop).toFixed(1)} mi` : user.isOnline ? 'Online' : 'Offline'}
                                   </span>
                                 </div>
                                 <span className="text-[10px] text-gray-300">•</span>
@@ -5203,22 +5301,6 @@ export default function App() {
                       }
                     }}
                     onClose={() => setVerifyingDeliveryId(null)}
-                  />
-                )}
-              </AnimatePresence>
-
-              {/* Earnings Detail Modal */}
-              <AnimatePresence>
-                {currentScreen === 'earnings_detail' && (
-                  <EarningsDetail 
-                    earnings={earnings}
-                    user={user}
-                    setCurrentScreen={setCurrentScreen}
-                    getArrivalTime={getArrivalTime}
-                    setBankBalance={setBankBalance}
-                    setEarnings={setEarnings}
-                    sendNotification={sendNotification}
-                    playUberSound={playUberSound}
                   />
                 )}
               </AnimatePresence>
@@ -6272,6 +6354,19 @@ export default function App() {
             />
           )}
 
+          {currentScreen === 'earnings_detail' && (
+            <EarningsDetail 
+              earnings={earnings}
+              user={user}
+              setCurrentScreen={setCurrentScreen}
+              getArrivalTime={getArrivalTime}
+              setBankBalance={setBankBalance}
+              setEarnings={setEarnings}
+              sendNotification={sendNotification}
+              playUberSound={playUberSound}
+            />
+          )}
+
           {/* Safety Fallback for unhandled screens */}
           {['rewards', 'work_hub', 'safety', 'planner'].includes(currentScreen) && (
             <motion.div 
@@ -6324,13 +6419,15 @@ export default function App() {
       </div>
 
       {/* Bottom Nav */}
-      <div className="h-20 bg-black border-t border-white/10 flex items-center justify-around px-4 z-[110]">
+      <div className="h-20 bg-black border-t border-white/10 flex items-center justify-around px-4 z-[2000] shrink-0 relative">
         <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={24} />} label="Home" />
         <NavButton active={currentScreen === 'earnings'} onClick={() => setCurrentScreen('earnings')} icon={<TrendingUp size={24} />} label="Earnings" />
         <NavButton active={currentScreen === 'inbox'} onClick={() => setCurrentScreen('inbox')} icon={<Mail size={24} />} label="Inbox" />
         <NavButton active={currentScreen === 'account'} onClick={() => setCurrentScreen('account')} icon={<User size={24} />} label="Account" />
       </div>
     </div>
+      )}
+    </AppErrorBoundary>
   );
 }
 

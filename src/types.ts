@@ -15,13 +15,15 @@ export interface Order {
   estimatedPay: number;
   estimatedDistance: number;
   estimatedTime: number;
-  status: 'pending' | 'accepted' | 'picked_up' | 'delivered' | 'en_route_to_pickup' | 'on_ride';
+  status: 'pending' | 'accepted' | 'picked_up' | 'delivered' | 'en_route_to_pickup' | 'on_ride' | 'arrived' | 'returning_to_restaurant';
   customerName: string;
   items?: string[];
   pin?: string;
   isMatching?: boolean;
   surge?: number;
   riderRating?: number;
+  isStacked?: boolean;
+  batchCount?: number;
 }
 
 export interface ChatMessage {
@@ -41,7 +43,7 @@ export interface ScheduledOrder {
   estimatedPay: number;
 }
 
-export type AppScreen = 'onboarding' | 'documents' | 'face_verification' | 'home' | 'earnings' | 'inbox' | 'account' | 'chat' | 'uber_pro' | 'wallet' | 'opportunities' | 'safety' | 'earnings_detail' | 'banking' | 'scheduled_orders' | 'rewards' | 'carplay_dashboard' | 'trip_history' | 'work_hub' | 'ratings' | 'planner' | 'uber_services' | 'vehicle_details' | 'payment_methods';
+export type AppScreen = 'onboarding' | 'documents' | 'face_verification' | 'home' | 'earnings' | 'inbox' | 'account' | 'chat' | 'uber_pro' | 'wallet' | 'opportunities' | 'safety' | 'earnings_detail' | 'banking' | 'scheduled_orders' | 'rewards' | 'carplay_dashboard' | 'trip_history' | 'work_hub' | 'ratings' | 'planner' | 'uber_services' | 'vehicle_details' | 'payment_methods' | 'trip_preferences';
 
 export interface CompletedTrip {
   id: string;
