@@ -1,0 +1,15 @@
+{
+  "name": "Uber Eats Driver Dashboard",
+  "short_name": "Uber Driver",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png",
+      "sizes": "48x48",
+      "type": "image/png"
+    }
+  ]
+}

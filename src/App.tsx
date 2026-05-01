@@ -30,6 +30,7 @@ import {
   CreditCard,
   Landmark,
   Bell,
+  Code,
   MessageSquare,
   LogOut,
   Plus,
@@ -1625,6 +1626,7 @@ const DeliveryVerificationModal = ({
 
 const LoadingScreen = () => {
   useEffect(() => {
+    console.log("LoadingScreen mounted. Waiting for Auth...");
     // If stuck for more than 8 seconds, something is likely wrong with auth/firebase
     const timer = setTimeout(() => {
       console.warn("Auth initialization taking too long. Attempting to force start...");
@@ -1634,22 +1636,55 @@ const LoadingScreen = () => {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[10000] bg-[#0a0a0a] flex flex-col items-center justify-center p-8">
-      <div className="relative mb-8">
-        <div className="w-16 h-16 border-[6px] border-blue-600/20 rounded-full" />
+    <div className="fixed inset-0 z-[10000] bg-[#0c1426] flex flex-col items-center justify-center p-8 overflow-hidden">
+      {/* Background Decorative Rings */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div 
-          animate={{ rotate: 360 }} 
-          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-          className="absolute inset-0 w-16 h-16 border-[6px] border-blue-600 border-t-transparent rounded-full" 
+          animate={{ scale: [1, 1.2, 1], rotate: 360 }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-white/5 rounded-full"
+        />
+        <motion.div 
+          animate={{ scale: [1.2, 1, 1.2], rotate: -360 }}
+          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] border border-white/5 rounded-full"
         />
       </div>
-      <h1 className="text-white text-3xl font-black tracking-tighter uppercase italic mb-2">Uber Eats</h1>
-      <div className="flex items-center gap-2 text-gray-500 font-bold text-xs uppercase tracking-[0.2em] animate-pulse">
-        <span>Initializing</span>
-        <div className="flex gap-1">
-          <motion.div animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1 h-1 bg-blue-500 rounded-full" />
-          <motion.div animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1 h-1 bg-blue-500 rounded-full" />
-          <motion.div animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1 h-1 bg-blue-500 rounded-full" />
+
+      <div className="relative z-10 flex flex-col items-center">
+        <div className="relative mb-12">
+          <div className="w-24 h-24 border-[8px] border-white/10 rounded-full" />
+          <motion.div 
+            animate={{ rotate: 360 }} 
+            transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+            className="absolute inset-0 w-24 h-24 border-[8px] border-blue-500 border-t-transparent rounded-full" 
+          />
+          <motion.div 
+            animate={{ scale: [0.8, 1.1, 0.8] }}
+            transition={{ repeat: Infinity, duration: 2 }}
+            className="absolute inset-0 flex items-center justify-center"
+          >
+            <Navigation className="text-blue-500" size={32} fill="currentColor" />
+          </motion.div>
+        </div>
+        
+        <h1 className="text-white text-4xl font-black tracking-tighter uppercase italic mb-2 drop-shadow-2xl">Uber Eats</h1>
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-[0.3em] animate-pulse">
+            <span>Systems Ready</span>
+            <div className="flex gap-1">
+              <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1.5 h-1.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+              <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+              <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+            </div>
+          </div>
+          
+          <button 
+            onClick={() => window.dispatchEvent(new CustomEvent('force-auth-ready'))}
+            className="mt-8 px-8 py-3 bg-white/10 hover:bg-white/20 text-white/40 hover:text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-all border border-white/5 active:scale-95"
+          >
+            Manual Startup
+          </button>
         </div>
       </div>
     </div>
@@ -1873,20 +1908,36 @@ export default function App() {
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
   const [earnings, setEarnings] = useState(() => {
-    const saved = localStorage.getItem('uber_earnings');
-    return saved ? parseFloat(saved) : 0.00;
+    try {
+      const saved = localStorage.getItem('uber_earnings');
+      return saved ? parseFloat(saved) : 0.00;
+    } catch (e) {
+      return 0.00;
+    }
   });
   const [bankBalance, setBankBalance] = useState(() => {
-    const saved = localStorage.getItem('uber_bank_balance');
-    return saved ? parseFloat(saved) : 500.00;
+    try {
+      const saved = localStorage.getItem('uber_bank_balance');
+      return saved ? parseFloat(saved) : 500.00;
+    } catch (e) {
+      return 500.00;
+    }
   });
   const [purchasedItems, setPurchasedItems] = useState<string[]>(() => {
-    const saved = localStorage.getItem('uber_purchased_items');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('uber_purchased_items');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
   });
   const [completedTrips, setCompletedTrips] = useState<CompletedTrip[]>(() => {
-    const saved = localStorage.getItem('uber_completed_trips');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('uber_completed_trips');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
   });
 
   // New Maintenance/Update States
@@ -1954,8 +2005,12 @@ export default function App() {
 
   const currentStop = currentStops[0];
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const saved = localStorage.getItem('uber_chat_messages');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('uber_chat_messages');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
   });
 
   useEffect(() => {
@@ -1990,8 +2045,12 @@ export default function App() {
   const [selectedCancelReason, setSelectedCancelReason] = useState<string | null>(null);
   const [viewingOrderDetailsId, setViewingOrderDetailsId] = useState<string | null>(null);
   const [earningsGoal, setEarningsGoal] = useState(() => {
-    const saved = localStorage.getItem('uber_earnings_goal');
-    return saved ? parseFloat(saved) : 50.00;
+    try {
+      const saved = localStorage.getItem('uber_earnings_goal');
+      return saved ? parseFloat(saved) : 50.00;
+    } catch (e) {
+      return 50.00;
+    }
   });
   
   useEffect(() => {

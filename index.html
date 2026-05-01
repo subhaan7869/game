@@ -3,10 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <link rel="manifest" href="/manifest.json" />
+    <title>Uber Eats Driver Dashboard</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="background: #000; height: 100vh; width: 100vw; display: flex; flex-direction: column; align-items: center; justify-center; color: #333; font-family: sans-serif;">
+        <h1 style="color: #fff; margin-bottom: 8px;">Uber Eats</h1>
+        <p style="font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;">Loading Driver System...</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
