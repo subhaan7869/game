@@ -1669,23 +1669,42 @@ const LoadingScreen = () => {
         </div>
         
         <h1 className="text-white text-4xl font-black tracking-tighter uppercase italic mb-2 drop-shadow-2xl">Uber Eats</h1>
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-[0.3em] animate-pulse">
-            <span>Systems Ready</span>
-            <div className="flex gap-1">
-              <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1.5 h-1.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-              <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-              <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+          <div className="flex flex-col items-center gap-6">
+            <div className="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-[0.3em] animate-pulse">
+              <span>Systems Ready</span>
+              <div className="flex gap-1">
+                <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1.5 h-1.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+              </div>
+            </div>
+            
+            <div className="flex flex-col gap-3 w-full">
+              <button 
+                onClick={() => window.dispatchEvent(new CustomEvent('force-auth-ready'))}
+                className="px-10 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-xs font-black uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(37,99,235,0.4)] active:scale-95"
+              >
+                Force Start System
+              </button>
+              
+              <button 
+                onClick={() => {
+                  if (confirm("This will clear all local data and reset the app. Continue?")) {
+                    localStorage.clear();
+                    if ('serviceWorker' in navigator) {
+                      navigator.serviceWorker.getRegistrations().then(registrations => {
+                        for(let registration of registrations) registration.unregister();
+                      });
+                    }
+                    window.location.reload();
+                  }
+                }}
+                className="px-8 py-3 bg-white/5 hover:bg-red-500/20 text-white/30 hover:text-red-500 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border border-white/5"
+              >
+                Reset & Repair App
+              </button>
             </div>
           </div>
-          
-          <button 
-            onClick={() => window.dispatchEvent(new CustomEvent('force-auth-ready'))}
-            className="mt-8 px-8 py-3 bg-white/10 hover:bg-white/20 text-white/40 hover:text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-all border border-white/5 active:scale-95"
-          >
-            Manual Startup
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -1718,39 +1737,45 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
   render() {
     if (this.state.hasError) {
       return (
-        <div className="h-screen w-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-8 text-center font-sans">
-          <div className="w-20 h-20 bg-red-600 shadow-[0_0_30px_rgba(220,38,38,0.5)] text-white rounded-full flex items-center justify-center mb-6">
-            <ShieldAlert size={40} strokeWidth={3} />
-          </div>
-          <h1 className="text-3xl font-black mb-2 tracking-tighter uppercase italic text-red-500">System Error</h1>
-          <p className="text-gray-400 font-bold mb-8 max-w-sm">
-            We encountered a critical error. This might be due to outdated cached data.
-          </p>
-          <div className="w-full max-w-md bg-black/40 border border-white/10 rounded-2xl p-4 mb-8 text-left overflow-hidden">
-            <div className="flex items-center gap-2 mb-2 text-red-400 opacity-80">
-              <Code size={14} />
-              <span className="text-[10px] font-black uppercase tracking-widest">Stack Trace Preview</span>
+        <div className="h-screen w-screen bg-[#050505] text-white flex flex-col items-center justify-center p-8 text-center font-sans">
+          <div className="p-12 bg-gray-900/50 rounded-[40px] border border-white/10 backdrop-blur-xl flex flex-col items-center">
+            <div className="w-24 h-24 bg-red-600 shadow-[0_0_30px_rgba(220,38,38,0.5)] text-white rounded-full flex items-center justify-center mb-8">
+              <ShieldAlert size={56} />
             </div>
-            <pre className="text-[10px] font-mono text-gray-500 overflow-auto max-h-32">
-              {this.state.error?.stack || this.state.error?.message}
-            </pre>
-          </div>
-          <div className="flex flex-col w-full max-w-xs gap-3">
-            <button 
-              onClick={() => window.location.reload()}
-              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black tracking-widest text-sm active:scale-95 transition-transform shadow-lg shadow-blue-500/20"
-            >
-              RELOAD APPLICATION
-            </button>
-            <button 
-              onClick={() => {
-                localStorage.clear();
-                window.location.reload();
-              }}
-              className="w-full py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black tracking-widest text-sm active:scale-95 transition-transform"
-            >
-              RESET APP DATA
-            </button>
+            <h1 className="text-4xl font-black mb-4 tracking-tighter uppercase italic text-red-500">System Error</h1>
+            <p className="text-gray-400 font-bold mb-10 max-w-sm text-lg">
+              The application encountered an unexpected issue. We've logged the error and are working on a fix.
+            </p>
+            
+            {this.state.error && (
+              <div className="w-full mb-10 p-6 bg-black/40 rounded-3xl border border-white/5 text-left">
+                <div className="flex items-center gap-2 mb-3 text-red-400 font-bold text-[10px] uppercase tracking-widest">
+                  <Code size={14} />
+                  Error Details
+                </div>
+                <pre className="text-[10px] font-mono text-gray-500 overflow-auto max-h-40 custom-scrollbar whitespace-pre-wrap">
+                  {this.state.error.stack || this.state.error.message}
+                </pre>
+              </div>
+            )}
+            
+            <div className="flex flex-col w-full gap-4">
+              <button 
+                onClick={() => window.location.reload()} 
+                className="w-full py-5 bg-white text-black rounded-3xl font-black tracking-widest text-lg active:scale-95 transition-transform shadow-2xl hover:bg-gray-100"
+              >
+                RESTART APPLICATION
+              </button>
+              <button 
+                onClick={() => {
+                  localStorage.clear();
+                  window.location.reload();
+                }}
+                className="w-full py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black tracking-widest text-sm active:scale-95 transition-transform border border-white/5"
+              >
+                CLEAR CACHE & RESET
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -1762,7 +1787,14 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
 
 export default function App() {
   // App State
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>('onboarding');
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>(() => {
+    try {
+      const saved = localStorage.getItem('uber_current_screen');
+      return (saved as AppScreen) || 'onboarding';
+    } catch (e) {
+      return 'onboarding';
+    }
+  });
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -1784,13 +1816,17 @@ export default function App() {
   const [isCarPlaySynced, setIsCarPlaySynced] = useState(false);
   const [isCarPlayRemoteMode, setIsCarPlayRemoteMode] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (localStorage.getItem('uber_theme') as 'light' | 'dark') || 'light';
+    try {
+      const saved = localStorage.getItem('uber_theme');
+      return (saved as 'light' | 'dark') || 'light';
+    } catch (e) {
+      return 'light';
+    }
   });
   const [earningsTab, setEarningsTab] = useState<'today' | 'weekly' | 'recent'>('today');
   
   // User Profile State
   const [user, setUser] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('uber_eats_user');
     const baseUser: UserProfile = {
       name: "Hassen Nabeel",
       rating: 5.00,
@@ -1817,9 +1853,14 @@ export default function App() {
         "Bank Statement": "Verified"
       }
     };
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return { ...baseUser, ...parsed, isOnline: false };
+    try {
+      const saved = localStorage.getItem('uber_eats_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...baseUser, ...parsed, isOnline: false };
+      }
+    } catch (e) {
+      console.warn("Failed to load user profile from localStorage", e);
     }
     return baseUser;
   });
@@ -1889,8 +1930,12 @@ export default function App() {
   const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [vehicleType, setVehicleType] = useState<'Car' | 'Bike' | 'Scooter'>(() => {
-    const saved = localStorage.getItem('uber_vehicle_type');
-    return (saved as any) || 'Car';
+    try {
+      const saved = localStorage.getItem('uber_vehicle_type');
+      return (saved as any) || 'Car';
+    } catch (e) {
+      return 'Car';
+    }
   });
   const [isVehicleSettingsOpen, setIsVehicleSettingsOpen] = useState(false);
 
@@ -2091,13 +2136,21 @@ export default function App() {
   }, [currentScreen]);
 
   const [jobTypePreference, setJobTypePreference] = useState<'normal' | 'matching' | 'both'>(() => {
-    const saved = localStorage.getItem('uber_job_preference');
-    return (saved as any) || 'both';
+    try {
+      const saved = localStorage.getItem('uber_job_preference');
+      return (saved as any) || 'both';
+    } catch (e) {
+      return 'both';
+    }
   });
 
   const [busynessMode, setBusynessMode] = useState<'Low' | 'Medium' | 'High'>(() => {
-    const saved = localStorage.getItem('uber_busyness_mode');
-    return (saved as any) || 'High';
+    try {
+      const saved = localStorage.getItem('uber_busyness_mode');
+      return (saved as any) || 'High';
+    } catch (e) {
+      return 'High';
+    }
   });
 
   useEffect(() => {
@@ -2225,8 +2278,12 @@ export default function App() {
   }, [location === null]);
   
   const [selectedServices, setSelectedServices] = useState<JobType[]>(() => {
-    const saved = localStorage.getItem('uber_selected_services');
-    return saved ? JSON.parse(saved) : ['delivery', 'ride'];
+    try {
+      const saved = localStorage.getItem('uber_selected_services');
+      return saved ? JSON.parse(saved) : ['delivery', 'ride'];
+    } catch (e) {
+      return ['delivery', 'ride'];
+    }
   });
 
   useEffect(() => {
@@ -2369,12 +2426,13 @@ export default function App() {
     const handleForceReady = () => setIsAuthReady(true);
     window.addEventListener('force-auth-ready', handleForceReady);
 
-    const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (fUser) => {
       setFirebaseUser(fUser);
+      setIsAuthReady(true);
+      
       if (fUser) {
-        // Load user profile from Firestore
-        try {
-          const userDoc = await getDoc(doc(db, 'users', fUser.uid));
+        // Load user profile from Firestore in background
+        getDoc(doc(db, 'users', fUser.uid)).then(userDoc => {
           if (userDoc.exists()) {
             const userData = userDoc.data() as UserProfile;
             setUser(userData);
@@ -2383,14 +2441,12 @@ export default function App() {
             setNewUserDetails({ name: fUser.displayName || '', email: fUser.email || '' });
           }
           setIsProfileLoaded(true);
-        } catch (error) {
+        }).catch(error => {
           console.error("Profile load failed:", error);
-          // Don't re-throw here to allow auth ready
-        }
+        });
       } else {
         setIsProfileLoaded(false);
       }
-      setIsAuthReady(true);
     });
     
     // Request notification permission on mount
@@ -3467,6 +3523,10 @@ export default function App() {
 
   return (
     <AppErrorBoundary>
+      {isUnderMaintenance && <MaintenanceScreen onRetry={() => window.location.reload()} />}
+      {isUpdating && <UpdateScreen progress={updateProgress} />}
+      {isScanning && <ScanningScreen />}
+      
       {!isAuthReady ? (
         <LoadingScreen />
       ) : (
@@ -3723,6 +3783,29 @@ export default function App() {
           {currentScreen === 'home' && (
             <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
               <MapGrid />
+              
+              {!location && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-50 bg-[#0c0c0d]/80 backdrop-blur-sm">
+                  <div className="relative mb-6">
+                    <div className="w-16 h-16 border-4 border-blue-500/20 rounded-full" />
+                    <motion.div 
+                      animate={{ rotate: 360 }} 
+                      transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                      className="absolute inset-0 w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full" 
+                    />
+                    <motion.div
+                      animate={{ opacity: [0.3, 1, 0.3] }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                      className="absolute inset-0 flex items-center justify-center"
+                    >
+                      <MapPin className="text-blue-500" size={24} />
+                    </motion.div>
+                  </div>
+                  <p className="text-blue-400 font-black text-xs uppercase tracking-[0.3em] animate-pulse">Establishing GPS Link</p>
+                  <p className="text-gray-500 text-[10px] uppercase font-bold mt-2 tracking-widest">Searching for driver coordinates...</p>
+                </div>
+              )}
+
               {/* Scanline Effect (Bottom Layer) */}
               <div className="absolute inset-0 z-0 pointer-events-none">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%)] bg-[length:100%_4px]" />
@@ -5152,68 +5235,90 @@ export default function App() {
                         )}
 
                         {/* Common scrollable items */}
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                           {/* Active Orders in Menu */}
                           {activeOrders.length > 0 ? (
-                            <div className="space-y-3 mb-6">
-                              <div className="flex items-center justify-between mb-2">
-                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Active Trips</p>
-                                <div className={`flex p-0.5 rounded-lg ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}>
-                                  {(['all', 'accepted', 'picked_up'] as const).map((f) => (
-                                    <button
-                                      key={f}
-                                      onClick={(e) => { e.stopPropagation(); setOrderStatusFilter(f); }}
-                                      className={`px-3 py-1 rounded-md text-[8px] font-black uppercase tracking-wider transition-all ${
-                                        orderStatusFilter === f 
-                                          ? (theme === 'dark' ? 'bg-white text-black shadow-sm' : 'bg-black text-white shadow-sm')
-                                          : 'text-gray-400 opacity-60 hover:opacity-100'
-                                      }`}
-                                    >
-                                      {f === 'all' ? 'All' : f === 'accepted' ? 'Pickup' : 'Drop'}
-                                    </button>
-                                  ))}
+                            <div className="space-y-4 mb-8">
+                                <div className="flex items-center justify-between mb-4 px-2">
+                                  <h2 className="text-2xl font-black tracking-tighter uppercase italic">Active Operations</h2>
+                                  <div className={`flex p-1 rounded-xl ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}>
+                                    {(['all', 'accepted', 'picked_up'] as const).map((f) => (
+                                      <button
+                                        key={f}
+                                        onClick={(e) => { e.stopPropagation(); setOrderStatusFilter(f); }}
+                                        className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                                          orderStatusFilter === f 
+                                            ? (theme === 'dark' ? 'bg-blue-600 text-white shadow-xl' : 'bg-black text-white shadow-xl')
+                                            : 'text-gray-400 opacity-60 hover:opacity-100'
+                                        }`}
+                                      >
+                                        {f === 'all' ? 'All' : f === 'accepted' ? 'Accepted' : 'Picked Up'}
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                              {activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, idx) => (
-                                <motion.div 
-                                  key={order.id} 
-                                  initial={{ x: -20, opacity: 0 }} 
-                                  animate={{ x: 0, opacity: 1 }} 
-                                  transition={{ delay: idx * 0.1 }}
-                                  className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-gray-100 shadow-sm'}`}
-                                  onClick={() => {
-                                    setViewingOrderDetailsId(order.id);
-                                    setIsBottomMenuOpen(false);
-                                  }}
-                                >
-                                  <div className="flex items-center gap-4">
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${order.status === 'accepted' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
-                                      {order.status === 'accepted' ? <Coffee size={24} /> : <User size={24} />}
-                                    </div>
-                                    <div>
-                                      <h3 className="font-black text-lg leading-tight">{order.status === 'accepted' ? order.restaurantName : order.customerName}</h3>
-                                      <p className="text-xs text-gray-400 font-bold">{(order.items?.length || 0)} items • £{order.estimatedPay.toFixed(2)}</p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <button 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveChatOrderId(order.id);
+
+                                <AnimatePresence mode="popLayout">
+                                  {activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, idx) => (
+                                    <motion.div 
+                                      key={order.id} 
+                                      initial={{ y: 20, opacity: 0 }} 
+                                      animate={{ y: 0, opacity: 1 }} 
+                                      exit={{ x: -100, opacity: 0 }}
+                                      transition={{ delay: idx * 0.05 }}
+                                      className={`group relative p-5 rounded-[32px] border-2 transition-all active:scale-[0.97] ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/5 shadow-2xl' : 'bg-white border-gray-100 shadow-xl shadow-black/5'}`}
+                                      onClick={() => {
+                                        setViewingOrderDetailsId(order.id);
                                         setIsBottomMenuOpen(false);
-                                        setCurrentScreen('chat');
                                       }}
-                                      className={`p-2 rounded-xl border ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}
                                     >
-                                      <MessageSquare size={18} />
-                                    </button>
-                                    <div className="text-right">
-                                      <p className="text-sm font-black">£{order.estimatedPay.toFixed(2)}</p>
-                                      <p className="text-[10px] font-bold text-gray-400">{order.status === 'accepted' ? 'Pickup' : 'Dropoff'}</p>
-                                    </div>
-                                  </div>
-                                </motion.div>
-                              ))}
+                                      <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-4">
+                                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${order.status === 'accepted' ? 'bg-blue-500/10 text-blue-500' : 'bg-green-500/10 text-green-500'}`}>
+                                            {order.type === 'delivery' ? <Utensils size={28} /> : <User size={28} />}
+                                          </div>
+                                          <div>
+                                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${order.status === 'accepted' ? 'text-blue-500' : 'text-green-500'}`}>
+                                              {order.status === 'accepted' ? 'Incoming Pickup' : 'Ongoing Dropoff'}
+                                            </p>
+                                            <h3 className="font-display text-xl font-black leading-none">{order.status === 'accepted' ? order.restaurantName : order.customerName}</h3>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="font-display text-lg font-black text-blue-600">£{order.estimatedPay.toFixed(2)}</p>
+                                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{getArrivalTime(order.estimatedTime)}</p>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-3 pt-4 border-t border-gray-100 dark:border-white/5">
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveChatOrderId(order.id);
+                                            setIsBottomMenuOpen(false);
+                                            setCurrentScreen('chat');
+                                          }}
+                                          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
+                                        >
+                                          <MessageSquare size={16} />
+                                          Message
+                                        </button>
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleNextStep(order.id);
+                                            setIsBottomMenuOpen(false);
+                                          }}
+                                          className={`flex-[2] py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all ${
+                                            order.status === 'accepted' ? 'bg-blue-600 text-white shadow-blue-500/30' : 'bg-green-600 text-white shadow-green-500/30'
+                                          }`}
+                                        >
+                                          {order.status === 'accepted' ? 'Start Pickup' : 'Start Dropoff'}
+                                        </button>
+                                      </div>
+                                    </motion.div>
+                                  ))}
+                                </AnimatePresence>
                             </div>
                           ) : (
                             <div className="py-10 text-center">
@@ -5966,8 +6071,8 @@ export default function App() {
             />
           )}
 
-          {currentScreen === 'planner' && (
-            <motion.div key="rewards" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
+          {(currentScreen === 'planner' || currentScreen === 'rewards') && (
+            <motion.div key="planner" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
                 <h1 className="text-3xl font-black">Rewards</h1>
@@ -6468,6 +6573,44 @@ export default function App() {
             </motion.div>
           )}
 
+          {currentScreen === 'work_hub' && (
+            <motion.div key="work_hub" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
+              <div className="flex items-center gap-4 mb-8">
+                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform"><X size={24} /></button>
+                <h1 className="text-3xl font-black">Work Hub</h1>
+              </div>
+              <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+                <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-6">
+                  <SlidersHorizontal size={32} />
+                </div>
+                <h2 className="text-2xl font-black mb-2 tracking-tighter uppercase">Opportunities</h2>
+                <p className="text-gray-400 font-bold mb-8">Manage your working preferences and discover new ways to earn.</p>
+                <div className="w-full grid grid-cols-1 gap-4">
+                  <button onClick={() => setCurrentScreen('uber_services')} className="flex items-center justify-between p-6 bg-gray-50 rounded-3xl border border-gray-100 shadow-sm active:scale-95 transition-transform">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-blue-600 text-white rounded-xl"><Zap size={20} /></div>
+                      <div className="text-left">
+                        <p className="font-black">Services</p>
+                        <p className="text-xs text-gray-400 font-bold">Manage vehicle types</p>
+                      </div>
+                    </div>
+                    <ChevronRight size={20} className="text-gray-300" />
+                  </button>
+                  <button onClick={() => setCurrentScreen('trip_preferences')} className="flex items-center justify-between p-6 bg-gray-50 rounded-3xl border border-gray-100 shadow-sm active:scale-95 transition-transform">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-purple-600 text-white rounded-xl"><Target size={20} /></div>
+                      <div className="text-left">
+                        <p className="font-black">Preferences</p>
+                        <p className="text-xs text-gray-400 font-bold">Trip limits & distance</p>
+                      </div>
+                    </div>
+                    <ChevronRight size={20} className="text-gray-300" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {currentScreen === 'scheduled_orders' && (
             <ScheduledOrdersScreen 
               scheduledOrders={scheduledOrders}
@@ -6502,7 +6645,7 @@ export default function App() {
           )}
 
           {/* Safety Fallback for unhandled screens */}
-          {['rewards', 'work_hub', 'safety', 'planner'].includes(currentScreen) && (
+          {!['onboarding', 'documents', 'face_verification', 'home', 'earnings', 'inbox', 'account', 'chat', 'uber_pro', 'wallet', 'opportunities', 'safety', 'earnings_detail', 'banking', 'scheduled_orders', 'rewards', 'carplay_dashboard', 'trip_history', 'work_hub', 'ratings', 'planner', 'uber_services', 'vehicle_details', 'payment_methods', 'trip_preferences'].includes(currentScreen) && (
             <motion.div 
               key="fallback" 
               initial={{ opacity: 0 }} 
@@ -6513,8 +6656,8 @@ export default function App() {
               <div className="w-24 h-24 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mb-6">
                 <Target size={48} />
               </div>
-              <h2 className="text-2xl font-black mb-2 tracking-tighter uppercase">Coming Soon</h2>
-              <p className="text-gray-400 font-bold mb-8 max-w-xs">This feature is currently being optimized for your region. Check back soon!</p>
+              <h2 className="text-2xl font-black mb-2 tracking-tighter uppercase">Screen Not Found</h2>
+              <p className="text-gray-400 font-bold mb-8 max-w-xs">This feature is currently being optimized for your profile. Check back soon!</p>
               <button 
                 onClick={() => setCurrentScreen('home')} 
                 className="px-12 py-4 bg-blue-600 text-white rounded-2xl font-black tracking-widest text-sm active:scale-95 transition-transform shadow-lg shadow-blue-500/20"
@@ -6554,7 +6697,16 @@ export default function App() {
 
       {/* Bottom Nav */}
       <div className="h-20 bg-black border-t border-white/10 flex items-center justify-around px-4 z-[2000] shrink-0 relative">
-        <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={24} />} label="Home" />
+        <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={24} />} label="Home" badge={activeOrders.length > 0 ? activeOrders.length : undefined} />
+        {activeOrders.length > 0 && (
+          <NavButton 
+            active={isBottomMenuOpen} 
+            onClick={() => setIsBottomMenuOpen(!isBottomMenuOpen)} 
+            icon={<List size={24} />} 
+            label="Trips" 
+            badge={activeOrders.filter(o => o.status === 'accepted').length}
+          />
+        )}
         <NavButton active={currentScreen === 'earnings'} onClick={() => setCurrentScreen('earnings')} icon={<TrendingUp size={24} />} label="Earnings" />
         <NavButton active={currentScreen === 'inbox'} onClick={() => setCurrentScreen('inbox')} icon={<Mail size={24} />} label="Inbox" />
         <NavButton active={currentScreen === 'account'} onClick={() => setCurrentScreen('account')} icon={<User size={24} />} label="Account" />
@@ -6565,11 +6717,22 @@ export default function App() {
   );
 }
 
-function NavButton({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: ReactNode, label: string }) {
+function NavButton({ active, onClick, icon, label, badge }: { active: boolean, onClick: () => void, icon: ReactNode, label: string, badge?: number }) {
   return (
-    <button onClick={onClick} className={`flex flex-col items-center gap-1 transition-colors ${active ? 'text-white' : 'text-gray-500'}`}>
-      <div className={`p-1 rounded-full transition-colors ${active ? 'bg-white/10' : ''}`}>{icon}</div>
-      <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
+    <button onClick={onClick} className={`flex flex-col items-center gap-1 transition-all relative ${active ? 'text-white scale-110' : 'text-gray-500'}`}>
+      <div className={`p-1.5 rounded-full transition-colors ${active ? 'bg-white/10' : ''}`}>
+        {icon}
+      </div>
+      <span className="text-[10px] font-black uppercase tracking-widest leading-none">{label}</span>
+      {badge !== undefined && badge > 0 && (
+        <motion.div 
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="absolute -top-1 -right-1 w-5 h-5 bg-blue-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-black"
+        >
+          {badge}
+        </motion.div>
+      )}
     </button>
   );
 }

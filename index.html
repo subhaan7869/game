@@ -8,9 +8,15 @@
   </head>
   <body>
     <div id="root">
-      <div style="background: #000; height: 100vh; width: 100vw; display: flex; flex-direction: column; align-items: center; justify-center; color: #333; font-family: sans-serif;">
-        <h1 style="color: #fff; margin-bottom: 8px;">Uber Eats</h1>
-        <p style="font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;">Loading Driver System...</p>
+      <div style="background: #000; height: 100vh; width: 100vw; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #666; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <h1 style="color: #fff; margin-bottom: 12px; font-weight: 900; font-style: italic; letter-spacing: -1px; font-size: 32px;">UBER EATS</h1>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 12px; height: 12px; border: 2px solid #3b82f6; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+          <p style="font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; color: #3b82f6;">Initializing System</p>
+        </div>
+        <style>
+          @keyframes spin { to { transform: rotate(360deg); } }
+        </style>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
