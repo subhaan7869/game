@@ -1901,29 +1901,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Dynamic Busyness Rotation
-  useEffect(() => {
-    const rotateBusyness = () => {
-      const modes: ('Low' | 'Medium' | 'High')[] = ['Low', 'Medium', 'High'];
-      // Randomly pick a new mode that is different from current if possible
-      const newMode = modes[Math.floor(Math.random() * modes.length)];
-      setBusynessMode(newMode);
-    };
-
-    // Change every 5 to 10 minutes (300k to 600k ms)
-    const getNextInterval = () => Math.floor(Math.random() * (600000 - 300000 + 1) + 300000);
-    
-    let timerId: NodeJS.Timeout;
-    const scheduleNext = () => {
-      timerId = setTimeout(() => {
-        rotateBusyness();
-        scheduleNext();
-      }, getNextInterval());
-    };
-
-    scheduleNext();
-    return () => clearTimeout(timerId);
-  }, []);
+  // Auto-rotation disabled so it stays on what the user selected in the opportunities view.
 
   // Location & Orders
   const [location, setLocation] = useState<Location | null>({ latitude: 51.5074, longitude: -0.1278 }); // Default to London
@@ -2144,17 +2122,10 @@ export default function App() {
     }
   });
 
-  const [busynessMode, setBusynessMode] = useState<'Low' | 'Medium' | 'High'>(() => {
-    try {
-      const saved = localStorage.getItem('uber_busyness_mode');
-      return (saved as any) || 'High';
-    } catch (e) {
-      return 'High';
-    }
-  });
+  const [busynessMode, setBusynessMode] = useState<'Low' | 'Medium' | 'High'>('Medium');
 
   useEffect(() => {
-    localStorage.setItem('uber_busyness_mode', busynessMode);
+    // We removed localStorage setting here to prevent it getting stuck on high.
   }, [busynessMode]);
 
   useEffect(() => {
@@ -2835,9 +2806,12 @@ export default function App() {
   // Dynamic Surge and Busyness Control
   useEffect(() => {
     const updateSurge = () => {
-      const modeImpact = busynessMode === 'High' ? 0.4 : busynessMode === 'Medium' ? 0.1 : -0.2;
+      const modeTarget = busynessMode === 'High' ? 2.5 : busynessMode === 'Medium' ? 1.5 : 1.0;
       setActiveSurgeAreas(prev => prev.map(area => {
-        const newMultiplier = Math.max(1.1, Number((area.multiplier + (Math.random() - 0.5) * 0.2 + modeImpact).toFixed(1)));
+        // Drift multiplier towards modeTarget
+        const drift = (modeTarget - area.multiplier) * 0.2;
+        const randomNoise = (Math.random() - 0.5) * 0.4;
+        const newMultiplier = Math.max(1.0, Math.min(4.0, Number((area.multiplier + drift + randomNoise).toFixed(1))));
         const trend = newMultiplier > area.multiplier ? 'rising' : (newMultiplier < area.multiplier ? 'falling' : 'stable');
         const newLat = area.lat + (Math.random() - 0.5) * 0.001;
         const newLng = area.lng + (Math.random() - 0.5) * 0.001;
@@ -3056,15 +3030,17 @@ export default function App() {
         
         if (shouldPickScheduled) {
           const sch = scheduledOrders[0];
+          const restLoc = { 
+            latitude: location.latitude + (Math.random() - 0.5) * 0.01, 
+            longitude: location.longitude + (Math.random() - 0.5) * 0.01 
+          };
           newOrder = {
             id: sch.id,
             type: 'delivery',
             restaurantName: sch.restaurantName,
             customerName: "Scheduled Pickup",
-            restaurantLocation: { 
-              latitude: location.latitude + (Math.random() - 0.5) * 0.01, 
-              longitude: location.longitude + (Math.random() - 0.5) * 0.01 
-            },
+            restaurantLocation: restLoc,
+            pickupLocation: restLoc,
             customerLocation: { 
               latitude: location.latitude + (Math.random() - 0.5) * 0.03, 
               longitude: location.longitude + (Math.random() - 0.5) * 0.03 
@@ -3988,30 +3964,41 @@ export default function App() {
                     y: (prev.y || 0) + info.delta.y
                   }));
                 }}
-                className={`absolute inset-0 overflow-hidden cursor-grab active:cursor-grabbing ${isNightMode || theme === 'dark' ? 'bg-[#181818]' : 'bg-[#f0f4f8]'} ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'blur-md grayscale opacity-50 pointer-events-none' : ''}`}
+                className={`absolute inset-0 overflow-hidden cursor-grab active:cursor-grabbing ${isNightMode || theme === 'dark' ? 'bg-[#0e1014]' : 'bg-[#e5e3df]'} ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'blur-md grayscale opacity-50 pointer-events-none' : ''}`}
               >
                 {/* Background Layer (Roads/Blocks Optimized) */}
                 <div className="absolute inset-0 pointer-events-none" style={{ 
                   transform: `translate(${mapOffset.x}px, ${mapOffset.y}px)`,
                   willChange: 'transform'
                 }}>
-                  {/* Roads Grid */}
-                  <div className="absolute inset-[-4000px] opacity-40" style={{ 
+                  {/* Uber-like Road Base */}
+                  <div className="absolute inset-[-4000px] border-none" style={{ backgroundColor: theme === 'dark' || isNightMode ? '#181a1f' : '#f0ece1' }} />
+                  
+                  {/* Fine Road Grid */}
+                  <div className="absolute inset-[-4000px] opacity-100" style={{ 
                     backgroundImage: `
-                      linear-gradient(90deg, ${isNightMode || theme === 'dark' ? '#333' : '#ccc'} ${4 * zoom}px, transparent ${4 * zoom}px),
-                      linear-gradient(${isNightMode || theme === 'dark' ? '#333' : '#ccc'} ${4 * zoom}px, transparent ${4 * zoom}px)
+                      linear-gradient(90deg, ${theme === 'dark' || isNightMode ? '#252830' : '#ffffff'} ${12 * zoom}px, transparent ${12 * zoom}px),
+                      linear-gradient(${theme === 'dark' || isNightMode ? '#252830' : '#ffffff'} ${12 * zoom}px, transparent ${12 * zoom}px)
                     `,
-                    backgroundSize: `${150 * zoom}px ${150 * zoom}px`
+                    backgroundSize: `${160 * zoom}px ${160 * zoom}px`
+                  }} />
+                  
+                  {/* Major Arterial Roads */}
+                  <div className="absolute inset-[-4000px] opacity-100" style={{ 
+                    backgroundImage: `
+                      linear-gradient(90deg, ${theme === 'dark' || isNightMode ? '#303440' : '#ffffff'} ${18 * zoom}px, transparent ${18 * zoom}px),
+                      linear-gradient(${theme === 'dark' || isNightMode ? '#303440' : '#ffffff'} ${18 * zoom}px, transparent ${18 * zoom}px)
+                    `,
+                    backgroundSize: `${640 * zoom}px ${640 * zoom}px`
                   }} />
                   
                   {/* Buildings Grid */}
-                  <div className="absolute inset-[-4000px] opacity-25" style={{ 
+                  <div className="absolute inset-[-4000px] opacity-[0.3]" style={{ 
                     backgroundImage: `
-                      linear-gradient(45deg, ${theme === 'dark' ? '#444' : '#ddd'} 25%, transparent 25%, transparent 75%, ${theme === 'dark' ? '#444' : '#ddd'} 75%, ${theme === 'dark' ? '#444' : '#ddd'}),
-                      radial-gradient(circle, ${theme === 'dark' ? '#333' : '#ccc'} 20%, transparent 20%)
+                      linear-gradient(45deg, ${theme === 'dark' || isNightMode ? '#1a1c22' : '#e4e1d5'} 25%, transparent 25%, transparent 75%, ${theme === 'dark' || isNightMode ? '#1a1c22' : '#e4e1d5'} 75%, ${theme === 'dark' || isNightMode ? '#1a1c22' : '#e4e1d5'})
                     `,
-                    backgroundSize: `${80 * zoom}px ${80 * zoom}px, ${50 * zoom}px ${50 * zoom}px`,
-                    backgroundPosition: `0 0, ${15 * zoom}px ${15 * zoom}px`
+                    backgroundSize: `${80 * zoom}px ${80 * zoom}px`,
+                    backgroundPosition: `0 0`
                   }} />
                 </div>
                 
@@ -4074,23 +4061,11 @@ export default function App() {
                   )}
                 </AnimatePresence>
 
-                {/* Buildings & Blocks */}
-                <div className="absolute inset-0 opacity-25" style={{ 
-                  backgroundImage: `
-                    linear-gradient(45deg, ${theme === 'dark' ? '#444' : '#ddd'} 25%, transparent 25%, transparent 75%, ${theme === 'dark' ? '#444' : '#ddd'} 75%, ${theme === 'dark' ? '#444' : '#ddd'}),
-                    linear-gradient(45deg, ${theme === 'dark' ? '#444' : '#ddd'} 25%, transparent 25%, transparent 75%, ${theme === 'dark' ? '#444' : '#ddd'} 75%, ${theme === 'dark' ? '#444' : '#ddd'}),
-                    radial-gradient(circle, ${theme === 'dark' ? '#333' : '#ccc'} 20%, transparent 20%)
-                  `,
-                  backgroundSize: `${80 * zoom}px ${80 * zoom}px, ${80 * zoom}px ${80 * zoom}px, ${50 * zoom}px ${50 * zoom}px`,
-                  backgroundPosition: `0 0, ${40 * zoom}px ${40 * zoom}px, ${15 * zoom}px ${15 * zoom}px`,
-                  transform: location ? `translate(${(location.longitude * BUILDING_SCALE + mapOffset.x) % (80 * zoom)}px, ${(location.latitude * BUILDING_SCALE + mapOffset.y) % (80 * zoom)}px)` : 'none'
-                }} />
-                
                 {/* Parks/Green areas */}
-                <div className="absolute inset-0 opacity-15" style={{ 
-                  backgroundImage: 'radial-gradient(circle, #2d5a27 15%, transparent 85%), radial-gradient(circle, #1e3a1a 10%, transparent 70%)',
-                  backgroundSize: `${500 * zoom}px ${500 * zoom}px, ${400 * zoom}px ${400 * zoom}px`,
-                  transform: location ? `translate(${(location.longitude * PARK_SCALE + mapOffset.x) % (500 * zoom)}px, ${(location.latitude * PARK_SCALE + mapOffset.y) % (500 * zoom)}px)` : 'none'
+                <div className="absolute inset-0 opacity-20" style={{ 
+                  backgroundImage: `radial-gradient(circle, ${theme === 'dark' ? '#1d3a33' : '#a3d9a5'} 25%, transparent 85%), radial-gradient(circle, ${theme === 'dark' ? '#142a24' : '#88c98a'} 15%, transparent 70%)`,
+                  backgroundSize: `${600 * zoom}px ${600 * zoom}px, ${500 * zoom}px ${500 * zoom}px`,
+                  transform: location ? `translate(${(location.longitude * PARK_SCALE + mapOffset.x) % (600 * zoom)}px, ${(location.latitude * PARK_SCALE + mapOffset.y) % (600 * zoom)}px)` : 'none'
                 }} />
 
                 {/* Surge Zones Visualization */}
