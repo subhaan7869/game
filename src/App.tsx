@@ -175,9 +175,9 @@ const ScanningScreen = () => (
 );
 
 
-const Heatmap = ({ busynessMode }: { busynessMode: 'Low' | 'Medium' | 'High' }) => {
+const Heatmap = ({ busynessMode, isLowPerformance }: { busynessMode: 'Low' | 'Medium' | 'High', isLowPerformance?: boolean }) => {
   const intensity = busynessMode === 'High' ? 1 : busynessMode === 'Medium' ? 0.6 : 0.3;
-  if (intensity < 0.4) return null; // Don't show heatmap in low busyness
+  if (intensity < 0.4 || isLowPerformance) return null; // Disable heatmap on low-perf devices
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-[5]">
@@ -692,7 +692,8 @@ const NewUserForm = ({
   user,
   setUser,
   setCurrentScreen,
-  sendNotification
+  sendNotification,
+  setHasSeenOnboarding
 }: { 
   newUserDetails: any, 
   setNewUserDetails: React.Dispatch<React.SetStateAction<any>>,
@@ -701,7 +702,8 @@ const NewUserForm = ({
   user: UserProfile,
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
   setCurrentScreen: (screen: AppScreen) => void,
-  sendNotification: (title: string, body: string) => void
+  sendNotification: (title: string, body: string) => void,
+  setHasSeenOnboarding: (val: boolean) => void
 }) => (
   <div className="fixed inset-0 z-[500] flex items-center justify-center p-6">
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
@@ -781,6 +783,8 @@ const NewUserForm = ({
               await setDoc(doc(db, 'users', uid), newUserProfile);
               setUser(newUserProfile);
               setIsNewUserFormOpen(false);
+              setHasSeenOnboarding(true);
+              localStorage.setItem('uber_has_seen_onboarding', 'true');
               setCurrentScreen('home');
               sendNotification("Account Created", `Welcome to Uber Eats, ${newUserDetails.name}!`);
             } catch (error) {
@@ -1521,6 +1525,8 @@ const DeliveryVerificationModal = ({
   onComplete: () => void,
   onClose: () => void
 }) => {
+  const vMethod = order.verificationMethod || (order.pin ? 'pin' : 'none');
+
   return (
     <motion.div 
       initial={{ y: '100%' }}
@@ -1536,68 +1542,89 @@ const DeliveryVerificationModal = ({
       </div>
 
       <div className="flex-1 p-6 flex flex-col">
-        <div className="text-center mb-10">
-          <h3 className="font-black text-2xl mb-2">{order.customerName}</h3>
-          <p className="text-gray-500 font-bold">Ask customer for the 4-digit PIN</p>
-          <div className="mt-2 inline-block px-4 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-black uppercase tracking-widest">
-            Customer's PIN: {order.pin}
-          </div>
-        </div>
-        
-        <div className="flex gap-2 justify-center mb-4">
-          {[0, 1, 2, 3].map(i => (
-            <div key={i} className={`w-10 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-black transition-all ${enteredPin[i] ? 'border-black bg-white shadow-lg' : 'border-gray-100 bg-gray-50'}`}>
-              {enteredPin[i] || ""}
+        {vMethod === 'pin' && (
+          <div className="text-center mb-10">
+            <h3 className="font-black text-2xl mb-2">{order.customerName}</h3>
+            <p className="text-gray-500 font-bold">Ask customer for the 4-digit PIN</p>
+            <div className="mt-2 inline-block px-4 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-black uppercase tracking-widest">
+              Customer's PIN: {order.pin}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
 
-        <div className="grid grid-cols-3 gap-1.5 max-w-[240px] mx-auto mb-4">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(val => (
-            <button 
-              key={val}
-              onClick={() => {
-                if (enteredPin.length < 4) {
-                  setEnteredPin(enteredPin + val);
-                  if (enteredPin.length === 3 && (enteredPin + val) === order.pin) {
-                    setTimeout(onComplete, 300); // Auto-confirm on correct pin
+        {vMethod === 'photo' && (
+          <div className="text-center mb-10">
+            <h3 className="font-black text-2xl mb-2">{order.customerName}</h3>
+            <p className="text-gray-500 font-bold">Photo required for verification</p>
+            <div className="mt-4 w-full aspect-video bg-gray-100 rounded-3xl flex flex-col items-center justify-center border-2 border-dashed border-gray-200">
+               {isPhotoCaptured ? <div className="text-green-500 flex flex-col items-center"><CheckCircle2 size={48} /><span className="mt-2 text-xs font-black uppercase">Captured</span></div> : <Camera size={48} className="text-gray-300" />}
+            </div>
+          </div>
+        )}
+
+        {vMethod === 'none' && (
+           <div className="text-center mb-10">
+            <h3 className="font-black text-2xl mb-2">{order.customerName}</h3>
+            <p className="text-gray-500 font-bold italic">No physical verification required for this dropoff.</p>
+            <div className="mt-8 p-6 bg-green-50 rounded-3xl flex items-center justify-center">
+               <Check size={48} className="text-green-500" />
+            </div>
+          </div>
+        )}
+        
+        {vMethod === 'pin' && (
+          <>
+            <div className="flex gap-2 justify-center mb-4">
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className={`w-10 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-black transition-all ${enteredPin[i] ? 'border-black bg-white shadow-lg' : 'border-gray-100 bg-gray-50'}`}>
+                  {enteredPin[i] || ""}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 max-w-[240px] mx-auto mb-4">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(val => (
+                <button 
+                  key={val}
+                  onClick={() => {
+                    if (enteredPin.length < 4) {
+                      setEnteredPin(enteredPin + val);
+                      if (enteredPin.length === 3 && (enteredPin + val) === order.pin) {
+                        setTimeout(onComplete, 300);
+                      }
+                    }
+                  }}
+                  className="h-10 bg-gray-50 rounded-lg font-black text-lg active:scale-90 transition-transform border border-gray-100"
+                >
+                  {val}
+                </button>
+              ))}
+              <button onClick={() => setEnteredPin("")} className="h-10 bg-red-50 text-red-500 rounded-lg font-black text-sm active:scale-90 transition-transform border border-red-100">CLR</button>
+              <button 
+                onClick={() => {
+                  if (enteredPin.length < 4) setEnteredPin(enteredPin + "0");
+                  if (enteredPin.length === 3 && (enteredPin + "0") === order.pin) {
+                    setTimeout(onComplete, 300);
                   }
-                }
-              }}
-              className="h-10 bg-gray-50 rounded-lg font-black text-lg active:scale-90 transition-transform border border-gray-100"
-            >
-              {val}
-            </button>
-          ))}
-          <button 
-            onClick={() => setEnteredPin("")}
-            className="h-10 bg-red-50 text-red-500 rounded-lg font-black text-sm active:scale-90 transition-transform border border-red-100 flex items-center justify-center"
-          >
-            CLR
-          </button>
-          <button 
-            onClick={() => {
-              if (enteredPin.length < 4) setEnteredPin(enteredPin + "0");
-              if (enteredPin.length === 3 && (enteredPin + "0") === order.pin) {
-                setTimeout(onComplete, 300);
-              }
-            }}
-            className="h-10 bg-gray-50 rounded-lg font-black text-lg active:scale-90 transition-transform border border-gray-100"
-          >
-            0
-          </button>
-          <button 
-            onClick={() => {
-              if (enteredPin.length === 4) onComplete();
-            }}
-            className={`h-10 rounded-lg flex items-center justify-center active:scale-90 transition-transform border ${enteredPin.length === 4 ? 'bg-green-600 text-white border-green-700 shadow-lg' : 'bg-gray-50 text-gray-300 border-gray-100'}`}
-          >
-            <Check size={20} strokeWidth={4} />
-          </button>
-        </div>
+                }}
+                className="h-10 bg-gray-50 rounded-lg font-black text-lg active:scale-90 transition-transform border border-gray-100"
+              >
+                0
+              </button>
+              <button 
+                onClick={() => {
+                  if (enteredPin.length === 4) onComplete();
+                }}
+                className={`h-10 rounded-lg flex items-center justify-center active:scale-90 transition-transform border ${enteredPin.length === 4 ? 'bg-green-600 text-white border-green-700 shadow-lg' : 'bg-gray-50 text-gray-300 border-gray-100'}`}
+              >
+                <Check size={20} strokeWidth={4} />
+              </button>
+            </div>
+          </>
+        )}
 
         <div className="mt-auto space-y-3">
-          {(enteredPin.length === 4 || isPhotoCaptured) && (
+          {(enteredPin.length === 4 || isPhotoCaptured || vMethod === 'none') && (
             <motion.button 
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -1605,20 +1632,103 @@ const DeliveryVerificationModal = ({
               className="w-full py-4 bg-green-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2"
             >
               <ShieldCheck size={20} />
-              {isPhotoCaptured ? 'CONFIRM PHOTO DELIVERY' : 'CONFIRM DELIVERY'}
+              CONFIRM DELIVERY
             </motion.button>
           )}
           
-          <button 
-            onClick={() => {
-              setIsPhotoCaptured(true);
-            }}
-            className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-2 ${isPhotoCaptured ? 'bg-green-100 text-green-600 border-2 border-green-500' : 'bg-gray-100 text-black'}`}
-          >
-            {isPhotoCaptured ? <Check size={18} /> : <Camera size={18} />}
-            {isPhotoCaptured ? 'Photo Captured' : 'Take a photo instead'}
-          </button>
+          {vMethod === 'photo' && !isPhotoCaptured && (
+            <button 
+              onClick={() => setIsPhotoCaptured(true)}
+              className="w-full py-4 bg-black text-white rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-2"
+            >
+              <Camera size={18} />
+              Take Photo
+            </button>
+          )}
+
+          {vMethod === 'pin' && (
+             <button 
+              onClick={() => setIsPhotoCaptured(true)}
+              className="w-full py-4 bg-gray-100 text-black rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-transform flex items-center justify-center gap-2"
+            >
+              <Camera size={18} />
+              Take a photo instead
+            </button>
+          )}
         </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const ReceiptScanModal = ({ 
+  order, 
+  onVerify, 
+  onClose,
+  isVerifying
+}: { 
+  order: Order, 
+  onVerify: (imageBase64: string) => void, 
+  onClose: () => void,
+  isVerifying: boolean
+}) => {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  
+  useEffect(() => {
+    const startCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      } catch (err) {
+        console.error("Camera error:", err);
+      }
+    };
+    startCamera();
+    return () => {
+      if (videoRef.current?.srcObject) {
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+      }
+    };
+  }, []);
+
+  const captureAndVerify = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0);
+        onVerify(canvas.toDataURL('image/jpeg'));
+      }
+    }
+  };
+
+  return (
+    <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="absolute inset-0 z-[5000] bg-black text-white flex flex-col">
+      <div className="p-6 flex items-center justify-between border-b border-white/10">
+        <h2 className="text-xl font-black">Scan Receipt</h2>
+        <button onClick={onClose} className="p-2 bg-white/10 rounded-full"><X size={24} /></button>
+      </div>
+      <div className="flex-1 p-6 flex flex-col items-center">
+        <p className="text-gray-400 font-bold mb-6 text-center">Scan the physical Uber Eats receipt to confirm you've picked up the correct order.</p>
+        <div className="w-full aspect-[3/4] bg-gray-900 rounded-3xl overflow-hidden relative border-2 border-dashed border-gray-700">
+           <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+           <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none" />
+           <motion.div 
+             animate={{ y: ['0%', '100%', '0%'] }}
+             transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+             className="absolute inset-x-0 h-1 bg-green-500 shadow-[0_0_20px_rgba(34,197,94,1)]"
+           />
+        </div>
+        <button 
+          onClick={captureAndVerify}
+          disabled={isVerifying}
+          className="mt-8 w-full py-5 bg-white text-black rounded-2xl font-black text-xl flex items-center justify-center gap-3 active:scale-95 transition-all"
+        >
+          {isVerifying ? <RefreshCw className="animate-spin" /> : <Camera />}
+          {isVerifying ? 'VERIFYING...' : 'CAPTURE RECEIPT'}
+        </button>
       </div>
     </motion.div>
   );
@@ -1789,8 +1899,12 @@ export default function App() {
   // App State
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(() => {
     try {
+      const hasSeen = localStorage.getItem('uber_has_seen_onboarding') === 'true';
+      if (!hasSeen) return 'onboarding';
       const saved = localStorage.getItem('uber_current_screen');
-      return (saved as AppScreen) || 'onboarding';
+      const screen = (saved as AppScreen) || 'home';
+      if (['onboarding', 'documents', 'face_verification'].includes(screen)) return 'home';
+      return screen;
     } catch (e) {
       return 'onboarding';
     }
@@ -1964,10 +2078,17 @@ export default function App() {
   });
 
   // New Maintenance/Update States
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [updateProgress, setUpdateProgress] = useState(0);
+  const [isLowPerformance, setIsLowPerformance] = useState(() => {
+    const ua = navigator.userAgent;
+    return /iPhone/i.test(ua) && (/6s/i.test(ua) || /iPhone 8/i.test(ua));
+  });
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(() => localStorage.getItem('uber_has_seen_onboarding') === 'true');
   const [isScanning, setIsScanning] = useState(false);
   const [isUnderMaintenance, setIsUnderMaintenance] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [isScanningReceipt, setIsScanningReceipt] = useState<string | null>(null);
+  const [isVerifyingReceipt, setIsVerifyingReceipt] = useState(false);
 
   // Persist theme and earnings
   useEffect(() => {
@@ -2233,7 +2354,8 @@ export default function App() {
   useEffect(() => {
     if (location) {
       const generateHotspots = () => {
-        const newHotspots = Array.from({ length: 15 }).map(() => ({
+        const hCount = isLowPerformance ? 5 : 15;
+        const newHotspots = Array.from({ length: hCount }).map(() => ({
           latitude: location.latitude + (Math.random() - 0.5) * 0.05,
           longitude: location.longitude + (Math.random() - 0.5) * 0.05,
           intensity: 0.4 + Math.random() * 0.6,
@@ -2956,6 +3078,9 @@ export default function App() {
       
       const pay = (finalBasePay + (Math.random() * 2)) * activeSurge * (isStacked ? 1.7 : 1);
 
+      const verificationMethod = (['pin', 'photo', 'none'] as const)[Math.floor(Math.random() * 3)];
+      const receiptRequired = type === 'delivery' && Math.random() < 0.7; // 70% chance for receipt scan
+
       return {
         id: Math.random().toString(36).substring(2, 11),
         type,
@@ -2975,7 +3100,10 @@ export default function App() {
         riderRating: type === 'ride' ? Number((4.6 + Math.random() * 0.4).toFixed(2)) : undefined,
         isUberX: type === 'ride',
         isStacked,
-        batchCount
+        batchCount,
+        verificationMethod,
+        receiptRequired,
+        receiptVerified: false
       } as Order;
     });
 
@@ -3186,21 +3314,69 @@ export default function App() {
     }, 2000 + Math.random() * 2000);
   };
 
+  const handleVerifyReceipt = async (orderId: string, imageBase64: string) => {
+    setIsVerifyingReceipt(true);
+    try {
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
+      const prompt = "Analyze this image. Is it a receipt from Uber Eats? Answer strictly 'true' or 'false'. We are verifying it for a driver app.";
+      const imagePart = {
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: imageBase64.split(',')[1],
+        },
+      };
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: { parts: [imagePart, { text: prompt }] },
+      });
+      
+      const isReceipt = response.text ? response.text.toLowerCase().includes('true') : false;
+      if (isReceipt) {
+        setActiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'picked_up', receiptVerified: true } : o));
+        setIsScanningReceipt(null);
+        sendNotification("Receipt Verified", "Order confirmed. Heading to customer.");
+        playUberSound('accept');
+      } else {
+        sendNotification("Invalid Receipt", "The scanned image does not appear to be an Uber Eats receipt. Please try again or find a clearer view.");
+      }
+    } catch (error) {
+      console.error("Receipt verification failed:", error);
+      // Fallback for demo
+      sendNotification("Receipt Verification", "Scanning completed. Proceeding to delivery.");
+      setActiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'picked_up', receiptVerified: true } : o));
+      setIsScanningReceipt(null);
+    } finally {
+      setIsVerifyingReceipt(false);
+    }
+  };
+
   const handleNextStep = (orderId: string) => {
     const order = activeOrders.find(o => o.id === orderId);
     if (!order) return;
 
     if (order.status === 'accepted') {
-      setActiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'picked_up' } : o));
-      const msg = order.type === 'ride' ? `Rider ${order.customerName} picked up` : `Order from ${order.restaurantName} picked up`;
-      sendNotification(order.type === 'ride' ? "Trip Started" : "Order Picked Up", msg);
-      playUberSound('accept');
-    } else if (order.status === 'picked_up') {
-      if (order.type === 'ride') {
-        handleCompleteDelivery(orderId); // Rides don't usually need PIN/Photo for this demo
+      if (order.type === 'delivery' && order.receiptRequired && !order.receiptVerified) {
+        setIsScanningReceipt(orderId);
+        setActiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'scanning_receipt' } : o));
       } else {
-        setVerifyingDeliveryId(orderId);
+        setActiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'picked_up' } : o));
+        const msg = order.type === 'ride' ? `Rider ${order.customerName} picked up` : `Order from ${order.restaurantName} picked up`;
+        sendNotification(order.type === 'ride' ? "Trip Started" : "Order Picked Up", msg);
+        playUberSound('accept');
       }
+    } else if (order.status === 'scanning_receipt') {
+        setIsScanningReceipt(orderId);
+    } else if (order.status === 'picked_up') {
+      setActiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'arriving' as any } : o));
+      setIsSimulatingMovement(true);
+      setIsNavigating(true);
+    } else if (order.status === 'arriving' || order.status === 'arrived') {
+       if (order.verificationMethod === 'none') {
+         handleCompleteDelivery(orderId);
+       } else {
+         setVerifyingDeliveryId(orderId);
+       }
     }
   };
 
@@ -3392,6 +3568,8 @@ export default function App() {
         // Mark as verified and go home
         setUser(u => ({ ...u, faceVerified: true }));
         setIsVerifying(false);
+        setHasSeenOnboarding(true);
+        localStorage.setItem('uber_has_seen_onboarding', 'true');
         setTimeout(() => {
           setCurrentScreen('home');
           if (isVerifyingToOnline) {
@@ -3792,7 +3970,7 @@ export default function App() {
               </div>
               
                   {/* Heatmap Simulation */}
-                  {user.isOnline && !isNavigating && <Heatmap busynessMode={busynessMode} />}
+                  {user.isOnline && !isNavigating && <Heatmap busynessMode={busynessMode} isLowPerformance={isLowPerformance} />}
               {/* Matching / Trip Request Overlay */}
               <AnimatePresence>
                 {pendingOrder && (
@@ -4003,7 +4181,7 @@ export default function App() {
                 </div>
                 
                 {/* Traffic Lines (Simulated) */}
-                {location && trafficSegments.map((seg, i) => {
+                {location && !isLowPerformance && trafficSegments.map((seg, i) => {
                   const x1 = (seg.start.longitude - location.longitude) * MAP_SCALE;
                   const y1 = (location.latitude - seg.start.latitude) * MAP_SCALE;
                   const x2 = (seg.end.longitude - location.longitude) * MAP_SCALE;
@@ -4069,7 +4247,7 @@ export default function App() {
                 }} />
 
                 {/* Surge Zones Visualization */}
-                {location && activeSurgeAreas.map((area, i) => {
+                {location && !isLowPerformance && activeSurgeAreas.map((area, i) => {
                   const x = area.lng * MAP_SCALE + mapOffset.x;
                   const y = -area.lat * MAP_SCALE + mapOffset.y;
                   return (
@@ -4099,7 +4277,7 @@ export default function App() {
                 })}
 
                 {/* Hotspots (Busy Areas) */}
-                {location && hotspots.map((spot, i) => {
+                {location && !isLowPerformance && hotspots.map((spot, i) => {
                   const x = (spot.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
                   const y = (location.latitude - spot.latitude) * MAP_SCALE + mapOffset.y;
                   return (
@@ -5506,15 +5684,35 @@ export default function App() {
                     onComplete={() => {
                       const order = activeOrders.find(o => o.id === verifyingDeliveryId);
                       if (order) {
-                        if (enteredPin === order.pin || isPhotoCaptured) {
+                        const vMethod = order.verificationMethod || (order.pin ? 'pin' : 'none');
+                        if (vMethod === 'pin' && enteredPin === order.pin) {
                           handleCompleteDelivery(order.id);
-                        } else if (enteredPin.length === 4) {
+                        } else if (vMethod === 'photo' && isPhotoCaptured) {
+                           handleCompleteDelivery(order.id);
+                        } else if (vMethod === 'none') {
+                           handleCompleteDelivery(order.id);
+                        } else if (vMethod === 'pin' && enteredPin.length === 4) {
                           sendNotification("Invalid PIN", "The PIN you entered is incorrect. Please try again.");
                           setEnteredPin("");
                         }
                       }
                     }}
                     onClose={() => setVerifyingDeliveryId(null)}
+                  />
+                )}
+              </AnimatePresence>
+
+              {/* Receipt Scan Modal */}
+              <AnimatePresence>
+                {isScanningReceipt && activeOrders.find(o => o.id === isScanningReceipt) && (
+                  <ReceiptScanModal 
+                    order={activeOrders.find(o => o.id === isScanningReceipt)!}
+                    isVerifying={isVerifyingReceipt}
+                    onVerify={(img) => handleVerifyReceipt(isScanningReceipt, img)}
+                    onClose={() => {
+                      setIsScanningReceipt(null);
+                      setActiveOrders(prev => prev.map(o => o.id === isScanningReceipt ? { ...o, status: 'accepted' } : o));
+                    }}
                   />
                 )}
               </AnimatePresence>
@@ -6653,6 +6851,7 @@ export default function App() {
             setUser={setUser}
             setCurrentScreen={setCurrentScreen}
             sendNotification={sendNotification}
+            setHasSeenOnboarding={setHasSeenOnboarding}
           />
         )}
 

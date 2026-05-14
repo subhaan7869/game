@@ -15,7 +15,7 @@ export interface Order {
   estimatedPay: number;
   estimatedDistance: number;
   estimatedTime: number;
-  status: 'pending' | 'accepted' | 'picked_up' | 'delivered' | 'en_route_to_pickup' | 'on_ride' | 'arrived' | 'returning_to_restaurant';
+  status: 'pending' | 'accepted' | 'picked_up' | 'delivered' | 'en_route_to_pickup' | 'on_ride' | 'arriving' | 'arrived' | 'returning_to_restaurant' | 'scanning_receipt';
   customerName: string;
   items?: string[];
   pin?: string;
@@ -24,6 +24,9 @@ export interface Order {
   riderRating?: number;
   isStacked?: boolean;
   batchCount?: number;
+  verificationMethod?: 'photo' | 'pin' | 'none';
+  receiptRequired?: boolean;
+  receiptVerified?: boolean;
 }
 
 export interface ChatMessage {

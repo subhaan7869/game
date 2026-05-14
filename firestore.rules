@@ -66,11 +66,11 @@ service cloud.firestore {
     }
 
     function isValidCarPlaySync(data) {
-      return data.driverUid is string && data.driverUid == request.auth.uid &&
-             data.isActive is bool &&
-             (!('activeOrderId' in data) || (data.activeOrderId is string || data.activeOrderId == null)) &&
-             (!('isNavigating' in data) || (data.isNavigating is bool)) &&
-             (!('lastUpdated' in data) || (data.lastUpdated is timestamp));
+      return data.get('driverUid', '') == request.auth.uid &&
+             data.get('isActive', false) is bool &&
+             (data.get('activeOrderId', null) == null || data.get('activeOrderId', null) is string) &&
+             data.get('isNavigating', false) is bool &&
+             (data.get('lastUpdated', request.time) is timestamp);
     }
 
     // ===============================================================
@@ -103,12 +103,13 @@ service cloud.firestore {
     }
 
     match /carplay_sync/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
       allow list: if isAdmin();
       
-      allow create: if isOwner(userId) && isValidCarPlaySync(incoming());
+      allow create: if isValidId(userId) && isOwner(userId) && isValidCarPlaySync(incoming()) &&
+                    incoming().keys().hasAll(['driverUid', 'isActive']);
       
-      allow update: if isOwner(userId) && isValidCarPlaySync(incoming()) &&
+      allow update: if isValidId(userId) && isOwner(userId) && isValidCarPlaySync(incoming()) &&
                     !affectedKeys().hasAny(['driverUid']);
       
       allow delete: if isAdmin();
