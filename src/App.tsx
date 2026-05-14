@@ -832,7 +832,7 @@ const NewUserForm = ({
   </div>
 );
 
-const PersonalDetailsModal = ({ 
+const PersonalDetailsScreen = ({ 
   user,
   setUser,
   onClose,
@@ -861,61 +861,76 @@ const PersonalDetailsModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={`w-full max-w-md rounded-[40px] p-8 shadow-2xl relative z-10 ${theme === 'dark' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black'}`}>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-3xl font-black">Details</h2>
-          <button onClick={onClose} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><X size={20} /></button>
+    <motion.div 
+      initial={{ x: '100%' }} 
+      animate={{ x: 0 }} 
+      exit={{ x: '100%' }} 
+      className={`fixed inset-0 z-[500] flex flex-col ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
+    >
+      <div className="p-6 flex items-center gap-4 border-b border-gray-100 dark:border-white/5">
+        <button onClick={onClose} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={24} /></button>
+        <h1 className="text-3xl font-black">Personal Info</h1>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex flex-col items-center py-8">
+            <div className={`w-32 h-32 rounded-full overflow-hidden border-4 shadow-xl mb-4 ${theme === 'dark' ? 'border-white/10' : 'border-white'}`}>
+                <img src={user.profilePic || "https://picsum.photos/seed/driver/200/200"} alt="Me" className="w-full h-full object-cover" />
+            </div>
+            <button className="text-blue-500 font-bold text-sm">Change Photo</button>
         </div>
-        
-        <div className="space-y-4 mb-8">
+
+        <div className="space-y-4">
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Full Name</label>
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2 tracking-widest">Full Name</label>
             <input 
               type="text" 
-              className={`w-full p-4 rounded-2xl border-none font-bold ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}
+              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
               value={editedUser.name}
               onChange={e => setEditedUser({...editedUser, name: e.target.value})}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Phone</label>
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2 tracking-widest">Phone Number</label>
             <input 
               type="tel" 
-              className={`w-full p-4 rounded-2xl border-none font-bold ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}
+              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
               value={editedUser.phone || ''}
               onChange={e => setEditedUser({...editedUser, phone: e.target.value})}
+              placeholder="+1 234 567 8900"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Date of Birth</label>
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2 tracking-widest">Date of Birth</label>
             <input 
               type="date" 
-              className={`w-full p-4 rounded-2xl border-none font-bold ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}
+              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
               value={editedUser.dob || ''}
               onChange={e => setEditedUser({...editedUser, dob: e.target.value})}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Home Address</label>
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2 tracking-widest">Residential Address</label>
             <input 
               type="text" 
-              className={`w-full p-4 rounded-2xl border-none font-bold ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}
+              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
               value={editedUser.address || ''}
               onChange={e => setEditedUser({...editedUser, address: e.target.value})}
+              placeholder="123 Driver St, City, Country"
             />
           </div>
         </div>
+      </div>
 
+      <div className="p-6 border-t border-gray-100 dark:border-white/5">
         <button 
           onClick={handleSave}
-          className="w-full py-4 bg-black text-white dark:bg-white dark:text-black rounded-2xl font-black shadow-xl active:scale-95 transition-transform"
+          className="w-full py-5 bg-black text-white dark:bg-white dark:text-black rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform"
         >
           SAVE CHANGES
         </button>
-      </motion.div>
-    </div>
+      </div>
+    </motion.div>
   );
 };
 
@@ -5851,18 +5866,6 @@ export default function App() {
                 )}
               </AnimatePresence>
 
-              <AnimatePresence>
-                {isPersonalDetailsOpen && (
-                  <PersonalDetailsModal 
-                    user={user}
-                    setUser={setUser}
-                    onClose={() => setIsPersonalDetailsOpen(false)}
-                    sendNotification={sendNotification}
-                    theme={theme}
-                  />
-                )}
-              </AnimatePresence>
-
               {/* Pending Order Modal */}
               <AnimatePresence>
                 {pendingOrder && (
@@ -5916,6 +5919,18 @@ export default function App() {
               </AnimatePresence>
             </motion.div>
           )}
+
+          <AnimatePresence>
+            {currentScreen === 'personal_details' && (
+              <PersonalDetailsScreen 
+                user={user}
+                setUser={setUser}
+                onClose={() => setCurrentScreen('account')}
+                sendNotification={sendNotification}
+                theme={theme}
+              />
+            )}
+          </AnimatePresence>
 
           {currentScreen === 'chat' && (
             <motion.div key="chat" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="fixed inset-0 z-[1000] bg-white text-black flex flex-col">
@@ -6599,7 +6614,7 @@ export default function App() {
               </div>
               <div className="space-y-2">
                 {[
-                  { icon: <User />, label: "Personal Information", action: () => setIsPersonalDetailsOpen(true) },
+                  { icon: <User />, label: "Personal Information", action: () => setCurrentScreen('personal_details') },
                   { icon: <CarIcon />, label: "Vehicle Details", action: () => setCurrentScreen('vehicle_details') },
                   { icon: <CreditCard />, label: "Payment", action: () => setCurrentScreen('payment_methods') },
                   { icon: <History />, label: "Trip History", action: () => setCurrentScreen('trip_history') },

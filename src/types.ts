@@ -46,7 +46,7 @@ export interface ScheduledOrder {
   estimatedPay: number;
 }
 
-export type AppScreen = 'onboarding' | 'documents' | 'face_verification' | 'home' | 'earnings' | 'inbox' | 'account' | 'chat' | 'uber_pro' | 'wallet' | 'opportunities' | 'safety' | 'earnings_detail' | 'banking' | 'scheduled_orders' | 'rewards' | 'carplay_dashboard' | 'trip_history' | 'work_hub' | 'ratings' | 'planner' | 'uber_services' | 'vehicle_details' | 'payment_methods' | 'trip_preferences';
+export type AppScreen = 'onboarding' | 'documents' | 'face_verification' | 'home' | 'earnings' | 'inbox' | 'account' | 'chat' | 'uber_pro' | 'wallet' | 'opportunities' | 'safety' | 'earnings_detail' | 'banking' | 'scheduled_orders' | 'rewards' | 'carplay_dashboard' | 'trip_history' | 'work_hub' | 'ratings' | 'planner' | 'uber_services' | 'vehicle_details' | 'payment_methods' | 'trip_preferences' | 'personal_details';
 
 export interface CompletedTrip {
   id: string;

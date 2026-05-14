@@ -47,6 +47,9 @@ service cloud.firestore {
       return data.uid == request.auth.uid &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              (!('email' in data) || (data.email is string && data.email.size() < 100)) &&
+             (!('dob' in data) || (data.dob is string && data.dob.size() <= 20)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
+             (!('address' in data) || (data.address is string && data.address.size() <= 300)) &&
              (!('deliveries' in data) || (data.deliveries is number && data.deliveries >= 0)) &&
              (!('walletBalance' in data) || (data.walletBalance is number && data.walletBalance >= 0));
     }
