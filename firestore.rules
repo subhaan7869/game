@@ -44,8 +44,8 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return data.uid == request.auth.uid &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             (!('uid' in data) || data.uid is string) &&
              (!('email' in data) || (data.email is string && data.email.size() < 100)) &&
              (!('dob' in data) || (data.dob is string && data.dob.size() <= 20)) &&
              (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
@@ -86,15 +86,11 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow get: if isAuthenticated();
+      allow read: if true;
       allow list: if isAdmin();
       
-      allow create: if isOwner(userId) && isValidUser(incoming()) && 
-                    incoming().keys().hasAll(['uid', 'name']);
-      
-      allow update: if (isOwner(userId) || isAdmin()) && 
-                    isValidUser(incoming()) &&
-                    !affectedKeys().hasAny(['uid', 'role']);
+      allow create, update: if isValidUser(incoming());
+      allow delete: if isAdmin();
     }
 
     match /scheduled_orders/{orderId} {

@@ -841,28 +841,19 @@ const PersonalDetailsScreen = ({
   onClose,
   sendNotification,
   theme,
-  firebaseUser,
-  onSignIn
 }: { 
   user: UserProfile,
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
   onClose: () => void,
   sendNotification: (title: string, body: string) => void,
   theme: 'light' | 'dark',
-  firebaseUser: any,
-  onSignIn: () => void
 }) => {
   const [editedUser, setEditedUser] = useState({...user});
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = async () => {
-    const uid = auth.currentUser?.uid || user.uid || firebaseUser?.uid;
-    if (!uid) {
-      console.error("No UID found for user", { authUid: auth.currentUser?.uid, userUid: user.uid, fbUid: firebaseUser?.uid });
-      sendNotification("Error", "Authentication required. Please sign in again.");
-      return;
-    }
+    const uid = auth.currentUser?.uid || user.uid || 'driver_123';
     
     setIsSaving(true);
     try {
@@ -874,7 +865,7 @@ const PersonalDetailsScreen = ({
     } catch (error) {
       console.error("Save error:", error);
       if (error instanceof Error && error.message.includes("insufficient permissions")) {
-        sendNotification("Error", "Permission denied. Please try re-signing in.");
+        sendNotification("Error", "Permission denied. Firestore rules might be blocking this.");
       } else {
         sendNotification("Error", "Could not save profile. Check your connection.");
       }
@@ -975,18 +966,10 @@ const PersonalDetailsScreen = ({
       </div>
 
       <div className="p-4 border-t border-gray-100 dark:border-white/5 shrink-0 bg-white dark:bg-[#0a0a0a] space-y-3">
-        {!firebaseUser && (
-          <button 
-            onClick={onSignIn}
-            className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
-          >
-            <Globe size={20} /> SIGN IN TO SAVE
-          </button>
-        )}
         <button 
           onClick={handleSave}
-          disabled={isSaving || !firebaseUser}
-          className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 ${firebaseUser ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'}`}
+          disabled={isSaving}
+          className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 bg-black text-white dark:bg-white dark:text-black`}
         >
           {isSaving ? <RefreshCw className="animate-spin" size={20} /> : 'SAVE CHANGES'}
         </button>
@@ -5989,8 +5972,6 @@ export default function App() {
                 onClose={() => setCurrentScreen('account')}
                 sendNotification={sendNotification}
                 theme={theme}
-                firebaseUser={firebaseUser}
-                onSignIn={signInWithGoogle}
               />
             )}
           </AnimatePresence>
@@ -6675,14 +6656,6 @@ export default function App() {
                 <h2 className="text-xl font-black">{user.name}</h2>
                 <div className="flex flex-col items-center gap-1">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{currentCity} • {userTier} Partner</p>
-                  {!firebaseUser && (
-                    <button 
-                      onClick={signInWithGoogle}
-                      className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-all shadow-lg shadow-blue-500/20"
-                    >
-                      <Globe size={14} /> SIGN IN TO SAVE CHANGES
-                    </button>
-                  )}
                 </div>
               </div>
               <div className="space-y-1.5">
