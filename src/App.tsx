@@ -705,76 +705,78 @@ const NewUserForm = ({
   sendNotification: (title: string, body: string) => void,
   setHasSeenOnboarding: (val: boolean) => void
 }) => (
-  <div className="fixed inset-0 z-[500] flex items-center justify-center p-6">
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
-    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-md rounded-[40px] p-8 shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto">
-      <h2 className="text-3xl font-black mb-2">New User?</h2>
-      <p className="text-gray-500 font-bold mb-8 text-sm">We don't recognize your face. Create an account to start earning.</p>
-      
-      <div className="space-y-4 mb-8">
-        {!firebaseUser && (
-          <button 
-            onClick={async () => {
-              try {
-                await signInWithGoogle();
-              } catch (error) {
-                console.error("Login failed", error);
-              }
-            }}
-            className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-95 transition-transform"
-          >
-            <Globe size={20} />
-            SIGN IN WITH GOOGLE FIRST
-          </button>
-        )}
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Full Name</label>
-          <input 
-            type="text" 
-            className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
-            value={newUserDetails.name}
-            onChange={e => setNewUserDetails({...newUserDetails, name: e.target.value})}
-            placeholder="Enter your full name"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Email</label>
-          <input 
-            type="email" 
-            className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
-            value={newUserDetails.email}
-            onChange={e => setNewUserDetails({...newUserDetails, email: e.target.value})}
-            placeholder="Enter your email"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Date of Birth</label>
-          <input 
-            type="date" 
-            className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
-            value={newUserDetails.dob}
-            onChange={e => setNewUserDetails({...newUserDetails, dob: e.target.value})}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Phone Number</label>
-          <input 
-            type="tel" 
-            className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
-            value={newUserDetails.phone}
-            onChange={e => setNewUserDetails({...newUserDetails, phone: e.target.value})}
-            placeholder="e.g. +1 234 567 8900"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Home Address</label>
-          <input 
-            type="text" 
-            className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
-            value={newUserDetails.address}
-            onChange={e => setNewUserDetails({...newUserDetails, address: e.target.value})}
-            placeholder="Enter your residential address"
-          />
+  <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/70" />
+    <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-md rounded-[32px] p-6 shadow-2xl relative z-10 max-h-[92vh] flex flex-col">
+      <div className="overflow-y-auto flex-1">
+        <h2 className="text-2xl font-black mb-1">New User?</h2>
+        <p className="text-gray-500 font-bold mb-6 text-sm">Create an account to start earning.</p>
+        
+        <div className="space-y-3 mb-6">
+          {!firebaseUser && (
+            <button 
+              onClick={async () => {
+                try {
+                  await signInWithGoogle();
+                } catch (error) {
+                  console.error("Login failed", error);
+                }
+              }}
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-95 transition-transform"
+            >
+              <Globe size={18} />
+              SIGN IN WITH GOOGLE
+            </button>
+          )}
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Full Name</label>
+            <input 
+              type="text" 
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-sm"
+              value={newUserDetails.name}
+              onChange={e => setNewUserDetails({...newUserDetails, name: e.target.value})}
+              placeholder="Enter your full name"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Email</label>
+            <input 
+              type="email" 
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-sm"
+              value={newUserDetails.email}
+              onChange={e => setNewUserDetails({...newUserDetails, email: e.target.value})}
+              placeholder="Enter your email"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Date of Birth</label>
+            <input 
+              type="date" 
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-sm"
+              value={newUserDetails.dob}
+              onChange={e => setNewUserDetails({...newUserDetails, dob: e.target.value})}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Phone Number</label>
+            <input 
+              type="tel" 
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-sm"
+              value={newUserDetails.phone}
+              onChange={e => setNewUserDetails({...newUserDetails, phone: e.target.value})}
+              placeholder="e.g. +1 234 567 8900"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Home Address</label>
+            <input 
+              type="text" 
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-sm"
+              value={newUserDetails.address}
+              onChange={e => setNewUserDetails({...newUserDetails, address: e.target.value})}
+              placeholder="Enter your residential address"
+            />
+          </div>
         </div>
       </div>
 
@@ -862,22 +864,22 @@ const PersonalDetailsScreen = ({
 
   return (
     <motion.div 
-      initial={{ x: '100%' }} 
-      animate={{ x: 0 }} 
-      exit={{ x: '100%' }} 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      exit={{ opacity: 0 }} 
       className={`fixed inset-0 z-[500] flex flex-col ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
     >
-      <div className="p-6 flex items-center gap-4 border-b border-gray-100 dark:border-white/5">
-        <button onClick={onClose} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={24} /></button>
-        <h1 className="text-3xl font-black">Personal Info</h1>
+      <div className="p-4 flex items-center gap-4 border-b border-gray-100 dark:border-white/5 shrink-0">
+        <button onClick={onClose} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={22} /></button>
+        <h1 className="text-2xl font-black">Personal Info</h1>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        <div className="flex flex-col items-center py-8">
-            <div className={`w-32 h-32 rounded-full overflow-hidden border-4 shadow-xl mb-4 ${theme === 'dark' ? 'border-white/10' : 'border-white'}`}>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-12">
+        <div className="flex flex-col items-center py-6">
+            <div className={`w-24 h-24 rounded-full overflow-hidden border-4 shadow-xl mb-3 ${theme === 'dark' ? 'border-white/10' : 'border-white'}`}>
                 <img src={user.profilePic || "https://picsum.photos/seed/driver/200/200"} alt="Me" className="w-full h-full object-cover" />
             </div>
-            <button className="text-blue-500 font-bold text-sm">Change Photo</button>
+            <button className="text-blue-500 font-bold text-xs uppercase tracking-wider">Change Photo</button>
         </div>
 
         <div className="space-y-4">
@@ -885,7 +887,7 @@ const PersonalDetailsScreen = ({
             <label className="text-[10px] font-black uppercase text-gray-400 ml-2 tracking-widest">Full Name</label>
             <input 
               type="text" 
-              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
+              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all text-sm focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
               value={editedUser.name}
               onChange={e => setEditedUser({...editedUser, name: e.target.value})}
             />
@@ -894,7 +896,7 @@ const PersonalDetailsScreen = ({
             <label className="text-[10px] font-black uppercase text-gray-400 ml-2 tracking-widest">Phone Number</label>
             <input 
               type="tel" 
-              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
+              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all text-sm focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
               value={editedUser.phone || ''}
               onChange={e => setEditedUser({...editedUser, phone: e.target.value})}
               placeholder="+1 234 567 8900"
@@ -904,16 +906,16 @@ const PersonalDetailsScreen = ({
             <label className="text-[10px] font-black uppercase text-gray-400 ml-2 tracking-widest">Date of Birth</label>
             <input 
               type="date" 
-              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
+              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all text-sm focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
               value={editedUser.dob || ''}
               onChange={e => setEditedUser({...editedUser, dob: e.target.value})}
             />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[10px] font-black uppercase text-gray-400 ml-2 tracking-widest">Residential Address</label>
-            <input 
-              type="text" 
-              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
+            <textarea 
+              rows={2}
+              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all text-sm focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
               value={editedUser.address || ''}
               onChange={e => setEditedUser({...editedUser, address: e.target.value})}
               placeholder="123 Driver St, City, Country"
@@ -922,10 +924,10 @@ const PersonalDetailsScreen = ({
         </div>
       </div>
 
-      <div className="p-6 border-t border-gray-100 dark:border-white/5">
+      <div className="p-4 border-t border-gray-100 dark:border-white/5 shrink-0 bg-white dark:bg-[#0a0a0a]">
         <button 
           onClick={handleSave}
-          className="w-full py-5 bg-black text-white dark:bg-white dark:text-black rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform"
+          className="w-full py-4 bg-black text-white dark:bg-white dark:text-black rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-transform"
         >
           SAVE CHANGES
         </button>
@@ -5869,49 +5871,49 @@ export default function App() {
               {/* Pending Order Modal */}
               <AnimatePresence>
                 {pendingOrder && (
-                  <motion.div initial={{ scale: 0.8, opacity: 0, y: 50 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.8, opacity: 0, y: 50 }} className="absolute inset-x-4 bottom-24 z-[60]">
-                    <div className="bg-white text-black rounded-2xl overflow-hidden shadow-[0_15px_45px_rgba(0,0,0,0.4)]">
-                      <div className="bg-blue-600 p-4 text-white text-center relative">
+                  <motion.div initial={{ scale: 0.9, opacity: 0, y: 30 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 30 }} className="absolute inset-x-4 bottom-24 z-[60] flex justify-center">
+                    <div className="bg-white text-black rounded-2xl overflow-hidden shadow-2xl w-full max-w-sm">
+                      <div className="bg-blue-600 p-4 text-white text-center relative border-b border-white/10">
                         <div className="text-[10px] font-bold tracking-widest opacity-80 mb-1 uppercase">New Delivery Opportunity</div>
                         <div className="text-3xl font-black">£{pendingOrder.estimatedPay.toFixed(2)}</div>
-                        <div className="text-[10px] font-bold opacity-80 mt-1">Includes expected tip</div>
+                        <div className="text-[10px] font-bold opacity-80 mt-0.5">Includes expected tip</div>
                         <div className="mt-3 flex justify-center">
-                          <div className="w-10 h-10 rounded-full border-4 border-white/30 flex items-center justify-center relative">
+                          <div className="w-9 h-9 rounded-full border-4 border-white/20 flex items-center justify-center relative">
                             <svg className="absolute inset-0 w-full h-full -rotate-90">
                               <circle 
-                                cx="20" cy="20" r="16" 
+                                cx="18" cy="18" r="14" 
                                 fill="none" 
                                 stroke="white" 
-                                strokeWidth="4" 
-                                strokeDasharray="100.48" 
-                                strokeDashoffset={100.48 * (1 - orderExpiryTimer / 10)}
+                                strokeWidth="3" 
+                                strokeDasharray="87.92" 
+                                strokeDashoffset={87.92 * (1 - orderExpiryTimer / 10)}
                                 className="transition-all duration-1000 ease-linear"
                               />
                             </svg>
-                            <span className="font-black text-sm">{orderExpiryTimer}</span>
+                            <span className="font-black text-xs">{orderExpiryTimer}</span>
                           </div>
                         </div>
-                        <button onClick={handleDeclineOrder} className="absolute top-3 right-3 p-1 bg-black/20 rounded-full"><X size={16} /></button>
+                        <button onClick={handleDeclineOrder} className="absolute top-3 right-3 p-1.5 bg-black/10 rounded-full active:scale-90 transition-transform"><X size={16} /></button>
                       </div>
                       <div className="p-4">
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-3">
                             <div className="flex flex-col items-center gap-1">
-                              <div className="w-2 h-2 bg-green-500 rounded-full" />
-                              <div className="w-0.5 h-4 bg-gray-200" />
-                              <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                              <div className="w-0.5 h-4 bg-gray-100" />
+                              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
                             </div>
                             <div className="flex-1">
-                              <div className="font-bold text-sm mb-2">{pendingOrder.restaurantName}</div>
-                              <div className="font-bold text-sm text-gray-400">Customer Address</div>
+                              <div className="font-bold text-sm tracking-tight">{pendingOrder.restaurantName}</div>
+                              <div className="font-bold text-[10px] text-gray-400 uppercase tracking-widest">Delivery Task</div>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm font-black">{getArrivalTime(pendingOrder.estimatedTime)}</p>
-                            <p className="text-[10px] text-gray-400 font-bold">ARRIVAL</p>
+                            <p className="text-sm font-black text-blue-600">{getArrivalTime(pendingOrder.estimatedTime)}</p>
+                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">ETA</p>
                           </div>
                         </div>
-                        <button onClick={handleAcceptOrder} className="w-full py-4 bg-black text-white rounded-xl font-black text-lg tracking-wide">ACCEPT</button>
+                        <button onClick={handleAcceptOrder} className="w-full py-4 bg-black text-white rounded-xl font-black text-lg tracking-wide active:scale-95 transition-transform shadow-lg">ACCEPT</button>
                       </div>
                     </div>
                   </motion.div>
@@ -5933,25 +5935,25 @@ export default function App() {
           </AnimatePresence>
 
           {currentScreen === 'chat' && (
-            <motion.div key="chat" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="fixed inset-0 z-[1000] bg-white text-black flex flex-col">
-              <div className="p-6 border-b border-gray-100 flex items-center gap-4 bg-white/80 backdrop-blur-md sticky top-0 z-10">
-                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors">
-                  <X size={24} />
+            <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] bg-white text-black flex flex-col">
+              <div className="p-4 border-b border-gray-100 flex items-center gap-4 bg-white sticky top-0 z-10 shrink-0">
+                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform">
+                  <X size={22} />
                 </button>
-                <div className="flex-1">
-                  <h2 className="font-black text-xl">
+                <div className="flex-1 overflow-hidden">
+                  <h2 className="font-black text-lg truncate leading-tight">
                     {activeOrders.find(o => o.id === activeChatOrderId)?.customerName || 'Customer'}
                   </h2>
-                  <p className="text-[10px] text-gray-400 font-black tracking-widest uppercase">Active Delivery</p>
+                  <p className="text-[9px] text-gray-400 font-black tracking-widest uppercase truncate">Active Delivery</p>
                 </div>
-                <button className="p-3 bg-green-500 text-white rounded-full transition-transform active:scale-95">
-                  <Phone size={20} />
+                <button className="p-3 bg-green-500 text-white rounded-full active:scale-95 transition-transform shadow-md">
+                  <Phone size={18} />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50 scroll-smooth no-scrollbar">
-                <div className="flex justify-center p-4">
-                  <div className="bg-white px-4 py-2 rounded-full border border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest shadow-sm">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50 scroll-smooth no-scrollbar">
+                <div className="flex justify-center p-2">
+                  <div className="bg-white px-3 py-1.5 rounded-full border border-gray-100 text-[9px] font-black text-gray-400 uppercase tracking-widest">
                     Today • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
@@ -6979,22 +6981,22 @@ export default function App() {
           )}
 
           {/* Safety Fallback for unhandled screens */}
-          {!['onboarding', 'documents', 'face_verification', 'home', 'earnings', 'inbox', 'account', 'chat', 'uber_pro', 'wallet', 'opportunities', 'safety', 'earnings_detail', 'banking', 'scheduled_orders', 'rewards', 'carplay_dashboard', 'trip_history', 'work_hub', 'ratings', 'planner', 'uber_services', 'vehicle_details', 'payment_methods', 'trip_preferences'].includes(currentScreen) && (
+          {!['onboarding', 'documents', 'face_verification', 'home', 'earnings', 'inbox', 'account', 'chat', 'uber_pro', 'wallet', 'opportunities', 'safety', 'earnings_detail', 'banking', 'scheduled_orders', 'rewards', 'carplay_dashboard', 'trip_history', 'work_hub', 'ratings', 'planner', 'uber_services', 'vehicle_details', 'payment_methods', 'trip_preferences', 'personal_details'].includes(currentScreen) && (
             <motion.div 
               key="fallback" 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }} 
-              className={`h-full w-full flex flex-col items-center justify-center p-8 text-center ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
+              className={`h-full w-full flex flex-col items-center justify-center p-6 text-center ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
             >
-              <div className="w-24 h-24 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mb-6">
-                <Target size={48} />
+              <div className="w-16 h-16 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mb-6">
+                <Target size={32} />
               </div>
-              <h2 className="text-2xl font-black mb-2 tracking-tighter uppercase">Screen Not Found</h2>
-              <p className="text-gray-400 font-bold mb-8 max-w-xs">This feature is currently being optimized for your profile. Check back soon!</p>
+              <h2 className="text-xl font-black mb-2 tracking-tighter uppercase">Screen Not Found</h2>
+              <p className="text-gray-400 font-bold mb-8 max-w-[240px] text-sm">This feature is currently being optimized for your profile. Check back soon!</p>
               <button 
                 onClick={() => setCurrentScreen('home')} 
-                className="px-12 py-4 bg-blue-600 text-white rounded-2xl font-black tracking-widest text-sm active:scale-95 transition-transform shadow-lg shadow-blue-500/20"
+                className="px-10 py-3 bg-blue-600 text-white rounded-2xl font-black tracking-widest text-xs active:scale-95 transition-transform shadow-lg shadow-blue-500/20"
               >
                 GO BACK
               </button>
@@ -7031,20 +7033,20 @@ export default function App() {
       </div>
 
       {/* Bottom Nav */}
-      <div className="h-20 bg-black border-t border-white/10 flex items-center justify-around px-4 z-[2000] shrink-0 relative">
-        <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={24} />} label="Home" badge={activeOrders.length > 0 ? activeOrders.length : undefined} />
+      <div className="h-16 bg-black border-t border-white/10 flex items-center justify-around px-2 z-[2000] shrink-0 relative">
+        <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={20} />} label="Home" badge={activeOrders.length > 0 ? activeOrders.length : undefined} />
         {activeOrders.length > 0 && (
           <NavButton 
             active={isBottomMenuOpen} 
             onClick={() => setIsBottomMenuOpen(!isBottomMenuOpen)} 
-            icon={<List size={24} />} 
+            icon={<List size={20} />} 
             label="Trips" 
             badge={activeOrders.filter(o => o.status === 'accepted').length}
           />
         )}
-        <NavButton active={currentScreen === 'earnings'} onClick={() => setCurrentScreen('earnings')} icon={<TrendingUp size={24} />} label="Earnings" />
-        <NavButton active={currentScreen === 'inbox'} onClick={() => setCurrentScreen('inbox')} icon={<Mail size={24} />} label="Inbox" />
-        <NavButton active={currentScreen === 'account'} onClick={() => setCurrentScreen('account')} icon={<User size={24} />} label="Account" />
+        <NavButton active={currentScreen === 'earnings'} onClick={() => setCurrentScreen('earnings')} icon={<TrendingUp size={20} />} label="Earnings" />
+        <NavButton active={currentScreen === 'inbox'} onClick={() => setCurrentScreen('inbox')} icon={<Mail size={20} />} label="Inbox" />
+        <NavButton active={currentScreen === 'account'} onClick={() => setCurrentScreen('account')} icon={<User size={20} />} label="Account" />
       </div>
     </div>
       )}
@@ -7054,19 +7056,15 @@ export default function App() {
 
 function NavButton({ active, onClick, icon, label, badge }: { active: boolean, onClick: () => void, icon: ReactNode, label: string, badge?: number }) {
   return (
-    <button onClick={onClick} className={`flex flex-col items-center gap-1 transition-all relative ${active ? 'text-white scale-110' : 'text-gray-500'}`}>
-      <div className={`p-1.5 rounded-full transition-colors ${active ? 'bg-white/10' : ''}`}>
+    <button onClick={onClick} className={`flex flex-col items-center p-1 transition-all relative ${active ? 'text-white' : 'text-gray-500'}`}>
+      <div className={`p-1 rounded-full transition-colors flex items-center justify-center ${active ? 'bg-white/10' : ''}`}>
         {icon}
       </div>
-      <span className="text-[10px] font-black uppercase tracking-widest leading-none">{label}</span>
+      <span className="text-[9px] font-black uppercase tracking-tight leading-none mt-0.5">{label}</span>
       {badge !== undefined && badge > 0 && (
-        <motion.div 
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="absolute -top-1 -right-1 w-5 h-5 bg-blue-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-black"
-        >
+        <div className="absolute top-0 right-0 w-4 h-4 bg-blue-600 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-black">
           {badge}
-        </motion.div>
+        </div>
       )}
     </button>
   );
