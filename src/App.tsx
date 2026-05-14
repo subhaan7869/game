@@ -732,7 +732,7 @@ const NewUserForm = ({
             <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Full Name</label>
             <input 
               type="text" 
-              className="w-full p-3.5 bg-gray-50 rounded-xl border-none font-bold text-sm"
+              className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
               value={newUserDetails.name}
               onChange={e => setNewUserDetails({...newUserDetails, name: e.target.value})}
               placeholder="Full name"
@@ -742,7 +742,7 @@ const NewUserForm = ({
             <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Email</label>
             <input 
               type="email" 
-              className="w-full p-3.5 bg-gray-50 rounded-xl border-none font-bold text-sm"
+              className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
               value={newUserDetails.email}
               onChange={e => setNewUserDetails({...newUserDetails, email: e.target.value})}
               placeholder="Email"
@@ -752,7 +752,7 @@ const NewUserForm = ({
             <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Date of Birth</label>
             <input 
               type="date" 
-              className="w-full p-3.5 bg-gray-50 rounded-xl border-none font-bold text-sm"
+              className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
               value={newUserDetails.dob}
               onChange={e => setNewUserDetails({...newUserDetails, dob: e.target.value})}
             />
@@ -761,7 +761,7 @@ const NewUserForm = ({
             <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Phone Number</label>
             <input 
               type="tel" 
-              className="w-full p-3.5 bg-gray-50 rounded-xl border-none font-bold text-sm"
+              className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
               value={newUserDetails.phone}
               onChange={e => setNewUserDetails({...newUserDetails, phone: e.target.value})}
               placeholder="+1 234 567 8900"
@@ -771,7 +771,7 @@ const NewUserForm = ({
             <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Home Address</label>
             <input 
               type="text" 
-              className="w-full p-3.5 bg-gray-50 rounded-xl border-none font-bold text-sm"
+              className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
               value={newUserDetails.address}
               onChange={e => setNewUserDetails({...newUserDetails, address: e.target.value})}
               placeholder="Address"
@@ -855,18 +855,15 @@ const PersonalDetailsScreen = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = async () => {
-    const uid = user.uid || firebaseUser?.uid;
+    const uid = auth.currentUser?.uid || user.uid || firebaseUser?.uid;
     if (!uid) {
-      console.error("No UID found for user");
-      sendNotification("Error", "Session expired. Please sign in again.");
+      console.error("No UID found for user", { authUid: auth.currentUser?.uid, userUid: user.uid, fbUid: firebaseUser?.uid });
+      sendNotification("Error", "Authentication required. Please sign in again.");
       return;
     }
     
     setIsSaving(true);
     try {
-      // Use updateDoc for partial updates to avoid overwriting systemic fields accidentally
-      // Though here we update the whole object for simplicity as per previous implementation, 
-      // but ensuring uid is set in the data as well.
       const dataToSave = { ...editedUser, uid };
       await setDoc(doc(db, 'users', uid), dataToSave);
       setUser(dataToSave);
@@ -875,9 +872,9 @@ const PersonalDetailsScreen = ({
     } catch (error) {
       console.error("Save error:", error);
       if (error instanceof Error && error.message.includes("insufficient permissions")) {
-        sendNotification("Error", "You don't have permission to update this profile.");
+        sendNotification("Error", "Permission denied. Please try re-signing in.");
       } else {
-        sendNotification("Error", "Could not save profile. Please check your connection.");
+        sendNotification("Error", "Could not save profile. Check your connection.");
       }
     } finally {
       setIsSaving(false);
@@ -938,7 +935,7 @@ const PersonalDetailsScreen = ({
             <label className="text-[10px] font-black uppercase text-gray-400 ml-2 tracking-widest">Full Name</label>
             <input 
               type="text" 
-              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all text-sm focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
+              className={`w-full p-3 rounded-xl border-2 font-bold transition-all text-sm focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
               value={editedUser.name}
               onChange={e => setEditedUser({...editedUser, name: e.target.value})}
             />
@@ -947,7 +944,7 @@ const PersonalDetailsScreen = ({
             <label className="text-[10px] font-black uppercase text-gray-400 ml-2 tracking-widest">Phone Number</label>
             <input 
               type="tel" 
-              className={`w-full p-4 rounded-2xl border-2 font-bold transition-all text-sm focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
+              className={`w-full p-3 rounded-xl border-2 font-bold transition-all text-sm focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
               value={editedUser.phone || ''}
               onChange={e => setEditedUser({...editedUser, phone: e.target.value})}
               placeholder="+1 234 567 8900"
@@ -6660,21 +6657,36 @@ export default function App() {
                 <button onClick={() => setCurrentScreen('home')} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><X size={24} /></button>
                 <h1 className="text-3xl font-black">Account</h1>
               </div>
-              <div className="flex flex-col items-center mb-8">
-                <div className={`w-32 h-32 rounded-full overflow-hidden border-4 shadow-xl mb-4 ${theme === 'dark' ? 'border-white/10' : 'border-white'}`}>
+              <div className="flex flex-col items-center mb-6">
+                <div className={`w-24 h-24 rounded-full overflow-hidden border-4 shadow-xl mb-3 ${theme === 'dark' ? 'border-white/10' : 'border-white'}`}>
                   <img src={user.profilePic || "https://picsum.photos/seed/driver/200/200"} alt="Me" className="w-full h-full object-cover" />
                 </div>
-                <h2 className="text-2xl font-black">{user.name}</h2>
-                <p className="text-sm font-bold text-gray-400">{currentCity} • {userTier} Partner</p>
+                <h2 className="text-xl font-black">{user.name}</h2>
+                <div className="flex flex-col items-center gap-1">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{currentCity} • {userTier} Partner</p>
+                  {!firebaseUser && (
+                    <button 
+                      onClick={signInWithGoogle}
+                      className="mt-2 text-blue-600 font-black text-[10px] uppercase tracking-widest flex items-center gap-1 active:scale-95 transition-transform"
+                    >
+                      <Globe size={10} /> Sign in to Save Changes
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {[
-                  { icon: <User />, label: "Personal Information", action: () => setCurrentScreen('personal_details') },
-                  { icon: <CarIcon />, label: "Vehicle Details", action: () => setCurrentScreen('vehicle_details') },
-                  { icon: <CreditCard />, label: "Payment", action: () => setCurrentScreen('payment_methods') },
-                  { icon: <History />, label: "Trip History", action: () => setCurrentScreen('trip_history') },
-                  { icon: <FileText />, label: "Documents", action: () => setCurrentScreen('documents') },
-                  { icon: <Settings />, label: "App Settings", action: () => sendNotification("Settings", "Settings updated.") },
+                  { icon: <User size={18} />, label: "Personal Information", action: () => setCurrentScreen('personal_details') },
+                  { icon: <CarIcon size={18} />, label: "Vehicle Details", action: () => setCurrentScreen('vehicle_details') },
+                  { icon: <CreditCard size={18} />, label: "Payment", action: () => setCurrentScreen('payment_methods') },
+                  { icon: <History size={18} />, label: "Trip History", action: () => setCurrentScreen('trip_history') },
+                  { icon: <FileText size={18} />, label: "Documents", action: () => setCurrentScreen('documents') },
+                  { icon: <Settings size={18} />, label: "App Settings", action: () => sendNotification("Settings", "Settings updated.") },
+                  ...(firebaseUser ? [{ icon: <LogOut size={18} />, label: "Sign Out", action: () => {
+                    logout();
+                    setCurrentScreen('home');
+                    sendNotification("Signed Out", "Session cleared.");
+                  } }] : []),
                   { icon: <SlidersHorizontal />, label: "Trip Preferences", action: () => setCurrentScreen('trip_preferences') },
                   { icon: <ShieldAlert />, label: "Simulate Bug Scan", action: () => {
                     setIsScanning(true);
