@@ -72,6 +72,9 @@ export interface UserProfile {
   isOnline: boolean;
   documentsUploaded: boolean;
   faceVerified: boolean;
+  dob?: string;
+  phone?: string;
+  address?: string;
   profilePic?: string;
   documentExpiries?: Record<string, string>;
   walletBalance: number;

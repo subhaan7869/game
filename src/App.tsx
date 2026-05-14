@@ -707,7 +707,7 @@ const NewUserForm = ({
 }) => (
   <div className="fixed inset-0 z-[500] flex items-center justify-center p-6">
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
-    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-md rounded-[40px] p-8 shadow-2xl relative z-10">
+    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-md rounded-[40px] p-8 shadow-2xl relative z-10 max-h-[90vh] overflow-y-auto">
       <h2 className="text-3xl font-black mb-2">New User?</h2>
       <p className="text-gray-500 font-bold mb-8 text-sm">We don't recognize your face. Create an account to start earning.</p>
       
@@ -747,12 +747,41 @@ const NewUserForm = ({
             placeholder="Enter your email"
           />
         </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Date of Birth</label>
+          <input 
+            type="date" 
+            className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
+            value={newUserDetails.dob}
+            onChange={e => setNewUserDetails({...newUserDetails, dob: e.target.value})}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Phone Number</label>
+          <input 
+            type="tel" 
+            className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
+            value={newUserDetails.phone}
+            onChange={e => setNewUserDetails({...newUserDetails, phone: e.target.value})}
+            placeholder="e.g. +1 234 567 8900"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Home Address</label>
+          <input 
+            type="text" 
+            className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
+            value={newUserDetails.address}
+            onChange={e => setNewUserDetails({...newUserDetails, address: e.target.value})}
+            placeholder="Enter your residential address"
+          />
+        </div>
       </div>
 
       <div className="flex gap-4">
         <button onClick={() => setIsNewUserFormOpen(false)} className="flex-1 py-4 bg-gray-100 text-black rounded-2xl font-black">CANCEL</button>
         <button 
-          disabled={!firebaseUser || !newUserDetails.name || !newUserDetails.email}
+          disabled={!firebaseUser || !newUserDetails.name || !newUserDetails.email || !newUserDetails.dob || !newUserDetails.phone}
           onClick={async () => {
             try {
               const uid = firebaseUser?.uid;
@@ -762,6 +791,9 @@ const NewUserForm = ({
                 ...user,
                 name: newUserDetails.name,
                 email: newUserDetails.email,
+                dob: newUserDetails.dob,
+                phone: newUserDetails.phone,
+                address: newUserDetails.address,
                 uid: uid,
                 documentsUploaded: true,
                 faceVerified: true,
@@ -799,6 +831,93 @@ const NewUserForm = ({
     </motion.div>
   </div>
 );
+
+const PersonalDetailsModal = ({ 
+  user,
+  setUser,
+  onClose,
+  sendNotification,
+  theme
+}: { 
+  user: UserProfile,
+  setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
+  onClose: () => void,
+  sendNotification: (title: string, body: string) => void,
+  theme: 'light' | 'dark'
+}) => {
+  const [editedUser, setEditedUser] = useState({...user});
+
+  const handleSave = async () => {
+    try {
+      if (user.uid) {
+        await setDoc(doc(db, 'users', user.uid), editedUser);
+        setUser(editedUser);
+        sendNotification("Success", "Personal details updated successfully.");
+        onClose();
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'users');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={`w-full max-w-md rounded-[40px] p-8 shadow-2xl relative z-10 ${theme === 'dark' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black'}`}>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-3xl font-black">Details</h2>
+          <button onClick={onClose} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><X size={20} /></button>
+        </div>
+        
+        <div className="space-y-4 mb-8">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Full Name</label>
+            <input 
+              type="text" 
+              className={`w-full p-4 rounded-2xl border-none font-bold ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}
+              value={editedUser.name}
+              onChange={e => setEditedUser({...editedUser, name: e.target.value})}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Phone</label>
+            <input 
+              type="tel" 
+              className={`w-full p-4 rounded-2xl border-none font-bold ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}
+              value={editedUser.phone || ''}
+              onChange={e => setEditedUser({...editedUser, phone: e.target.value})}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Date of Birth</label>
+            <input 
+              type="date" 
+              className={`w-full p-4 rounded-2xl border-none font-bold ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}
+              value={editedUser.dob || ''}
+              onChange={e => setEditedUser({...editedUser, dob: e.target.value})}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Home Address</label>
+            <input 
+              type="text" 
+              className={`w-full p-4 rounded-2xl border-none font-bold ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}
+              value={editedUser.address || ''}
+              onChange={e => setEditedUser({...editedUser, address: e.target.value})}
+            />
+          </div>
+        </div>
+
+        <button 
+          onClick={handleSave}
+          className="w-full py-4 bg-black text-white dark:bg-white dark:text-black rounded-2xl font-black shadow-xl active:scale-95 transition-transform"
+        >
+          SAVE CHANGES
+        </button>
+      </motion.div>
+    </div>
+  );
+};
 
 const CarPlayDashboard = ({ 
   activeOrders, 
@@ -2269,7 +2388,14 @@ export default function App() {
     { id: 'sch_2', driverUid: 'mock', restaurantName: 'Burger King', scheduledTime: new Date(Date.now() + 7200000).toISOString(), status: 'pending', estimatedPay: 8.75 },
   ]);
   const [isNewUserFormOpen, setIsNewUserFormOpen] = useState(false);
-  const [newUserDetails, setNewUserDetails] = useState({ name: '', email: '' });
+  const [isPersonalDetailsOpen, setIsPersonalDetailsOpen] = useState(false);
+  const [newUserDetails, setNewUserDetails] = useState({ 
+    name: '', 
+    email: '',
+    dob: '',
+    phone: '',
+    address: ''
+  });
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isProfileLoaded, setIsProfileLoaded] = useState(false);
@@ -2533,7 +2659,13 @@ export default function App() {
             setUser(userData);
           } else {
             // New user from Google Auth, but profile not created yet
-            setNewUserDetails({ name: fUser.displayName || '', email: fUser.email || '' });
+            setNewUserDetails({ 
+              name: fUser.displayName || '', 
+              email: fUser.email || '',
+              dob: '',
+              phone: '',
+              address: ''
+            });
           }
           setIsProfileLoaded(true);
         }).catch(error => {
@@ -5719,6 +5851,18 @@ export default function App() {
                 )}
               </AnimatePresence>
 
+              <AnimatePresence>
+                {isPersonalDetailsOpen && (
+                  <PersonalDetailsModal 
+                    user={user}
+                    setUser={setUser}
+                    onClose={() => setIsPersonalDetailsOpen(false)}
+                    sendNotification={sendNotification}
+                    theme={theme}
+                  />
+                )}
+              </AnimatePresence>
+
               {/* Pending Order Modal */}
               <AnimatePresence>
                 {pendingOrder && (
@@ -6455,7 +6599,7 @@ export default function App() {
               </div>
               <div className="space-y-2">
                 {[
-                  { icon: <User />, label: "Personal Information", action: () => sendNotification("Account", "Personal info updated.") },
+                  { icon: <User />, label: "Personal Information", action: () => setIsPersonalDetailsOpen(true) },
                   { icon: <CarIcon />, label: "Vehicle Details", action: () => setCurrentScreen('vehicle_details') },
                   { icon: <CreditCard />, label: "Payment", action: () => setCurrentScreen('payment_methods') },
                   { icon: <History />, label: "Trip History", action: () => setCurrentScreen('trip_history') },
