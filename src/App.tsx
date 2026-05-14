@@ -1705,30 +1705,32 @@ const ReceiptScanModal = ({
   };
 
   return (
-    <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="absolute inset-0 z-[5000] bg-black text-white flex flex-col">
-      <div className="p-6 flex items-center justify-between border-b border-white/10">
+    <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="absolute inset-0 z-[5000] bg-black text-white flex flex-col overflow-hidden">
+      <div className="p-4 flex items-center justify-between border-b border-white/10 shrink-0">
         <h2 className="text-xl font-black">Scan Receipt</h2>
         <button onClick={onClose} className="p-2 bg-white/10 rounded-full"><X size={24} /></button>
       </div>
-      <div className="flex-1 p-6 flex flex-col items-center">
-        <p className="text-gray-400 font-bold mb-6 text-center">Scan the physical Uber Eats receipt to confirm you've picked up the correct order.</p>
-        <div className="w-full aspect-[3/4] bg-gray-900 rounded-3xl overflow-hidden relative border-2 border-dashed border-gray-700">
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center pb-10">
+        <p className="text-gray-400 font-bold mb-4 text-center text-sm">Scan the physical Uber Eats receipt to confirm you've picked up the correct order.</p>
+        <div className="w-full max-w-[320px] aspect-[4/5] bg-gray-900 rounded-3xl overflow-hidden relative border-2 border-dashed border-gray-700">
            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-           <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none" />
+           <div className="absolute inset-0 border-[30px] border-black/40 pointer-events-none" />
            <motion.div 
              animate={{ y: ['0%', '100%', '0%'] }}
              transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
              className="absolute inset-x-0 h-1 bg-green-500 shadow-[0_0_20px_rgba(34,197,94,1)]"
            />
         </div>
-        <button 
-          onClick={captureAndVerify}
-          disabled={isVerifying}
-          className="mt-8 w-full py-5 bg-white text-black rounded-2xl font-black text-xl flex items-center justify-center gap-3 active:scale-95 transition-all"
-        >
-          {isVerifying ? <RefreshCw className="animate-spin" /> : <Camera />}
-          {isVerifying ? 'VERIFYING...' : 'CAPTURE RECEIPT'}
-        </button>
+        <div className="w-full max-w-[320px] mt-6">
+          <button 
+            onClick={captureAndVerify}
+            disabled={isVerifying}
+            className="w-full py-4 bg-white text-black rounded-2xl font-black text-lg flex items-center justify-center gap-3 active:scale-95 transition-all shadow-lg"
+          >
+            {isVerifying ? <RefreshCw className="animate-spin" /> : <Camera />}
+            {isVerifying ? 'VERIFYING...' : 'CAPTURE RECEIPT'}
+          </button>
+        </div>
       </div>
     </motion.div>
   );
