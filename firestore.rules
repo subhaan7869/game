@@ -49,7 +49,12 @@ service cloud.firestore {
              (!('email' in data) || (data.email is string && data.email.size() < 100)) &&
              (!('dob' in data) || (data.dob is string && data.dob.size() <= 20)) &&
              (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
-             (!('address' in data) || (data.address is string && data.address.size() <= 300)) &&
+             (!('address' in data) || (data.address is string && data.address.size() <= 600)) &&
+             (!('profilePic' in data) || (data.profilePic is string && data.profilePic.size() < 1048576)) &&
+             (!('isOnline' in data) || (data.isOnline is bool)) &&
+             (!('tier' in data) || (data.tier is string)) &&
+             (!('rating' in data) || (data.rating is number)) &&
+             (!('points' in data) || (data.points is number)) &&
              (!('deliveries' in data) || (data.deliveries is number && data.deliveries >= 0)) &&
              (!('walletBalance' in data) || (data.walletBalance is number && data.walletBalance >= 0));
     }

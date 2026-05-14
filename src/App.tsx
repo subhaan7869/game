@@ -840,29 +840,45 @@ const PersonalDetailsScreen = ({
   setUser,
   onClose,
   sendNotification,
-  theme
+  theme,
+  firebaseUser
 }: { 
   user: UserProfile,
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
   onClose: () => void,
   sendNotification: (title: string, body: string) => void,
-  theme: 'light' | 'dark'
+  theme: 'light' | 'dark',
+  firebaseUser: any
 }) => {
   const [editedUser, setEditedUser] = useState({...user});
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = async () => {
-    if (!user.uid) return;
+    const uid = user.uid || firebaseUser?.uid;
+    if (!uid) {
+      console.error("No UID found for user");
+      sendNotification("Error", "Session expired. Please sign in again.");
+      return;
+    }
+    
     setIsSaving(true);
     try {
-      await setDoc(doc(db, 'users', user.uid), editedUser);
-      setUser(editedUser);
+      // Use updateDoc for partial updates to avoid overwriting systemic fields accidentally
+      // Though here we update the whole object for simplicity as per previous implementation, 
+      // but ensuring uid is set in the data as well.
+      const dataToSave = { ...editedUser, uid };
+      await setDoc(doc(db, 'users', uid), dataToSave);
+      setUser(dataToSave);
       sendNotification("Profile Updated", "Your changes have been saved successfully.");
       onClose();
     } catch (error) {
       console.error("Save error:", error);
-      sendNotification("Error", "Could not save profile. Please check your connection.");
+      if (error instanceof Error && error.message.includes("insufficient permissions")) {
+        sendNotification("Error", "You don't have permission to update this profile.");
+      } else {
+        sendNotification("Error", "Could not save profile. Please check your connection.");
+      }
     } finally {
       setIsSaving(false);
     }
@@ -893,9 +909,12 @@ const PersonalDetailsScreen = ({
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-12">
         <div className="flex flex-col items-center py-6">
-            <div className={`w-24 h-24 rounded-full overflow-hidden border-4 shadow-xl mb-3 relative group ${theme === 'dark' ? 'border-white/10' : 'border-white'}`}>
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className={`w-24 h-24 rounded-full overflow-hidden border-4 shadow-xl mb-3 relative group cursor-pointer active:scale-95 transition-transform ${theme === 'dark' ? 'border-white/10' : 'border-white'}`}
+            >
                 <img src={editedUser.profilePic || user.profilePic || "https://picsum.photos/seed/driver/200/200"} alt="Me" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Camera className="text-white" size={20} />
                 </div>
             </div>
@@ -2705,7 +2724,7 @@ export default function App() {
         // Load user profile from Firestore in background
         getDoc(doc(db, 'users', fUser.uid)).then(userDoc => {
           if (userDoc.exists()) {
-            const userData = userDoc.data() as UserProfile;
+            const userData = { ...userDoc.data(), uid: fUser.uid } as UserProfile;
             setUser(userData);
           } else {
             // New user from Google Auth, but profile not created yet
@@ -5963,6 +5982,7 @@ export default function App() {
                 onClose={() => setCurrentScreen('account')}
                 sendNotification={sendNotification}
                 theme={theme}
+                firebaseUser={firebaseUser}
               />
             )}
           </AnimatePresence>
