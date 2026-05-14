@@ -841,14 +841,16 @@ const PersonalDetailsScreen = ({
   onClose,
   sendNotification,
   theme,
-  firebaseUser
+  firebaseUser,
+  onSignIn
 }: { 
   user: UserProfile,
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
   onClose: () => void,
   sendNotification: (title: string, body: string) => void,
   theme: 'light' | 'dark',
-  firebaseUser: any
+  firebaseUser: any,
+  onSignIn: () => void
 }) => {
   const [editedUser, setEditedUser] = useState({...user});
   const [isSaving, setIsSaving] = useState(false);
@@ -972,11 +974,19 @@ const PersonalDetailsScreen = ({
         </div>
       </div>
 
-      <div className="p-4 border-t border-gray-100 dark:border-white/5 shrink-0 bg-white dark:bg-[#0a0a0a]">
+      <div className="p-4 border-t border-gray-100 dark:border-white/5 shrink-0 bg-white dark:bg-[#0a0a0a] space-y-3">
+        {!firebaseUser && (
+          <button 
+            onClick={onSignIn}
+            className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            <Globe size={20} /> SIGN IN TO SAVE
+          </button>
+        )}
         <button 
           onClick={handleSave}
-          disabled={isSaving}
-          className="w-full py-4 bg-black text-white dark:bg-white dark:text-black rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+          disabled={isSaving || !firebaseUser}
+          className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 ${firebaseUser ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'}`}
         >
           {isSaving ? <RefreshCw className="animate-spin" size={20} /> : 'SAVE CHANGES'}
         </button>
@@ -5980,6 +5990,7 @@ export default function App() {
                 sendNotification={sendNotification}
                 theme={theme}
                 firebaseUser={firebaseUser}
+                onSignIn={signInWithGoogle}
               />
             )}
           </AnimatePresence>
@@ -6667,9 +6678,9 @@ export default function App() {
                   {!firebaseUser && (
                     <button 
                       onClick={signInWithGoogle}
-                      className="mt-2 text-blue-600 font-black text-[10px] uppercase tracking-widest flex items-center gap-1 active:scale-95 transition-transform"
+                      className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-all shadow-lg shadow-blue-500/20"
                     >
-                      <Globe size={10} /> Sign in to Save Changes
+                      <Globe size={14} /> SIGN IN TO SAVE CHANGES
                     </button>
                   )}
                 </div>
