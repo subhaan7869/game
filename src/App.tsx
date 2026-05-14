@@ -705,14 +705,14 @@ const NewUserForm = ({
   sendNotification: (title: string, body: string) => void,
   setHasSeenOnboarding: (val: boolean) => void
 }) => (
-  <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
+  <div className="fixed inset-0 z-[500] flex items-center justify-center p-3 sm:p-4">
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/70" />
-    <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-md rounded-[32px] p-6 shadow-2xl relative z-10 max-h-[92vh] flex flex-col">
-      <div className="overflow-y-auto flex-1">
-        <h2 className="text-2xl font-black mb-1">New User?</h2>
-        <p className="text-gray-500 font-bold mb-6 text-sm">Create an account to start earning.</p>
+    <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-sm rounded-[28px] p-5 shadow-2xl relative z-10 max-h-[94vh] flex flex-col">
+      <div className="overflow-y-auto flex-1 no-scrollbar">
+        <h2 className="text-xl font-black mb-1 leading-tight tracking-tighter">New User?</h2>
+        <p className="text-gray-500 font-bold mb-4 text-[10px]">Create an account to start earning.</p>
         
-        <div className="space-y-3 mb-6">
+        <div className="space-y-2.5 mb-4">
           {!firebaseUser && (
             <button 
               onClick={async () => {
@@ -722,66 +722,66 @@ const NewUserForm = ({
                   console.error("Login failed", error);
                 }
               }}
-              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-95 transition-transform"
+              className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-blue-600/10 active:scale-95 transition-transform text-sm"
             >
-              <Globe size={18} />
+              <Globe size={16} />
               SIGN IN WITH GOOGLE
             </button>
           )}
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Full Name</label>
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Full Name</label>
             <input 
               type="text" 
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-sm"
+              className="w-full p-3.5 bg-gray-50 rounded-xl border-none font-bold text-sm"
               value={newUserDetails.name}
               onChange={e => setNewUserDetails({...newUserDetails, name: e.target.value})}
-              placeholder="Enter your full name"
+              placeholder="Full name"
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Email</label>
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Email</label>
             <input 
               type="email" 
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-sm"
+              className="w-full p-3.5 bg-gray-50 rounded-xl border-none font-bold text-sm"
               value={newUserDetails.email}
               onChange={e => setNewUserDetails({...newUserDetails, email: e.target.value})}
-              placeholder="Enter your email"
+              placeholder="Email"
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Date of Birth</label>
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Date of Birth</label>
             <input 
               type="date" 
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-sm"
+              className="w-full p-3.5 bg-gray-50 rounded-xl border-none font-bold text-sm"
               value={newUserDetails.dob}
               onChange={e => setNewUserDetails({...newUserDetails, dob: e.target.value})}
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Phone Number</label>
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Phone Number</label>
             <input 
               type="tel" 
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-sm"
+              className="w-full p-3.5 bg-gray-50 rounded-xl border-none font-bold text-sm"
               value={newUserDetails.phone}
               onChange={e => setNewUserDetails({...newUserDetails, phone: e.target.value})}
-              placeholder="e.g. +1 234 567 8900"
+              placeholder="+1 234 567 8900"
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Home Address</label>
+          <div className="flex flex-col gap-0.5">
+            <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Home Address</label>
             <input 
               type="text" 
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold text-sm"
+              className="w-full p-3.5 bg-gray-50 rounded-xl border-none font-bold text-sm"
               value={newUserDetails.address}
               onChange={e => setNewUserDetails({...newUserDetails, address: e.target.value})}
-              placeholder="Enter your residential address"
+              placeholder="Address"
             />
           </div>
         </div>
       </div>
 
-      <div className="flex gap-4">
-        <button onClick={() => setIsNewUserFormOpen(false)} className="flex-1 py-4 bg-gray-100 text-black rounded-2xl font-black">CANCEL</button>
+      <div className="flex gap-3 mt-2">
+        <button onClick={() => setIsNewUserFormOpen(false)} className="px-5 py-4 bg-gray-100 text-black rounded-xl font-black text-sm">EXIT</button>
         <button 
           disabled={!firebaseUser || !newUserDetails.name || !newUserDetails.email || !newUserDetails.dob || !newUserDetails.phone}
           onClick={async () => {
@@ -822,10 +822,11 @@ const NewUserForm = ({
               setCurrentScreen('home');
               sendNotification("Account Created", `Welcome to Uber Eats, ${newUserDetails.name}!`);
             } catch (error) {
-              handleFirestoreError(error, OperationType.WRITE, 'users');
+              console.error("Create account failed:", error);
+              sendNotification("Error", "Could not create account.");
             }
           }} 
-          className={`flex-2 py-4 rounded-2xl font-black transition-all ${(!firebaseUser || !newUserDetails.name || !newUserDetails.email) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-black text-white shadow-xl active:scale-95'}`}
+          className={`flex-1 py-4 rounded-xl font-black transition-all text-sm ${(!firebaseUser || !newUserDetails.name || !newUserDetails.email) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-black text-white shadow-xl active:scale-95'}`}
         >
           CREATE ACCOUNT
         </button>
@@ -848,17 +849,33 @@ const PersonalDetailsScreen = ({
   theme: 'light' | 'dark'
 }) => {
   const [editedUser, setEditedUser] = useState({...user});
+  const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = async () => {
+    if (!user.uid) return;
+    setIsSaving(true);
     try {
-      if (user.uid) {
-        await setDoc(doc(db, 'users', user.uid), editedUser);
-        setUser(editedUser);
-        sendNotification("Success", "Personal details updated successfully.");
-        onClose();
-      }
+      await setDoc(doc(db, 'users', user.uid), editedUser);
+      setUser(editedUser);
+      sendNotification("Profile Updated", "Your changes have been saved successfully.");
+      onClose();
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'users');
+      console.error("Save error:", error);
+      sendNotification("Error", "Could not save profile. Please check your connection.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditedUser(prev => ({ ...prev, profilePic: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -876,10 +893,25 @@ const PersonalDetailsScreen = ({
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-12">
         <div className="flex flex-col items-center py-6">
-            <div className={`w-24 h-24 rounded-full overflow-hidden border-4 shadow-xl mb-3 ${theme === 'dark' ? 'border-white/10' : 'border-white'}`}>
-                <img src={user.profilePic || "https://picsum.photos/seed/driver/200/200"} alt="Me" className="w-full h-full object-cover" />
+            <div className={`w-24 h-24 rounded-full overflow-hidden border-4 shadow-xl mb-3 relative group ${theme === 'dark' ? 'border-white/10' : 'border-white'}`}>
+                <img src={editedUser.profilePic || user.profilePic || "https://picsum.photos/seed/driver/200/200"} alt="Me" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                  <Camera className="text-white" size={20} />
+                </div>
             </div>
-            <button className="text-blue-500 font-bold text-xs uppercase tracking-wider">Change Photo</button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleImageChange} 
+              className="hidden" 
+              accept="image/*"
+            />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="text-blue-500 font-bold text-xs uppercase tracking-wider active:opacity-50"
+            >
+              Change Photo
+            </button>
         </div>
 
         <div className="space-y-4">
@@ -927,9 +959,10 @@ const PersonalDetailsScreen = ({
       <div className="p-4 border-t border-gray-100 dark:border-white/5 shrink-0 bg-white dark:bg-[#0a0a0a]">
         <button 
           onClick={handleSave}
-          className="w-full py-4 bg-black text-white dark:bg-white dark:text-black rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-transform"
+          disabled={isSaving}
+          className="w-full py-4 bg-black text-white dark:bg-white dark:text-black rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
         >
-          SAVE CHANGES
+          {isSaving ? <RefreshCw className="animate-spin" size={20} /> : 'SAVE CHANGES'}
         </button>
       </div>
     </motion.div>
