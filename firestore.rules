@@ -45,18 +45,25 @@ service cloud.firestore {
 
     function isValidUser(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             (!('uid' in data) || data.uid is string) &&
+             (!('uid' in data) || (data.uid is string && data.uid == request.auth.uid)) &&
              (!('email' in data) || (data.email is string && data.email.size() < 100)) &&
-             (!('dob' in data) || (data.dob is string && data.dob.size() <= 20)) &&
-             (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
-             (!('address' in data) || (data.address is string && data.address.size() <= 600)) &&
-             (!('profilePic' in data) || (data.profilePic is string && data.profilePic.size() < 1048576)) &&
+             (!('profilePic' in data) || (data.profilePic is string && data.profilePic.size() < 1000)) &&
              (!('isOnline' in data) || (data.isOnline is bool)) &&
-             (!('tier' in data) || (data.tier is string)) &&
-             (!('rating' in data) || (data.rating is number)) &&
-             (!('points' in data) || (data.points is number)) &&
+             (!('tier' in data) || (data.tier in ['Blue', 'Gold', 'Platinum', 'Diamond'])) &&
+             (!('rating' in data) || (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
+             (!('points' in data) || (data.points is number && data.points >= 0)) &&
+             (!('experience' in data) || (data.experience is number && data.experience >= 0)) &&
+             (!('level' in data) || (data.level is number && data.level > 0)) &&
              (!('deliveries' in data) || (data.deliveries is number && data.deliveries >= 0)) &&
-             (!('walletBalance' in data) || (data.walletBalance is number && data.walletBalance >= 0));
+             (!('walletBalance' in data) || (data.walletBalance is number && data.walletBalance >= 0)) &&
+             (!('documentExpiries' in data) || (data.documentExpiries is shadow && data.documentExpiries.keys().size() < 20));
+    }
+
+    function isValidStatusTransition(oldStatus, newStatus) {
+      return (oldStatus == 'accepted' && (newStatus == 'picked_up' || newStatus == 'accepted')) ||
+             (oldStatus == 'picked_up' && (newStatus == 'arrived' || newStatus == 'picked_up')) ||
+             (oldStatus == 'arrived' && (newStatus == 'completed' || newStatus == 'arrived')) ||
+             (oldStatus == 'completed' && newStatus == 'completed');
     }
 
     function isValidScheduledOrder(data) {
@@ -70,15 +77,15 @@ service cloud.firestore {
     function isValidActiveOrder(data) {
       return data.driverUid is string && data.driverUid == request.auth.uid &&
              data.restaurantName is string && data.restaurantName.size() > 0 &&
-             data.status in ['accepted', 'picked_up', 'arrived', 'completed', 'returning_to_restaurant'];
+             data.status in ['accepted', 'picked_up', 'arrived', 'completed'];
     }
 
     function isValidCarPlaySync(data) {
-      return data.get('driverUid', '') == request.auth.uid &&
-             data.get('isActive', false) is bool &&
-             (data.get('activeOrderId', null) == null || data.get('activeOrderId', null) is string) &&
-             data.get('isNavigating', false) is bool &&
-             (data.get('lastUpdated', request.time) is timestamp);
+      return data.driverUid == request.auth.uid &&
+             data.isActive is bool &&
+             (!('activeOrderId' in data) || data.activeOrderId == null || data.activeOrderId is string) &&
+             data.isNavigating is bool &&
+             (data.lastUpdated == request.time);
     }
 
     // ===============================================================
@@ -86,10 +93,20 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if true;
+      allow read: if isAuthenticated();
       allow list: if isAdmin();
       
-      allow create, update: if isValidUser(incoming());
+      allow create: if isOwner(userId) && isValidUser(incoming()) && 
+                    incoming().walletBalance == 0 &&
+                    incoming().points == 0 &&
+                    incoming().rating == 5.0 &&
+                    (!('faceVerified' in incoming()) || incoming().faceVerified == false);
+      
+      allow update: if isOwner(userId) && isValidUser(incoming()) &&
+                    // Restrict direct manipulation of critical fields as per security audit.
+                    // These should ideally be managed by a trusted backend environment.
+                    (!affectedKeys().hasAny(['walletBalance', 'points', 'rating', 'deliveries', 'tier', 'level', 'experience', 'faceVerified']) || isAdmin());
+      
       allow delete: if isAdmin();
     }
 
@@ -107,26 +124,30 @@ service cloud.firestore {
     }
 
     match /carplay_sync/{userId} {
-      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       
-      allow create: if isValidId(userId) && isOwner(userId) && isValidCarPlaySync(incoming()) &&
-                    incoming().keys().hasAll(['driverUid', 'isActive']);
+      allow create: if isOwner(userId) && isValidCarPlaySync(incoming()) &&
+                    incoming().driverUid == userId;
       
-      allow update: if isValidId(userId) && isOwner(userId) && isValidCarPlaySync(incoming()) &&
+      allow update: if isOwner(userId) && isValidCarPlaySync(incoming()) &&
                     !affectedKeys().hasAny(['driverUid']);
       
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isOwner(userId);
     }
 
     match /active_orders/{orderId} {
       allow get: if isAuthenticated() && (existing().driverUid == request.auth.uid || isAdmin());
       allow list: if isAuthenticated() && (resource.data.driverUid == request.auth.uid || isAdmin());
       
-      allow create: if isAuthenticated() && isValidActiveOrder(incoming());
+      allow create: if isAuthenticated() && isValidActiveOrder(incoming()) &&
+                    incoming().status == 'accepted';
+                    
       allow update: if isAuthenticated() && (existing().driverUid == request.auth.uid || isAdmin()) && 
                     isValidActiveOrder(incoming()) &&
-                    !affectedKeys().hasAny(['driverUid']);
+                    isValidStatusTransition(existing().status, incoming().status) &&
+                    !affectedKeys().hasAny(['driverUid', 'restaurantName', 'estimatedPay']);
+                    
       allow delete: if isAuthenticated() && (existing().driverUid == request.auth.uid || isAdmin());
     }
   }
