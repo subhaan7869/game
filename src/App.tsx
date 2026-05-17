@@ -7850,7 +7850,14 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex-1 p-8 pt-4 flex flex-col">
+              <div className="flex-1 p-8 pt-4 flex flex-col relative">
+                <button 
+                  onClick={handleDeclineOrder}
+                  className="absolute top-4 right-4 w-12 h-12 bg-white/10 hover:bg-white/20 active:scale-90 rounded-full flex items-center justify-center transition-all z-30 border border-white/5"
+                  aria-label="Decline"
+                >
+                  <X size={24} className="text-gray-400" />
+                </button>
                 <div className="flex justify-between items-start mb-8">
                   <div>
                     <div className="flex items-center gap-2 mb-3">
@@ -7929,15 +7936,6 @@ export default function App() {
                       )}
                     </span>
                   </button>
-                  
-                  {!isMatchingLoading && !isMatchFailed && (
-                    <button 
-                      onClick={handleDeclineOrder}
-                      className="w-full py-4 bg-white/5 rounded-2xl font-black text-gray-500 active:scale-95 transition-all uppercase tracking-widest text-xs"
-                    >
-                      Decline
-                    </button>
-                  )}
                 </div>
               </div>
             </motion.div>
