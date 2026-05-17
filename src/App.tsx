@@ -2636,6 +2636,8 @@ export default function App() {
   }, [activeOrders]);
 
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isMatchingLoading, setIsMatchingLoading] = useState(false);
+  const [isMatchFailed, setIsMatchFailed] = useState(false);
 
   // Random Road Events while navigating
   useEffect(() => {
@@ -3775,15 +3777,19 @@ export default function App() {
   }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference, busynessMode]);
 
   const handleAcceptOrder = () => {
-    if (pendingOrder) {
-      // Check total order limit - stacked counts as 2
-      const orderCountToAdd = (pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1)) ? 2 : 1;
-      
-      if (activeOrders.length + orderCountToAdd > 4) { // Increased limit slightly for batches
-        sendNotification("Limit Reached", "You can only handle up to 4 active orders at a time.");
-        setPendingOrder(null);
-        return;
-      }
+    if (!pendingOrder) return;
+
+    // Check total order limit - stacked counts as 2
+    const orderCountToAdd = (pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1)) ? 2 : 1;
+    
+    if (activeOrders.length + orderCountToAdd > 4) { // Increased limit slightly for batches
+      sendNotification("Limit Reached", "You can only handle up to 4 active orders at a time.");
+      setPendingOrder(null);
+      return;
+    }
+
+    const processOrder = () => {
+      if (!pendingOrder) return;
 
       if (orderCountToAdd === 2) {
         // Split into 2 jobs as requested (max+1 logic)
@@ -3850,6 +3856,27 @@ export default function App() {
           playUberSound('message');
         });
       }, 5000);
+    };
+
+    if (pendingOrder.isMatching) {
+      setIsMatchingLoading(true);
+      setTimeout(() => {
+        const isSuccess = Math.random() > 0.3; // 70% chance to match
+        if (isSuccess) {
+          processOrder();
+          setIsMatchingLoading(false);
+        } else {
+          setIsMatchingLoading(false);
+          setIsMatchFailed(true);
+          playUberSound('message');
+          setTimeout(() => {
+            setIsMatchFailed(false);
+            setPendingOrder(null);
+          }, 4000);
+        }
+      }, 3500);
+    } else {
+      processOrder();
     }
   };
 
@@ -7870,26 +7897,47 @@ export default function App() {
                 <div className="mt-auto flex flex-col gap-3 pb-6 relative z-10">
                   <button 
                     onClick={handleAcceptOrder}
-                    className="relative w-full py-6 bg-blue-600 rounded-3xl font-black text-2xl shadow-[0_10px_30px_rgba(37,99,235,0.4)] active:scale-95 transition-all overflow-hidden"
+                    disabled={isMatchingLoading || isMatchFailed}
+                    className={`relative w-full py-6 rounded-3xl font-black text-2xl shadow-[0_10px_30px_rgba(37,99,235,0.4)] active:scale-95 transition-all overflow-hidden ${isMatchFailed ? 'bg-red-600' : 'bg-blue-600'}`}
                   >
-                    <motion.div 
-                      key={`timer-${pendingOrder.id}`}
-                      initial={{ width: '100%' }}
-                      animate={{ width: '0%' }}
-                      transition={{ duration: 18, ease: 'linear' }}
-                      className="absolute inset-0 bg-white/20"
-                    />
+                    {!isMatchingLoading && !isMatchFailed && (
+                      <motion.div 
+                        key={`timer-${pendingOrder.id}`}
+                        initial={{ width: '100%' }}
+                        animate={{ width: '0%' }}
+                        transition={{ duration: 18, ease: 'linear' }}
+                        className="absolute inset-0 bg-white/20"
+                      />
+                    )}
                     <span className="relative z-10 uppercase tracking-widest flex items-center justify-center gap-3">
-                      Accept Trip <span className="opacity-60 text-lg">•</span> {orderExpiryTimer}s
+                      {isMatchingLoading ? (
+                        <>
+                          <motion.div 
+                            animate={{ rotate: 360 }}
+                            transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                            className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full"
+                          />
+                          Matching...
+                        </>
+                      ) : isMatchFailed ? (
+                        <>
+                          <X size={24} />
+                          Another driver matched
+                        </>
+                      ) : (
+                        <>Accept Trip <span className="opacity-60 text-lg">•</span> {orderExpiryTimer}s</>
+                      )}
                     </span>
                   </button>
                   
-                  <button 
-                    onClick={handleDeclineOrder}
-                    className="w-full py-4 bg-white/5 rounded-2xl font-black text-gray-500 active:scale-95 transition-all uppercase tracking-widest text-xs"
-                  >
-                    Decline
-                  </button>
+                  {!isMatchingLoading && !isMatchFailed && (
+                    <button 
+                      onClick={handleDeclineOrder}
+                      className="w-full py-4 bg-white/5 rounded-2xl font-black text-gray-500 active:scale-95 transition-all uppercase tracking-widest text-xs"
+                    >
+                      Decline
+                    </button>
+                  )}
                 </div>
               </div>
             </motion.div>
