@@ -46,6 +46,7 @@ import {
   Phone,
   RefreshCw,
   Smartphone,
+  Shield,
   ShieldAlert,
   Share2,
   CheckCircle2,
@@ -66,7 +67,6 @@ import {
   Utensils,
   SlidersHorizontal,
   List,
-  Shield,
   Target,
   ArrowUp,
   ArrowDown,
@@ -1330,6 +1330,185 @@ const EarningsDetail = ({
   );
 };
 
+const OnboardingFlow = ({ 
+  user, 
+  setUser, 
+  onComplete,
+  theme
+}: { 
+  user: UserProfile, 
+  setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
+  onComplete: () => void,
+  theme: string
+}) => {
+  const [step, setStep] = useState(0);
+  const [localUser, setLocalUser] = useState(user);
+  const [vehicle, setVehicle] = useState(user.vehicleInfo || { make: '', model: '', year: 2024, plate: '', type: 'Uber Eats', photo: '' });
+
+  const nextStep = () => setStep(s => s + 1);
+  const prevStep = () => setStep(s => s - 1);
+
+  const handleFinish = () => {
+    setUser({ ...localUser, vehicleInfo: vehicle, documentsUploaded: false, faceVerified: false });
+    onComplete();
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      exit={{ opacity: 0 }} 
+      className={`h-full w-full flex flex-col p-8 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
+    >
+      <AnimatePresence mode="wait">
+        {step === 0 && (
+          <motion.div key="step0" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} className="flex-1 flex flex-col justify-center">
+            <div className="w-20 h-20 bg-black rounded-3xl flex items-center justify-center mb-10 shadow-2xl">
+              <span className="text-white text-4xl font-black">U</span>
+            </div>
+            <h1 className="text-5xl font-black leading-none tracking-tighter mb-6 underline decoration-blue-600 underline-offset-8">WELCOME TO<br/>THE FUTURE.</h1>
+            <p className="text-gray-500 font-bold text-lg mb-12">Let's get you set up to start earning. First, we need some details about you and your ride.</p>
+            <button onClick={nextStep} className="w-full py-6 bg-black text-white rounded-3xl font-black text-2xl tracking-tight shadow-xl active:scale-95 transition-all">
+              LET'S GO!
+            </button>
+          </motion.div>
+        )}
+
+        {step === 1 && (
+          <motion.div key="step1" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}>
+            <h2 className="text-3xl font-black mb-2">Service Type</h2>
+            <p className="text-gray-400 font-bold mb-8">How do you want to earn?</p>
+            <div className="grid gap-4">
+              {[
+                { id: 'UberX', label: 'Uber X', desc: 'Carry passengers around the city', icon: <Car className="w-8 h-8" /> },
+                { id: 'Uber Eats', label: 'Uber Eats', desc: 'Deliver food and groceries', icon: <Utensils className="w-8 h-8" /> },
+              ].map(item => (
+                <button 
+                  key={item.id}
+                  onClick={() => {
+                    setVehicle({...vehicle, type: item.id});
+                    nextStep();
+                  }}
+                  className={`p-6 border-4 rounded-[40px] text-left transition-all flex items-center gap-6 ${vehicle.type === item.id ? 'border-blue-600 bg-blue-50' : 'border-gray-100 hover:border-gray-200'}`}
+                >
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${vehicle.type === item.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                    {item.icon}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black">{item.label}</h3>
+                    <p className="text-sm font-bold text-gray-400">{item.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button onClick={prevStep} className="mt-8 text-sm font-black text-gray-400 hover:text-black transition-colors uppercase tracking-widest">Back</button>
+          </motion.div>
+        )}
+
+        {step === 2 && (
+          <motion.div key="step2" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}>
+            <h2 className="text-3xl font-black mb-2">Vehicle Details</h2>
+            <p className="text-gray-400 font-bold mb-8">Tell us about your {vehicle.type} vehicle.</p>
+            <div className="space-y-4">
+              <input 
+                type="text" 
+                placeholder="Vehicle Make (e.g. Toyota)"
+                value={vehicle.make}
+                onChange={e => setVehicle({...vehicle, make: e.target.value})}
+                className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all"
+              />
+              <input 
+                type="text" 
+                placeholder="Vehicle Model (e.g. Prius)"
+                value={vehicle.model}
+                onChange={e => setVehicle({...vehicle, model: e.target.value})}
+                className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all"
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <input 
+                  type="number" 
+                  placeholder="Year"
+                  value={vehicle.year}
+                  onChange={e => setVehicle({...vehicle, year: parseInt(e.target.value) || 2024})}
+                  className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all"
+                />
+                <input 
+                  type="text" 
+                  placeholder="License Plate"
+                  value={vehicle.plate}
+                  onChange={e => setVehicle({...vehicle, plate: e.target.value.toUpperCase()})}
+                  className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all"
+                />
+              </div>
+            </div>
+            <div className="mt-8 flex items-center justify-between">
+              <button onClick={prevStep} className="text-sm font-black text-gray-400 hover:text-black transition-colors uppercase tracking-widest">Back</button>
+              <button 
+                onClick={nextStep}
+                disabled={!vehicle.make || !vehicle.model || !vehicle.plate}
+                className="py-5 px-12 bg-black text-white rounded-2xl font-black text-lg shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                NEXT
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {step === 3 && (
+          <motion.div key="step3" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}>
+            <h2 className="text-3xl font-black mb-2">Show off your ride!</h2>
+            <p className="text-gray-400 font-bold mb-8">Upload a photo of your vehicle.</p>
+            <div className="relative aspect-video w-full rounded-[40px] overflow-hidden border-4 border-dashed border-gray-100 bg-gray-50 flex flex-col items-center justify-center group transition-all hover:border-blue-600">
+              {vehicle.photo ? (
+                <>
+                  <img src={vehicle.photo} alt="Vehicle" className="w-full h-full object-cover" />
+                  <button 
+                    onClick={() => setVehicle({...vehicle, photo: ''})}
+                    className="absolute top-4 right-4 p-3 bg-black/50 backdrop-blur-md text-white rounded-full active:scale-90 transition-transform"
+                  >
+                    <X size={24} />
+                  </button>
+                </>
+              ) : (
+                <label className="cursor-pointer flex flex-col items-center">
+                  <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-xl mb-4 group-hover:scale-110 transition-transform">
+                    <Camera size={40} className="text-blue-600" />
+                  </div>
+                  <span className="text-sm font-bold text-gray-400">Tap to upload photo</span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setVehicle({...vehicle, photo: reader.result as string});
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+            <div className="mt-8 flex items-center justify-between">
+              <button onClick={prevStep} className="text-sm font-black text-gray-400 hover:text-black transition-colors uppercase tracking-widest">Back</button>
+              <button 
+                onClick={handleFinish}
+                className="py-5 px-12 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
+              >
+                FINISH SETUP
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
 const VehicleDetailsScreen = ({ 
   user, 
   setUser, 
@@ -1342,9 +1521,17 @@ const VehicleDetailsScreen = ({
   theme: string
 }) => {
   const [vehicle, setVehicle] = useState(user.vehicleInfo || { make: '', model: '', year: 2024, plate: '', type: 'Car' });
+  const [insuranceDate, setInsuranceDate] = useState(user.documentExpiries?.["Vehicle Insurance"] || "");
 
   const handleSave = () => {
-    setUser(u => ({ ...u, vehicleInfo: vehicle }));
+    setUser(u => ({ 
+      ...u, 
+      vehicleInfo: vehicle,
+      documentExpiries: {
+        ...u.documentExpiries,
+        "Vehicle Insurance": insuranceDate
+      }
+    }));
     onClose();
   };
 
@@ -1360,58 +1547,123 @@ const VehicleDetailsScreen = ({
         <h1 className="text-3xl font-black">Vehicle Details</h1>
       </div>
       
-      <div className="space-y-6">
-        <div className="space-y-4">
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Make</label>
-            <input 
-              type="text" 
-              value={vehicle.make}
-              onChange={e => setVehicle({...vehicle, make: e.target.value})}
-              placeholder="e.g. Toyota"
-              className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
-            />
-          </div>
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Model</label>
-            <input 
-              type="text" 
-              value={vehicle.model}
-              onChange={e => setVehicle({...vehicle, model: e.target.value})}
-              placeholder="e.g. Prius"
-              className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+      <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex-1 space-y-6">
+          <div className="space-y-4">
             <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Year</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Make</label>
               <input 
-                type="number" 
-                value={vehicle.year}
-                onChange={e => setVehicle({...vehicle, year: parseInt(e.target.value) || 2024})}
+                type="text" 
+                value={vehicle.make}
+                onChange={e => setVehicle({...vehicle, make: e.target.value})}
+                placeholder="e.g. Toyota"
                 className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
               />
             </div>
             <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">License Plate</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Model</label>
               <input 
                 type="text" 
-                value={vehicle.plate}
-                onChange={e => setVehicle({...vehicle, plate: e.target.value.toUpperCase()})}
-                placeholder="e.g. AB12 CDE"
+                value={vehicle.model}
+                onChange={e => setVehicle({...vehicle, model: e.target.value})}
+                placeholder="e.g. Prius"
                 className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
               />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Year</label>
+                <input 
+                  type="number" 
+                  value={vehicle.year}
+                  onChange={e => setVehicle({...vehicle, year: parseInt(e.target.value) || 2024})}
+                  className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">License Plate</label>
+                <input 
+                  type="text" 
+                  value={vehicle.plate}
+                  onChange={e => setVehicle({...vehicle, plate: e.target.value.toUpperCase()})}
+                  placeholder="e.g. AB12 CDE"
+                  className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Insurance Expiry Date</label>
+              <input 
+                type="date" 
+                value={insuranceDate}
+                onChange={e => setInsuranceDate(e.target.value)}
+                className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
+              />
+              <p className="mt-2 text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
+                Updating this date will automatically refresh the alert in your Account screen if nearing expiry.
+              </p>
             </div>
           </div>
         </div>
-        
-        <button 
-          onClick={handleSave}
-          className="w-full py-4 bg-black text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-transform mt-8"
-        >
-          SAVE CHANGES
-        </button>
+
+        <div className="w-full lg:w-72 space-y-4">
+          <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Vehicle Photo</label>
+          <div className="relative aspect-square w-full rounded-3xl overflow-hidden border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center group transition-all hover:border-blue-500">
+            {vehicle.photo ? (
+              <>
+                <img src={vehicle.photo} alt="Vehicle" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <label className="cursor-pointer p-4 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">
+                    Change Photo
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setVehicle({...vehicle, photo: reader.result as string});
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </>
+            ) : (
+              <label className="cursor-pointer flex flex-col items-center p-8 text-center">
+                <Camera size={32} className="text-gray-400 mb-2 group-hover:text-blue-500 transition-colors" />
+                <span className="text-xs font-bold text-gray-400 group-hover:text-blue-500 transition-colors">Upload vehicle photo</span>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setVehicle({...vehicle, photo: reader.result as string});
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                />
+              </label>
+            )}
+          </div>
+        </div>
       </div>
+      
+      <button 
+        onClick={handleSave}
+        className="w-full py-5 bg-black text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform mt-12"
+      >
+        SAVE CHANGES
+      </button>
     </motion.div>
   );
 };
@@ -2126,14 +2378,42 @@ export default function App() {
       rating: 5.00,
       tier: 'Blue',
       points: 0,
+      experience: 0,
+      level: 1,
       deliveries: 0,
       deliveriesToday: 0,
       rides: 0,
+      acceptanceRate: 98,
+      cancellationRate: 1,
       isOnline: false,
       documentsUploaded: true,
       faceVerified: true,
       walletBalance: 0.00,
       profilePic: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop",
+      activeMissions: [
+        {
+          id: 'm1',
+          title: 'Daily Sprinter',
+          description: 'Complete 3 deliveries today',
+          progress: 0,
+          goal: 3,
+          pointsReward: 50,
+          cashReward: 10,
+          completed: false,
+          type: 'delivery_count'
+        },
+        {
+          id: 'm2',
+          title: 'Earnings Kickstart',
+          description: 'Earn £50 in a single day',
+          progress: 0,
+          goal: 50,
+          pointsReward: 100,
+          cashReward: 25,
+          completed: false,
+          type: 'earnings_goal'
+        }
+      ],
       vehicleInfo: {
         make: "Tesla",
         model: "Model 3 Performance",
@@ -2143,7 +2423,7 @@ export default function App() {
       },
       documentExpiries: {
         "Driving Licence": "2027-05-01",
-        "Vehicle Insurance": "2026-12-15",
+        "Vehicle Insurance": "2026-06-10",
         "Bank Statement": "Verified"
       }
     };
@@ -2269,6 +2549,24 @@ export default function App() {
   const [updateProgress, setUpdateProgress] = useState(0);
   const [isScanningReceipt, setIsScanningReceipt] = useState<string | null>(null);
   const [isVerifyingReceipt, setIsVerifyingReceipt] = useState(false);
+  const [dismissedExpiries, setDismissedExpiries] = useState<string[]>([]);
+  const [isUpdatingInsurance, setIsUpdatingInsurance] = useState(false);
+  const [newInsuranceDate, setNewInsuranceDate] = useState("");
+  const [lastRatedStars, setLastRatedStars] = useState<number | null>(null);
+  const [showLevelUp, setShowLevelUp] = useState<{ level: number, unlocked: string } | null>(null);
+  const [roadEvent, setRoadEvent] = useState<{ id: string, title: string, description: string, bonus: number } | null>(null);
+
+  const insuranceExpiry = user.documentExpiries?.["Vehicle Insurance"];
+  const insuranceDaysLeft = useMemo(() => {
+    if (!insuranceExpiry) return null;
+    const expiryDate = new Date(insuranceExpiry);
+    if (isNaN(expiryDate.getTime())) return null;
+    const today = new Date();
+    const diffTime = expiryDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }, [insuranceExpiry]);
+
+  const showInsuranceWarning = insuranceDaysLeft !== null && insuranceDaysLeft <= 30 && !dismissedExpiries.includes("Vehicle Insurance");
 
   // Persist theme and earnings
   useEffect(() => {
@@ -2300,34 +2598,106 @@ export default function App() {
     
     const stops: { orderId: string, type: 'pickup' | 'dropoff', location: Location, label: string }[] = [];
     
-    // Simple logic: Pickups first, then dropoffs
-    // In a more complex app, we'd sort by distance
-    activeOrders.forEach(order => {
-      if (order.status === 'accepted' || order.status === 'en_route_to_pickup') {
+    // STRICT SEQUENCING: If any accepted orders exist that haven't been picked up yet,
+    // we MUST prioritize ALL pickups first before any dropoffs.
+    const ordersNeedingPickup = activeOrders.filter(o => 
+      o.status === 'accepted' || 
+      o.status === 'en_route_to_pickup' || 
+      o.status === 'arrived' ||
+      o.status === 'scanning_receipt' ||
+      o.status === 'arriving'
+    ).filter(o => o.status !== 'picked_up' && o.status !== 'delivered');
+
+    const ordersReadyForDropoff = activeOrders.filter(o => o.status === 'picked_up');
+
+    // If there ARE pickups to do, we ONLY show pickups in the stop list to enforce "Pick up all before dropping off"
+    if (ordersNeedingPickup.length > 0) {
+      ordersNeedingPickup.forEach(order => {
         stops.push({
           orderId: order.id,
           type: 'pickup',
           location: order.restaurantLocation || order.pickupLocation!,
-          label: order.type === 'ride' ? `Pickup: ${order.customerName}` : `Pickup: ${order.restaurantName}`
+          label: order.type === 'ride' ? `Pickup: ${order.customerName}` : `Pickup: ${order.restaurantName || "Restaurant"}`
         });
-      }
-    });
-    
-    activeOrders.forEach(order => {
-      if (order.status === 'picked_up' || order.status === 'arrived') {
+      });
+    } else {
+      // Only show dropoffs if all pickups are complete
+      ordersReadyForDropoff.forEach(order => {
         stops.push({
           orderId: order.id,
           type: 'dropoff',
           location: order.customerLocation,
           label: order.type === 'ride' ? `Dropoff: Passenger` : `Deliver to: ${order.customerName}`
         });
-      }
-    });
+      });
+    }
 
     return stops;
   }, [activeOrders]);
 
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  // Random Road Events while navigating
+  useEffect(() => {
+    if (!isNavigating || !user.isOnline) {
+      setRoadEvent(null);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      if (Math.random() > 0.85 && !roadEvent) {
+        const events = [
+          { id: 'e1', title: "Road Closure", description: "Heavy traffic ahead. +£1.50 logic applied.", bonus: 1.50 },
+          { id: 'e2', title: "Fuel Discount", description: "Nearby station offering 10% off for drivers.", bonus: 0 },
+          { id: 'e3', title: "Surge Alert", description: "Demand is spiking in your area! +£2.00 on next trip.", bonus: 2.00 },
+          { id: 'e4', title: "Weather Warning", description: "Rain expected. Drive safe! +£1.00 rain bonus.", bonus: 1.00 }
+        ];
+        const randomEvent = events[Math.floor(Math.random() * events.length)];
+        setRoadEvent(randomEvent);
+        playUberSound('message');
+        
+        // Auto-clear after 10 seconds
+        setTimeout(() => setRoadEvent(null), 10000);
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [isNavigating, user.isOnline, roadEvent]);
+  const [radarOrders, setRadarOrders] = useState<Order[]>([]);
+  const [selectedRadarOrder, setSelectedRadarOrder] = useState<Order | null>(null);
+
+  // Generate Radar Orders periodically when idle
+  useEffect(() => {
+    if (!user.isOnline || isNavigating || activeOrders.length >= 4 || pendingOrder) {
+      setRadarOrders([]);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      if (Math.random() > 0.7) {
+        setRadarOrders(prev => {
+          if (prev.length >= 3) return prev;
+          const newRadar = generateSmartOrder();
+          newRadar.isMatching = true; // Mark as matching trip
+          
+          // Remove after 20 seconds if not taken
+          setTimeout(() => {
+            setRadarOrders(curr => curr.filter(o => o.id !== newRadar.id));
+          }, 20000);
+          
+          return [...prev, newRadar];
+        });
+      }
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, [user.isOnline, isNavigating, activeOrders.length, pendingOrder]);
+
   const currentStop = currentStops[0];
+  const currentOrder = useMemo(() => {
+    if (!currentStop) return null;
+    return activeOrders.find(o => o.id === currentStop.orderId) || null;
+  }, [currentStop, activeOrders]);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = localStorage.getItem('uber_chat_messages');
@@ -2353,7 +2723,6 @@ export default function App() {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   
   const [isBottomMenuOpen, setIsBottomMenuOpen] = useState(false);
-  const [isNavigating, setIsNavigating] = useState(false);
   const [heading, setHeading] = useState(0);
   const [isSafetyToolkitOpen, setIsSafetyToolkitOpen] = useState(false);
   const [isDestFilterOpen, setIsDestFilterOpen] = useState(false);
@@ -3277,7 +3646,7 @@ export default function App() {
       return {
         id: Math.random().toString(36).substring(2, 11),
         type,
-        customerName: isStacked ? `${customerName} + 1 more` : customerName,
+        customerName: isStacked ? `${customerName} (Max+1)` : customerName,
         restaurantName: type === 'delivery' ? MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)].name : "UberX",
         restaurantLocation: { latitude: pickupLat, longitude: pickupLng },
         pickupLocation: { latitude: pickupLat, longitude: pickupLng },
@@ -3407,18 +3776,80 @@ export default function App() {
 
   const handleAcceptOrder = () => {
     if (pendingOrder) {
-      if (activeOrders.length >= 3) {
-        sendNotification("Limit Reached", "You can only handle up to 3 active orders at a time.");
+      // Check total order limit - stacked counts as 2
+      const orderCountToAdd = (pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1)) ? 2 : 1;
+      
+      if (activeOrders.length + orderCountToAdd > 4) { // Increased limit slightly for batches
+        sendNotification("Limit Reached", "You can only handle up to 4 active orders at a time.");
         setPendingOrder(null);
         return;
       }
-      setActiveOrders(prev => [...prev, { ...pendingOrder, status: 'accepted' }]);
-      console.log(`Order Accepted: ${pendingOrder.id}, PIN: ${pendingOrder.pin}`);
+
+      if (orderCountToAdd === 2) {
+        // Split into 2 jobs as requested (max+1 logic)
+        const order1: Order = {
+          ...pendingOrder,
+          id: pendingOrder.id + "_1",
+          customerName: pendingOrder.customerName.replace(" + 1 more", "").trim(),
+          estimatedPay: Number((pendingOrder.estimatedPay * 0.55).toFixed(2)),
+          status: 'accepted',
+          isStacked: false,
+          batchCount: 1
+        };
+        const secondCustomer = MOCK_CUSTOMERS[Math.floor(Math.random() * MOCK_CUSTOMERS.length)];
+        const order2: Order = {
+          ...pendingOrder,
+          id: pendingOrder.id + "_2",
+          customerName: `${secondCustomer} (Part 2)`,
+          estimatedPay: Number((pendingOrder.estimatedPay * 0.45).toFixed(2)),
+          status: 'accepted',
+          isStacked: false,
+          batchCount: 1,
+          // Offset customer location slightly for the second job to make it realistic
+          customerLocation: { 
+            latitude: pendingOrder.customerLocation.latitude + (Math.random() - 0.5) * 0.005, 
+            longitude: pendingOrder.customerLocation.longitude + (Math.random() - 0.5) * 0.005 
+          }
+        };
+        setActiveOrders(prev => [...prev, order1, order2]);
+        sendNotification("2 Jobs Accepted", `Stacked delivery: ${order1.customerName} & ${order2.customerName}`);
+      } else {
+        setActiveOrders(prev => [...prev, { ...pendingOrder, status: 'accepted' }]);
+        console.log(`Order Accepted: ${pendingOrder.id}, PIN: ${pendingOrder.pin}`);
+      }
+
       setPendingOrder(null);
       setOrderExpiryTimer(10);
       setIsNavigating(true);
       setMapOffset({ x: 0, y: 0 }); // Snap map back to driver on acceptance
       playUberSound('accept');
+
+      // Simulated Customer Greeting after 5 seconds
+      const orderIds = orderCountToAdd === 2 
+        ? [pendingOrder.id + "_1", pendingOrder.id + "_2"] 
+        : [pendingOrder.id];
+
+      setTimeout(() => {
+        orderIds.forEach(id => {
+          const greetings = [
+            "Hi! Please leave it at the door. Thanks!",
+            "On my way down to meet you soon.",
+            "Please call when you arrive!",
+            "The buzzer is #404. Let me know if you have trouble."
+          ];
+          const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+          
+          setMessages(prev => [...prev, {
+            id: Math.random().toString(36).substr(2, 9),
+            orderId: id,
+            sender: 'customer',
+            text: randomGreeting,
+            timestamp: Date.now()
+          }]);
+          sendNotification("New Message", randomGreeting);
+          playUberSound('message');
+        });
+      }, 5000);
     }
   };
 
@@ -3544,6 +3975,45 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    if (!user.isOnline || activeOrders.length === 0) return;
+
+    const interval = setInterval(() => {
+      if (Math.random() > 0.85 && !isCustomerTyping) {
+        const randomOrder = activeOrders[Math.floor(Math.random() * activeOrders.length)];
+        // Don't send if already busy with a reply or just sent one
+        setIsCustomerTyping(true);
+        
+        setTimeout(() => {
+          const prods = [
+            "Any updates on the delivery?",
+            "Just checking in, see you soon!",
+            "Thanks for picking this up!",
+            "Is everything okay with the order?",
+            "Could you please make sure they included the extra napkins? Thanks!"
+          ];
+          const randomProd = prods[Math.floor(Math.random() * prods.length)];
+          
+          setMessages(prev => [...prev, {
+            id: Math.random().toString(36).substr(2, 9),
+            orderId: randomOrder.id,
+            sender: 'customer',
+            text: randomProd,
+            timestamp: Date.now()
+          }]);
+          
+          if (activeChatOrderId !== randomOrder.id) {
+            sendNotification(`Message from ${randomOrder.customerName}`, randomProd);
+          }
+          playUberSound('message');
+          setIsCustomerTyping(false);
+        }, 3000);
+      }
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, [user.isOnline, activeOrders, isCustomerTyping, activeChatOrderId]);
+
   const handleNextStep = (orderId: string) => {
     const order = activeOrders.find(o => o.id === orderId);
     if (!order) return;
@@ -3577,26 +4047,86 @@ export default function App() {
     const order = activeOrders.find(o => o.id === orderId);
     if (!order) return;
 
-    setEarnings(prev => prev + order.estimatedPay);
-    setBankBalance(prev => prev + order.estimatedPay);
+    const earnedPay = order.estimatedPay;
+    setEarnings(prev => prev + earnedPay);
+    setBankBalance(prev => prev + earnedPay);
     setCompletedTrips(prev => [
       {
         id: order.id,
         type: order.type,
         restaurantName: order.restaurantName || "UberX Trip",
         customerName: order.customerName,
-        earnings: order.estimatedPay,
+        earnings: earnedPay,
         distance: order.estimatedDistance,
         timestamp: Date.now()
       },
       ...prev
     ]);
     
-    if (order.type === 'ride') {
-      setUser(u => ({ ...u, rides: (u.rides || 0) + 1, deliveriesToday: (u.deliveriesToday || 0) + 1, points: u.points + 10 }));
-    } else {
-      setUser(u => ({ ...u, deliveries: u.deliveries + 1, deliveriesToday: (u.deliveriesToday || 0) + 1, points: u.points + 10 }));
-    }
+    // Random Customer Rating (weighted towards 5)
+    const randomRating = Math.random() > 0.1 ? 5 : Math.floor(Math.random() * 2) + 3;
+    setLastRatedStars(randomRating);
+    setTimeout(() => setLastRatedStars(null), 5000);
+
+    setUser(u => {
+      const newDeliveriesToday = (u.deliveriesToday || 0) + 1;
+      const newPoints = u.points + 10;
+      const newExp = (u.experience || 0) + 25;
+      let newLevel = u.level || 1;
+      let unlockedFeature = "";
+
+      // Level Up Logic (100 XP per level)
+      if (newExp >= newLevel * 100) {
+        newLevel += 1;
+        unlockedFeature = newLevel === 2 ? "Fuel Perks" : newLevel === 3 ? "Instant Pay" : "Service Discounts";
+        setShowLevelUp({ level: newLevel, unlocked: unlockedFeature });
+      }
+
+      // Update Missions
+      const updatedMissions = (u.activeMissions || []).map(m => {
+        if (m.completed) return m;
+        
+        let newProgress = m.progress;
+        if (m.type === 'delivery_count') {
+          newProgress += 1;
+        } else if (m.type === 'earnings_goal') {
+          newProgress += earnedPay;
+        }
+
+        const isNowCompleted = newProgress >= m.goal;
+        if (isNowCompleted) {
+          sendNotification("Mission Completed!", `You earned £${m.cashReward} and ${m.pointsReward} pts: ${m.title}`);
+          playUberSound('accept');
+        }
+
+        return {
+          ...m,
+          progress: newProgress,
+          completed: isNowCompleted
+        };
+      });
+
+      // Apply mission rewards if newly completed
+      const newlyCompleted = updatedMissions.filter((m, i) => m.completed && !(u.activeMissions?.[i]?.completed));
+      const extraCash = newlyCompleted.reduce((acc, m) => acc + m.cashReward, 0);
+      const extraPoints = newlyCompleted.reduce((acc, m) => acc + m.pointsReward, 0);
+
+      // Simple rating update (weighted average simulation)
+      const newRating = (u.rating * 100 + randomRating) / 101;
+
+      return { 
+        ...u, 
+        deliveries: order.type === 'ride' ? u.deliveries : u.deliveries + 1,
+        rides: order.type === 'ride' ? (u.rides || 0) + 1 : u.rides,
+        deliveriesToday: newDeliveriesToday, 
+        points: newPoints + extraPoints,
+        experience: newExp,
+        level: newLevel,
+        walletBalance: u.walletBalance + extraCash,
+        activeMissions: updatedMissions,
+        rating: newRating
+      };
+    });
 
     setActiveOrders(prev => {
       const remaining = prev.filter(o => o.id !== orderId);
@@ -3787,11 +4317,17 @@ export default function App() {
 
 
   const userTier = useMemo(() => {
-    if (user.points >= 3000) return 'Diamond';
-    if (user.points >= 1500) return 'Platinum';
-    if (user.points >= 500) return 'Gold';
+    const minRating = 4.85;
+    const minAcceptance = 85;
+    const maxCancellation = 4;
+
+    const meetsCriteria = user.rating >= minRating && user.acceptanceRate >= minAcceptance && user.cancellationRate <= maxCancellation;
+
+    if (user.points >= 1800 && meetsCriteria) return 'Diamond';
+    if (user.points >= 1200 && meetsCriteria) return 'Platinum';
+    if (user.points >= 600 && meetsCriteria) return 'Gold';
     return 'Blue';
-  }, [user.points]);
+  }, [user.points, user.rating, user.acceptanceRate, user.cancellationRate]);
 
   const wakeLock = useRef<any>(null);
   const hiddenVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -3948,23 +4484,18 @@ export default function App() {
         <div className="flex-1 relative overflow-hidden flex flex-col">
           <AnimatePresence>
             {currentScreen === 'onboarding' && (
-              <motion.div key="onboarding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full w-full bg-white text-black p-8 flex flex-col justify-center pb-24">
-              <div className="mb-12">
-                <div className="w-20 h-20 bg-black rounded-2xl flex items-center justify-center mb-6">
-                  <span className="text-white text-4xl font-black">U</span>
-                </div>
-                <h1 className="font-display text-4xl font-black leading-[0.9] tracking-tighter">Drive when you want,<br/>earn what you need</h1>
-              </div>
-              <div className="space-y-4">
-                <button onClick={() => setCurrentScreen('documents')} className="w-full py-5 bg-black text-white rounded-2xl font-black text-xl tracking-wide">
-                  CONTINUE
-                </button>
-                <p className="text-center text-sm text-gray-400 font-bold">By continuing, you agree to our Terms of Service</p>
-              </div>
-            </motion.div>
-          )}
+              <OnboardingFlow 
+                user={user}
+                setUser={setUser}
+                theme={theme}
+                onComplete={() => {
+                  localStorage.setItem('uber_has_seen_onboarding', 'true');
+                  setCurrentScreen('documents');
+                }}
+              />
+            )}
 
-          {currentScreen === 'documents' && (
+            {currentScreen === 'documents' && (
             <motion.div key="documents" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="h-full w-full bg-white text-black p-6 flex flex-col pb-24">
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen(user.isOnline ? 'account' : 'onboarding')} className="p-2 bg-gray-100 rounded-full"><ArrowRight className="rotate-180" size={24} /></button>
@@ -4164,142 +4695,6 @@ export default function App() {
               
                   {/* Heatmap Simulation */}
                   {user.isOnline && !isNavigating && <Heatmap busynessMode={busynessMode} isLowPerformance={isLowPerformance} />}
-              {/* Matching / Trip Request Overlay */}
-              <AnimatePresence>
-                {pendingOrder && (
-                  <motion.div 
-                    initial={{ y: '100%' }} 
-                    animate={{ y: 0 }} 
-                    exit={{ y: '100%' }} 
-                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="absolute inset-x-0 bottom-0 z-[1500] h-[75vh] bg-black/95 text-white rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden border-t border-white/10"
-                  >
-                    {/* Map Preview (Simulated) */}
-                    <div className="h-48 w-full relative overflow-hidden bg-gray-900">
-                      <div className="absolute inset-0 opacity-30" style={{ 
-                        backgroundImage: 'linear-gradient(90deg, #333 1px, transparent 1px), linear-gradient(#333 1px, transparent 1px)',
-                        backgroundSize: '20px 20px'
-                      }} />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="relative w-full h-full max-w-[500px]">
-                          {/* Driver to Restaurant line */}
-                          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 500 300" preserveAspectRatio="xMidYMid meet">
-                            <motion.path 
-                              d="M 50 150 Q 150 50 250 150" 
-                              fill="none" 
-                              stroke="#3b82f6" 
-                              strokeWidth="8" 
-                              strokeDasharray="12,12"
-                              initial={{ strokeDashoffset: 100 }}
-                              animate={{ strokeDashoffset: 0 }}
-                              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                            />
-                            <motion.path 
-                              d="M 250 150 Q 350 250 450 150" 
-                              fill="none" 
-                              stroke="#10b981" 
-                              strokeWidth="8" 
-                              strokeDasharray="12,12"
-                              initial={{ strokeDashoffset: 100 }}
-                              animate={{ strokeDashoffset: 0 }}
-                              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                            />
-                          </svg>
-                          <div className="absolute left-[10%] top-[150px] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg" />
-                          <div className="absolute left-[50%] top-[150px] -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-green-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-                            <Coffee size={16} className="text-white" />
-                          </div>
-                          <div className="absolute left-[90%] top-[150px] -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-                            <User size={16} className="text-white" />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="absolute top-4 left-6 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase border border-white/10">
-                        Trip Preview
-                      </div>
-                    </div>
-
-                    <div className="flex-1 p-8 pt-4 flex flex-col">
-                      <div className="flex justify-between items-start mb-8">
-                        <div>
-                          <div className="flex items-center gap-2 mb-3">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${pendingOrder.type === 'ride' ? 'bg-white text-black' : pendingOrder.isMatching ? 'bg-orange-500 text-white' : 'bg-blue-600 text-white shadow-[0_5px_15px_rgba(37,99,235,0.3)]'}`}>
-                          {pendingOrder.type === 'ride' ? 'UberX' : pendingOrder.isMatching ? 'Matching Trip' : 'New Trip'}
-                        </span>
-                        {pendingOrder.type === 'ride' && (
-                          <span className="px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-blue-600 text-white flex items-center gap-1 shadow-[0_5px_15px_rgba(37,99,235,0.3)]">
-                            <CarIcon size={12} fill="currentColor" />
-                            UBERX EXCLUSIVE
-                          </span>
-                        )}
-                            {pendingOrder.type === 'ride' && pendingOrder.riderRating && (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-yellow-400 text-black flex items-center gap-1">
-                                <Star size={10} fill="currentColor" />
-                                {pendingOrder.riderRating}
-                              </span>
-                            )}
-                            {pendingOrder.surge && (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-blue-500 text-white flex items-center gap-1">
-                                <Zap size={10} fill="currentColor" />
-                                {pendingOrder.surge}x
-                              </span>
-                            )}
-                          </div>
-                          <h2 className="font-display text-5xl font-black mb-1">£{pendingOrder.estimatedPay.toFixed(2)}</h2>
-                          <p className="text-gray-500 font-black tracking-widest uppercase text-[10px]">Total Payment</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-display font-black text-2xl">{getArrivalTime(pendingOrder.estimatedTime)}</p>
-                          <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest">{pendingOrder.estimatedDistance.toFixed(1)} mi • {pendingOrder.estimatedTime} min</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-6 mb-12">
-                        <div className="flex items-start gap-4">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${pendingOrder.type === 'ride' ? 'bg-blue-500/20 text-blue-500' : 'bg-orange-500/20 text-orange-500'}`}>
-                            {pendingOrder.type === 'ride' ? <User size={20} /> : <Coffee size={20} />}
-                          </div>
-                          <div>
-                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${pendingOrder.type === 'ride' ? 'text-blue-500' : 'text-orange-500'}`}>{pendingOrder.type === 'ride' ? 'Rider Pickup' : 'Restaurant Pickup'}</p>
-                            <p className="text-xl font-bold">{pendingOrder.type === 'ride' ? `${pendingOrder.customerName} • ${pendingOrder.riderRating} ★` : pendingOrder.restaurantName}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-4">
-                          <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 shrink-0">
-                            <Navigation size={20} />
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Trip Destination</p>
-                            <p className="text-xl font-bold">{pendingOrder.type === 'ride' ? 'Dropoff Location' : pendingOrder.customerName}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-auto flex flex-col gap-4 relative z-10">
-                        <button 
-                          onClick={handleAcceptOrder}
-                          className="relative w-full py-6 bg-orange-500 rounded-3xl font-black text-2xl shadow-[0_0_40px_rgba(249,115,22,0.4)] active:scale-95 transition-all overflow-hidden"
-                        >
-                          <motion.div 
-                            initial={{ width: '100%' }}
-                            animate={{ width: '0%' }}
-                            transition={{ duration: 15, ease: 'linear' }}
-                            className="absolute inset-0 bg-white/20"
-                          />
-                          <span className="relative z-10">ACCEPT TRIP • {orderExpiryTimer}s</span>
-                        </button>
-                        
-                        <button 
-                          onClick={handleDeclineOrder}
-                          className="w-full py-4 bg-white/5 rounded-2xl font-black text-gray-400 active:scale-95 transition-all"
-                        >
-                          DECLINE
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
               {/* Background Mode Indicator */}
               {user.isOnline && !isNavigating && (
@@ -4309,7 +4704,34 @@ export default function App() {
                     <span className="text-[10px] font-black tracking-widest uppercase tracking-[0.2em]">Active</span>
                   </div>
                   
-                  {surgeMultiplier > 1.0 && (
+                  {/* Road Event Notification */}
+              <AnimatePresence>
+                {roadEvent && (
+                  <motion.div 
+                    initial={{ y: -50, opacity: 0 }}
+                    animate={{ y: isNavigating ? 140 : 100, opacity: 1 }}
+                    exit={{ y: -50, opacity: 0 }}
+                    className="absolute left-6 right-6 z-[200] bg-red-600 text-white p-4 rounded-[28px] shadow-2xl flex items-center gap-4 border border-red-500"
+                  >
+                    <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
+                      <AlertCircle size={24} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-0.5">Road Event</p>
+                      <h4 className="font-black text-sm uppercase leading-tight mb-0.5">{roadEvent.title}</h4>
+                      <p className="text-xs font-bold opacity-90">{roadEvent.description}</p>
+                    </div>
+                    <button 
+                      onClick={() => setRoadEvent(null)}
+                      className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                    >
+                      <X size={20} />
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {surgeMultiplier > 1.0 && (
                     <motion.div 
                       initial={{ scale: 0.5, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
@@ -4321,6 +4743,116 @@ export default function App() {
                   )}
                 </div>
               )}
+
+              {/* Radar Orders Map Overlay (Interactive Icons) */}
+              {user.isOnline && !isNavigating && radarOrders.map(order => (
+                <motion.div
+                  key={`radar-icon-${order.id}`}
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0, opacity: 0 }}
+                  style={{ 
+                    position: 'absolute',
+                    left: `calc(50% + ${(order.pickupLocation?.longitude - (location?.longitude || 0)) * MAP_SCALE + (mapOffset.x || 0)}px)`,
+                    top: `calc(50% + ${((location?.latitude || 0) - order.pickupLocation?.latitude) * MAP_SCALE + (mapOffset.y || 0)}px)`,
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: 2000
+                  }}
+                  onClick={() => setPendingOrder(order)}
+                  className="cursor-pointer group"
+                >
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-20" />
+                    <div className="relative w-12 h-12 bg-white dark:bg-black rounded-3xl shadow-2xl flex items-center justify-center border-2 border-blue-600 group-hover:scale-110 transition-transform">
+                      {order.type === 'ride' ? <User size={20} className="text-blue-600" /> : <Coffee size={20} className="text-orange-500" />}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+
+              {/* Speedometer Overlay */}
+              {user.isOnline && !pendingOrder && (
+                <div className="absolute left-6 bottom-48 z-50 flex flex-col items-center">
+                  <div className="w-20 h-20 bg-black/80 text-white rounded-full flex flex-col items-center justify-center shadow-2xl border border-white/10 backdrop-blur-md">
+                    <span className="text-3xl font-black leading-none">
+                      {isNavigating ? Math.floor(Math.random() * 15 + 25) : 0}
+                    </span>
+                    <span className="text-[8px] font-black opacity-60 uppercase tracking-widest">mph</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Safety Toolkit Button */}
+              {user.isOnline && !pendingOrder && (
+                <div className="absolute right-6 bottom-48 z-50">
+                  <button 
+                    onClick={() => sendNotification("Safety Toolkit", "Emergency assistance and safety features are active.")}
+                    className="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-transform border border-blue-400"
+                  >
+                    <ShieldCheck size={24} />
+                  </button>
+                </div>
+              )}
+
+              {/* Trip Radar Matcher Drawer */}
+              <AnimatePresence>
+                {user.isOnline && !isNavigating && !pendingOrder && !isBottomMenuOpen && radarOrders.length > 0 && (
+                  <motion.div 
+                    initial={{ y: 300 }} 
+                    animate={{ y: 0 }} 
+                    exit={{ y: 300 }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    className="absolute inset-x-0 bottom-2 z-[2500] pointer-events-none"
+                  >
+                    <div className="mx-4 bg-black/95 text-white rounded-[32px] p-6 shadow-[0_-20px_60px_rgba(0,0,0,0.5)] border-t border-white/10 pointer-events-auto overflow-hidden">
+                      <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.8)]" />
+                          <h3 className="text-sm font-black uppercase tracking-[0.25em]">Trip Radar Match</h3>
+                        </div>
+                        <span className="text-[10px] font-bold opacity-40 uppercase tracking-widest">{radarOrders.length} TRIP{radarOrders.length > 1 ? 'S' : ''} DISCOVERED</span>
+                      </div>
+
+                      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none snap-x">
+                        {radarOrders.map(order => (
+                          <motion.button 
+                            key={`radar-list-item-${order.id}`}
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            onClick={() => setPendingOrder(order)}
+                            className="min-w-[320px] snap-center bg-white/5 hover:bg-white/10 rounded-2xl p-5 border border-white/5 transition-all text-left group"
+                          >
+                            <div className="flex justify-between items-start mb-6">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${order.type === 'ride' ? 'bg-blue-600/20 text-blue-500' : 'bg-orange-500/20 text-orange-500'}`}>
+                                  {order.type === 'ride' ? <User size={24} /> : <Coffee size={24} />}
+                                </div>
+                                <div>
+                                  <p className="text-2xl font-black">£{order.estimatedPay.toFixed(2)}</p>
+                                  <p className="text-[10px] font-black opacity-30 uppercase tracking-widest leading-none">{order.estimatedDistance.toFixed(1)} mi • {order.estimatedTime} min</p>
+                                </div>
+                              </div>
+                              <div className="px-3 py-1 bg-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest group-hover:scale-110 transition-transform">
+                                MATCH
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <MapPin size={12} className="text-blue-500" />
+                                <span className="text-sm font-bold truncate opacity-80">{order.type === 'ride' ? 'Pickup' : order.restaurantName}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Navigation size={12} className="text-gray-500" />
+                                <span className="text-sm font-bold truncate opacity-80">{order.customerName}</span>
+                              </div>
+                            </div>
+                          </motion.button>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Map Simulation */}
               <motion.div 
@@ -5612,12 +6144,17 @@ export default function App() {
                                       animate={{ y: 0, opacity: 1 }} 
                                       exit={{ x: -100, opacity: 0 }}
                                       transition={{ delay: idx * 0.05 }}
-                                      className={`group relative p-5 rounded-[32px] border-2 transition-all active:scale-[0.97] ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/5 shadow-2xl' : 'bg-white border-gray-100 shadow-xl shadow-black/5'}`}
+                                      className={`group relative p-5 rounded-[32px] border-2 transition-all active:scale-[0.97] ${order.id === currentOrder?.id ? 'border-blue-500 ring-4 ring-blue-500/10' : (theme === 'dark' ? 'border-white/5' : 'border-gray-100')} ${theme === 'dark' ? 'bg-[#1a1a1a] shadow-2xl' : 'bg-white shadow-xl shadow-black/5'}`}
                                       onClick={() => {
                                         setViewingOrderDetailsId(order.id);
                                         setIsBottomMenuOpen(false);
                                       }}
                                     >
+                                      {order.id === currentOrder?.id && (
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-blue-600 text-white rounded-full text-[9px] font-black uppercase tracking-[0.2em] shadow-lg z-10 animate-pulse">
+                                          Priority Task
+                                        </div>
+                                      )}
                                       <div className="flex items-center justify-between mb-4">
                                         <div className="flex items-center gap-4">
                                           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${order.status === 'accepted' ? 'bg-blue-500/10 text-blue-500' : 'bg-green-500/10 text-green-500'}`}>
@@ -5714,17 +6251,23 @@ export default function App() {
               </AnimatePresence>
 
               {/* Bottom Cards */}
-              <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2 pointer-events-none">
-                <AnimatePresence>
-                  {activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, idx) => (
+              {!isBottomMenuOpen && !pendingOrder && !activeChatOrderId && (
+                <div className="absolute bottom-24 left-0 right-0 p-4 space-y-2 pointer-events-none z-[140]">
+                  <AnimatePresence>
+                    {activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, idx) => (
                     <motion.div 
                       key={order.id} 
                       initial={{ y: 100 }} 
                       animate={{ y: 0 }} 
                       exit={{ y: 100 }}
-                      className="bg-white text-black rounded-xl shadow-xl overflow-hidden mb-2 cursor-pointer active:scale-[0.98] transition-transform pointer-events-auto"
+                      className={`bg-white text-black rounded-xl shadow-xl overflow-hidden mb-2 cursor-pointer active:scale-[0.98] transition-transform pointer-events-auto border-2 ${order.id === currentOrder?.id ? 'border-blue-500 shadow-blue-500/20' : 'border-transparent'}`}
                       onClick={() => setViewingOrderDetailsId(order.id)}
                     >
+                      {order.id === currentOrder?.id && (
+                        <div className="bg-blue-600 text-white text-[8px] font-black uppercase tracking-widest text-center py-0.5">
+                          Current Priority Task
+                        </div>
+                      )}
                       <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-blue-50">
                         <div className="flex items-center gap-2 text-blue-600 font-bold">
                           <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-[9px] font-black">
@@ -5782,6 +6325,7 @@ export default function App() {
                   ))}
                 </AnimatePresence>
               </div>
+            )}
 
               {/* Order Details Modal */}
               <AnimatePresence>
@@ -5909,58 +6453,6 @@ export default function App() {
                   />
                 )}
               </AnimatePresence>
-
-              {/* Pending Order Modal */}
-              <AnimatePresence>
-                {pendingOrder && (
-                  <motion.div initial={{ scale: 0.9, opacity: 0, y: 30 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 30 }} className="absolute inset-x-4 bottom-24 z-[60] flex justify-center">
-                    <div className="bg-white text-black rounded-2xl overflow-hidden shadow-2xl w-full max-w-sm">
-                      <div className="bg-blue-600 p-4 text-white text-center relative border-b border-white/10">
-                        <div className="text-[10px] font-bold tracking-widest opacity-80 mb-1 uppercase">New Delivery Opportunity</div>
-                        <div className="text-3xl font-black">£{pendingOrder.estimatedPay.toFixed(2)}</div>
-                        <div className="text-[10px] font-bold opacity-80 mt-0.5">Includes expected tip</div>
-                        <div className="mt-3 flex justify-center">
-                          <div className="w-9 h-9 rounded-full border-4 border-white/20 flex items-center justify-center relative">
-                            <svg className="absolute inset-0 w-full h-full -rotate-90">
-                              <circle 
-                                cx="18" cy="18" r="14" 
-                                fill="none" 
-                                stroke="white" 
-                                strokeWidth="3" 
-                                strokeDasharray="87.92" 
-                                strokeDashoffset={87.92 * (1 - orderExpiryTimer / 10)}
-                                className="transition-all duration-1000 ease-linear"
-                              />
-                            </svg>
-                            <span className="font-black text-xs">{orderExpiryTimer}</span>
-                          </div>
-                        </div>
-                        <button onClick={handleDeclineOrder} className="absolute top-3 right-3 p-1.5 bg-black/10 rounded-full active:scale-90 transition-transform"><X size={16} /></button>
-                      </div>
-                      <div className="p-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex flex-col items-center gap-1">
-                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-                              <div className="w-0.5 h-4 bg-gray-100" />
-                              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="font-bold text-sm tracking-tight">{pendingOrder.restaurantName}</div>
-                              <div className="font-bold text-[10px] text-gray-400 uppercase tracking-widest">Delivery Task</div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-black text-blue-600">{getArrivalTime(pendingOrder.estimatedTime)}</p>
-                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">ETA</p>
-                          </div>
-                        </div>
-                        <button onClick={handleAcceptOrder} className="w-full py-4 bg-black text-white rounded-xl font-black text-lg tracking-wide active:scale-95 transition-transform shadow-lg">ACCEPT</button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </motion.div>
           )}
 
@@ -6077,7 +6569,7 @@ export default function App() {
                   <ShieldCheck size={14} />
                   Request PIN
                 </button>
-                {["I've arrived", "I'm outside", "Can't find you"].map(text => (
+                {["On my way!", "I've arrived", "I'm outside", "Can't find you"].map(text => (
                   <button 
                     key={text}
                     onClick={() => handleSendMessage(text)}
@@ -6167,28 +6659,138 @@ export default function App() {
             </motion.div>
           )}
           {currentScreen === 'uber_pro' && (
-            <motion.div key="pro" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto">
+            <motion.div key="pro" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform"><X size={24} /></button>
                 <h1 className="text-3xl font-black">Uber Pro</h1>
               </div>
               <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-[40px] p-8 text-white mb-8 relative overflow-hidden shadow-2xl shadow-blue-600/30">
                 <div className="relative z-10">
-                  <p className="text-xs font-black opacity-60 mb-2 uppercase tracking-[0.2em]">{userTier} Tier</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-black opacity-60 uppercase tracking-[0.2em]">{userTier} Tier</p>
+                    <div className="px-3 py-1 bg-white/20 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10">
+                      Level {user.level || 1}
+                    </div>
+                  </div>
                   <h2 className="text-5xl font-black mb-6">{user.points} <span className="text-xl opacity-60">pts</span></h2>
+                  
+                  <div className="grid grid-cols-3 gap-2 mb-6">
+                    <div className="bg-white/10 rounded-2xl p-3 backdrop-blur-md">
+                      <p className="text-[10px] font-black opacity-60 uppercase mb-1">Rating</p>
+                      <p className="text-lg font-black">{user.rating.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-white/10 rounded-2xl p-3 backdrop-blur-md">
+                      <p className="text-[10px] font-black opacity-60 uppercase mb-1">Accept</p>
+                      <p className="text-lg font-black">{user.acceptanceRate}%</p>
+                    </div>
+                    <div className="bg-white/10 rounded-2xl p-3 backdrop-blur-md">
+                      <p className="text-[10px] font-black opacity-60 uppercase mb-1">XP</p>
+                      <p className="text-lg font-black">{user.experience || 0}</p>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] font-black opacity-60 uppercase mb-2 tracking-widest flex items-center justify-between">
+                    <span>Level Progress</span>
+                    <span>{((user.experience || 0) % 100)} / 100 XP</span>
+                  </p>
                   <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden mb-4">
                     <motion.div 
+                      key={`xp-${user.experience}`}
                       initial={{ width: 0 }}
-                      animate={{ width: `${userTier === 'Diamond' ? 100 : (user.points % 500) / 5}%` }}
+                      animate={{ width: `${((user.experience || 0) % 100)}%` }}
                       className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]"
                     />
                   </div>
+                  
                   <p className="text-sm font-bold opacity-80">
-                    {userTier === 'Diamond' ? 'You have reached the highest tier!' : `${500 - (user.points % 500)} points to next tier`}
+                    {userTier === 'Diamond' ? 'Highest tier reached!' : 
+                     user.points >= 1800 ? 'Improve stats to unlock Diamond' :
+                     user.points >= 1200 && userTier !== 'Platinum' ? 'Improve stats to unlock Platinum' :
+                     user.points >= 600 && userTier === 'Blue' ? 'Improve stats to unlock Gold' :
+                     userTier === 'Platinum' ? `${1800 - user.points} pts to Diamond` :
+                     userTier === 'Gold' ? `${1200 - user.points} pts to Platinum` :
+                     `${600 - user.points} pts to Gold`}
                   </p>
                 </div>
                 <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 blur-3xl rounded-full" />
               </div>
+
+              {/* Weekly Missions */}
+              <div className="space-y-6 mb-12">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-black text-2xl tracking-tight">Active Missions</h3>
+                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full">Weekly</span>
+                </div>
+                <div className="space-y-4">
+                  {(user.activeMissions || []).map((mission, i) => (
+                    <div key={mission.id} className={`p-6 rounded-[32px] border-2 transition-all ${mission.completed ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100 shadow-sm'}`}>
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className={`font-black text-lg ${mission.completed ? 'text-green-900' : 'text-black'}`}>{mission.title}</h4>
+                            {mission.completed && <CheckCircle2 size={16} className="text-green-600" />}
+                          </div>
+                          <p className={`text-xs font-bold leading-relaxed ${mission.completed ? 'text-green-800/60' : 'text-gray-400'}`}>{mission.description}</p>
+                        </div>
+                        <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${mission.completed ? 'bg-green-200 text-green-700' : 'bg-blue-600 text-white'}`}>
+                          {mission.completed ? 'DONE' : `+£${mission.cashReward}`}
+                        </div>
+                      </div>
+                      
+                      {!mission.completed && (
+                        <>
+                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest mb-2 text-gray-500">
+                            <span>Progress</span>
+                            <span>{Math.floor(mission.progress)} / {mission.goal}</span>
+                          </div>
+                          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${Math.min(100, (mission.progress / mission.goal) * 100)}%` }}
+                              className="h-full bg-blue-600"
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-6 mb-12">
+                <h3 className="font-black text-2xl tracking-tight">Status Requirements</h3>
+                <div className="bg-gray-50 rounded-[30px] p-6 border border-gray-100 shadow-sm">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-gray-500">Star Rating</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-black ${user.rating >= 4.85 ? 'text-green-600' : 'text-red-500'}`}>{user.rating.toFixed(2)}</span>
+                        <div className={`w-2 h-2 rounded-full ${user.rating >= 4.85 ? 'bg-green-500' : 'bg-red-500'}`} />
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-gray-500">Acceptance Rate</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-black ${user.acceptanceRate >= 85 ? 'text-green-600' : 'text-red-500'}`}>{user.acceptanceRate}%</span>
+                        <div className={`w-2 h-2 rounded-full ${user.acceptanceRate >= 85 ? 'bg-green-500' : 'bg-red-500'}`} />
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-gray-500">Cancellation Rate</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-black ${user.cancellationRate <= 4 ? 'text-green-600' : 'text-red-500'}`}>{user.cancellationRate}%</span>
+                        <div className={`w-2 h-2 rounded-full ${user.cancellationRate <= 4 ? 'bg-green-500' : 'bg-red-500'}`} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest leading-relaxed">
+                      Maintain a 4.85+ rating, 85%+ acceptance, and &lt;4% cancellation rate to qualify for Gold, Platinum, and Diamond status.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-6">
                 <h3 className="font-black text-2xl tracking-tight">Your Rewards</h3>
                 {[
@@ -6397,7 +6999,7 @@ export default function App() {
                 <p className="text-6xl font-black mb-2">{user.rating.toFixed(2)}</p>
                 <div className="flex justify-center gap-1 mb-2">
                   {[1, 2, 3, 4, 5].map(i => (
-                    <Star key={i} size={24} fill={i <= Math.floor(user.rating) ? "#FBBF24" : "none"} className={i <= Math.floor(user.rating) ? "text-yellow-400" : "text-gray-300"} />
+                    <Star key={`star-${i}`} size={24} fill={i <= Math.floor(user.rating) ? "#FBBF24" : "none"} className={i <= Math.floor(user.rating) ? "text-yellow-400" : "text-gray-300"} />
                   ))}
                 </div>
                 <p className="text-sm font-bold text-gray-400">Based on last 500 trips</p>
@@ -6422,7 +7024,7 @@ export default function App() {
                   "Great communication during the ride.",
                   "Always on time, 5 stars!"
                 ].map((quote, i) => (
-                  <div key={i} className={`p-4 rounded-2xl italic font-medium ${theme === 'dark' ? 'bg-white/5 border-l-4 border-blue-500' : 'bg-gray-50 border-l-4 border-black'}`}>
+                  <div key={`quote-${i}`} className={`p-4 rounded-2xl italic font-medium ${theme === 'dark' ? 'bg-white/5 border-l-4 border-blue-500' : 'bg-gray-50 border-l-4 border-black'}`}>
                     "{quote}"
                   </div>
                 ))}
@@ -6631,8 +7233,8 @@ export default function App() {
                   <div className="mt-8">
                     <h3 className="font-black text-xl text-blue-900 mb-4">Your Collection</h3>
                     <div className="flex flex-wrap gap-2">
-                      {purchasedItems.map(id => (
-                        <span key={id} className="px-4 py-2 bg-white rounded-full text-xs font-black text-blue-900 shadow-sm border border-blue-50 uppercase tracking-widest">
+                      {purchasedItems.map((id, idx) => (
+                        <span key={`${id}-${idx}`} className="px-4 py-2 bg-white rounded-full text-xs font-black text-blue-900 shadow-sm border border-blue-50 uppercase tracking-widest">
                           {id}
                         </span>
                       ))}
@@ -6658,6 +7260,93 @@ export default function App() {
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{currentCity} • {userTier} Partner</p>
                 </div>
               </div>
+
+              <AnimatePresence>
+                {showInsuranceWarning && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0, marginBottom: 0 }}
+                    animate={{ height: 'auto', opacity: 1, marginBottom: 24 }}
+                    exit={{ height: 0, opacity: 0, marginBottom: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className={`p-5 rounded-[32px] border-2 flex flex-col gap-4 shadow-xl ${theme === 'dark' ? 'bg-orange-600/10 border-orange-500/30' : 'bg-orange-50 border-orange-200 shadow-orange-100'}`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex gap-4">
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${theme === 'dark' ? 'bg-orange-500/20 text-orange-500' : 'bg-orange-100 text-orange-600'}`}>
+                            <ShieldAlert size={24} />
+                          </div>
+                          <div>
+                            <p className="font-black text-lg text-orange-950 dark:text-orange-100">Insurance Alert</p>
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" />
+                              <p className="text-[10px] font-black text-orange-800/60 dark:text-orange-400/60 uppercase tracking-[0.1em]">
+                                Expires {insuranceDaysLeft}d ({insuranceExpiry})
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => setDismissedExpiries(prev => [...prev, "Vehicle Insurance"])}
+                          className={`p-2 rounded-full transition-colors ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
+                        >
+                          <X size={18} className="text-orange-950 dark:text-orange-200" />
+                        </button>
+                      </div>
+                      <p className="text-xs font-bold leading-relaxed text-orange-900/80 dark:text-orange-300/80">
+                        Your vehicle insurance is set to expire soon. Avoid an account block by updating your policy details now.
+                      </p>
+                      
+                      {!isUpdatingInsurance ? (
+                        <button 
+                          onClick={() => {
+                            setIsUpdatingInsurance(true);
+                            setNewInsuranceDate(insuranceExpiry || "");
+                          }}
+                          className="w-full py-3 bg-orange-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-600/20 active:scale-95 transition-transform"
+                        >
+                          UPDATE NOW
+                        </button>
+                      ) : (
+                        <div className="space-y-2">
+                          <input 
+                            type="date" 
+                            value={newInsuranceDate}
+                            onChange={(e) => setNewInsuranceDate(e.target.value)}
+                            className="w-full p-3 rounded-xl bg-white/20 border border-orange-200 text-orange-950 font-bold outline-none focus:bg-white transition-all shadow-inner"
+                          />
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => {
+                                if (newInsuranceDate) {
+                                  setUser(u => ({
+                                    ...u,
+                                    documentExpiries: {
+                                      ...u.documentExpiries,
+                                      "Vehicle Insurance": newInsuranceDate
+                                    }
+                                  }));
+                                  setIsUpdatingInsurance(false);
+                                  sendNotification("Insurance Updated", "Your vehicle insurance details have been saved.");
+                                }
+                              }}
+                              className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-transform"
+                            >
+                              SAVE
+                            </button>
+                            <button 
+                              onClick={() => setIsUpdatingInsurance(false)}
+                              className="px-4 py-3 bg-white/20 text-orange-950 rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-transform"
+                            >
+                              CANCEL
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="space-y-1.5">
                 {[
                   { icon: <User size={18} />, label: "Personal Information", action: () => setCurrentScreen('personal_details') },
@@ -7079,24 +7768,208 @@ export default function App() {
             />
           )}
         </AnimatePresence>
+
+        {/* Global Trip Request Overlay - Visible on any screen */}
+        <AnimatePresence>
+          {pendingOrder && (
+            <motion.div 
+              initial={{ y: '100%' }} 
+              animate={{ y: 0 }} 
+              exit={{ y: '100%' }} 
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="absolute inset-x-0 bottom-0 z-[5000] h-[75vh] bg-black/95 text-white rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden border-t border-white/10"
+            >
+              {/* Map Preview (Simulated) */}
+              <div className="h-48 w-full relative overflow-hidden bg-gray-900 shrink-0">
+                <div className="absolute inset-0 opacity-30" style={{ 
+                  backgroundImage: 'linear-gradient(90deg, #333 1px, transparent 1px), linear-gradient(#333 1px, transparent 1px)',
+                  backgroundSize: '20px 20px'
+                }} />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="relative w-full h-full max-w-[500px]">
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 500 300" preserveAspectRatio="xMidYMid meet">
+                      <motion.path 
+                        d="M 50 150 Q 150 50 250 150" 
+                        fill="none" 
+                        stroke="#3b82f6" 
+                        strokeWidth="8" 
+                        strokeDasharray="12,12"
+                        initial={{ strokeDashoffset: 100 }}
+                        animate={{ strokeDashoffset: 0 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      />
+                      <motion.path 
+                        d="M 250 150 Q 350 250 450 150" 
+                        fill="none" 
+                        stroke="#10b981" 
+                        strokeWidth="8" 
+                        strokeDasharray="12,12"
+                        initial={{ strokeDashoffset: 100 }}
+                        animate={{ strokeDashoffset: 0 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      />
+                    </svg>
+                    <div className="absolute left-[10%] top-[150px] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg" />
+                    <div className="absolute left-[50%] top-[150px] -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-green-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+                      <Coffee size={16} className="text-white" />
+                    </div>
+                    <div className="absolute left-[90%] top-[150px] -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+                      <User size={16} className="text-white" />
+                    </div>
+                  </div>
+                </div>
+                <div className="absolute top-4 left-6 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase border border-white/10">
+                  New Trip Request
+                </div>
+              </div>
+
+              <div className="flex-1 p-8 pt-4 flex flex-col">
+                <div className="flex justify-between items-start mb-8">
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${pendingOrder.type === 'ride' ? 'bg-white text-black' : pendingOrder.isMatching ? 'bg-orange-500 text-white' : 'bg-blue-600 text-white shadow-[0_5px_15px_rgba(37,99,235,0.3)]'}`}>
+                        {pendingOrder.type === 'ride' ? 'UberX' : pendingOrder.isStacked ? 'Stacked • Max+1' : pendingOrder.isMatching ? 'Matching Trip' : 'New Trip'}
+                      </span>
+                      {pendingOrder.surge && (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-blue-500 text-white flex items-center gap-1">
+                          <Zap size={10} fill="currentColor" />
+                          {pendingOrder.surge}x
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="font-display text-5xl font-black mb-1">£{pendingOrder.estimatedPay.toFixed(2)}</h2>
+                    <p className="text-gray-500 font-black tracking-widest uppercase text-[10px]">Estimated Earnings</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-display font-black text-2xl">{getArrivalTime(pendingOrder.estimatedTime)}</p>
+                    <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest">{pendingOrder.estimatedDistance.toFixed(1)} mi • {pendingOrder.estimatedTime} min</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6 mb-8">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${pendingOrder.type === 'ride' ? 'bg-blue-500/20 text-blue-500' : 'bg-orange-500/20 text-orange-500'}`}>
+                      {pendingOrder.type === 'ride' ? <User size={20} /> : <Coffee size={20} />}
+                    </div>
+                    <div>
+                      <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${pendingOrder.type === 'ride' ? 'text-blue-500' : 'text-orange-500'}`}>{pendingOrder.type === 'ride' ? 'Rider Pickup' : 'Restaurant Pickup'}</p>
+                      <p className="text-xl font-bold">{pendingOrder.type === 'ride' ? `${pendingOrder.customerName}` : pendingOrder.restaurantName}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 shrink-0">
+                      <Navigation size={20} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Trip Destination</p>
+                      <p className="text-xl font-bold">{pendingOrder.type === 'ride' ? 'Dropoff Location' : pendingOrder.customerName}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-auto flex flex-col gap-3 pb-6 relative z-10">
+                  <button 
+                    onClick={handleAcceptOrder}
+                    className="relative w-full py-6 bg-blue-600 rounded-3xl font-black text-2xl shadow-[0_10px_30px_rgba(37,99,235,0.4)] active:scale-95 transition-all overflow-hidden"
+                  >
+                    <motion.div 
+                      key={`timer-${pendingOrder.id}`}
+                      initial={{ width: '100%' }}
+                      animate={{ width: '0%' }}
+                      transition={{ duration: 18, ease: 'linear' }}
+                      className="absolute inset-0 bg-white/20"
+                    />
+                    <span className="relative z-10 uppercase tracking-widest flex items-center justify-center gap-3">
+                      Accept Trip <span className="opacity-60 text-lg">•</span> {orderExpiryTimer}s
+                    </span>
+                  </button>
+                  
+                  <button 
+                    onClick={handleDeclineOrder}
+                    className="w-full py-4 bg-white/5 rounded-2xl font-black text-gray-500 active:scale-95 transition-all uppercase tracking-widest text-xs"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Bottom Nav */}
-      <div className="h-16 bg-black border-t border-white/10 flex items-center justify-around px-2 z-[2000] shrink-0 relative">
-        <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={20} />} label="Home" badge={activeOrders.length > 0 ? activeOrders.length : undefined} />
-        {activeOrders.length > 0 && (
-          <NavButton 
-            active={isBottomMenuOpen} 
-            onClick={() => setIsBottomMenuOpen(!isBottomMenuOpen)} 
-            icon={<List size={20} />} 
-            label="Trips" 
-            badge={activeOrders.filter(o => o.status === 'accepted').length}
-          />
+      {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && (
+        <div className="h-16 bg-black border-t border-white/10 flex items-center justify-around px-2 z-[2000] shrink-0 relative">
+          <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={20} />} label="Home" badge={activeOrders.length > 0 ? activeOrders.length : undefined} />
+          {activeOrders.length > 0 && (
+            <NavButton 
+              active={isBottomMenuOpen} 
+              onClick={() => setIsBottomMenuOpen(!isBottomMenuOpen)} 
+              icon={<List size={20} />} 
+              label="Trips" 
+              badge={activeOrders.filter(o => o.status === 'accepted').length}
+            />
+          )}
+          <NavButton active={currentScreen === 'earnings'} onClick={() => setCurrentScreen('earnings')} icon={<TrendingUp size={20} />} label="Earnings" />
+          <NavButton active={currentScreen === 'inbox'} onClick={() => setCurrentScreen('inbox')} icon={<Mail size={20} />} label="Inbox" />
+          <NavButton active={currentScreen === 'account'} onClick={() => setCurrentScreen('account')} icon={<User size={20} />} label="Account" />
+        </div>
+      )}
+      {/* Rating & Level Up Overlays */}
+      <AnimatePresence>
+        {lastRatedStars && (
+          <motion.div 
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 20, opacity: 1 }}
+            exit={{ y: -100, opacity: 0 }}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-[3000] bg-black/90 backdrop-blur-xl border border-white/10 px-6 py-4 rounded-[32px] flex items-center gap-4 shadow-2xl"
+          >
+            <div className="w-12 h-12 bg-yellow-500 rounded-2xl flex items-center justify-center text-black">
+              <Star size={24} fill="currentColor" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Customer Rated You</p>
+              <div className="flex items-center gap-1">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} size={16} fill={i < lastRatedStars ? "#eab308" : "none"} className={i < lastRatedStars ? "text-yellow-500" : "text-gray-700"} />
+                ))}
+              </div>
+            </div>
+          </motion.div>
         )}
-        <NavButton active={currentScreen === 'earnings'} onClick={() => setCurrentScreen('earnings')} icon={<TrendingUp size={20} />} label="Earnings" />
-        <NavButton active={currentScreen === 'inbox'} onClick={() => setCurrentScreen('inbox')} icon={<Mail size={20} />} label="Inbox" />
-        <NavButton active={currentScreen === 'account'} onClick={() => setCurrentScreen('account')} icon={<User size={20} />} label="Account" />
-      </div>
+
+        {showLevelUp && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[4000] bg-blue-600 flex flex-col items-center justify-center p-12 text-white text-center"
+          >
+            <motion.div 
+              initial={{ scale: 0.5, rotate: -10 }}
+              animate={{ scale: 1, rotate: 0 }}
+              className="w-32 h-32 bg-white rounded-[40px] flex items-center justify-center mb-8 shadow-2xl"
+            >
+              <Trophy size={64} className="text-blue-600" />
+            </motion.div>
+            <h1 className="text-6xl font-black mb-2 tracking-tighter uppercase">Level Up!</h1>
+            <p className="text-2xl font-bold opacity-80 mb-12">You've reached Level {showLevelUp.level}</p>
+            
+            <div className="bg-white/10 backdrop-blur-md rounded-[32px] p-8 border border-white/20 w-full max-w-sm mb-12">
+              <p className="text-xs font-black opacity-60 uppercase tracking-widest mb-4">New Perk Unlocked</p>
+              <h3 className="text-3xl font-black uppercase tracking-tight">{showLevelUp.unlocked}</h3>
+            </div>
+
+            <button 
+              onClick={() => setShowLevelUp(null)}
+              className="w-full max-w-sm py-6 bg-white text-blue-600 rounded-3xl font-black text-2xl shadow-2xl active:scale-95 transition-transform"
+            >
+              CONTINUE
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
       )}
     </AppErrorBoundary>

@@ -60,15 +60,31 @@ export interface CompletedTrip {
 
 export type UberProTier = 'Blue' | 'Gold' | 'Platinum' | 'Diamond';
 
+export interface Mission {
+  id: string;
+  title: string;
+  description: string;
+  progress: number;
+  goal: number;
+  pointsReward: number;
+  cashReward: number;
+  completed: boolean;
+  type: 'delivery_count' | 'earnings_goal' | 'rating_streak';
+}
+
 export interface UserProfile {
   uid?: string;
   name: string;
   rating: number;
   tier: UberProTier;
   points: number;
+  experience: number; // For progression
+  level: number;
   deliveries: number;
   deliveriesToday: number;
   rides: number;
+  acceptanceRate: number;
+  cancellationRate: number;
   isOnline: boolean;
   documentsUploaded: boolean;
   faceVerified: boolean;
@@ -78,12 +94,14 @@ export interface UserProfile {
   profilePic?: string;
   documentExpiries?: Record<string, string>;
   walletBalance: number;
+  activeMissions?: Mission[];
   vehicleInfo?: {
     make: string;
     model: string;
     year: number;
     plate: string;
     type: string;
+    photo?: string;
   };
   paymentMethods?: {
     id: string;
