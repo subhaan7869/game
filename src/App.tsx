@@ -489,14 +489,16 @@ const NewDashboard = ({
   startShift, 
   setCurrentScreen,
   busynessMode,
-  globalSurge
+  globalSurge,
+  vigilanteAdActive
 }: { 
   user: UserProfile, 
   earnings: number, 
   startShift: () => void,
   setCurrentScreen: (s: AppScreen) => void,
   busynessMode: string,
-  globalSurge: number
+  globalSurge: number,
+  vigilanteAdActive: boolean
 }) => {
   const greeting = () => {
     const hour = new Date().getHours();
@@ -530,6 +532,35 @@ const NewDashboard = ({
         <h2 className="text-2xl font-black text-gray-800">{greeting()}, {user.name.split(' ')[0]}</h2>
         <p className="text-gray-500 font-bold">Ready to hit the road?</p>
       </div>
+
+      {/* Vigilante Sponsor Banner */}
+      {vigilanteAdActive && (
+        <motion.div 
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          className="px-6 mb-8"
+        >
+          <div className="bg-gradient-to-r from-blue-900 via-blue-950 to-black p-5 rounded-[28px] border border-blue-500/30 flex items-center justify-between shadow-xl relative overflow-hidden group">
+             <div className="absolute inset-0 bg-blue-600/5 backdrop-blur-sm opacity-50" />
+             <div className="flex items-center gap-4 relative z-10">
+                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]">
+                   <ShieldCheck size={28} />
+                </div>
+                <div>
+                   <h4 className="text-white font-black text-xs uppercase tracking-[0.2em] mb-1">Vigilante Sponsor</h4>
+                   <p className="text-blue-400 text-[10px] font-bold">Ad detected: +£5.00 sponsorship bonus</p>
+                </div>
+             </div>
+             <motion.div 
+               animate={{ scale: [1, 1.1, 1] }} 
+               transition={{ repeat: Infinity, duration: 2 }} 
+               className="px-4 py-2 bg-blue-600 text-white rounded-2xl font-black text-xs relative z-10 shadow-lg"
+             >
+                £5 BONUS
+             </motion.div>
+          </div>
+        </motion.div>
+      )}
 
       {/* GO Button */}
       <div className="px-6 mb-10">
@@ -2654,6 +2685,25 @@ export default function App() {
       setSelectedServices(prev => prev.filter(s => s !== 'ride'));
     }
   }, [vehicleType]);
+  // Vigilante Ad Random Trigger
+  useEffect(() => {
+    if (!user.isOnline) return;
+    
+    const interval = setInterval(() => {
+      // 10% chance every 2 minutes
+      if (Math.random() > 0.90) {
+        setVigilanteAdActive(true);
+        addToast("Vigilante Ad", "A Vigilante Ad is currently active. +£5.00 sponsorship bonus applied!", "success");
+        setEarnings(prev => prev + 5);
+        setBankBalance(prev => prev + 5);
+        // Automatically hide after 15 seconds
+        setTimeout(() => setVigilanteAdActive(false), 15000);
+      }
+    }, 120000); 
+
+    return () => clearInterval(interval);
+  }, [user.isOnline]);
+
   const MAP_SCALE = 50000 * zoom;
   const LABEL_SCALE = 10000 * zoom;
   const BUILDING_SCALE = 6000 * zoom;
@@ -2724,6 +2774,7 @@ export default function App() {
   const [lastRatedStars, setLastRatedStars] = useState<number | null>(null);
   const [showLevelUp, setShowLevelUp] = useState<{ level: number, unlocked: string } | null>(null);
   const [roadEvent, setRoadEvent] = useState<{ id: string, title: string, description: string, bonus?: number, delay?: number } | null>(null);
+  const [vigilanteAdActive, setVigilanteAdActive] = useState(false);
 
   const insuranceExpiry = user.documentExpiries?.["Vehicle Insurance"];
   const insuranceDaysLeft = useMemo(() => {
@@ -2870,7 +2921,8 @@ export default function App() {
           { id: 'e3', title: "Surge Alert", description: "Demand is spiking in your area! +£2.00 on next trip.", bonus: 2.00 },
           { id: 'e4', title: "Weather Warning", description: "Rain expected. Drive safe! +£1.00 rain bonus.", bonus: 1.00 },
           { id: 'e5', title: "Customer Update", description: "Customer changed drop-off instructions. +£0.50 convenience fee.", bonus: 0.50 },
-          { id: 'e6', title: "Restaurant Delay", description: "Restaurant is busy. Prep time +5 mins.", delay: 5 }
+          { id: 'e6', title: "Restaurant Delay", description: "Restaurant is busy. Prep time +5 mins.", delay: 5 },
+          { id: 'v1', title: "Vigilante Ad", description: "Vigilante Ad detected. You've earned a £5.00 sponsorship bonus!", bonus: 5.00 }
         ];
         const randomEvent = events[Math.floor(Math.random() * events.length)];
         setRoadEvent(randomEvent);
@@ -2886,6 +2938,7 @@ export default function App() {
 
         if (randomEvent.bonus) {
           setBankBalance(prev => prev + (randomEvent.bonus || 0));
+          setEarnings(prev => prev + (randomEvent.bonus || 0));
         }
         
         // Auto-clear after 10 seconds
@@ -6305,6 +6358,7 @@ export default function App() {
                 setCurrentScreen={setCurrentScreen}
                 busynessMode={busynessMode}
                 globalSurge={globalSurge}
+                vigilanteAdActive={vigilanteAdActive}
               />
             )}
 
