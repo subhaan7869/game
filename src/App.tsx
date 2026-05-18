@@ -26,6 +26,7 @@ import {
   Star,
   Coffee,
   Camera,
+  Users,
   FileText,
   CreditCard,
   Landmark,
@@ -76,6 +77,7 @@ import {
   ArrowDown,
   Delete,
   Settings2,
+  Trash2,
   Bike as BikeIcon,
   Car as CarIcon
 } from 'lucide-react';
@@ -751,7 +753,7 @@ const SideMenu = ({
         {user.badges && user.badges.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
             {user.badges.map((badge, i) => (
-              <div key={i} className="px-2 py-1 bg-blue-600/20 border border-blue-500/20 rounded-lg text-[8px] font-black uppercase text-blue-500 tracking-widest">
+              <div key={`profile-badge-${i}`} className="px-2 py-1 bg-blue-600/20 border border-blue-500/20 rounded-lg text-[8px] font-black uppercase text-blue-500 tracking-widest">
                 {badge}
               </div>
             ))}
@@ -798,7 +800,7 @@ const SideMenu = ({
           { icon: <Smartphone size={20} />, label: isCarPlaySynced ? "CarPlay Active" : "Sync CarPlay", action: () => setIsCarPlaySynced(!isCarPlaySynced), active: isCarPlaySynced },
         ].map((item, i) => (
           <button 
-            key={i}
+            key={`side-menu-item-${i}`}
             onClick={() => {
               if (item.action) {
                 item.action();
@@ -1327,6 +1329,16 @@ const PersonalDetailsScreen = ({
             />
           </div>
           <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-2 tracking-widest">Nationality</label>
+            <input 
+              type="text" 
+              className={`w-full p-3 rounded-xl border-2 font-bold transition-all text-sm focus:border-black dark:focus:border-white ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}
+              value={editedUser.nationality || ''}
+              onChange={e => setEditedUser({...editedUser, nationality: e.target.value})}
+              placeholder="e.g. British"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
             <label className="text-[10px] font-black uppercase text-gray-400 ml-2 tracking-widest">Residential Address</label>
             <textarea 
               rows={2}
@@ -1546,85 +1558,52 @@ const OnboardingFlow = ({
               <span className="text-white text-4xl font-black">U</span>
             </div>
             <h1 className="text-5xl font-black leading-none tracking-tighter mb-6 underline decoration-blue-600 underline-offset-8">WELCOME TO<br/>THE FUTURE.</h1>
-            <p className="text-gray-500 font-bold text-lg mb-12">Let's get you set up to start earning. First, we need some details about you and your ride.</p>
+            <p className="text-gray-500 font-bold text-lg mb-12">Let's get you set up to start earning. We'll need a few details to create your driver profile.</p>
             <button onClick={nextStep} className="w-full py-6 bg-black text-white rounded-3xl font-black text-2xl tracking-tight shadow-xl active:scale-95 transition-all">
-              LET'S GO!
+              GET STARTED
             </button>
           </motion.div>
         )}
 
         {step === 1 && (
           <motion.div key="step1" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}>
-            <h2 className="text-3xl font-black mb-2">Service Type</h2>
-            <p className="text-gray-400 font-bold mb-8">How do you want to earn?</p>
-            <div className="grid gap-4">
-              {[
-                { id: 'UberX', label: 'Uber X', desc: 'Carry passengers around the city', icon: <Car className="w-8 h-8" /> },
-                { id: 'Uber Eats', label: 'Uber Eats', desc: 'Deliver food and groceries', icon: <Utensils className="w-8 h-8" /> },
-              ].map(item => (
-                <button 
-                  key={item.id}
-                  onClick={() => {
-                    setVehicle({...vehicle, type: item.id});
-                    nextStep();
-                  }}
-                  className={`p-6 border-4 rounded-[40px] text-left transition-all flex items-center gap-6 ${vehicle.type === item.id ? 'border-blue-600 bg-blue-50' : 'border-gray-100 hover:border-gray-200'}`}
-                >
-                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${vehicle.type === item.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                    {item.icon}
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black">{item.label}</h3>
-                    <p className="text-sm font-bold text-gray-400">{item.desc}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-            <button onClick={prevStep} className="mt-8 text-sm font-black text-gray-400 hover:text-black transition-colors uppercase tracking-widest">Back</button>
-          </motion.div>
-        )}
-
-        {step === 2 && (
-          <motion.div key="step2" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}>
-            <h2 className="text-3xl font-black mb-2">Vehicle Details</h2>
-            <p className="text-gray-400 font-bold mb-8">Tell us about your {vehicle.type} vehicle.</p>
+            <h2 className="text-3xl font-black mb-2">Personal Info</h2>
+            <p className="text-gray-400 font-bold mb-8">Confirm your identification details.</p>
             <div className="space-y-4">
               <input 
                 type="text" 
-                placeholder="Vehicle Make (e.g. Toyota)"
-                value={vehicle.make}
-                onChange={e => setVehicle({...vehicle, make: e.target.value})}
-                className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all"
-              />
-              <input 
-                type="text" 
-                placeholder="Vehicle Model (e.g. Prius)"
-                value={vehicle.model}
-                onChange={e => setVehicle({...vehicle, model: e.target.value})}
-                className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all"
+                placeholder="Full Name"
+                value={localUser.name}
+                onChange={e => setLocalUser({...localUser, name: e.target.value})}
+                className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all text-black"
               />
               <div className="grid grid-cols-2 gap-4">
-                <input 
-                  type="number" 
-                  placeholder="Year"
-                  value={vehicle.year}
-                  onChange={e => setVehicle({...vehicle, year: parseInt(e.target.value) || 2024})}
-                  className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all"
-                />
-                <input 
-                  type="text" 
-                  placeholder="License Plate"
-                  value={vehicle.plate}
-                  onChange={e => setVehicle({...vehicle, plate: e.target.value.toUpperCase()})}
-                  className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all"
-                />
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-4">Date of Birth</label>
+                  <input 
+                    type="date" 
+                    value={localUser.dob || ''}
+                    onChange={e => setLocalUser({...localUser, dob: e.target.value})}
+                    className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all text-black"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-4">Nationality</label>
+                  <input 
+                    type="text" 
+                    placeholder="UK"
+                    value={localUser.nationality || ''}
+                    onChange={e => setLocalUser({...localUser, nationality: e.target.value})}
+                    className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all text-black"
+                  />
+                </div>
               </div>
             </div>
             <div className="mt-8 flex items-center justify-between">
               <button onClick={prevStep} className="text-sm font-black text-gray-400 hover:text-black transition-colors uppercase tracking-widest">Back</button>
               <button 
                 onClick={nextStep}
-                disabled={!vehicle.make || !vehicle.model || !vehicle.plate}
+                disabled={!localUser.name || !localUser.dob || !localUser.nationality}
                 className="py-5 px-12 bg-black text-white rounded-2xl font-black text-lg shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 NEXT
@@ -1633,52 +1612,72 @@ const OnboardingFlow = ({
           </motion.div>
         )}
 
+        {step === 2 && (
+          <motion.div key="step2" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}>
+            <h2 className="text-3xl font-black mb-2">Service Type</h2>
+            <p className="text-gray-400 font-bold mb-8">How do you want to earn?</p>
+            <div className="grid gap-4">
+                  {[
+                    { id: 'UberX', label: 'Uber X', desc: 'Carry passengers around the city', icon: <CarIcon size={32} /> },
+                    { id: 'Uber Eats', label: 'Uber Eats', desc: 'Deliver food and groceries', icon: <BikeIcon size={32} /> },
+                  ].map(item => (
+                    <button 
+                      key={`service-type-${item.id}`}
+                      onClick={() => {
+                        setVehicle({...vehicle, type: item.id});
+                        nextStep();
+                      }}
+                      className={`p-6 border-4 rounded-[40px] text-left transition-all flex items-center gap-6 ${vehicle.type === item.id ? 'border-blue-600 bg-blue-50' : 'border-gray-100 hover:border-gray-200'}`}
+                    >
+                      <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${vehicle.type === item.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-400'}`}>
+                        {item.icon}
+                      </div>
+                      <div>
+                        <h3 className={`text-xl font-black ${vehicle.type === item.id ? 'text-black' : 'text-gray-600'}`}>{item.label}</h3>
+                        <p className="text-sm font-bold text-gray-400">{item.desc}</p>
+                      </div>
+                    </button>
+                  ))}
+            </div>
+            <button onClick={prevStep} className="mt-8 text-sm font-black text-gray-400 hover:text-black transition-colors uppercase tracking-widest text-black">Back</button>
+          </motion.div>
+        )}
+
         {step === 3 && (
           <motion.div key="step3" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}>
-            <h2 className="text-3xl font-black mb-2">Show off your ride!</h2>
-            <p className="text-gray-400 font-bold mb-8">Upload a photo of your vehicle.</p>
-            <div className="relative aspect-video w-full rounded-[40px] overflow-hidden border-4 border-dashed border-gray-100 bg-gray-50 flex flex-col items-center justify-center group transition-all hover:border-blue-600">
-              {vehicle.photo ? (
-                <>
-                  <img src={vehicle.photo} alt="Vehicle" className="w-full h-full object-cover" />
-                  <button 
-                    onClick={() => setVehicle({...vehicle, photo: ''})}
-                    className="absolute top-4 right-4 p-3 bg-black/50 backdrop-blur-md text-white rounded-full active:scale-90 transition-transform"
-                  >
-                    <X size={24} />
-                  </button>
-                </>
-              ) : (
-                <label className="cursor-pointer flex flex-col items-center">
-                  <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-xl mb-4 group-hover:scale-110 transition-transform">
-                    <Camera size={40} className="text-blue-600" />
-                  </div>
-                  <span className="text-sm font-bold text-gray-400">Tap to upload photo</span>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setVehicle({...vehicle, photo: reader.result as string});
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                  />
-                </label>
-              )}
+            <h2 className="text-3xl font-black mb-2">Vehicle Info</h2>
+            <p className="text-gray-400 font-bold mb-8">Details of your {vehicle.type} vehicle.</p>
+            <div className="space-y-4">
+              <input 
+                type="text" 
+                placeholder="Vehicle Make (e.g. Toyota)"
+                value={vehicle.make}
+                onChange={e => setVehicle({...vehicle, make: e.target.value})}
+                className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all text-black"
+              />
+              <input 
+                type="text" 
+                placeholder="Vehicle Model (e.g. Prius)"
+                value={vehicle.model}
+                onChange={e => setVehicle({...vehicle, model: e.target.value})}
+                className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all text-black"
+              />
+              <input 
+                type="text" 
+                placeholder="License Plate"
+                value={vehicle.plate}
+                onChange={e => setVehicle({...vehicle, plate: e.target.value.toUpperCase()})}
+                className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all text-black"
+              />
             </div>
-            <div className="mt-8 flex items-center justify-between">
-              <button onClick={prevStep} className="text-sm font-black text-gray-400 hover:text-black transition-colors uppercase tracking-widest">Back</button>
+            <div className="mt-8 flex items-center justify-between text-black">
+              <button onClick={prevStep} className="text-sm font-black text-gray-400 hover:text-black transition-colors uppercase tracking-widest ">Back</button>
               <button 
                 onClick={handleFinish}
+                disabled={!vehicle.make || !vehicle.model || !vehicle.plate}
                 className="py-5 px-12 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
               >
-                FINISH SETUP
+                COMPLETE SETUP
               </button>
             </div>
           </motion.div>
@@ -2011,6 +2010,256 @@ const PaymentMethodsScreen = ({
           </div>
         )}
       </AnimatePresence>
+    </motion.div>
+  );
+};
+
+const InsuranceScreen = ({ 
+  user, 
+  setUser, 
+  onClose, 
+  theme, 
+  sendNotification 
+}: { 
+  user: UserProfile, 
+  setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
+  onClose: () => void,
+  theme: string,
+  sendNotification: (t: string, b: string, type?: any) => void
+}) => {
+  const [isChangingVehicle, setIsChangingVehicle] = useState(false);
+  const [tempVehicle, setTempVehicle] = useState(user.vehicleInfo || { make: '', model: '', year: 2024, plate: '', type: 'UberX' });
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'taxi' | 'food' | 'all'>('all');
+  const [addDrivers, setAddDrivers] = useState(false);
+
+  const insuranceExpiry = user.documentExpiries?.["Vehicle Insurance"];
+  
+  const handleSaveVehicle = () => {
+    setUser(prev => ({
+      ...prev,
+      vehicleInfo: tempVehicle
+    }));
+    setIsChangingVehicle(false);
+    sendNotification("Vehicle Updated", `Your ${tempVehicle.make} ${tempVehicle.model} is now active.`);
+  };
+
+  const handleCancelPlan = () => {
+    // RESET EVERYTHING - Force user to start again
+    setUser(prev => ({
+      ...prev,
+      documentsUploaded: false,
+      faceVerified: false,
+      isOnline: false,
+      documentExpiries: {
+        ...prev.documentExpiries,
+        "Vehicle Insurance": "2020-01-01" // Expired
+      }
+    }));
+    setShowCancelConfirm(false);
+    sendNotification("Plan Canceled", "Insurance terminated. Identity and document verification reset. Please restart onboarding.", "alert");
+    // Force to onboarding screen
+    window.location.reload(); // Simplest way to reset app state/onboarding loop
+  };
+
+  const plans = [
+    { id: 'taxi', name: 'Taxi Insurance', price: '£89.99', desc: 'Passenger & Commercial Hire' },
+    { id: 'food', name: 'Food Delivery', price: '£45.50', desc: 'Courier & Food Transport Only' },
+    { id: 'all', name: 'Full Coverage (All)', price: '£112.00', desc: 'Full Platform Protection' },
+  ];
+
+  return (
+    <motion.div 
+      initial={{ x: '100%' }} 
+      animate={{ x: 0 }} 
+      exit={{ x: '100%' }} 
+      className={`h-full w-full overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-gray-50 text-black'}`}
+    >
+      {/* Navbar */}
+      <div className={`sticky top-0 z-50 p-6 flex items-center justify-between backdrop-blur-xl border-b ${theme === 'dark' ? 'bg-black/80 border-white/10' : 'bg-white/80 border-gray-100'}`}>
+        <div className="flex items-center gap-4">
+          <button onClick={onClose} className={`p-2 rounded-full active:scale-90 transition-transform ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}>
+            <X size={24} />
+          </button>
+          <h1 className="text-2xl font-black tracking-tight">Insurance & Plan</h1>
+        </div>
+        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg">
+          <ShieldCheck size={24} />
+        </div>
+      </div>
+
+      <div className="p-6 max-w-2xl mx-auto space-y-8">
+        {/* Plan Selection */}
+        <section>
+          <h3 className="font-black text-xs uppercase tracking-[0.2em] mb-4 text-gray-400 px-2">Choose Protection Type</h3>
+          <div className="space-y-3">
+            {plans.map(plan => (
+              <button 
+                key={plan.id}
+                onClick={() => setSelectedPlan(plan.id as any)}
+                className={`w-full p-6 rounded-[32px] border-4 text-left transition-all flex items-center justify-between ${selectedPlan === plan.id ? 'border-blue-600 bg-blue-50' : 'border-white bg-white shadow-sm'}`}
+              >
+                <div>
+                  <h4 className="font-black text-lg">{plan.name}</h4>
+                  <p className="text-xs font-bold text-gray-400">{plan.desc}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-black text-blue-600">{plan.price}</p>
+                  <p className="text-[10px] uppercase font-black text-gray-300">Monthly</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* Additional Drivers Toggle */}
+        <section className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 flex items-center justify-between">
+           <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
+                 <Users size={24} />
+              </div>
+              <div>
+                 <h4 className="font-black">Additional Drivers</h4>
+                 <p className="text-xs font-bold text-gray-400">Add up to 2 named drivers</p>
+              </div>
+           </div>
+           <button 
+             onClick={() => setAddDrivers(!addDrivers)}
+             className={`w-14 h-8 rounded-full transition-all flex items-center p-1 ${addDrivers ? 'bg-blue-600 justify-end' : 'bg-gray-200 justify-start'}`}
+           >
+              <motion.div layout className="w-6 h-6 bg-white rounded-full shadow-md" />
+           </button>
+        </section>
+
+        {/* Vehicle Management Section */}
+        <section>
+          <div className="flex items-center justify-between mb-4 px-2">
+            <h3 className="font-black text-xs uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
+              <CarIcon size={16} />
+              Policy Vehicle
+            </h3>
+            {!isChangingVehicle && (
+              <button 
+                onClick={() => setIsChangingVehicle(true)}
+                className="text-blue-600 font-black text-[10px] uppercase tracking-widest hover:underline"
+              >
+                Switch Vehicle
+              </button>
+            )}
+          </div>
+
+          <div className={`p-6 rounded-[32px] border-2 transition-all ${isChangingVehicle ? 'border-blue-600' : 'bg-white border-white shadow-sm'}`}>
+            {isChangingVehicle ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-gray-400 ml-2 uppercase">Make</label>
+                    <input 
+                      type="text" 
+                      value={tempVehicle.make}
+                      onChange={e => setTempVehicle({...tempVehicle, make: e.target.value})}
+                      placeholder="e.g. Toyota"
+                      className="w-full p-4 rounded-2xl font-bold bg-gray-50 outline-none border-2 border-transparent focus:border-blue-600 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-gray-400 ml-2 uppercase">Model</label>
+                    <input 
+                      type="text" 
+                      value={tempVehicle.model}
+                      onChange={e => setTempVehicle({...tempVehicle, model: e.target.value})}
+                      placeholder="e.g. Prius"
+                      className="w-full p-4 rounded-2xl font-bold bg-gray-50 outline-none border-2 border-transparent focus:border-blue-600 transition-all"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-gray-400 ml-2 uppercase">Year</label>
+                    <input 
+                      type="number" 
+                      value={tempVehicle.year}
+                      onChange={e => setTempVehicle({...tempVehicle, year: parseInt(e.target.value) || 2024})}
+                      className="w-full p-4 rounded-2xl font-bold bg-gray-50 outline-none border-2 border-transparent focus:border-blue-600 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-gray-400 ml-2 uppercase">Plate</label>
+                    <input 
+                      type="text" 
+                      value={tempVehicle.plate}
+                      onChange={e => setTempVehicle({...tempVehicle, plate: e.target.value.toUpperCase()})}
+                      placeholder="e.g. YG22 XPT"
+                      className="w-full p-4 rounded-2xl font-bold bg-gray-50 outline-none border-2 border-transparent focus:border-blue-600 transition-all"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button onClick={handleSaveVehicle} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all">Save Changes</button>
+                  <button onClick={() => { setIsChangingVehicle(false); setTempVehicle(user.vehicleInfo!); }} className="px-6 py-4 bg-gray-200 text-gray-600 rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-all">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center">
+                    <CarIcon size={40} />
+                  </div>
+                  <div>
+                    <h4 className="text-2xl font-black">{user.vehicleInfo?.make} {user.vehicleInfo?.model}</h4>
+                    <p className="text-sm font-bold text-gray-400">{user.vehicleInfo?.year} • {user.vehicleInfo?.plate}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="px-2 py-0.5 bg-green-100 text-green-600 rounded-full text-[8px] font-black uppercase tracking-widest">Active Coverage</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Renewal Button */}
+        <div className="px-2">
+          <button 
+            onClick={() => sendNotification("Renewal Initiated", "Check your Inbox for the payment link.", "success")}
+            className="w-full py-5 bg-black text-white rounded-3xl font-black text-lg uppercase tracking-tight shadow-xl active:scale-95 transition-transform"
+          >
+            RENEW NOW
+          </button>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="mt-12 p-8 rounded-[40px] border-4 border-dashed border-red-100 bg-red-50/30">
+          <h4 className="font-black text-lg text-red-900 mb-1">Cancel Plan</h4>
+          <p className="text-xs text-red-800/60 font-bold mb-6">Warning: Cancellation will terminate your policy and reset your account verification. You will have to start the entire onboarding process again.</p>
+          
+          {showCancelConfirm ? (
+            <div className="space-y-4">
+              <div className="p-4 bg-red-600 text-white rounded-2xl flex items-center gap-3">
+                <AlertCircle size={20} />
+                <p className="text-xs font-black uppercase tracking-widest">FINAL WARNING: VERIFICATION WILL BE RESET</p>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={handleCancelPlan}
+                  className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all shadow-lg"
+                >
+                  TERMINATE NOW
+                </button>
+                <button onClick={() => setShowCancelConfirm(false)} className="flex-1 py-4 bg-white text-black border border-red-100 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all">Go Back</button>
+              </div>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setShowCancelConfirm(true)}
+              className="w-full flex items-center justify-center gap-2 p-4 text-red-600 font-black border-2 border-red-600/20 rounded-2xl hover:bg-red-50 transition-colors active:scale-95"
+            >
+              <Trash2 size={20} />
+              <span>CANCEL POLICY & RESET</span>
+            </button>
+          )}
+        </div>
+      </div>
     </motion.div>
   );
 };
@@ -2554,6 +2803,8 @@ export default function App() {
   const [user, setUser] = useState<UserProfile>(() => {
     const baseUser: UserProfile = {
       name: "Hassen Nabeel",
+      dob: "1995-05-18",
+      nationality: "British",
       rating: 5.00,
       tier: 'Blue',
       points: 0,
@@ -2775,6 +3026,7 @@ export default function App() {
   const [showLevelUp, setShowLevelUp] = useState<{ level: number, unlocked: string } | null>(null);
   const [roadEvent, setRoadEvent] = useState<{ id: string, title: string, description: string, bonus?: number, delay?: number } | null>(null);
   const [vigilanteAdActive, setVigilanteAdActive] = useState(false);
+  const [isInsuranceRenewalChatOpen, setIsInsuranceRenewalChatOpen] = useState(false);
 
   const insuranceExpiry = user.documentExpiries?.["Vehicle Insurance"];
   const insuranceDaysLeft = useMemo(() => {
@@ -4253,7 +4505,14 @@ export default function App() {
     }
   };
 
+  const isInsuranceExpired = insuranceDaysLeft !== null && insuranceDaysLeft < 0;
+
   const handleGoOnline = () => {
+    if (isInsuranceExpired) {
+      setIsInsuranceRenewalChatOpen(true);
+      sendNotification("Insurance Expired", "Your vehicle insurance has expired. Please renew it to go online.", "alert");
+      return;
+    }
     if (checkDocsExpired()) {
       sendNotification("Documents Expired", "Please update your documents to go online.");
       setCurrentScreen('documents');
@@ -4993,7 +5252,7 @@ export default function App() {
                   const isUploading = uploadingDoc === doc.label;
                   return (
                     <button 
-                      key={i} 
+                      key={`doc-upload-${i}`} 
                       onClick={() => !isUploading && toggleDoc(doc.label)}
                       disabled={isUploading}
                       className={`w-full p-6 border-2 rounded-3xl flex items-center justify-between transition-all ${isUploaded ? 'border-green-500 bg-green-50' : isUploading ? 'border-blue-500 bg-blue-50' : 'border-gray-100 active:scale-95'}`}
@@ -6101,7 +6360,7 @@ export default function App() {
                           </div>
                         ) : (
                           notifications.map((note, i) => (
-                            <div key={i} className={`p-5 rounded-3xl border ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}>
+                            <div key={`notification-${i}`} className={`p-5 rounded-3xl border ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}>
                               <div className="flex items-center gap-3 mb-2">
                                 <div className="w-2 h-2 bg-blue-600 rounded-full" />
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">System Update</p>
@@ -6361,6 +6620,20 @@ export default function App() {
                 vigilanteAdActive={vigilanteAdActive}
               />
             )}
+
+            <AnimatePresence>
+              {isInsuranceRenewalChatOpen && (
+                <InsuranceRenewalChat 
+                  user={user}
+                  setUser={setUser}
+                  onClose={() => setIsInsuranceRenewalChatOpen(false)}
+                  theme={theme}
+                  bankBalance={bankBalance}
+                  setBankBalance={setBankBalance}
+                  sendNotification={sendNotification}
+                />
+              )}
+            </AnimatePresence>
 
             <AnimatePresence>
               {isBottomMenuOpen && user.isOnline && (
@@ -6832,7 +7105,7 @@ export default function App() {
 
                   return (
                     <motion.div 
-                      key={msg.id} 
+                      key={msg.id || `msg-${i}`} 
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       className={`flex ${msg.sender === 'driver' ? 'justify-end' : 'justify-start'}`}
@@ -6903,9 +7176,9 @@ export default function App() {
                   <ShieldCheck size={14} />
                   Request PIN
                 </button>
-                {["On my way!", "I've arrived", "I'm outside", "Can't find you"].map(text => (
+                {["On my way!", "I've arrived", "I'm outside", "Can't find you"].map((text, idx) => (
                   <button 
-                    key={text}
+                    key={`quick-reply-${idx}`}
                     onClick={() => handleSendMessage(text)}
                     className="whitespace-nowrap px-4 py-2 bg-gray-100 rounded-full text-xs font-black uppercase tracking-wider hover:bg-gray-200 active:scale-95 transition-all text-black border border-gray-50 shadow-sm"
                   >
@@ -7056,8 +7329,8 @@ export default function App() {
                   <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full">Weekly</span>
                 </div>
                 <div className="space-y-4">
-                  {(user.activeMissions || []).map((mission, i) => (
-                    <div key={mission.id} className={`p-6 rounded-[32px] border-2 transition-all ${mission.completed ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100 shadow-sm'}`}>
+                  {(user.activeMissions || []).map((mission, idx) => (
+                    <div key={`mission-card-${mission.id || idx}`} className={`p-6 rounded-[32px] border-2 transition-all ${mission.completed ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100 shadow-sm'}`}>
                       <div className="flex items-start justify-between mb-4">
                         <div>
                           <div className="flex items-center gap-2 mb-1">
@@ -7483,7 +7756,7 @@ export default function App() {
                 ) : (
                   notifications.map((note, i) => (
                     <motion.div 
-                      key={i} 
+                      key={`inbox-note-${i}`} 
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.1 }}
@@ -7665,52 +7938,12 @@ export default function App() {
                         Your vehicle insurance is set to expire soon. Avoid an account block by updating your policy details now.
                       </p>
                       
-                      {!isUpdatingInsurance ? (
-                        <button 
-                          onClick={() => {
-                            setIsUpdatingInsurance(true);
-                            setNewInsuranceDate(insuranceExpiry || "");
-                          }}
-                          className="w-full py-3 bg-orange-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-600/20 active:scale-95 transition-transform"
-                        >
-                          UPDATE NOW
-                        </button>
-                      ) : (
-                        <div className="space-y-2">
-                          <input 
-                            type="date" 
-                            value={newInsuranceDate}
-                            onChange={(e) => setNewInsuranceDate(e.target.value)}
-                            className="w-full p-3 rounded-xl bg-white/20 border border-orange-200 text-orange-950 font-bold outline-none focus:bg-white transition-all shadow-inner"
-                          />
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={() => {
-                                if (newInsuranceDate) {
-                                  setUser(u => ({
-                                    ...u,
-                                    documentExpiries: {
-                                      ...u.documentExpiries,
-                                      "Vehicle Insurance": newInsuranceDate
-                                    }
-                                  }));
-                                  setIsUpdatingInsurance(false);
-                                  sendNotification("Insurance Updated", "Your vehicle insurance details have been saved.");
-                                }
-                              }}
-                              className="flex-1 py-3 bg-orange-600 text-white rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-transform"
-                            >
-                              SAVE
-                            </button>
-                            <button 
-                              onClick={() => setIsUpdatingInsurance(false)}
-                              className="px-4 py-3 bg-white/20 text-orange-950 rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-transform"
-                            >
-                              CANCEL
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      <button 
+                        onClick={() => setCurrentScreen('insurance')}
+                        className="w-full py-3 bg-orange-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-600/20 active:scale-95 transition-transform"
+                      >
+                        RENEW NOW
+                      </button>
                     </div>
                   </motion.div>
                 )}
@@ -7719,6 +7952,7 @@ export default function App() {
               <div className="space-y-1.5">
                 {[
                   { icon: <User size={18} />, label: "Personal Information", action: () => setCurrentScreen('personal_details') },
+                  { icon: <ShieldCheck size={18} />, label: "Insurance & Plan", action: () => setCurrentScreen('insurance') },
                   { icon: <CarIcon size={18} />, label: "Vehicle Details", action: () => setCurrentScreen('vehicle_details') },
                   { icon: <CreditCard size={18} />, label: "Payment", action: () => setCurrentScreen('payment_methods') },
                   { icon: <History size={18} />, label: "Trip History", action: () => setCurrentScreen('trip_history') },
@@ -7755,7 +7989,7 @@ export default function App() {
                   }},
                 ].map((item, idx) => (
                   <button 
-                    key={idx} 
+                    key={`account-menu-${idx}`} 
                     onClick={item.action}
                     className={`w-full flex items-center justify-between p-4 rounded-2xl transition-colors ${theme === 'dark' ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}
                   >
@@ -7905,6 +8139,16 @@ export default function App() {
               completedTrips={completedTrips} 
               onClose={() => setCurrentScreen('account')} 
               theme={theme} 
+            />
+          )}
+
+          {currentScreen === 'insurance' && (
+            <InsuranceScreen 
+              user={user}
+              setUser={setUser}
+              onClose={() => setCurrentScreen('account')}
+              theme={theme}
+              sendNotification={sendNotification}
             />
           )}
 
@@ -8091,7 +8335,7 @@ export default function App() {
           )}
 
           {/* Safety Fallback for unhandled screens */}
-          {!['onboarding', 'documents', 'face_verification', 'home', 'earnings', 'inbox', 'account', 'chat', 'uber_pro', 'wallet', 'opportunities', 'safety', 'earnings_detail', 'banking', 'scheduled_orders', 'rewards', 'carplay_dashboard', 'trip_history', 'work_hub', 'ratings', 'planner', 'uber_services', 'vehicle_details', 'payment_methods', 'trip_preferences', 'personal_details'].includes(currentScreen) && (
+          {!['onboarding', 'documents', 'face_verification', 'home', 'earnings', 'inbox', 'account', 'chat', 'uber_pro', 'wallet', 'opportunities', 'safety', 'earnings_detail', 'banking', 'scheduled_orders', 'rewards', 'carplay_dashboard', 'trip_history', 'work_hub', 'ratings', 'planner', 'uber_services', 'vehicle_details', 'payment_methods', 'trip_preferences', 'personal_details', 'insurance'].includes(currentScreen) && (
             <motion.div 
               key="fallback" 
               initial={{ opacity: 0 }} 
@@ -8291,7 +8535,7 @@ export default function App() {
       {/* Bottom Nav */}
       {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && (
         <div className="h-20 bg-white border-t border-gray-100 flex items-center justify-around px-2 z-[2000] shrink-0 relative pb-4 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
-          <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={22} />} label="Home" badge={activeOrders.length > 0 ? activeOrders.length : undefined} />
+          <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={22} />} label="Home" badgeCount={activeOrders.length > 0 ? activeOrders.length : undefined} />
           <NavButton 
             active={isBottomMenuOpen || currentScreen === 'trip_history'} 
             onClick={() => {
@@ -8300,7 +8544,7 @@ export default function App() {
             }} 
             icon={<List size={22} />} 
             label="Trips" 
-            badge={activeOrders.filter(o => o.status === 'accepted').length > 0 ? activeOrders.filter(o => o.status === 'accepted').length : undefined}
+            badgeCount={activeOrders.filter(o => o.status === 'accepted').length > 0 ? activeOrders.filter(o => o.status === 'accepted').length : undefined}
           />
           <NavButton active={currentScreen === 'earnings' || currentScreen === 'earnings_detail'} onClick={() => setCurrentScreen('earnings_detail')} icon={<DollarSign size={22} />} label="Earnings" />
           <NavButton active={currentScreen === 'account' || currentScreen === 'work_hub'} onClick={() => setCurrentScreen('account')} icon={<Menu size={22} />} label="More" />
@@ -8371,18 +8615,358 @@ export default function App() {
   );
 }
 
-function NavButton({ active, onClick, icon, label, badge }: { active: boolean, onClick: () => void, icon: ReactNode, label: string, badge?: number }) {
+function NavButton({ active, onClick, icon, label, badgeCount }: { active: boolean, onClick: () => void, icon: ReactNode, label: string, badgeCount?: number }) {
   return (
     <button onClick={onClick} className={`flex flex-col items-center p-1 transition-all relative ${active ? 'text-white' : 'text-gray-500'}`}>
       <div className={`p-1 rounded-full transition-colors flex items-center justify-center ${active ? 'bg-white/10' : ''}`}>
         {icon}
       </div>
       <span className="text-[9px] font-black uppercase tracking-tight leading-none mt-0.5">{label}</span>
-      {badge !== undefined && badge > 0 && (
+      {badgeCount !== undefined && badgeCount > 0 && (
         <div className="absolute top-0 right-0 w-4 h-4 bg-blue-600 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-black">
-          {badge}
+          {badgeCount}
         </div>
       )}
     </button>
   );
 }
+
+export const InsuranceRenewalChat = ({ 
+  user, 
+  setUser, 
+  onClose,
+  theme,
+  bankBalance,
+  setBankBalance,
+  sendNotification
+}: { 
+  user: UserProfile, 
+  setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
+  onClose: () => void,
+  theme: string,
+  bankBalance: number,
+  setBankBalance: (b: number | ((b: number) => number)) => void,
+  sendNotification: (t: string, b: string, type?: any) => void
+}) => {
+  const [renewalMessages, setRenewalMessages] = useState<ChatMessage[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [inputText, setInputText] = useState("");
+  const [renewalStatus, setRenewalStatus] = useState<'normal' | 'paying' | 'completed'>('normal');
+  const [flowStep, setFlowStep] = useState<'initial' | 'asking_plan' | 'confirming_cost' | 'awaiting_payment'>('initial');
+  const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'yearly' | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const PRICES = {
+    monthly: 45.00,
+    yearly: 450.00
+  };
+
+  const getRenewalPrice = () => selectedPeriod ? PRICES[selectedPeriod] : 450.00;
+
+  useEffect(() => {
+    let t1: any, t2: any, t3: any;
+    
+    setIsTyping(true);
+    t1 = setTimeout(() => {
+      setRenewalMessages(prev => {
+        if (prev.some(m => m.id === 'welcome-1')) return prev;
+        return [
+          {
+            id: 'welcome-1',
+            orderId: 'insurance-renewal',
+            sender: 'customer', 
+            text: "Hi! I'm Sarah from the Insurance Compliance Team. I noticed your vehicle insurance for your " + (user.vehicleInfo?.make || "vehicle") + " has expired.",
+            timestamp: Date.now()
+          }
+        ];
+      });
+      setIsTyping(false);
+      
+      t2 = setTimeout(() => {
+        setIsTyping(true);
+        t3 = setTimeout(() => {
+          setRenewalMessages(prev => {
+            if (prev.some(m => m.id === 'welcome-2')) return prev;
+            return [...prev, {
+              id: 'welcome-2',
+              orderId: 'insurance-renewal',
+              sender: 'customer',
+              text: "To resume your services on the platform, we need to set up a new coverage plan. At Uber, we offer full flexibility. Do you prefer a Rolling Monthly plan (£45/mo) or our Priority Yearly coverage (£450/yr)?",
+              timestamp: Date.now()
+            }];
+          });
+          setIsTyping(false);
+          setFlowStep('asking_plan');
+        }, 1500);
+      }, 1000);
+    }, 1000);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [renewalMessages, isTyping]);
+
+  const handleSend = () => {
+    if (!inputText.trim()) return;
+    
+    const newMsg: ChatMessage = {
+      id: `driver-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      orderId: 'insurance-renewal',
+      sender: 'driver',
+      text: inputText,
+      timestamp: Date.now()
+    };
+    
+    setRenewalMessages(prev => [...prev, newMsg]);
+    const userText = inputText.toLowerCase();
+    setInputText("");
+
+    setIsTyping(true);
+    setTimeout(() => {
+      setIsTyping(false);
+      
+      if (flowStep === 'asking_plan') {
+        if (userText.includes('monthly') || userText.includes('month')) {
+          setSelectedPeriod('monthly');
+          setRenewalMessages(prev => {
+            if (prev.some(m => m.id === `agent-confirm-${selectedPeriod}`)) return prev;
+            return [...prev, {
+              id: `agent-confirm-${selectedPeriod}-${Date.now()}`,
+              orderId: 'insurance-renewal',
+              sender: 'customer',
+              text: `Perfect. The Monthly plan is £${PRICES.monthly.toFixed(2)}. It automatically renews every 30 days unless cancelled. Shall I proceed with this for you?`,
+              timestamp: Date.now()
+            }];
+          });
+          setFlowStep('confirming_cost');
+        } else if (userText.includes('yearly') || userText.includes('year')) {
+          setSelectedPeriod('yearly');
+          setRenewalMessages(prev => {
+            if (prev.some(m => m.id === `agent-confirm-${selectedPeriod}`)) return prev;
+            return [...prev, {
+              id: `agent-confirm-${selectedPeriod}-${Date.now()}`,
+              orderId: 'insurance-renewal',
+              sender: 'customer',
+              text: `Excellent choice. The Yearly plan is £${PRICES.yearly.toFixed(2)} (saving you £90 vs monthly). This includes full platform liability. Would you like to confirm?`,
+              timestamp: Date.now()
+            }];
+          });
+          setFlowStep('confirming_cost');
+        } else {
+          setRenewalMessages(prev => [...prev, {
+            id: `agent-${Date.now()}`,
+            orderId: 'insurance-renewal',
+            sender: 'customer',
+            text: "I didn't catch that. Would you like the 'Monthly' plan or the 'Yearly' plan?",
+            timestamp: Date.now()
+          }]);
+        }
+      } else if (flowStep === 'confirming_cost') {
+        if (userText.includes('yes') || userText.includes('proceed') || userText.includes('confirm') || userText.includes('renew')) {
+          setRenewalMessages(prev => [...prev, {
+            id: `agent-renew-${Date.now()}`,
+            orderId: 'insurance-renewal',
+            sender: 'customer',
+            text: `Great! I've prepared the invoice for £${getRenewalPrice().toFixed(2)}. Once you confirm the payment below, your policy will be updated immediately.`,
+            timestamp: Date.now()
+          }]);
+          setFlowStep('awaiting_payment');
+        } else {
+          setRenewalMessages(prev => [...prev, {
+            id: `agent-confused-${Date.now()}`,
+            orderId: 'insurance-renewal',
+            sender: 'customer',
+            text: "To resume your services, we need your confirmation. Should we proceed with the renewal?",
+            timestamp: Date.now()
+          }]);
+        }
+      } else {
+        setRenewalMessages(prev => [...prev, {
+          id: `agent-final-${Date.now()}`,
+          orderId: 'insurance-renewal',
+          sender: 'customer',
+          text: "I'm ready when you are! Just use the payment button below to finalize your new policy.",
+          timestamp: Date.now()
+        }]);
+      }
+    }, 1500);
+  };
+
+  const processRenewal = () => {
+    const price = getRenewalPrice();
+    if (bankBalance < price) {
+      sendNotification("Insufficient Funds", `You need £${price.toFixed(2)} to renew your insurance.`);
+      return;
+    }
+    
+    setRenewalStatus('paying');
+    setTimeout(() => {
+      setBankBalance(prev => prev - price);
+      // Set new expiry date
+      const newExpiry = new Date();
+      if (selectedPeriod === 'yearly') {
+        newExpiry.setFullYear(newExpiry.getFullYear() + 1);
+      } else {
+        newExpiry.setMonth(newExpiry.getMonth() + 1);
+      }
+      const dateStr = newExpiry.toISOString().split('T')[0];
+      
+      setUser(u => ({
+        ...u,
+        documentExpiries: {
+          ...u.documentExpiries,
+          "Vehicle Insurance": dateStr
+        }
+      }));
+      
+      setRenewalStatus('completed');
+      setRenewalMessages(prev => {
+        if (prev.some(m => m.id === 'success')) return prev;
+        return [...prev, {
+          id: 'success',
+          orderId: 'insurance-renewal',
+          sender: 'customer',
+          text: "Success! Your policy is now active until " + dateStr + ". You are clear to go online now. Safe travels!",
+          timestamp: Date.now()
+        }];
+      });
+      sendNotification("Insurance Renewed", "Your policy has been successfully updated.", "success");
+    }, 2000);
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      exit={{ opacity: 0 }} 
+      className="fixed inset-0 z-[2000] bg-white text-black flex flex-col"
+    >
+      {/* Header */}
+      <div className="p-4 border-b border-gray-100 flex items-center gap-4 bg-white sticky top-0 z-10 shrink-0">
+        <button onClick={onClose} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform">
+          <X size={22} />
+        </button>
+        <div className="flex-1 overflow-hidden">
+          <h2 className="font-black text-lg truncate leading-tight">Sarah (Compliance)</h2>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <p className="text-[9px] text-gray-400 font-black tracking-widest uppercase truncate">Uber Support • Compliance</p>
+          </div>
+        </div>
+        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg">
+          <ShieldCheck size={20} />
+        </div>
+      </div>
+
+      {/* Messages Area */}
+      <div 
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50 scroll-smooth no-scrollbar"
+      >
+        <div className="flex justify-center p-2 mb-4">
+          <div className="bg-white px-3 py-1.5 rounded-full border border-gray-100 text-[9px] font-black text-gray-400 uppercase tracking-widest">
+            Compliance Channel • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+
+        {renewalMessages.map((msg, idx) => (
+          <motion.div 
+            key={msg.id || `renewal-${idx}`} 
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className={`flex ${msg.sender === 'driver' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div className={`p-4 rounded-2xl font-bold text-sm shadow-sm max-w-[80%] ${
+              msg.sender === 'driver' 
+                ? 'bg-blue-600 text-white rounded-tr-none' 
+                : 'bg-white text-black border border-gray-100 rounded-tl-none'
+            }`}>
+              {msg.text}
+            </div>
+          </motion.div>
+        ))}
+
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="bg-white p-3 rounded-2xl border border-gray-100 rounded-tl-none flex gap-1 items-center shadow-sm">
+              <div className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <div className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:-0.15s]" />
+              <div className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer / Input / Action */}
+      <div className="p-4 bg-white border-t border-gray-100">
+        {renewalStatus === 'normal' && flowStep === 'awaiting_payment' && (
+          <motion.div 
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="mb-4 bg-blue-50 border border-blue-100 p-4 rounded-3xl"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                 <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Renewal Policy</p>
+                 <h3 className="text-sm font-black text-blue-900 leading-none">Vehicle Insurance ({selectedPeriod === 'yearly' ? '12 Months' : '30 Days'})</h3>
+              </div>
+              <p className="text-sm font-black text-blue-900">£{getRenewalPrice().toFixed(2)}</p>
+            </div>
+            <button 
+              onClick={processRenewal}
+              className="w-full py-3 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-transform"
+            >
+              PAY & RENEW NOW
+            </button>
+          </motion.div>
+        )}
+
+        {renewalStatus === 'paying' && (
+          <div className="py-4 flex flex-col items-center gap-3">
+            <RefreshCw className="animate-spin text-blue-600" size={32} />
+            <p className="font-black text-sm uppercase tracking-widest text-gray-500 animate-pulse">Processing Payment...</p>
+          </div>
+        )}
+
+        {renewalStatus === 'completed' && (
+          <div className="py-4">
+            <button 
+              onClick={onClose}
+              className="w-full py-4 bg-black text-white rounded-3xl font-black text-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 size={24} />
+              BACK TO RADAR
+            </button>
+          </div>
+        )}
+
+        {renewalStatus === 'normal' && (
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              value={inputText}
+              onChange={e => setInputText(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSend()}
+              placeholder="Type 'Renew' here..."
+              className="flex-1 p-4 bg-gray-100 rounded-full font-bold outline-none border-2 border-transparent focus:bg-white focus:border-blue-600 transition-all text-sm"
+            />
+            <button 
+              onClick={handleSend}
+              className="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center shrink-0 active:scale-90 transition-transform"
+            >
+              <Send size={20} />
+            </button>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+};

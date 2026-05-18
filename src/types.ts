@@ -65,7 +65,7 @@ export interface ScheduledOrder {
   estimatedPay: number;
 }
 
-export type AppScreen = 'onboarding' | 'documents' | 'face_verification' | 'home' | 'earnings' | 'inbox' | 'account' | 'chat' | 'uber_pro' | 'wallet' | 'opportunities' | 'safety' | 'earnings_detail' | 'banking' | 'scheduled_orders' | 'rewards' | 'carplay_dashboard' | 'trip_history' | 'work_hub' | 'ratings' | 'planner' | 'uber_services' | 'vehicle_details' | 'payment_methods' | 'trip_preferences' | 'personal_details';
+export type AppScreen = 'onboarding' | 'documents' | 'face_verification' | 'home' | 'earnings' | 'inbox' | 'account' | 'chat' | 'uber_pro' | 'wallet' | 'opportunities' | 'safety' | 'earnings_detail' | 'banking' | 'scheduled_orders' | 'rewards' | 'carplay_dashboard' | 'trip_history' | 'work_hub' | 'ratings' | 'planner' | 'uber_services' | 'vehicle_details' | 'payment_methods' | 'trip_preferences' | 'personal_details' | 'insurance';
 
 export interface CompletedTrip {
   id: string;
@@ -124,6 +124,7 @@ export interface UserProfile {
   documentsUploaded: boolean;
   faceVerified: boolean;
   dob?: string;
+  nationality?: string;
   phone?: string;
   address?: string;
   profilePic?: string;
