@@ -27,6 +27,25 @@ export interface Order {
   verificationMethod?: 'photo' | 'pin' | 'none';
   receiptRequired?: boolean;
   receiptVerified?: boolean;
+  baseFare?: number;
+  mileageRate?: number;
+  timeRate?: number;
+  surgeMultiplier?: number;
+  pickupPos?: { lat: number, lng: number };
+  dropoffPos?: { lat: number, lng: number };
+}
+
+export interface NavSimulation {
+  active: boolean;
+  orderId: string;
+  type: 'pickup' | 'dropoff';
+  startPos: { lat: number, lng: number };
+  endPos: { lat: number, lng: number };
+  currentPos: { lat: number, lng: number };
+  progress: number;
+  distanceRemaining: number;
+  eta: number;
+  speed: number;
 }
 
 export interface ChatMessage {
@@ -56,6 +75,13 @@ export interface CompletedTrip {
   distance: number;
   timestamp: number;
   type: JobType;
+  breakdown?: {
+    base: number;
+    distancePay: number;
+    timePay: number;
+    surge: number;
+    tip: number;
+  };
 }
 
 export type UberProTier = 'Blue' | 'Gold' | 'Platinum' | 'Diamond';
@@ -82,6 +108,15 @@ export interface UserProfile {
   level: number;
   deliveries: number;
   deliveriesToday: number;
+  lifetimeTrips?: number;
+  badges?: string[];
+  compliments?: { type: string, count: number }[];
+  earningsStats?: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+    ytd: number;
+  };
   rides: number;
   acceptanceRate: number;
   cancellationRate: number;

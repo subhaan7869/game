@@ -33,6 +33,7 @@ import {
   Code,
   MessageSquare,
   LogOut,
+  Power,
   Plus,
   Minus,
   HelpCircle,
@@ -51,7 +52,11 @@ import {
   Share2,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   MoreVertical,
+  History,
+  Plane,
+  Utensils,
   Play,
   Square,
   Volume2,
@@ -64,20 +69,30 @@ import {
   Truck,
   Bike,
   Car,
-  Utensils,
   SlidersHorizontal,
   List,
   Target,
   ArrowUp,
   ArrowDown,
-  History,
   Delete,
   Settings2,
   Bike as BikeIcon,
   Car as CarIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, UberProTier, ScheduledOrder, CompletedTrip } from './types';
+import { 
+  BarChart, Bar, 
+  LineChart, Line, 
+  XAxis, YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  Cell,
+  AreaChart,
+  Area
+} from 'recharts';
+import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, UberProTier, ScheduledOrder, CompletedTrip, NavSimulation } from './types';
+import { EarningsDetail } from './components/EarningsDetail';
 import { auth, db, signInWithGoogle, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
@@ -175,6 +190,150 @@ const ScanningScreen = () => (
 );
 
 
+const MapSimulationView = ({ sim }: { sim: NavSimulation }) => {
+  if (!sim.active) return null;
+
+  // Simple relative positioning for simulation
+  const startX = 20;
+  const startY = 80;
+  const endX = 80;
+  const endY = 20;
+
+  const currentX = startX + (endX - startX) * sim.progress;
+  const currentY = startY + (endY - startY) * sim.progress;
+
+  return (
+    <div className="absolute inset-0 pointer-events-none z-10 p-12 flex flex-col justify-end">
+      <div className="h-48 relative mb-24">
+        {/* Destination Path */}
+        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <motion.line 
+            x1={startX} y1={startY} x2={endX} y2={endY}
+            stroke="rgba(37,99,235,0.2)"
+            strokeWidth="0.5"
+            strokeDasharray="2 2"
+          />
+          <motion.line 
+            x1={startX} y1={startY} x2={currentX} y2={currentY}
+            stroke="#2563eb"
+            strokeWidth="1"
+          />
+          
+          {/* Destination Icon */}
+          <circle cx={endX} cy={endY} r="3" fill="#2563eb" fillOpacity="0.2" />
+          <circle cx={endX} cy={endY} r="1" fill="#2563eb" />
+        </svg>
+
+        {/* Driver Pointer */}
+        <motion.div 
+          style={{ 
+            left: `${currentX}%`, 
+            top: `${currentY}%`,
+            x: '-50%',
+            y: '-50%'
+          }} 
+          className="absolute"
+        >
+          <div className="relative">
+            <motion.div 
+              animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.1, 0.3] }}
+              transition={{ repeat: Infinity, duration: 2 }}
+              className="absolute inset-0 bg-blue-500 rounded-full blur-md" 
+            />
+            <div className="w-6 h-6 bg-blue-600 rounded-full border-4 border-white shadow-lg flex items-center justify-center relative z-10">
+              <Navigation size={12} className="text-white rotate-45" />
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      <div className="bg-black/90 backdrop-blur-xl rounded-[32px] p-6 border border-white/10 shadow-2xl">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <Clock size={20} className="text-white" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">ETA</p>
+              <h4 className="text-xl font-black text-white">{Math.ceil(sim.eta)} MIN</h4>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Distance</p>
+            <h4 className="text-xl font-black text-white">{sim.distanceRemaining.toFixed(1)} MI</h4>
+          </div>
+        </div>
+        
+        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${sim.progress * 100}%` }}
+            className="h-full bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.5)]"
+          />
+        </div>
+        <div className="flex justify-between mt-2">
+          <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">
+            {sim.type === 'pickup' ? 'START' : 'RESTAURANT'}
+          </span>
+          <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest">
+            {sim.type === 'pickup' ? 'PICKUP' : 'DESTINATION'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ShiftSummaryModal = ({ stats, onClose }: { stats: any, onClose: () => void }) => {
+  const duration = Math.floor((Date.now() - stats.startTime) / 60000); // minutes
+  return (
+    <div className="fixed inset-0 z-[5000] bg-black/60 backdrop-blur-md flex items-center justify-center p-6">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="w-full max-w-md bg-white rounded-[40px] p-8 flex flex-col items-center text-center overflow-hidden relative shadow-2xl"
+      >
+        <div className="absolute top-4 right-4">
+           <button onClick={onClose} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"><X size={24} className="text-black" /></button>
+        </div>
+        
+        <div className="w-20 h-20 bg-blue-600 rounded-[32px] flex items-center justify-center mb-6 shadow-xl rotate-3">
+          <History size={40} className="text-white" />
+        </div>
+
+        <h2 className="text-3xl font-black text-black mb-2">Shift Completed</h2>
+        <p className="text-gray-400 font-bold mb-8">Great job today! Here's how you did.</p>
+
+        <div className="grid grid-cols-2 gap-4 w-full mb-8">
+          <div className="bg-gray-50 p-6 rounded-3xl text-left border border-gray-100 shadow-sm">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Pay</p>
+            <h4 className="text-2xl font-black text-blue-600">£{stats.earnings.toFixed(2)}</h4>
+          </div>
+          <div className="bg-gray-50 p-6 rounded-3xl text-left border border-gray-100 shadow-sm">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Trips Done</p>
+            <h4 className="text-2xl font-black text-black">{stats.trips}</h4>
+          </div>
+          <div className="bg-gray-50 p-6 rounded-3xl text-left border border-gray-100 shadow-sm">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Time Online</p>
+            <h4 className="text-2xl font-black text-black">{duration}m</h4>
+          </div>
+          <div className="bg-gray-50 p-6 rounded-3xl text-left border border-gray-100 shadow-sm">
+             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Avg Rating</p>
+             <h4 className="text-2xl font-black text-green-600">5.0 ★</h4>
+          </div>
+        </div>
+
+        <button 
+          onClick={onClose}
+          className="w-full py-6 bg-black text-white rounded-3xl font-black text-xl shadow-xl active:scale-95 transition-transform"
+        >
+          GO TO DASHBOARD
+        </button>
+      </motion.div>
+    </div>
+  );
+};
+
 const Heatmap = ({ busynessMode, isLowPerformance }: { busynessMode: 'Low' | 'Medium' | 'High', isLowPerformance?: boolean }) => {
   const intensity = busynessMode === 'High' ? 1 : busynessMode === 'Medium' ? 0.6 : 0.3;
   if (intensity < 0.4 || isLowPerformance) return null; // Disable heatmap on low-perf devices
@@ -227,14 +386,16 @@ const OrderDetailsModal = ({
   onClose, 
   onNextStep, 
   getArrivalTime,
-  onOpenChat
+  onOpenChat,
+  onCancel
 }: { 
   order: Order, 
   theme: string, 
   onClose: () => void, 
   onNextStep: (id: string) => void,
   getArrivalTime: (mins: number) => string,
-  onOpenChat: (id: string) => void
+  onOpenChat: (id: string) => void,
+  onCancel: (id: string) => void
 }) => {
   return (
     <motion.div 
@@ -293,6 +454,14 @@ const OrderDetailsModal = ({
               </div>
             </div>
           </div>
+
+          <button 
+            onClick={() => onCancel(order.id)}
+            className={`w-full flex items-center justify-center gap-3 p-5 rounded-2xl font-black text-red-600 transition-all active:scale-95 ${theme === 'dark' ? 'bg-red-500/10' : 'bg-red-50'}`}
+          >
+            <AlertTriangle size={20} />
+            CANCEL TRIP
+          </button>
         </div>
       </div>
 
@@ -311,6 +480,170 @@ const OrderDetailsModal = ({
         </button>
       </div>
     </motion.div>
+  );
+};
+
+const NewDashboard = ({ 
+  user, 
+  earnings, 
+  startShift, 
+  setCurrentScreen,
+  busynessMode,
+  globalSurge
+}: { 
+  user: UserProfile, 
+  earnings: number, 
+  startShift: () => void,
+  setCurrentScreen: (s: AppScreen) => void,
+  busynessMode: string,
+  globalSurge: number
+}) => {
+  const greeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const stats = user.earningsStats || { daily: 0, weekly: 0, monthly: 0, ytd: 0 };
+
+  return (
+    <div className="h-full w-full bg-gray-50 flex flex-col font-sans overflow-y-auto no-scrollbar pb-32">
+      {/* Header */}
+      <div className="px-6 pt-12 pb-6 flex items-center justify-between">
+        <h1 className="text-3xl font-black tracking-tighter">Uber</h1>
+        <div className="flex items-center gap-3">
+          <button className="w-10 h-10 bg-white shadow-sm border border-gray-100 rounded-full flex items-center justify-center text-gray-700 active:scale-90 transition-transform">
+            <Camera size={20} />
+          </button>
+          <button onClick={() => setCurrentScreen('opportunities')} className="w-10 h-10 bg-white shadow-sm border border-gray-100 rounded-full flex items-center justify-center text-gray-700 active:scale-90 transition-transform">
+            <MapPin size={20} />
+          </button>
+          <button onClick={() => setCurrentScreen('account')} className="w-10 h-10 bg-white shadow-sm border border-gray-100 rounded-full flex items-center justify-center text-gray-700 active:scale-90 transition-transform">
+            <Settings size={20} />
+          </button>
+        </div>
+      </div>
+
+      {/* Greeting */}
+      <div className="px-6 mb-8">
+        <h2 className="text-2xl font-black text-gray-800">{greeting()}, {user.name.split(' ')[0]}</h2>
+        <p className="text-gray-500 font-bold">Ready to hit the road?</p>
+      </div>
+
+      {/* GO Button */}
+      <div className="px-6 mb-10">
+        <button 
+          onClick={startShift}
+          className="w-full py-8 bg-blue-600 text-white rounded-3xl shadow-[0_20px_50px_rgba(37,99,235,0.3)] flex flex-col items-center justify-center active:scale-95 transition-all group"
+        >
+          <span className="text-4xl font-black tracking-tight mb-1">GO</span>
+          <span className="text-[10px] font-black uppercase tracking-widest opacity-60">GO ONLINE</span>
+        </button>
+      </div>
+
+      {/* Quick Stats Grid */}
+      <div className="px-6 mb-8 grid grid-cols-3 gap-3">
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+          <p className="text-lg font-black tracking-tight text-gray-800">£24-32/hr 🔥</p>
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-tight mt-1">High Demand Now</p>
+        </div>
+        <div onClick={() => setCurrentScreen('rewards')} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm cursor-pointer active:scale-95 transition-transform">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Next Quest</p>
+          <p className="text-xs font-black text-gray-800 leading-tight">Complete 4 Trips, Earn <span className="text-blue-600">£40</span></p>
+        </div>
+        <div onClick={() => setCurrentScreen('earnings_detail')} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm cursor-pointer active:scale-95 transition-transform">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">This Week</p>
+          <p className="text-lg font-black text-gray-800">£{stats.weekly.toFixed(2)}</p>
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{user.deliveries} TRIPS</p>
+        </div>
+      </div>
+
+      {/* Opportunity Card */}
+      <div className="px-6 mb-8">
+        <div className="flex items-center justify-between mb-3 px-2">
+          <h3 className="text-sm font-black uppercase tracking-widest text-gray-800">Nearby Opportunities</h3>
+          <ChevronRight size={18} className="text-gray-400" />
+        </div>
+        <div className="bg-white rounded-[32px] overflow-hidden border border-gray-100 shadow-sm p-2">
+           <div className="h-40 bg-gray-100 rounded-[28px] relative overflow-hidden">
+              <div className="absolute inset-0 bg-[#f0ece1]" style={{ backgroundImage: 'radial-gradient(circle, #e4e1d5 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
+                {/* Simplified surge map look */}
+                <div className="absolute top-4 left-10 w-32 h-32 bg-orange-500/20 rounded-full blur-2xl animate-pulse" />
+                <div className="absolute bottom-4 right-10 w-24 h-24 bg-blue-500/20 rounded-full blur-xl" />
+              </div>
+              
+              {/* Surge Tag */}
+              <div className="absolute top-10 left-10 scale-90">
+                <div className="bg-orange-500 text-white px-4 py-3 rounded-2xl font-black text-sm shadow-xl flex flex-col items-center">
+                  <span>Surge +£2.50</span>
+                  <span className="text-[8px] uppercase tracking-widest opacity-80">Extra</span>
+                </div>
+              </div>
+
+              {/* Airport Tag */}
+              <div className="absolute bottom-10 right-8 scale-90">
+                <div className="bg-white p-3 rounded-2xl shadow-xl flex items-center gap-3 border border-gray-100">
+                  <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">
+                    <MapPin size={24} />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-xs">Airport Queue</h4>
+                    <p className="text-[9px] font-bold text-gray-400">15 Drivers Ahead</p>
+                  </div>
+                </div>
+              </div>
+           </div>
+           <button onClick={() => setCurrentScreen('rewards')} className="w-full py-4 text-center text-blue-600 font-black text-xs uppercase tracking-widest border-t border-gray-50 flex items-center justify-center gap-2 mt-1">
+             VIEW QUESTS & PROMOS
+             <ChevronRight size={14} />
+           </button>
+        </div>
+      </div>
+
+      {/* Quick Action Tiles */}
+      <div className="px-6 mb-8 grid grid-cols-2 gap-4">
+        <button onClick={() => setCurrentScreen('trip_preferences')} className="bg-white p-6 rounded-[28px] border border-gray-100 shadow-sm flex flex-col items-start active:scale-95 transition-all text-left group">
+          <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-800 mb-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+            <Target size={24} />
+          </div>
+          <h4 className="font-black text-sm mb-1">Set a Destination</h4>
+          <p className="text-[10px] font-bold text-gray-400">Get trips towards a location</p>
+        </button>
+        <button onClick={() => setCurrentScreen('rewards')} className="bg-white p-6 rounded-[28px] border border-gray-100 shadow-sm flex flex-col items-start active:scale-95 transition-all text-left group">
+          <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-800 mb-4 group-hover:bg-green-600 group-hover:text-white transition-colors">
+            <FileText size={24} />
+          </div>
+          <h4 className="font-black text-sm mb-1">Quests & Challenges</h4>
+          <p className="text-[10px] font-bold text-gray-400">Complete trips, earn bonuses</p>
+        </button>
+      </div>
+
+      {/* Bottom Earnings Row */}
+      <div className="px-6 mb-12">
+        <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Today's Earnings</p>
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-black text-gray-800">£{earnings.toFixed(2)}</span>
+              <button onClick={() => setCurrentScreen('earnings_detail')} className="text-blue-600 text-[10px] font-black uppercase tracking-widest border-b border-blue-600 mb-1">SEE DETAILS</button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button onClick={() => setCurrentScreen('ratings')} className="flex items-center gap-1 bg-gray-50 border border-gray-100 px-3 py-2 rounded-full active:scale-90 transition-transform">
+              <User size={16} className="text-gray-400" />
+              <span className="text-xs font-black text-gray-500">Ratings</span>
+              <span className="text-xs font-black text-gray-800 ml-1">{user.rating.toFixed(1)}</span>
+            </button>
+            <button onClick={() => setCurrentScreen('account')} className="flex items-center gap-1 bg-gray-50 border border-gray-100 px-3 py-2 rounded-full active:scale-90 transition-transform">
+              <SlidersHorizontal size={16} className="text-gray-400" />
+              <span className="text-xs font-black text-gray-500">Account</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -375,14 +708,24 @@ const SideMenu = ({
             <p className="text-lg font-black">{user.deliveriesToday || 0}</p>
           </div>
           <div className="p-3 bg-white/5 rounded-2xl text-center">
-            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Total</p>
-            <p className="text-lg font-black">{user.deliveries}</p>
+            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Lifetime</p>
+            <p className="text-lg font-black">{user.lifetimeTrips || user.deliveries || 0}</p>
           </div>
           <div className="p-3 bg-white/5 rounded-2xl text-center">
-            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Points</p>
-            <p className="text-lg font-black">{user.points}</p>
+            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">XP</p>
+            <p className="text-lg font-black">{Math.floor(user.experience || 0)}</p>
           </div>
         </div>
+
+        {user.badges && user.badges.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {user.badges.map((badge, i) => (
+              <div key={i} className="px-2 py-1 bg-blue-600/20 border border-blue-500/20 rounded-lg text-[8px] font-black uppercase text-blue-500 tracking-widest">
+                {badge}
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="mt-4 p-3 bg-white/5 rounded-2xl flex items-center justify-between border border-white/5">
           <div className="flex items-center gap-2">
@@ -1134,201 +1477,6 @@ const CarPlayDashboard = ({
   );
 };
 
-const EarningsDetail = ({ 
-  earnings, 
-  user, 
-  setCurrentScreen, 
-  getArrivalTime, 
-  setBankBalance, 
-  setEarnings, 
-  sendNotification, 
-  playUberSound 
-}: { 
-  earnings: number, 
-  user: UserProfile, 
-  setCurrentScreen: (screen: AppScreen) => void,
-  getArrivalTime: (mins: number) => string,
-  setBankBalance: React.Dispatch<React.SetStateAction<number>>,
-  setEarnings: React.Dispatch<React.SetStateAction<number>>,
-  sendNotification: (title: string, body: string) => void,
-  playUberSound: (type: 'order' | 'accept' | 'complete') => void
-}) => {
-  const [page, setPage] = useState(0);
-  const pages = ['Today', 'Weekly', 'Recent'];
-
-  return (
-    <motion.div 
-      initial={{ y: '100%' }}
-      animate={{ y: 0 }}
-      exit={{ y: '100%' }}
-      className="absolute inset-0 z-[300] bg-black text-white flex flex-col pb-12"
-    >
-      <div className="p-6 border-b border-white/10">
-        <div className="flex items-center justify-between mb-6">
-          <button onClick={() => setCurrentScreen('home')} className="p-2 bg-white/10 rounded-full"><X size={24} /></button>
-          <h2 className="text-xl font-black">Earnings</h2>
-          <div className="w-10" />
-        </div>
-
-        <div className="flex bg-white/10 p-1 rounded-2xl">
-          {pages.map((p, i) => (
-            <button 
-              key={p}
-              onClick={() => setPage(i)}
-              className={`flex-1 py-2 rounded-xl font-bold text-sm transition-all ${page === i ? 'bg-white text-black shadow-sm' : 'text-gray-500'}`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6 relative">
-        <AnimatePresence mode="wait">
-          {page === 0 && (
-            <motion.div 
-              key="today" 
-              initial={{ opacity: 0, x: 50 }} 
-              animate={{ opacity: 1, x: 0 }} 
-              exit={{ opacity: 0, x: -50 }} 
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="space-y-8"
-            >
-              <div className="text-center">
-                <p className="text-gray-400 font-bold text-sm uppercase tracking-widest mb-2">Today's Earnings</p>
-                <h1 className="text-5xl font-black">£{earnings.toFixed(2)}</h1>
-                <p className="text-green-500 font-bold mt-2 flex items-center justify-center gap-1">
-                  <TrendingUp size={16} /> +12% from yesterday
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white/5 p-4 rounded-3xl">
-                  <p className="text-gray-400 text-xs font-bold mb-1">Trips</p>
-                  <p className="text-xl font-black">{user.deliveries}</p>
-                </div>
-                <div className="bg-white/5 p-4 rounded-3xl">
-                  <p className="text-gray-400 text-xs font-bold mb-1">Time Online</p>
-                  <p className="text-xl font-black">4h 22m</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="font-black text-lg">Breakdown</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between font-bold">
-                    <span className="text-gray-500">Fare</span>
-                    <span>£{(earnings * 0.7).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold">
-                    <span className="text-gray-500">Tips</span>
-                    <span>£{(earnings * 0.2).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold">
-                    <span className="text-gray-500">Promotions</span>
-                    <span>£{(earnings * 0.1).toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {page === 1 && (
-            <motion.div 
-              key="weekly" 
-              initial={{ opacity: 0, x: 50 }} 
-              animate={{ opacity: 1, x: 0 }} 
-              exit={{ opacity: 0, x: -50 }} 
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="space-y-8"
-            >
-              <div className="text-center">
-                <p className="text-gray-400 font-bold text-sm uppercase tracking-widest mb-2">Weekly Total</p>
-                <h1 className="text-5xl font-black">£{(earnings * 5.4).toFixed(2)}</h1>
-                <p className="text-gray-400 font-bold mt-2">Mar 30 - Apr 5</p>
-              </div>
-
-              <div className="h-40 flex items-end justify-between gap-2 px-4">
-                {[40, 70, 45, 90, 65, 85, 30].map((h, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                    <motion.div 
-                      initial={{ height: 0 }} 
-                      animate={{ height: `${h}%` }} 
-                      className={`w-full rounded-t-lg ${i === 6 ? 'bg-blue-600' : 'bg-white/10'}`} 
-                    />
-                    <span className="text-[10px] font-bold text-gray-400">{['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-blue-900/20 p-6 rounded-3xl border border-blue-500/20">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white">
-                    <Zap size={24} />
-                  </div>
-                  <div>
-                    <h4 className="font-black">Top Earner</h4>
-                    <p className="text-sm text-blue-400 font-bold">You're in the top 5% this week!</p>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {page === 2 && (
-            <motion.div 
-              key="recent" 
-              initial={{ opacity: 0, x: 50 }} 
-              animate={{ opacity: 1, x: 0 }} 
-              exit={{ opacity: 0, x: -50 }} 
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="space-y-4"
-            >
-              <h3 className="font-black text-lg">Recent Transactions</h3>
-              {[
-                { label: 'Trip - Greggs', time: getArrivalTime(-120), amount: '£4.50' },
-                { label: 'Trip - Wagamama', time: getArrivalTime(-180), amount: '£8.20' },
-                { label: 'Promotion - Lunch Rush', time: getArrivalTime(-240), amount: '£2.00' },
-                { label: 'Trip - Nando\'s', time: getArrivalTime(-300), amount: '£6.75' },
-                { label: 'Trip - Costa Coffee', time: getArrivalTime(-360), amount: '£3.80' },
-              ].map((t, i) => (
-                <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl">
-                  <div>
-                    <p className="font-bold">{t.label}</p>
-                    <p className="text-xs text-gray-400 font-bold">{t.time}</p>
-                  </div>
-                  <p className="font-black text-lg">{t.amount}</p>
-                </div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      <div className="p-6 border-t border-white/10">
-        <div className="flex justify-center gap-2 mb-6">
-          {pages.map((_, i) => (
-            <div key={i} className={`w-2 h-2 rounded-full transition-all ${page === i ? 'w-4 bg-blue-600' : 'bg-white/10'}`} />
-          ))}
-        </div>
-        <button 
-          onClick={() => {
-            if (earnings > 0) {
-              setBankBalance(prev => prev + earnings);
-              setEarnings(0);
-              sendNotification("Cash Out Successful", "£" + earnings.toFixed(2) + " has been sent to your bank account.");
-              playUberSound('complete');
-              setCurrentScreen('home');
-            }
-          }}
-          className="w-full py-4 bg-white text-black rounded-2xl font-black text-lg active:scale-95 transition-transform"
-        >
-          CASH OUT
-        </button>
-      </div>
-    </motion.div>
-  );
-};
 
 const OnboardingFlow = ({ 
   user, 
@@ -2006,7 +2154,7 @@ const DeliveryVerificationModal = ({
           <>
             <div className="flex gap-2 justify-center mb-4">
               {[0, 1, 2, 3].map(i => (
-                <div key={i} className={`w-10 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-black transition-all ${enteredPin[i] ? 'border-black bg-white shadow-lg' : 'border-gray-100 bg-gray-50'}`}>
+                <div key={`pin-slot-${i}`} className={`w-10 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-black transition-all ${enteredPin[i] ? 'border-black bg-white shadow-lg' : 'border-gray-100 bg-gray-50'}`}>
                   {enteredPin[i] || ""}
                 </div>
               ))}
@@ -2382,6 +2530,15 @@ export default function App() {
       level: 1,
       deliveries: 0,
       deliveriesToday: 0,
+      lifetimeTrips: 0,
+      badges: [],
+      compliments: [],
+      earningsStats: {
+        daily: 0,
+        weekly: 0,
+        monthly: 0,
+        ytd: 0
+      },
       rides: 0,
       acceptanceRate: 98,
       cancellationRate: 1,
@@ -2503,6 +2660,18 @@ export default function App() {
   const PARK_SCALE = 2000 * zoom;
 
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
+  const [navSimulation, setNavSimulation] = useState<NavSimulation>({
+    active: false,
+    orderId: '',
+    type: 'pickup',
+    startPos: { lat: 0, lng: 0 },
+    endPos: { lat: 0, lng: 0 },
+    currentPos: { lat: 0, lng: 0 },
+    progress: 0,
+    distanceRemaining: 0,
+    eta: 0,
+    speed: 15 + Math.random() * 15
+  });
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
   const [earnings, setEarnings] = useState(() => {
     try {
@@ -2554,7 +2723,7 @@ export default function App() {
   const [newInsuranceDate, setNewInsuranceDate] = useState("");
   const [lastRatedStars, setLastRatedStars] = useState<number | null>(null);
   const [showLevelUp, setShowLevelUp] = useState<{ level: number, unlocked: string } | null>(null);
-  const [roadEvent, setRoadEvent] = useState<{ id: string, title: string, description: string, bonus: number } | null>(null);
+  const [roadEvent, setRoadEvent] = useState<{ id: string, title: string, description: string, bonus?: number, delay?: number } | null>(null);
 
   const insuranceExpiry = user.documentExpiries?.["Vehicle Insurance"];
   const insuranceDaysLeft = useMemo(() => {
@@ -2636,8 +2805,55 @@ export default function App() {
   }, [activeOrders]);
 
   const [isNavigating, setIsNavigating] = useState(false);
+  const [userSpeed, setUserSpeed] = useState(0);
+  const [currentSpeedLimit, setCurrentSpeedLimit] = useState(30);
+  const [isSpeeding, setIsSpeeding] = useState(false);
   const [isMatchingLoading, setIsMatchingLoading] = useState(false);
   const [isMatchFailed, setIsMatchFailed] = useState(false);
+  const [isOnBreak, setIsOnBreak] = useState(false);
+  const [isSafetyToolkitOpen, setIsSafetyToolkitOpen] = useState(false);
+  const [showShiftSummary, setShowShiftSummary] = useState(false);
+  const [shiftStats, setShiftStats] = useState({
+    trips: 0,
+    earnings: 0,
+    startTime: 0
+  });
+
+  // REAL-TIME NAVIGATION SIMULATION LOOP
+  useEffect(() => {
+    if (!navSimulation.active) return;
+
+    const interval = setInterval(() => {
+      setNavSimulation(prev => {
+        if (!prev.active) return prev;
+        
+        // Advance progress based on simulated speed
+        // distance = speed * time. speed is mph, interval is 1s
+        const hoursPassed = 1 / 3600;
+        const milesTravelled = prev.speed * hoursPassed;
+        const totalDistance = prev.endPos ? Math.sqrt(Math.pow(prev.endPos.lat - prev.startPos.lat, 2) + Math.pow(prev.endPos.lng - prev.startPos.lng, 2)) * MILES_PER_DEGREE : 1;
+        
+        const newProgress = Math.min(1, prev.progress + (milesTravelled / totalDistance));
+        const distanceRemaining = Math.max(0, totalDistance * (1 - newProgress));
+        const eta = (distanceRemaining / prev.speed) * 60; // in minutes
+
+        if (newProgress >= 1) {
+          // Arrived at destination phase
+          setIsNavigating(false); // Stop general navigation flag
+          return { ...prev, active: false, progress: 1, distanceRemaining: 0, eta: 0 };
+        }
+
+        return {
+          ...prev,
+          progress: newProgress,
+          distanceRemaining,
+          eta
+        };
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [navSimulation.active]);
 
   // Random Road Events while navigating
   useEffect(() => {
@@ -2649,14 +2865,28 @@ export default function App() {
     const interval = setInterval(() => {
       if (Math.random() > 0.85 && !roadEvent) {
         const events = [
-          { id: 'e1', title: "Road Closure", description: "Heavy traffic ahead. +£1.50 logic applied.", bonus: 1.50 },
+          { id: 'e1', title: "Road Closure", description: "Heavy traffic ahead. ETA increased by 3 mins.", delay: 3 },
           { id: 'e2', title: "Fuel Discount", description: "Nearby station offering 10% off for drivers.", bonus: 0 },
           { id: 'e3', title: "Surge Alert", description: "Demand is spiking in your area! +£2.00 on next trip.", bonus: 2.00 },
-          { id: 'e4', title: "Weather Warning", description: "Rain expected. Drive safe! +£1.00 rain bonus.", bonus: 1.00 }
+          { id: 'e4', title: "Weather Warning", description: "Rain expected. Drive safe! +£1.00 rain bonus.", bonus: 1.00 },
+          { id: 'e5', title: "Customer Update", description: "Customer changed drop-off instructions. +£0.50 convenience fee.", bonus: 0.50 },
+          { id: 'e6', title: "Restaurant Delay", description: "Restaurant is busy. Prep time +5 mins.", delay: 5 }
         ];
         const randomEvent = events[Math.floor(Math.random() * events.length)];
         setRoadEvent(randomEvent);
         playUberSound('message');
+        
+        if (randomEvent.delay) {
+          setNavSimulation(prev => ({
+            ...prev,
+            eta: prev.eta + (randomEvent.delay || 0),
+            speed: prev.speed * 0.7 // Slow down simulation
+          }));
+        }
+
+        if (randomEvent.bonus) {
+          setBankBalance(prev => prev + (randomEvent.bonus || 0));
+        }
         
         // Auto-clear after 10 seconds
         setTimeout(() => setRoadEvent(null), 10000);
@@ -2676,6 +2906,7 @@ export default function App() {
     }
 
     const interval = setInterval(() => {
+      if (radarOrders.length >= 3 || isOnBreak) return;
       if (Math.random() > 0.7) {
         setRadarOrders(prev => {
           if (prev.length >= 3) return prev;
@@ -2693,7 +2924,7 @@ export default function App() {
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [user.isOnline, isNavigating, activeOrders.length, pendingOrder]);
+  }, [user.isOnline, isNavigating, activeOrders.length, pendingOrder, isOnBreak, radarOrders.length]);
 
   const currentStop = currentStops[0];
   const currentOrder = useMemo(() => {
@@ -2726,7 +2957,6 @@ export default function App() {
   
   const [isBottomMenuOpen, setIsBottomMenuOpen] = useState(false);
   const [heading, setHeading] = useState(0);
-  const [isSafetyToolkitOpen, setIsSafetyToolkitOpen] = useState(false);
   const [isDestFilterOpen, setIsDestFilterOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
@@ -2795,6 +3025,68 @@ export default function App() {
   });
 
   const [busynessMode, setBusynessMode] = useState<'Low' | 'Medium' | 'High'>('Medium');
+  const [globalSurge, setGlobalSurge] = useState(1.0);
+
+  // Realistic Demand Simulation (every 5 mins)
+  useEffect(() => {
+    const simulateDemand = () => {
+      const hour = new Date().getHours();
+      const isPeak = (hour >= 11 && hour <= 14) || (hour >= 18 && hour <= 21);
+      
+      const modes: ('Low' | 'Medium' | 'High')[] = isPeak ? ['Medium', 'High', 'High'] : ['Low', 'Low', 'Medium'];
+      const newMode = modes[Math.floor(Math.random() * modes.length)];
+      setBusynessMode(newMode);
+      
+      let newSurge = 1.0;
+      if (newMode === 'High') {
+        newSurge = 1.3 + Math.random() * 0.7; // 1.3x to 2.0x
+      } else if (newMode === 'Medium') {
+        newSurge = 1.0 + Math.random() * 0.4; // 1.0x to 1.4x
+      }
+      setGlobalSurge(newSurge);
+      
+      if (newSurge > 1.2 && user.isOnline) {
+        sendNotification("Surge Alert!", `Demand is spiking! Earnings are now ${newSurge.toFixed(1)}x higher in your area.`);
+        playUberSound('order');
+      }
+    };
+
+    // Run once on mount
+    simulateDemand();
+    
+    const interval = setInterval(simulateDemand, 300000); // 5 minutes
+    return () => clearInterval(interval);
+  }, [user.isOnline]);
+
+  // Navigation Speed & Progress Simulation
+  useEffect(() => {
+    let interval: any;
+    if (isNavigating && activeOrders.length > 0) {
+      interval = setInterval(() => {
+        // Randomly simulate speed around the speed limit
+        const targetSpeed = currentSpeedLimit + (Math.random() * 10 - 4); 
+        setUserSpeed(prev => {
+          const diff = targetSpeed - prev;
+          let next = prev + diff * 0.2;
+          return Math.max(0, next);
+        });
+        
+        // Randomly change speed limit
+        if (Math.random() < 0.02) {
+          const limits = [20, 30, 40, 50, 60, 70];
+          setCurrentSpeedLimit(limits[Math.floor(Math.random() * limits.length)]);
+        }
+      }, 1000);
+    } else {
+      setUserSpeed(0);
+      setIsSpeeding(false);
+    }
+    return () => clearInterval(interval);
+  }, [isNavigating, activeOrders.length, currentSpeedLimit]);
+
+  useEffect(() => {
+    setIsSpeeding(userSpeed > currentSpeedLimit + 2);
+  }, [userSpeed, currentSpeedLimit]);
 
   useEffect(() => {
     // We removed localStorage setting here to prevent it getting stuck on high.
@@ -3609,6 +3901,7 @@ export default function App() {
     // 1. Generate 5 candidate orders
     const candidates = Array.from({ length: 5 }).map(() => {
       const type = getJobType();
+      const variant = type === 'ride' ? (Math.random() > 0.8 ? 'Premier' : Math.random() > 0.6 ? 'UberXL' : 'UberX') : 'Uber Eats';
       const customerName = MOCK_CUSTOMERS[Math.floor(Math.random() * MOCK_CUSTOMERS.length)];
       
       const restOffset = MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)].offset;
@@ -3620,7 +3913,9 @@ export default function App() {
       const distToPickup = Math.sqrt(Math.pow(pickupLat - location.latitude, 2) + Math.pow(pickupLng - location.longitude, 2)) * MILES_PER_DEGREE;
       const tripDist = Math.sqrt(Math.pow(custLat - pickupLat, 2) + Math.pow(custLng - pickupLng, 2)) * MILES_PER_DEGREE;
       
-      let activeSurge = surgeMultiplier;
+      // Use whichever surge is higher: area-based or global demand-based
+      let activeSurge = Math.max(surgeMultiplier, globalSurge);
+      
       activeSurgeAreas.forEach(area => {
         const d = Math.sqrt(Math.pow(pickupLat - 51.5074 - area.lat, 2) + Math.pow(pickupLng - (-0.1278) - area.lng, 2));
         if (d < area.radius) {
@@ -3628,13 +3923,13 @@ export default function App() {
         }
       });
 
-      const baseFee = type === 'ride' ? 2.50 : 1.50;
-      const mileRate = type === 'ride' ? 1.45 : 1.10;
-      const minuteRate = 0.15;
+      const baseFee = variant === 'Premier' ? 5.00 : variant === 'UberXL' ? 3.50 : type === 'ride' ? 2.50 : 1.50;
+      const mileRate = variant === 'Premier' ? 2.80 : variant === 'UberXL' ? 2.10 : type === 'ride' ? 1.45 : 1.10;
+      const minuteRate = variant === 'Premier' ? 0.35 : 0.15;
       const estTime = Math.floor((tripDist + distToPickup) * 4 + 3);
       
       const calculatedPay = baseFee + ((tripDist + distToPickup) * mileRate) + (estTime * minuteRate);
-      const minPay = type === 'ride' ? 5.00 : 4.00;
+      const minPay = variant === 'Premier' ? 12.00 : variant === 'UberXL' ? 8.00 : type === 'ride' ? 5.00 : 4.00;
       const finalBasePay = Math.max(calculatedPay, minPay);
       
       const isStacked = type === 'delivery' && Math.random() < 0.3; // 30% chance for double orders
@@ -3649,11 +3944,17 @@ export default function App() {
         id: Math.random().toString(36).substring(2, 11),
         type,
         customerName: isStacked ? `${customerName} (Max+1)` : customerName,
-        restaurantName: type === 'delivery' ? MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)].name : "UberX",
+        restaurantName: type === 'delivery' ? MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)].name : variant,
         restaurantLocation: { latitude: pickupLat, longitude: pickupLng },
         pickupLocation: { latitude: pickupLat, longitude: pickupLng },
         customerLocation: { latitude: custLat, longitude: custLng },
+        pickupPos: { lat: pickupLat, lng: pickupLng },
+        dropoffPos: { lat: custLat, lng: custLng },
         estimatedPay: pay,
+        baseFare: baseFee,
+        mileageRate: mileRate,
+        timeRate: minuteRate,
+        surgeMultiplier: activeSurge,
         estimatedDistance: Number(((tripDist + distToPickup) * (isStacked ? 1.4 : 1)).toFixed(1)),
         estimatedTime: Math.floor(((tripDist + distToPickup) * 5 + 4) * (isStacked ? 1.5 : 1)),
         status: 'pending' as const,
@@ -3688,6 +3989,8 @@ export default function App() {
     let timer: NodeJS.Timeout;
     const scheduleNextOrder = () => {
       // Adjusted wait time based on busyness mode
+      if (!user.isOnline || isOnBreak) return;
+
       let baseWait = 1500;
       let randomRange = 2500;
 
@@ -3706,10 +4009,10 @@ export default function App() {
       const waitTime = baseWait + Math.random() * randomRange;
 
       timer = setTimeout(() => {
-        const canReceive = user.isOnline && activeOrders.length < 3 && !pendingOrder && location;
+        const canReceive = user.isOnline && !isOnBreak && activeOrders.length < 3 && !pendingOrder && location;
         
         if (!canReceive) {
-          if (user.isOnline) scheduleNextOrder();
+          if (user.isOnline && !isOnBreak) scheduleNextOrder();
           return;
         }
 
@@ -3774,7 +4077,7 @@ export default function App() {
 
     scheduleNextOrder();
     return () => clearTimeout(timer);
-  }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference, busynessMode]);
+  }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference, busynessMode, isOnBreak]);
 
   const handleAcceptOrder = () => {
     if (!pendingOrder) return;
@@ -3827,6 +4130,23 @@ export default function App() {
       setPendingOrder(null);
       setOrderExpiryTimer(10);
       setIsNavigating(true);
+      
+      // Start navigation simulation to pickup
+      if (pendingOrder.pickupPos) {
+        setNavSimulation({
+          active: true,
+          orderId: orderCountToAdd === 2 ? pendingOrder.id + "_1" : pendingOrder.id,
+          type: 'pickup',
+          startPos: { lat: location.latitude, lng: location.longitude },
+          endPos: pendingOrder.pickupPos,
+          currentPos: { lat: location.latitude, lng: location.longitude },
+          progress: 0,
+          distanceRemaining: pendingOrder.estimatedDistance / 2,
+          eta: pendingOrder.estimatedTime / 2,
+          speed: 15 + Math.random() * 10
+        });
+      }
+
       setMapOffset({ x: 0, y: 0 }); // Snap map back to driver on acceptance
       playUberSound('accept');
 
@@ -3878,6 +4198,38 @@ export default function App() {
     } else {
       processOrder();
     }
+  };
+
+  const handleGoOnline = () => {
+    if (checkDocsExpired()) {
+      sendNotification("Documents Expired", "Please update your documents to go online.");
+      setCurrentScreen('documents');
+      return;
+    }
+    if (user.faceVerified) {
+      startShift();
+    } else {
+      setIsVerifyingToOnline(true);
+      playUberSound('order');
+      setCurrentScreen('face_verification');
+    }
+  };
+
+  const startShift = () => {
+    setUser(u => ({ ...u, isOnline: true }));
+    setIsOnBreak(false);
+    setShiftStats({
+      trips: 0,
+      earnings: 0,
+      startTime: Date.now()
+    });
+    playUberSound('accept');
+  };
+
+  const endShift = () => {
+    setUser(u => ({ ...u, isOnline: false }));
+    setIsOnBreak(false);
+    setShowShiftSummary(true);
   };
 
   const handleDeclineOrder = () => {
@@ -4051,6 +4403,24 @@ export default function App() {
         setActiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'scanning_receipt' } : o));
       } else {
         setActiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'picked_up' } : o));
+        
+        // Trigger navigation to customer
+        if (order.dropoffPos && location) {
+          setIsNavigating(true);
+          setNavSimulation({
+            active: true,
+            orderId: order.id,
+            type: 'dropoff',
+            startPos: { lat: location.latitude, lng: location.longitude },
+            endPos: order.dropoffPos,
+            currentPos: { lat: location.latitude, lng: location.longitude },
+            progress: 0,
+            distanceRemaining: order.estimatedDistance / 2,
+            eta: order.estimatedTime / 2,
+            speed: 20 + Math.random() * 10
+          });
+        }
+
         const msg = order.type === 'ride' ? `Rider ${order.customerName} picked up` : `Order from ${order.restaurantName} picked up`;
         sendNotification(order.type === 'ride' ? "Trip Started" : "Order Picked Up", msg);
         playUberSound('accept');
@@ -4074,9 +4444,21 @@ export default function App() {
     const order = activeOrders.find(o => o.id === orderId);
     if (!order) return;
 
-    const earnedPay = order.estimatedPay;
+    const base = order.baseFare || 2.0;
+    const distancePay = order.estimatedDistance * (order.mileageRate || 0.5);
+    const timePay = (order.estimatedTime || 10) * (order.timeRate || 0.1);
+    const surge = order.surgeMultiplier || 1.0;
+    const tip = Math.random() > 0.6 ? Math.floor(Math.random() * 5) + 1 : 0;
+    
+    const earnedPay = Number(((base + distancePay + timePay) * surge + tip).toFixed(2));
+
     setEarnings(prev => prev + earnedPay);
     setBankBalance(prev => prev + earnedPay);
+    setShiftStats(prev => ({
+      ...prev,
+      trips: prev.trips + 1,
+      earnings: prev.earnings + earnedPay
+    }));
     setCompletedTrips(prev => [
       {
         id: order.id,
@@ -4085,22 +4467,38 @@ export default function App() {
         customerName: order.customerName,
         earnings: earnedPay,
         distance: order.estimatedDistance,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        // Breakdown for summary
+        breakdown: { base, distancePay, timePay, surge, tip }
       },
       ...prev
     ]);
     
-    // Random Customer Rating (weighted towards 5)
-    const randomRating = Math.random() > 0.1 ? 5 : Math.floor(Math.random() * 2) + 3;
+    // Realistic Rating System
+    let randomRating = 5;
+    const roll = Math.random();
+    if (roll > 0.95) randomRating = 1; // 5% very bad
+    else if (roll > 0.9) randomRating = 3; // 5% average
+    else if (roll > 0.8) randomRating = 4; // 10% good
+    else randomRating = 5; // 80% perfect
+    
     setLastRatedStars(randomRating);
     setTimeout(() => setLastRatedStars(null), 5000);
 
     setUser(u => {
       const newDeliveriesToday = (u.deliveriesToday || 0) + 1;
+      const newLifetimeTrips = (u.lifetimeTrips || 0) + 1;
       const newPoints = u.points + 10;
       const newExp = (u.experience || 0) + 25;
       let newLevel = u.level || 1;
       let unlockedFeature = "";
+
+      const newStats = {
+        daily: (u.earningsStats?.daily || 0) + earnedPay,
+        weekly: (u.earningsStats?.weekly || 0) + earnedPay,
+        monthly: (u.earningsStats?.monthly || 0) + earnedPay,
+        ytd: (u.earningsStats?.ytd || 0) + earnedPay,
+      };
 
       // Level Up Logic (100 XP per level)
       if (newExp >= newLevel * 100) {
@@ -4146,6 +4544,8 @@ export default function App() {
         deliveries: order.type === 'ride' ? u.deliveries : u.deliveries + 1,
         rides: order.type === 'ride' ? (u.rides || 0) + 1 : u.rides,
         deliveriesToday: newDeliveriesToday, 
+        lifetimeTrips: newLifetimeTrips,
+        earningsStats: newStats,
         points: newPoints + extraPoints,
         experience: newExp,
         level: newLevel,
@@ -4686,10 +5086,12 @@ export default function App() {
           )}
 
           {currentScreen === 'home' && (
-            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
-              <MapGrid />
-              
-              {!location && (
+            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden">
+              {user.isOnline ? (
+                <div className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
+                  <MapGrid />
+                  
+                  {!location && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center z-50 bg-[#0c0c0d]/80 backdrop-blur-sm">
                   <div className="relative mb-6">
                     <div className="w-16 h-16 border-4 border-blue-500/20 rounded-full" />
@@ -4722,6 +5124,9 @@ export default function App() {
               
                   {/* Heatmap Simulation */}
                   {user.isOnline && !isNavigating && <Heatmap busynessMode={busynessMode} isLowPerformance={isLowPerformance} />}
+                  
+                  {/* Navigation Simulation Overlay */}
+                  <MapSimulationView sim={navSimulation} />
 
               {/* Background Mode Indicator */}
               {user.isOnline && !isNavigating && (
@@ -4958,36 +5363,99 @@ export default function App() {
                 {/* Navigation Overlay */}
                 <AnimatePresence>
                   {isNavigating && activeOrders.length > 0 && (
-                    <motion.div 
-                      initial={{ y: -100 }}
-                      animate={{ y: 0 }}
-                      exit={{ y: -100 }}
-                      className="absolute top-0 left-0 right-0 z-[150] bg-[#1a1a1a] text-white px-6 py-4 shadow-2xl flex items-center justify-between border-b border-white/10"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-600/20">
-                          <Navigation size={24} className="fill-white" style={{ transform: 'rotate(45deg)' }} />
+                    <div className="absolute top-0 left-0 right-0 z-[150] flex flex-col gap-3 p-4 pt-12">
+                      <motion.div 
+                        initial={{ y: -50, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: -50, opacity: 0 }}
+                        className="bg-[#1a1a1a] text-white px-6 py-4 rounded-[32px] shadow-2xl flex items-center justify-between border border-white/10 backdrop-blur-xl"
+                      >
+                        <div className="flex items-center gap-5">
+                          <div className="bg-blue-600 p-3 rounded-2xl shadow-[0_0_25px_rgba(37,99,235,0.4)]">
+                            <motion.div
+                               animate={{ rotate: [45, 55, 45] }}
+                               transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                            >
+                              <Navigation size={28} className="fill-white text-white" />
+                            </motion.div>
+                          </div>
+                          <div className="max-w-[180px]">
+                            <p className="font-display text-xl font-black leading-tight tracking-tight truncate">
+                              {currentStop?.label || (activeOrders[0]?.status === 'accepted' ? (activeOrders[0]?.type === 'delivery' ? activeOrders[0]?.restaurantName : 'Pickup Location') : 'Destination')}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">
+                                 Arrive by {getArrivalTime(activeOrders[0]?.estimatedTime / 2)}
+                               </p>
+                               <div className="w-1 h-1 rounded-full bg-blue-500" />
+                               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">
+                                 {activeOrders[0]?.estimatedDistance.toFixed(1)} mi
+                               </p>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-display text-xl font-black leading-tight tracking-tight">
-                            {currentStop?.label || (activeOrders[0]?.status === 'accepted' ? (activeOrders[0]?.type === 'delivery' ? activeOrders[0]?.restaurantName : 'Pickup Location') : 'Destination')}
-                          </p>
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                            {activeOrders.length > 1 ? `${activeOrders.length} Trips In Progress • ` : ''}
-                            {activeOrders[0]?.status === 'accepted' ? `Pickup by ${getArrivalTime(activeOrders[0]?.estimatedTime / 2)}` : `Arriving by ${getArrivalTime(activeOrders[0]?.estimatedTime / 2)}`}
-                          </p>
+                        <div className="flex items-center gap-4 pr-1">
+                           <div className="text-right hidden sm:block">
+                              <p className="font-display text-2xl font-black leading-tight">£{activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}</p>
+                              <p className="text-[8px] font-black text-blue-500 tracking-[0.2em] uppercase">Real-Time Pay</p>
+                           </div>
+                           <button onClick={() => setIsNavigating(false)} className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-gray-200 active:scale-90 transition-transform">
+                             <X size={20} />
+                           </button>
                         </div>
+                      </motion.div>
+
+                      {/* Tactical HUD: Speed & Lane Assistance */}
+                      <div className="flex gap-2.5">
+                         {/* Dynamic Speedometer */}
+                         <motion.div 
+                           initial={{ x: -30, opacity: 0 }}
+                           animate={{ x: 0, opacity: 1 }}
+                           className={`bg-white rounded-[28px] px-6 py-4 shadow-2xl flex flex-col items-center justify-center border-4 h-20 min-w-24 ${isSpeeding ? 'border-red-500 bg-red-50 animate-pulse' : 'border-black'}`}
+                         >
+                            <span className={`text-4xl font-black italic leading-none tracking-tighter ${isSpeeding ? 'text-red-600' : 'text-black'}`}>{Math.round(userSpeed)}</span>
+                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] mt-1">MPH</span>
+                         </motion.div>
+
+                         {/* Legal Speed Limit (UK Style Circle) */}
+                         <motion.div 
+                           initial={{ x: -20, opacity: 0 }}
+                           animate={{ x: 0, opacity: 1 }}
+                           transition={{ delay: 0.1 }}
+                           className="bg-white rounded-full w-20 h-20 border-[6px] border-red-600 flex flex-col items-center justify-center shadow-2xl z-10"
+                         >
+                            <span className="text-3xl font-black text-black leading-none">{currentSpeedLimit}</span>
+                            <span className="text-[8px] font-black text-gray-400 leading-none">LIMIT</span>
+                         </motion.div>
+
+                         {/* Smart Lane Guidance */}
+                         <motion.div 
+                           initial={{ x: -20, opacity: 0 }}
+                           animate={{ x: 0, opacity: 1 }}
+                           transition={{ delay: 0.2 }}
+                           className="bg-[#1a1a1a]/95 rounded-[28px] px-6 py-4 flex items-center gap-4 border border-white/10 shadow-2xl backdrop-blur-xl h-20"
+                         >
+                            <div className="flex gap-2 items-end h-8">
+                               {[1, 2, 3, 4, 5].map(l => (
+                                 <motion.div 
+                                    key={`lane-marker-${l}`} 
+                                    animate={l === 4 ? { opacity: [0.4, 1, 0.4] } : {}}
+                                    transition={{ duration: 1.5, repeat: Infinity }}
+                                    className={`w-1.5 rounded-full transition-all duration-700 ${l === 4 ? 'h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)]' : 'h-5 bg-white/10'}`} 
+                                 />
+                               ))}
+                            </div>
+                            <div className="text-left">
+                               <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest leading-none mb-1.5">Lane Assistance</p>
+                               <p className="text-sm font-black text-white leading-tight uppercase">Keep Right</p>
+                               <p className="text-[10px] font-bold text-blue-500 leading-none mt-1">Exit in 0.4 mi</p>
+                            </div>
+                            <div className="bg-blue-600/20 p-2 rounded-xl">
+                               <ArrowUp size={18} className="text-blue-500 rotate-45" />
+                            </div>
+                         </motion.div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="font-display text-lg font-black leading-tight">£{activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}</p>
-                          <p className="text-[8px] font-black text-blue-500 tracking-widest uppercase">Ongoing</p>
-                        </div>
-                        <button onClick={() => setIsNavigating(false)} className="p-2 bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors">
-                          <X size={20} />
-                        </button>
-                      </div>
-                    </motion.div>
+                    </div>
                   )}
                 </AnimatePresence>
 
@@ -5719,425 +6187,216 @@ export default function App() {
                 )}
               </AnimatePresence>
 
-              {/* Top Controls */}
-              {!user.isOnline ? (
-                <div className="absolute top-4 left-4 right-4 flex flex-col gap-4 z-50">
-                  <div className="flex justify-between items-center">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsSideMenuOpen(true);
-                      }} 
-                      className={`p-3 rounded-full shadow-xl active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}
-                    >
-                      <Menu size={24} />
-                    </button>
-                    
-                    {/* Top Tabs (Status, Browse, Earnings) */}
-                    <div className="flex bg-black/80 backdrop-blur-md p-1 rounded-full border border-white/10 shadow-2xl">
-                      {(['status', 'browse', 'earnings'] as const).map(tab => (
-                        <button 
-                          key={tab}
-                          onClick={() => {
-                            setActiveTopTab(tab);
-                            if (tab === 'earnings') setCurrentScreen('earnings');
-                            if (tab === 'browse') setCurrentScreen('opportunities');
-                          }}
-                          className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeTopTab === tab ? 'bg-white text-black' : 'text-gray-400'}`}
-                        >
-                          {tab}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button className={`p-3 rounded-full shadow-xl ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}>
-                        <Search size={24} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="absolute top-6 left-4 right-4 flex justify-between items-center z-50">
+              {/* Top Controls Overlay */}
+              <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+                <div className="p-4 flex justify-between items-center pointer-events-auto">
                   <button 
-                    onClick={() => setIsSearchOpen(true)} 
+                    onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
                     className="w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-black active:scale-95 transition-transform"
                   >
-                    <Search size={24} />
+                    <Menu size={24} />
                   </button>
                   
-                  <motion.button 
-                    initial={{ y: -50 }}
-                    animate={{ y: 0 }}
-                    onClick={() => setCurrentScreen('earnings')}
-                    className="bg-black text-white px-6 py-2.5 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform border border-white/10"
-                  >
-                    <span className="font-display text-2xl font-black tracking-tighter">£{earnings.toFixed(2)}</span>
-                  </motion.button>
-                  
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsSideMenuOpen(true);
-                    }}
-                    className="relative w-12 h-12 rounded-full shadow-xl active:scale-95 transition-transform overflow-hidden border-2 border-white"
-                  >
-                    <img src={user.profilePic || "https://picsum.photos/seed/driver/100/100"} alt="Profile" className="w-full h-full object-cover" />
-                    <div className="absolute top-0 right-0 w-3 h-3 bg-blue-500 rounded-full border-2 border-white" />
-                  </button>
+                  {user.isOnline && (
+                    <motion.button 
+                      initial={{ y: -50 }}
+                      animate={{ y: 0 }}
+                      onClick={() => setCurrentScreen('earnings')}
+                      className="bg-black text-white px-6 py-2.5 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform border border-white/10"
+                    >
+                      <span className="font-display text-2xl font-black tracking-tighter">£{earnings.toFixed(2)}</span>
+                    </motion.button>
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => setIsSearchOpen(true)}
+                      className="w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-black active:scale-95 transition-transform"
+                    >
+                      <Search size={24} />
+                    </button>
+                    {!user.isOnline && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
+                        className="w-12 h-12 rounded-full shadow-xl active:scale-95 transition-transform overflow-hidden border-2 border-white"
+                      >
+                        <img src={user.profilePic || "https://picsum.photos/seed/driver/100/100"} alt="Profile" className="w-full h-full object-cover" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              )}
+              </div>
 
               {/* Bottom Menu Toggle Button / Map Status Bar */}
-              {!pendingOrder && !isBottomMenuOpen && (
+              {user.isOnline && !pendingOrder && !isBottomMenuOpen && (
                 <div className="absolute bottom-0 left-0 right-0 z-[150]">
-                  {user.isOnline ? (
-                    <motion.div 
-                      key="online-bar"
-                      initial={{ y: 100 }}
-                      animate={{ y: 0 }}
-                      className="w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.2)] flex flex-col rounded-t-[32px] overflow-hidden"
-                    >
-                      <div 
-                        onClick={() => setIsBottomMenuOpen(true)}
-                        className="flex items-center justify-between px-8 py-5 cursor-pointer active:bg-gray-50 transition-colors"
-                      >
-                        <button className="text-black" onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}>
-                          <Menu size={28} />
-                        </button>
-                        
-                        <div className="flex flex-col items-center flex-1">
-                          {currentStop && distanceToStop(currentStop) <= 0.1 ? (
-                            <motion.button
-                              whileTap={{ scale: 0.95 }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleNextStep(currentStop.orderId);
-                              }}
-                              className={`px-8 py-3 rounded-full font-display font-black text-lg uppercase tracking-tighter shadow-lg transition-all ${
-                                currentStop.type === 'pickup' 
-                                  ? 'bg-blue-600 text-white shadow-blue-500/20' 
-                                  : 'bg-green-600 text-white shadow-green-500/20'
-                              }`}
-                            >
-                              {currentStop.type === 'pickup' ? (activeOrders.find(o => o.id === currentStop.orderId)?.type === 'delivery' ? 'Confirm Pickup' : 'Confirm Arrival') : 'Confirm Dropoff'}
-                            </motion.button>
-                          ) : (
-                            <div className="flex flex-col items-center">
-                              <span className="font-display text-2xl font-black text-black tracking-tight leading-none">
-                                {activeOrders.length > 0 
-                                  ? `${activeOrders.length} ${activeOrders.length === 1 ? 'Trip' : 'Trips'} • £${activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}`
-                                  : 'Finding trips'}
-                              </span>
-                              <div className="flex items-center gap-3 mt-1.5">
-                                <div className="flex items-center gap-1">
-                                  <motion.div 
-                                    animate={{ opacity: [1, 0, 1] }}
-                                    transition={{ duration: 1.5, repeat: Infinity }}
-                                    className="w-1.5 h-1.5 rounded-full bg-blue-500"
-                                  />
-                                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
-                                    {currentStop ? `${currentStop.label} • ${distanceToStop(currentStop).toFixed(1)} mi` : user.isOnline ? 'Online' : 'Offline'}
-                                  </span>
-                                </div>
-                                <span className="text-[10px] text-gray-300">•</span>
-                                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${busynessMode === 'High' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' : 'bg-blue-500/10 border-blue-500/20 text-blue-500'}`}>
-                                  <TrendingUp size={10} />
-                                  <span className="text-[9px] font-black uppercase tracking-wider">{busynessMode} Demand</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-  
-                        <button className="text-black p-2" onClick={(e) => { e.stopPropagation(); setIsBottomMenuOpen(true); }}>
-                          <List size={28} />
-                        </button>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <div className="flex flex-col items-center w-full relative">
-                      <button 
-                        onClick={() => setIsVehicleSettingsOpen(true)}
-                        className={`absolute top-6 left-6 z-[160] p-3 rounded-full shadow-2xl backdrop-blur-md border border-white/10 ${theme === 'dark' ? 'bg-black/80 text-white' : 'bg-white/90 text-black shadow-black/5'}`}
-                      >
-                        <Settings size={20} />
-                      </button>
-
-                      {/* GO Button Container - Shifted for prominence */}
-                      <motion.div 
-                        key="offline-go"
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="absolute bottom-[280px] left-1/2 -translate-x-1/2 z-[170]"
-                      >
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (checkDocsExpired()) {
-                              sendNotification("Documents Expired", "Please update your documents to go online.");
-                              setCurrentScreen('documents');
-                              return;
-                            }
-                            if (user.faceVerified) {
-                              setUser(u => ({ ...u, isOnline: true }));
-                              playUberSound('accept');
-                            } else {
-                              setIsVerifyingToOnline(true);
-                              playUberSound('order');
-                              setCurrentScreen('face_verification');
-                            }
-                          }}
-                          className="w-28 h-28 bg-blue-600 text-white rounded-full font-display font-black text-3xl shadow-[0_20px_50px_rgba(37,99,235,0.4)] flex flex-col items-center justify-center relative active:scale-90 transition-transform border-[6px] border-white group"
-                        >
-                          <span className="relative z-10">GO</span>
-                          <motion.div 
-                            animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0.1, 0.3] }} 
-                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                            className="absolute inset-0 bg-blue-400 rounded-full" 
-                          />
-                        </button>
-                      </motion.div>
-
-                      {/* Dashboard Feed (Offline) */}
-                      <div className="w-full bg-[#0c0c0d] rounded-t-[40px] shadow-[0_-20px_80px_rgba(0,0,0,0.5)] border-t border-white/5 pt-6 pb-12 px-6 z-[120] max-h-[320px] overflow-y-auto no-scrollbar">
-                        <div className="flex justify-center mb-6">
-                          <div className="w-12 h-1.5 rounded-full bg-white/10" />
-                        </div>
-                        
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div 
-                              onClick={() => setCurrentScreen('earnings')}
-                              className={`p-6 rounded-[30px] border-2 transition-all active:scale-95 ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-100 shadow-sm'}`}
-                            >
-                              <div className="text-gray-400 font-black text-[10px] uppercase tracking-widest mb-1">Today</div>
-                              <div className="text-2xl font-black">£{earnings.toFixed(2)}</div>
-                              <div className="flex items-center gap-1 text-[10px] font-bold text-blue-600 mt-2 lowercase">
-                                <TrendingUp size={12} />
-                                details
-                              </div>
-                            </div>
-                            <div 
-                              onClick={() => setCurrentScreen('ratings')}
-                              className={`p-6 rounded-[30px] border-2 transition-all active:scale-95 ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-100 shadow-sm'}`}
-                            >
-                              <div className="text-gray-400 font-black text-[10px] uppercase tracking-widest mb-1">Rating</div>
-                              <div className="text-2xl font-black">{user.rating.toFixed(2)} ★</div>
-                              <div className="flex items-center gap-1 text-[10px] font-bold text-green-600 mt-2 lowercase">
-                                <Star size={12} fill="currentColor" />
-                                partner
-                              </div>
-                            </div>
-                          </div>
-
-                          <div 
-                            onClick={() => setIsVehicleSettingsOpen(true)}
-                            className={`p-5 rounded-[32px] border-2 transition-all active:scale-[0.98] flex items-center justify-between col-span-2 ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-100 shadow-sm'}`}
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="p-3 bg-blue-600/10 text-blue-600 rounded-2xl">
-                                {vehicleType === 'Car' ? <CarIcon size={24} /> : vehicleType === 'Bike' ? <BikeIcon size={24} /> : <Zap size={24} />}
-                              </div>
-                              <div>
-                                <h3 className="font-black text-sm">Trip Preferences</h3>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{vehicleType} • {selectedServices.length} Active</p>
-                              </div>
-                            </div>
-                            <Settings size={18} className="text-gray-500" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Last Trip Card Overlay */}
-              {!user.isOnline && lastTrip && showLastTripCard && (
-                <div className="absolute bottom-32 left-4 right-4 z-[60] flex justify-center">
                   <motion.div 
-                    initial={{ y: 100, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-gray-100 flex flex-col items-center relative"
+                    key="online-bar"
+                    initial={{ y: 100 }}
+                    animate={{ y: 0 }}
+                    className="w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.2)] flex flex-col rounded-t-[32px] overflow-hidden"
                   >
-                    <button 
-                      onClick={() => setShowLastTripCard(false)}
-                      className="absolute top-4 right-4 p-1 bg-gray-100 rounded-full text-gray-400 hover:text-black transition-colors"
+                    <div 
+                      onClick={() => setIsBottomMenuOpen(true)}
+                      className="flex items-center justify-between px-8 py-5 cursor-pointer active:bg-gray-50 transition-colors"
                     >
-                      <X size={16} />
-                    </button>
-                    <div className="flex justify-between w-full items-center mb-4">
-                      <Eye size={20} className="text-gray-300" />
-                      <div className="flex flex-col items-center">
-                        <span className="text-3xl font-black text-black">£{lastTrip.amount.toFixed(2)}</span>
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Last Trip</span>
+                      <button className="text-black" onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}>
+                        <Menu size={28} />
+                      </button>
+                      
+                      <div className="flex flex-col items-center flex-1">
+                        {currentStop && distanceToStop(currentStop) <= 0.1 ? (
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleNextStep(currentStop.orderId);
+                            }}
+                            className={`px-8 py-3 rounded-full font-display font-black text-lg uppercase tracking-tighter shadow-lg transition-all ${
+                              currentStop.type === 'pickup' 
+                                ? 'bg-blue-600 text-white shadow-blue-500/20' 
+                                : 'bg-green-600 text-white shadow-green-500/20'
+                            }`}
+                          >
+                            {currentStop.type === 'pickup' ? (activeOrders.find(o => o.id === currentStop.orderId)?.type === 'delivery' ? 'Confirm Pickup' : 'Confirm Arrival') : 'Confirm Dropoff'}
+                          </motion.button>
+                        ) : (
+                          <div className="flex flex-col items-center">
+                            <span className="font-display text-2xl font-black text-black tracking-tight leading-none">
+                              {activeOrders.length > 0 
+                                ? `${activeOrders.length} ${activeOrders.length === 1 ? 'Trip' : 'Trips'} • £${activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}`
+                                : 'Finding trips'}
+                            </span>
+                            <div className="flex items-center gap-3 mt-1.5">
+                              <div className="flex items-center gap-1">
+                                <motion.div 
+                                  animate={{ opacity: [1, 0, 1] }}
+                                  transition={{ duration: 1.5, repeat: Infinity }}
+                                  className="w-1.5 h-1.5 rounded-full bg-blue-500"
+                                />
+                                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                                  {currentStop ? `${currentStop.label} • ${distanceToStop(currentStop).toFixed(1)} mi` : user.isOnline ? 'Online' : 'Offline'}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-gray-300">•</span>
+                              <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${busynessMode === 'High' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' : 'bg-blue-500/10 border-blue-500/20 text-blue-500'}`}>
+                                <TrendingUp size={10} />
+                                <span className="text-[9px] font-black uppercase tracking-wider">{busynessMode} Demand</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <HelpCircle size={20} className="text-gray-300" />
-                    </div>
-                    
-                    <div className="flex flex-col items-center mb-4">
-                      <span className="text-sm font-bold text-black">Today at {lastTrip.time}</span>
-                      <span className="text-xs font-bold text-gray-400">{lastTrip.type}</span>
-                    </div>
 
-                    <button 
-                      onClick={() => { setCurrentScreen('earnings'); setShowLastTripCard(false); }}
-                      className="text-blue-600 font-black text-xs uppercase tracking-widest"
-                    >
-                      See all trips
-                    </button>
+                      <button className="text-black p-2" onClick={(e) => { e.stopPropagation(); setIsBottomMenuOpen(true); }}>
+                        <List size={28} />
+                      </button>
+                    </div>
                   </motion.div>
                 </div>
               )}
 
-              <AnimatePresence>
-                {isBottomMenuOpen && (
-                  <div className="absolute inset-0 z-[150]">
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      onClick={() => setIsBottomMenuOpen(false)}
-                      className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                    />
-                    <motion.div 
-                      initial={{ y: '100%' }}
-                      animate={{ y: 0 }}
-                      exit={{ y: '100%' }}
-                      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                      className={`absolute bottom-0 left-0 right-0 rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] flex flex-col max-h-[70vh] ${theme === 'dark' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black'}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex flex-col items-center pt-4 pb-2 shrink-0">
-                        <div className={`w-12 h-1.5 rounded-full mb-4 ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-200'}`} />
-                      </div>
-                      
-                      <div className="relative flex-1 flex flex-col min-h-0">
-                        <div className="overflow-y-auto px-6 pb-20 custom-scrollbar flex-1">
-                          {!user.isOnline ? (
-                            <>
-                              <div className="flex justify-between w-full mb-8 px-4 relative">
-                                <button onClick={() => { setIsSideMenuOpen(true); setIsBottomMenuOpen(false); }} className="flex flex-col items-center gap-2">
-                                  <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Menu size={24} /></div>
-                                  <span className="text-xs font-bold">Menu</span>
-                                </button>
-                                
-                                <div className="relative -mt-12">
-                                  <motion.button
-                                    whileTap={{ scale: 0.9 }}
-                                    disabled={(lockoutUntil ? Date.now() < lockoutUntil : false) || Object.values(customerTimers).some(t => Number(t) > 0)}
-                                    onClick={() => {
-                                      if (!firebaseUser) {
-                                        signInWithGoogle().catch(console.error);
-                                        return;
-                                      }
-                                      if (user.faceVerified) {
-                                        setUser(u => ({ ...u, isOnline: true }));
-                                        setIsBottomMenuOpen(false);
-                                        playUberSound('accept');
-                                      } else {
-                                        setIsVerifyingToOnline(true);
-                                        playUberSound('order');
-                                        setCurrentScreen('face_verification');
-                                        setIsBottomMenuOpen(false);
-                                      }
-                                    }}
-                                    className={`w-24 h-24 rounded-full border-4 border-white flex items-center justify-center shadow-[0_0_50px_rgba(37,99,235,0.5)] relative overflow-visible transition-all ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'bg-gray-800 grayscale cursor-not-allowed' : 'bg-blue-600'}`}
-                                  >
-                                    <motion.div 
-                                      animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.1, 0.3] }} 
-                                      transition={{ duration: 2, repeat: Infinity }} 
-                                      className="absolute inset-0 bg-white rounded-full" 
-                                    />
-                                    <span className="text-xl font-black tracking-widest relative z-10 text-white">{(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'LOCKED' : 'GO'}</span>
-                                  </motion.button>
-                                </div>
+              </div>
+            ) : (
+              <NewDashboard 
+                user={user} 
+                earnings={earnings} 
+                startShift={handleGoOnline} 
+                setCurrentScreen={setCurrentScreen}
+                busynessMode={busynessMode}
+                globalSurge={globalSurge}
+              />
+            )}
 
-                              <button onClick={() => setIsSearchOpen(true)} className="flex flex-col items-center gap-2">
-                                <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Search size={24} /></div>
-                                <span className="text-xs font-bold">Search</span>
-                              </button>
-                            </div>
-
-                            <div className={`w-full p-4 rounded-2xl flex items-center justify-between mb-4 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
-                              <div className="flex items-center gap-3">
-                                <div className="w-2 h-2 bg-red-500 rounded-full" />
-                                <div className="flex flex-col">
-                                  <span className="font-bold text-sm">You're offline</span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{user.deliveriesToday} deliveries today</span>
-                                    <span className="text-[10px] opacity-30 text-white">•</span>
-                                    <span className={`text-[10px] font-black uppercase tracking-widest ${busynessMode === 'High' ? 'text-orange-500' : busynessMode === 'Medium' ? 'text-blue-400' : 'text-gray-500'}`}>
-                                      {busynessMode} Demand
-                                    </span>
-                                  </div>
-                                </div>
+            <AnimatePresence>
+              {isBottomMenuOpen && user.isOnline && (
+                <div className="absolute inset-0 z-[150]">
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setIsBottomMenuOpen(false)}
+                    className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                  />
+                  <motion.div 
+                    initial={{ y: '100%' }}
+                    animate={{ y: 0 }}
+                    exit={{ y: '100%' }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    className={`absolute bottom-0 left-0 right-0 rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] flex flex-col max-h-[70vh] ${theme === 'dark' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black'}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex flex-col items-center pt-4 pb-2 shrink-0">
+                      <div className={`w-12 h-1.5 rounded-full mb-4 ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-200'}`} />
+                    </div>
+                    
+                    <div className="relative flex-1 flex flex-col min-h-0">
+                      <div className="overflow-y-auto px-6 pb-20 custom-scrollbar flex-1">
+                        <div className="flex justify-between w-full mb-8 px-4">
+                          <button onClick={() => { setIsSideMenuOpen(true); setIsBottomMenuOpen(false); }} className="flex flex-col items-center gap-2">
+                            <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Menu size={24} /></div>
+                            <span className="text-xs font-bold">Menu</span>
+                          </button>
+                          
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="relative">
+                              <motion.div 
+                                animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.1, 0.4] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                                className="absolute inset-0 bg-blue-500 rounded-full"
+                              />
+                              <div className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg relative z-10">
+                                <Navigation size={28} className="animate-pulse" />
                               </div>
-                              <span className="text-xs text-gray-400 font-bold">{currentCity}</span>
                             </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="flex justify-between w-full mb-8 px-4">
-                              <button onClick={() => { setIsSideMenuOpen(true); setIsBottomMenuOpen(false); }} className="flex flex-col items-center gap-2">
-                                <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Menu size={24} /></div>
-                                <span className="text-xs font-bold">Menu</span>
-                              </button>
-                              
-                              <div className="flex flex-col items-center gap-2">
-                                <div className="relative">
-                                  <motion.div 
-                                    animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.1, 0.4] }}
-                                    transition={{ duration: 2, repeat: Infinity }}
-                                    className="absolute inset-0 bg-blue-500 rounded-full"
-                                  />
-                                  <div className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg relative z-10">
-                                    <Navigation size={28} className="animate-pulse" />
-                                  </div>
-                                </div>
-                                <span className="text-[10px] font-black text-blue-600 tracking-widest uppercase">Finding trips</span>
-                              </div>
+                            <span className={`text-[10px] font-black tracking-widest uppercase ${isOnBreak ? 'text-orange-500' : 'text-blue-600'}`}>
+                              {isOnBreak ? 'On Break' : 'Finding trips'}
+                            </span>
+                          </div>
 
-                              <button onClick={() => setIsSearchOpen(true)} className="flex flex-col items-center gap-2">
-                                <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Search size={24} /></div>
-                                <span className="text-xs font-bold">Search</span>
-                              </button>
-                            </div>
+                          <button onClick={() => setIsSearchOpen(true)} className="flex flex-col items-center gap-2">
+                            <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Search size={24} /></div>
+                            <span className="text-xs font-bold">Search</span>
+                          </button>
+                        </div>
 
-                            <div className={`w-full p-6 rounded-3xl flex items-center justify-between mb-4 border-2 ${theme === 'dark' ? 'bg-blue-500/10 border-blue-500/30' : 'bg-blue-50 border-blue-200'}`}>
-                              <div className="flex items-center gap-4">
-                                <motion.div 
-                                  animate={{ scale: [1, 1.2, 1] }}
-                                  transition={{ duration: 1, repeat: Infinity }}
-                                  className="w-3 h-3 bg-blue-500 rounded-full" 
-                                />
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <p className={`font-black text-lg leading-none ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>Finding trips</p>
-                                    <div className="flex items-center gap-1 bg-green-500/20 px-2 py-0.5 rounded-full border border-green-500/20">
-                                      <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
-                                      <span className="text-[8px] font-black text-green-500 uppercase tracking-widest">Awake</span>
-                                    </div>
+                        <div className={`w-full p-6 rounded-3xl flex items-center justify-between mb-4 border-2 ${theme === 'dark' ? 'bg-blue-500/10 border-blue-500/30' : 'bg-blue-50 border-blue-200'}`}>
+                          <div className="flex items-center gap-4">
+                            <motion.div 
+                              animate={{ scale: [1, 1.2, 1] }}
+                              transition={{ duration: 1, repeat: Infinity }}
+                              className={`w-3 h-3 rounded-full ${isOnBreak ? 'bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]' : 'bg-blue-500'}`}
+                            />
+                            <div>
+                                <p className={`font-black text-lg leading-none ${isOnBreak ? 'text-orange-500' : theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+                                   {isOnBreak ? 'On Break' : 'Finding trips'}
+                                </p>
+                                {globalSurge > 1.0 && !isOnBreak && (
+                                  <div className="flex items-center gap-1 bg-orange-500/20 px-2 py-0.5 rounded-full border border-orange-500/20 mt-1">
+                                    <Zap size={10} className="text-orange-500 fill-orange-500" />
+                                    <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest">{globalSurge.toFixed(1)}x Surge</span>
                                   </div>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <p className="text-[10px] font-bold text-gray-400">{currentCity}</p>
-                                    <span className="text-[10px] opacity-30 text-white">•</span>
-                                    <span className={`text-[10px] font-black uppercase tracking-widest ${busynessMode === 'High' ? 'text-orange-500' : busynessMode === 'Medium' ? 'text-blue-400' : 'text-gray-400'}`}>
-                                      {busynessMode} Demand
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                              <button 
-                                onClick={() => { setUser(u => ({ ...u, isOnline: false, faceVerified: false })); setIsBottomMenuOpen(false); }} 
-                                className="bg-red-600 text-white px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-transform shadow-lg"
-                              >
-                                GO OFFLINE
-                              </button>
+                                )}
+                                <p className="text-[10px] font-bold text-gray-400 mt-1">{currentCity}</p>
                             </div>
-                          </>
-                        )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => setIsOnBreak(!isOnBreak)} 
+                              className={`${isOnBreak ? 'bg-orange-500 text-white shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'bg-blue-600/10 text-blue-600 border border-blue-600/20'} w-12 h-12 rounded-2xl flex items-center justify-center active:scale-95 transition-all`}
+                              title={isOnBreak ? 'Resume' : 'Take a break'}
+                            >
+                              <Coffee size={20} />
+                            </button>
+                            <button 
+                              onClick={() => endShift()} 
+                              className="bg-red-600 text-white px-6 py-4 rounded-3xl font-black text-sm active:scale-95 transition-transform shadow-lg flex items-center gap-2"
+                            >
+                              <Power size={18} />
+                              OFFLINE
+                            </button>
+                          </div>
+                        </div>
 
                         {/* Common scrollable items */}
                         <div className="space-y-6">
@@ -6259,23 +6518,13 @@ export default function App() {
                               <p className="text-[10px] text-gray-400 font-bold">Check your notifications</p>
                             </div>
                           </div>
-                          <div 
-                            onClick={() => { setCurrentScreen('earnings'); setIsBottomMenuOpen(false); }}
-                            className={`p-4 rounded-2xl flex items-center gap-4 cursor-pointer active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}
-                          >
-                            <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}><TrendingUp size={20} /></div>
-                            <div>
-                              <p className="text-sm font-black">Earnings Trend</p>
-                              <p className="text-[10px] text-gray-400 font-bold">Busy area nearby</p>
-                            </div>
-                          </div>
-                          </div>
                         </div>
                       </div>
-                    </motion.div>
-                  </div>
-                )}
-              </AnimatePresence>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
 
               {/* Bottom Cards */}
               {!isBottomMenuOpen && !pendingOrder && !activeChatOrderId && (
@@ -6367,6 +6616,10 @@ export default function App() {
                       setActiveChatOrderId(id);
                       setViewingOrderDetailsId(null);
                       setCurrentScreen('chat');
+                    }}
+                    onCancel={(id) => {
+                      setCancellingOrderId(id);
+                      setViewingOrderDetailsId(null);
                     }}
                   />
                 )}
@@ -7005,11 +7258,12 @@ export default function App() {
                 </div>
 
                 <div className={`p-6 bg-gray-50 rounded-[32px] border-dashed border-2 border-gray-200 flex flex-col items-center justify-center text-center py-10 ${theme === 'dark' ? 'bg-white/5 border-white/10' : ''}`}>
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
-                    <Plus className="text-gray-300" />
+                  <div className="w-16 h-16 bg-white dark:bg-white/10 rounded-full flex items-center justify-center shadow-sm mb-4">
+                    <Plane className="text-blue-600" />
                   </div>
-                  <h4 className="font-black text-gray-400">Unlock more services</h4>
-                  <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mt-1">Uber Connect • Uber Pet • Uber Green</p>
+                  <h4 className="font-black">Airport Queue</h4>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">LHR: 45-60 Cars • LGW: 10-15 Cars</p>
+                  <button className="mt-4 px-6 py-2 bg-black dark:bg-white dark:text-black text-white rounded-full text-xs font-black">VIEW QUEUE</button>
                 </div>
               </div>
             </motion.div>
@@ -7030,6 +7284,40 @@ export default function App() {
                   ))}
                 </div>
                 <p className="text-sm font-bold text-gray-400">Based on last 500 trips</p>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-widest mb-4">Compliments</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { icon: <MessageSquare size={16} />, label: "Great Chat", count: 42 },
+                      { icon: <Navigation size={16} />, label: "Navigation Ace", count: 38 },
+                      { icon: <Zap size={16} />, label: "Fast & Precise", count: 56 },
+                      { icon: <Star size={16} />, label: "Excellent Service", count: 89 },
+                    ].map((c, i) => (
+                      <div key={`compliment-${i}`} className="bg-white/5 p-4 rounded-3xl border border-white/5 flex flex-col items-center text-center">
+                        <div className="text-blue-500 mb-2">{c.icon}</div>
+                        <p className="font-black text-xl">{c.count}</p>
+                        <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">{c.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                   <h3 className="text-sm font-black uppercase tracking-widest mb-4">Top Badges</h3>
+                   <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
+                     {["Professional", "Night Owl", "Smooth Driver", "Elite Courier"].map((b, i) => (
+                       <div key={`pro-badge-${i}`} className="shrink-0 px-4 py-3 bg-blue-600/10 border border-blue-500/20 rounded-2xl flex items-center gap-2">
+                         <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+                           <Trophy size={16} />
+                         </div>
+                         <span className="font-black text-xs text-blue-500 uppercase tracking-tight">{b}</span>
+                       </div>
+                     ))}
+                   </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-8">
@@ -7659,7 +7947,7 @@ export default function App() {
                   </button>
                 </div>
                 {(earningsTab === 'today' ? [1, 2] : [1, 2, 3, 4, 5]).map(i => (
-                  <div key={i} className={`flex items-center justify-between py-2 border-b ${theme === 'dark' ? 'border-white/5' : 'border-gray-100'}`}>
+                  <div key={`earnings-entry-${i}`} className={`flex items-center justify-between py-2 border-b ${theme === 'dark' ? 'border-white/5' : 'border-gray-100'}`}>
                     <div className="flex items-center gap-4">
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center text-green-500 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Check size={24} /></div>
                       <div>
@@ -7736,12 +8024,15 @@ export default function App() {
             <EarningsDetail 
               earnings={earnings}
               user={user}
+              setUser={setUser}
               setCurrentScreen={setCurrentScreen}
               getArrivalTime={getArrivalTime}
               setBankBalance={setBankBalance}
               setEarnings={setEarnings}
               sendNotification={sendNotification}
               playUberSound={playUberSound}
+              completedTrips={completedTrips}
+              theme={theme}
             />
           )}
 
@@ -7945,20 +8236,20 @@ export default function App() {
 
       {/* Bottom Nav */}
       {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && (
-        <div className="h-16 bg-black border-t border-white/10 flex items-center justify-around px-2 z-[2000] shrink-0 relative">
-          <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={20} />} label="Home" badge={activeOrders.length > 0 ? activeOrders.length : undefined} />
-          {activeOrders.length > 0 && (
-            <NavButton 
-              active={isBottomMenuOpen} 
-              onClick={() => setIsBottomMenuOpen(!isBottomMenuOpen)} 
-              icon={<List size={20} />} 
-              label="Trips" 
-              badge={activeOrders.filter(o => o.status === 'accepted').length}
-            />
-          )}
-          <NavButton active={currentScreen === 'earnings'} onClick={() => setCurrentScreen('earnings')} icon={<TrendingUp size={20} />} label="Earnings" />
-          <NavButton active={currentScreen === 'inbox'} onClick={() => setCurrentScreen('inbox')} icon={<Mail size={20} />} label="Inbox" />
-          <NavButton active={currentScreen === 'account'} onClick={() => setCurrentScreen('account')} icon={<User size={20} />} label="Account" />
+        <div className="h-20 bg-white border-t border-gray-100 flex items-center justify-around px-2 z-[2000] shrink-0 relative pb-4 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+          <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={22} />} label="Home" badge={activeOrders.length > 0 ? activeOrders.length : undefined} />
+          <NavButton 
+            active={isBottomMenuOpen || currentScreen === 'trip_history'} 
+            onClick={() => {
+              if (activeOrders.length > 0) setIsBottomMenuOpen(true);
+              else setCurrentScreen('trip_history');
+            }} 
+            icon={<List size={22} />} 
+            label="Trips" 
+            badge={activeOrders.filter(o => o.status === 'accepted').length > 0 ? activeOrders.filter(o => o.status === 'accepted').length : undefined}
+          />
+          <NavButton active={currentScreen === 'earnings' || currentScreen === 'earnings_detail'} onClick={() => setCurrentScreen('earnings_detail')} icon={<DollarSign size={22} />} label="Earnings" />
+          <NavButton active={currentScreen === 'account' || currentScreen === 'work_hub'} onClick={() => setCurrentScreen('account')} icon={<Menu size={22} />} label="More" />
         </div>
       )}
       {/* Rating & Level Up Overlays */}
@@ -7977,7 +8268,7 @@ export default function App() {
               <p className="text-xs font-black text-gray-500 uppercase tracking-widest">Customer Rated You</p>
               <div className="flex items-center gap-1">
                 {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={16} fill={i < lastRatedStars ? "#eab308" : "none"} className={i < lastRatedStars ? "text-yellow-500" : "text-gray-700"} />
+                  <Star key={`rating-star-toast-${i}`} size={16} fill={i < lastRatedStars ? "#eab308" : "none"} className={i < lastRatedStars ? "text-yellow-500" : "text-gray-700"} />
                 ))}
               </div>
             </div>
@@ -8013,6 +8304,10 @@ export default function App() {
               CONTINUE
             </button>
           </motion.div>
+        )}
+
+        {showShiftSummary && (
+          <ShiftSummaryModal stats={shiftStats} onClose={() => setShowShiftSummary(false)} />
         )}
       </AnimatePresence>
 
