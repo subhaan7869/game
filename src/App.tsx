@@ -8866,9 +8866,9 @@ const PolicyDocumentModal = ({
       </div>
 
       {/* Progress & Action */}
-      <div className="absolute bottom-0 inset-x-0 bg-white p-6 border-t border-gray-100">
+      <div className="absolute bottom-0 inset-x-0 bg-white p-8 pb-12 border-t border-gray-100 shadow-[0_-20px_40px_rgba(0,0,0,0.05)]">
         <div className="max-w-2xl mx-auto">
-          <div className="w-full h-1.5 bg-gray-100 rounded-full mb-4 overflow-hidden">
+          <div className="w-full h-2 bg-gray-100 rounded-full mb-6 overflow-hidden">
             <motion.div 
                className="h-full bg-blue-600"
                initial={{ width: 0 }}
@@ -8878,9 +8878,9 @@ const PolicyDocumentModal = ({
           <button 
              disabled={scrollProgress < 95}
              onClick={onAccept}
-             className={`w-full py-4 rounded-3xl font-black text-sm uppercase tracking-widest transition-all ${
+             className={`w-full py-6 rounded-[32px] font-black text-lg uppercase tracking-widest transition-all shadow-xl ${
                scrollProgress >= 95 
-                 ? 'bg-blue-600 text-white active:scale-95' 
+                 ? 'bg-blue-600 text-white active:scale-95 shadow-blue-200' 
                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
              }`}
           >
