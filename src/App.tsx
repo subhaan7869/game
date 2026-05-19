@@ -1897,51 +1897,157 @@ const PaymentMethodsScreen = ({
   setUser, 
   earnings,
   onClose,
-  theme
+  theme,
+  onCashOut,
+  setCurrentScreen
 }: { 
   user: UserProfile, 
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
   earnings: number,
   onClose: () => void,
-  theme: string
+  theme: string,
+  onCashOut: (amount: number) => void,
+  setCurrentScreen: (screen: AppScreen) => void
 }) => {
   const [isAdding, setIsAdding] = useState(false);
-  const [newMethod, setNewMethod] = useState<{type: 'card' | 'bank', last4: string, bankName?: string}>({ type: 'card', last4: '' });
+  const [addingRealBank, setAddingRealBank] = useState(false);
+  const [selectedBank, setSelectedBank] = useState<{ name: string, color: string, textColor: string } | null>(null);
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [authState, setAuthState] = useState<string>('');
+  
+  const [newMethod, setNewMethod] = useState<{
+    type: 'card' | 'bank', 
+    last4: string, 
+    bankName?: string,
+    accountHolder?: string,
+    sortCode?: string,
+    isReal?: boolean
+  }>({ type: 'card', last4: '' });
   
   const paymentMethods = user.paymentMethods || [
-    { id: '1', type: 'bank', last4: '9876', bankName: 'Monzo', isDefault: true }
+    { id: '1', type: 'bank', last4: '9876', bankName: 'Monzo', isDefault: true, isReal: false }
   ];
 
   const handleAdd = () => {
+    const last4Str = newMethod.last4;
     const method = {
       id: Math.random().toString(),
-      ...newMethod,
+      type: newMethod.type,
+      last4: last4Str || '9999',
+      bankName: newMethod.bankName || 'General Bank',
+      accountHolder: newMethod.accountHolder || user.name || 'Hassen Nabeel',
+      sortCode: newMethod.sortCode || '00-00-00',
+      isReal: !!newMethod.isReal,
       isDefault: false
     };
+    
+    setUser(u => {
+      const currentMethods = u.paymentMethods || [
+        { id: '1', type: 'bank', last4: '9876', bankName: 'Monzo', isDefault: true, isReal: false }
+      ];
+      // If of type bank and first real account, make default
+      const shouldBeDefault = currentMethods.length === 0 || method.isReal;
+      const updated = currentMethods.map(m => shouldBeDefault ? { ...m, isDefault: false } : m);
+      return {
+        ...u,
+        paymentMethods: [...updated, { ...method, isDefault: shouldBeDefault }] as any
+      };
+    });
+    
+    // Reset states
+    setIsAdding(false);
+    setAddingRealBank(false);
+    setSelectedBank(null);
+    setNewMethod({ type: 'card', last4: '' });
+  };
+
+  const startOpenBankingLink = (bank: { name: string, color: string, textColor: string }) => {
+    setSelectedBank(bank);
+    setIsAuthorizing(true);
+    setAuthState('Initiating secure Open Banking token handshake...');
+    
+    setTimeout(() => {
+      setAuthState(`Redirecting to ${bank.name} Mobile Banking Gateway...`);
+    }, 1000);
+
+    setTimeout(() => {
+      setAuthState('Authorizing secure read-only read/write payout consent...');
+    }, 2200);
+
+    setTimeout(() => {
+      setAuthState('Generating encrypted vault reference tokens...');
+    }, 3500);
+
+    setTimeout(() => {
+      setIsAuthorizing(false);
+      setNewMethod({
+        type: 'bank',
+        bankName: bank.name,
+        isReal: true,
+        last4: '',
+        sortCode: '',
+        accountHolder: user.name || 'Hassen Nabeel'
+      });
+    }, 4500);
+  };
+
+  const makeDefault = (id: string) => {
     setUser(u => ({
       ...u,
-      paymentMethods: [...(u.paymentMethods || []), method] as any
+      paymentMethods: (u.paymentMethods || []).map(m => m.id === id ? { ...m, isDefault: true } : { ...m, isDefault: false }) as any
     }));
-    setIsAdding(false);
   };
+
+  const deleteMethod = (id: string) => {
+    setUser(u => {
+      const filtered = (u.paymentMethods || []).filter(m => m.id !== id);
+      if (filtered.length > 0 && !filtered.some(m => m.isDefault)) {
+        filtered[0].isDefault = true;
+      }
+      return {
+        ...u,
+        paymentMethods: filtered as any
+      };
+    });
+  };
+
+  const REAL_BANKS = [
+    { name: 'Monzo', color: 'bg-gradient-to-r from-[#FF5640] to-[#E33322]', textColor: 'text-white' },
+    { name: 'Revolut', color: 'bg-gradient-to-r from-[#17171d] to-[#0D0D11]', textColor: 'text-white' },
+    { name: 'Barclays', color: 'bg-blue-500', textColor: 'text-white' },
+    { name: 'HSBC', color: 'bg-[#db0011]', textColor: 'text-white' },
+    { name: 'Lloyds', color: 'bg-[#006a4e]', textColor: 'text-white' },
+    { name: 'Starling', color: 'bg-gradient-to-r from-[#2c0e37] to-[#1a0524]', textColor: 'text-white' },
+    { name: 'Santander', color: 'bg-[#ec0000]', textColor: 'text-white' },
+    { name: 'NatWest', color: 'bg-[#4c125c]', textColor: 'text-white' },
+    { name: 'Chase UK', color: 'bg-[#110e2b]', textColor: 'text-white' },
+  ];
 
   return (
     <motion.div 
       initial={{ x: '100%' }} 
       animate={{ x: 0 }} 
       exit={{ x: '100%' }} 
-      className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
+      className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-[#f4f7f6] text-black'}`}
     >
       <div className="flex items-center gap-4 mb-8">
-        <button onClick={onClose} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={24} /></button>
+        <button onClick={onClose} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-white shadow-sm'}`}><ArrowRight className="rotate-180" size={24} /></button>
         <h1 className="text-3xl font-black">Payments</h1>
       </div>
 
-      <div className="bg-blue-600 rounded-[32px] p-8 text-white mb-8 shadow-2xl shadow-blue-600/30 overflow-hidden relative">
+      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[32px] p-8 text-white mb-8 shadow-2xl shadow-blue-600/30 overflow-hidden relative">
         <div className="relative z-10">
           <p className="text-[10px] font-black opacity-60 uppercase tracking-widest mb-1">Available to cash out</p>
           <h2 className="text-5xl font-black mb-6">£{earnings.toFixed(2)}</h2>
-          <button className="w-full py-3 bg-white text-blue-600 rounded-xl font-black text-sm uppercase tracking-widest active:scale-95 transition-transform">
+          <button 
+            onClick={() => {
+              if (earnings > 0) {
+                onCashOut(earnings);
+              }
+            }}
+            disabled={earnings <= 0}
+            className="w-full py-4 bg-white text-blue-600 rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-all shadow-lg hover:shadow-white/20 disabled:scale-100 disabled:opacity-40"
+          >
             CASH OUT NOW
           </button>
         </div>
@@ -1950,43 +2056,93 @@ const PaymentMethodsScreen = ({
 
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h3 className="font-black text-xl">Payment Methods</h3>
-          <button onClick={() => setIsAdding(true)} className="p-1 text-blue-600 font-black text-xs uppercase tracking-widest">Add New</button>
+          <h3 className="font-black text-xl">Payment & Bank Methods</h3>
+          <button 
+            onClick={() => {
+              setNewMethod({ type: 'bank', last4: '' });
+              setIsAdding(true);
+            }} 
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-colors shadow-md shadow-blue-500/10"
+          >
+            Add Account
+          </button>
         </div>
 
         <div className="space-y-3">
           {paymentMethods.map(method => (
-            <div key={method.id} className={`p-4 rounded-2xl border-2 flex items-center justify-between ${theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-100 shadow-sm'}`}>
+            <div 
+              key={method.id} 
+              className={`p-5 rounded-3xl border-2 flex items-center justify-between transition-all ${
+                theme === 'dark' 
+                  ? 'bg-white/5 border-white/5 hover:border-white/10' 
+                  : 'bg-white border-gray-100 hover:border-gray-200 shadow-sm'
+              }`}
+            >
               <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100 text-gray-500'}`}>
+                <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 text-white ${
+                  method.type === 'bank' 
+                    ? method.isReal 
+                      ? (method.bankName === 'Monzo' ? 'bg-[#FF5640]' : method.bankName === 'Barclays' ? 'bg-blue-500' : method.bankName === 'Revolut' ? 'bg-[#17171d]' : 'bg-blue-600')
+                      : 'bg-[#ff5640]' 
+                    : 'bg-neutral-800'
+                }`}>
                   {method.type === 'bank' ? <Landmark size={24} /> : <CreditCard size={24} />}
                 </div>
                 <div>
-                  <p className="font-bold">{method.type === 'bank' ? method.bankName : 'Personal Card'}</p>
-                  <p className="text-xs text-gray-400 font-bold">•••• {method.last4}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-black leading-tight">{method.type === 'bank' ? method.bankName : 'Personal Card'}</p>
+                    {method.isReal && (
+                      <span className="text-[7px] font-black uppercase tracking-widest bg-emerald-500 text-white px-2 py-0.5 rounded shadow-sm shadow-emerald-500/20">Real Linked</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 font-bold mt-1">
+                    {method.type === 'bank' ? `Sort: ${method.sortCode || '••-••-••'} • Acc: ` : ''}•••• {method.last4}
+                  </p>
+                  {method.accountHolder && (
+                    <p className="text-[9px] uppercase tracking-widest opacity-55 font-bold mt-1">{method.accountHolder}</p>
+                  )}
                 </div>
               </div>
-              {method.isDefault && (
-                <span className="text-[8px] font-black uppercase tracking-widest bg-blue-600 text-white px-2 py-0.5 rounded">Default</span>
-              )}
+              
+              <div className="flex items-center gap-2">
+                {method.isDefault ? (
+                  <span className="text-[8px] font-black uppercase tracking-widest bg-blue-600 text-white px-2.5 py-1 rounded-xl shadow-lg shadow-blue-500/15">Default</span>
+                ) : (
+                  <button 
+                    onClick={() => makeDefault(method.id)}
+                    className="text-[8px] font-black uppercase tracking-widest bg-gray-100 hover:bg-gray-200 text-gray-500 px-2.5 py-1 rounded-xl transition-colors"
+                  >
+                    Set Default
+                  </button>
+                )}
+                
+                {paymentMethods.length > 1 && (
+                  <button 
+                    onClick={() => deleteMethod(method.id)}
+                    className="p-1 px-2 text-[10px] text-red-500 hover:bg-red-50 hover:text-red-700 rounded font-black uppercase tracking-wider transition-colors"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
 
         <div className="pt-6">
-          <h3 className="font-black text-xl mb-4">Transaction History</h3>
-          <div className="space-y-4">
+          <h3 className="font-black text-xl mb-4">Payout Statements</h3>
+          <div className="space-y-3">
             {[
-              { id: '1', date: 'Yesterday', amount: 45.20, type: 'earnings', title: 'Daily Earnings' },
-              { id: '2', date: '2 days ago', amount: -150.00, type: 'payout', title: 'Bank Transfer' },
-              { id: '3', date: '3 days ago', amount: 38.50, type: 'earnings', title: 'Daily Earnings' },
+              { id: 'tx-2', date: 'Yesterday', amount: 45.20, type: 'earnings', title: 'Uber Driver Earnings Settled', ref: 'FPS-831902-DRV', bank: 'Monzo' },
+              { id: 'tx-1', date: '3 days ago', amount: -65.00, type: 'payout', title: 'Faster Payments Payout', ref: 'FPS-491932-DRV', bank: 'Barclays' },
+              { id: 'tx-3', date: '5 days ago', amount: 38.50, type: 'earnings', title: 'Uber Driver Earnings Settled', ref: 'FPS-193021-DRV', bank: 'Monzo' },
             ].map(tx => (
-              <div key={tx.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+              <div key={tx.id} className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                 <div>
-                  <p className="font-bold">{tx.title}</p>
-                  <p className="text-xs text-gray-400 font-bold">{tx.date}</p>
+                  <p className="font-bold text-sm text-gray-900">{tx.title}</p>
+                  <p className="text-[10px] text-gray-400 font-bold mt-0.5">{tx.date} • Ref: {tx.ref} • {tx.bank}</p>
                 </div>
-                <div className={`font-black ${tx.type === 'payout' ? 'text-gray-400' : 'text-green-500'}`}>
+                <div className={`font-black text-sm ${tx.type === 'payout' ? 'text-gray-500' : 'text-green-500'}`}>
                   {tx.type === 'payout' ? '-' : '+'}£{Math.abs(tx.amount).toFixed(2)}
                 </div>
               </div>
@@ -1997,60 +2153,205 @@ const PaymentMethodsScreen = ({
 
       <AnimatePresence>
         {isAdding && (
-          <div className="fixed inset-0 z-[5000] flex items-end justify-center px-4 pb-10 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[5000] flex items-end justify-center px-4 pb-10 bg-black/60 backdrop-blur-sm overflow-hidden dialog-container">
             <motion.div 
-              initial={{ y: 100, opacity: 0 }}
+              initial={{ y: 200, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 100, opacity: 0 }}
-              className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl"
+              exit={{ y: 200, opacity: 0 }}
+              className="bg-white text-black w-full max-w-md rounded-[32px] p-6 shadow-2xl relative overflow-y-auto max-h-[90vh]"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-6">
-                <h3 className="font-black text-xl">Add Method</h3>
-                <button onClick={() => setIsAdding(false)} className="p-2 bg-gray-100 rounded-full"><X size={16} /></button>
+                <div>
+                  <h3 className="font-black text-xl">Add Payout Account</h3>
+                  <p className="text-xs text-gray-400 font-medium">Link a dynamic real account or enter simple values</p>
+                </div>
+                <button onClick={() => { setIsAdding(false); setAddingRealBank(false); setSelectedBank(null); }} className="p-2 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full text-gray-500"><X size={16} /></button>
               </div>
               
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => setNewMethod({...newMethod, type: 'card'})} 
-                    className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest border-2 ${newMethod.type === 'card' ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-400 border-transparent'}`}
-                  >
-                    Card
-                  </button>
-                  <button 
-                    onClick={() => setNewMethod({...newMethod, type: 'bank'})} 
-                    className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest border-2 ${newMethod.type === 'bank' ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-400 border-transparent'}`}
-                  >
-                    Bank
-                  </button>
-                </div>
-                
-                {newMethod.type === 'bank' && (
-                  <input 
-                    type="text" 
-                    placeholder="Bank Name"
-                    className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500"
-                    onChange={e => setNewMethod({...newMethod, bankName: e.target.value})}
-                  />
+              <div className="space-y-5">
+                {!addingRealBank ? (
+                  <>
+                    <div className="flex bg-gray-100 p-1 rounded-2xl">
+                      <button 
+                        onClick={() => setNewMethod({...newMethod, type: 'card'})} 
+                        className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${newMethod.type === 'card' ? 'bg-black text-white' : 'text-gray-400'}`}
+                      >
+                        Payment Card
+                      </button>
+                      <button 
+                        onClick={() => setNewMethod({...newMethod, type: 'bank'})} 
+                        className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${newMethod.type === 'bank' ? 'bg-black text-white' : 'text-gray-400'}`}
+                      >
+                        Bank Account
+                      </button>
+                    </div>
+
+                    {newMethod.type === 'bank' && (
+                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-3xl p-5 text-center">
+                        <Landmark size={32} className="mx-auto text-blue-600 mb-2 animate-bounce" />
+                        <h4 className="font-black text-blue-900 text-sm mb-1">Instant UK Faster Payments Payouts</h4>
+                        <p className="text-xs text-blue-700 leading-tight mb-4">Connect your real bank account via Open Banking. It takes 5 seconds and receives cased-out money automatically.</p>
+                        
+                        <button 
+                          onClick={() => setAddingRealBank(true)}
+                          className="w-full py-3.5 bg-blue-600 active:scale-95 transition-all text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-blue-500/20"
+                        >
+                          CONNECT REAL BANK ACCOUNT 🔒
+                        </button>
+                        
+                        <div className="text-[9px] uppercase tracking-widest text-blue-400 font-bold mt-3">Supports Monzo, Revolut, Barclays, Starling...</div>
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      {newMethod.type === 'bank' && (
+                        <input 
+                          type="text" 
+                          placeholder="Bank Name (e.g. Barclays, Monzo)"
+                          className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm"
+                          value={newMethod.bankName || ''}
+                          onChange={e => setNewMethod({...newMethod, bankName: e.target.value, isReal: false})}
+                        />
+                      )}
+
+                      <input 
+                        type="text" 
+                        placeholder={newMethod.type === 'bank' ? "Account Holder's Name" : "Cardholder's Full Name"}
+                        className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm"
+                        value={newMethod.accountHolder || ''}
+                        onChange={e => setNewMethod({...newMethod, accountHolder: e.target.value})}
+                      />
+
+                      <input 
+                        type="text" 
+                        placeholder={newMethod.type === 'bank' ? "Sort Code (6 digits)" : "Expiry Date (MM/YY)"}
+                        className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm"
+                        value={newMethod.sortCode || ''}
+                        maxLength={newMethod.type === 'bank' ? 6 : 5}
+                        onChange={e => setNewMethod({...newMethod, sortCode: e.target.value})}
+                      />
+
+                      <input 
+                        type="text" 
+                        placeholder={newMethod.type === 'bank' ? "Account Number (last 4 digits)" : "Card Number (last 4 digits)"}
+                        maxLength={4}
+                        className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm"
+                        value={newMethod.last4}
+                        onChange={e => setNewMethod({...newMethod, last4: e.target.value.replace(/\D/g, '')})}
+                      />
+                    </div>
+
+                    <button 
+                      onClick={handleAdd}
+                      disabled={!newMethod.last4 || (newMethod.type === 'bank' && !newMethod.bankName)}
+                      className="w-full py-4 bg-black text-white hover:bg-neutral-800 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-40"
+                    >
+                      <Plus size={16} />
+                      ADD ACCOUNT
+                    </button>
+                  </>
+                ) : isAuthorizing ? (
+                  <div className="py-12 text-center flex flex-col items-center justify-center">
+                    <div className="relative w-20 h-20 mb-6">
+                      <div className="absolute inset-0 rounded-full border-4 border-amber-500/10 border-t-amber-500 animate-spin" />
+                      <div className="absolute inset-2 bg-slate-50 rounded-full flex items-center justify-center">
+                        <Shield className="text-amber-500 animate-pulse" size={32} />
+                      </div>
+                    </div>
+                    {selectedBank && (
+                      <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${selectedBank.color} ${selectedBank.textColor} mb-3 shadow-md`}>
+                        {selectedBank.name} Payout Link
+                      </span>
+                    )}
+                    <h4 className="font-black text-lg text-slate-900 mb-2">Connecting Bank App</h4>
+                    <p className="text-xs text-gray-400 font-bold max-w-xs leading-normal animate-pulse h-8">
+                      {authState}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setAddingRealBank(false)} className="p-2 bg-gray-100 rounded-full"><ArrowRight className="rotate-180" size={14} /></button>
+                      <span className="font-extrabold text-sm text-gray-500 uppercase tracking-wider">Select Bank Provider</span>
+                    </div>
+
+                    {newMethod.isReal && selectedBank ? (
+                      <div className="space-y-3 pt-2">
+                        <div className={`p-6 rounded-3xl ${selectedBank.color} text-white text-center shadow-xl`}>
+                          <CheckCircle2 size={40} className="mx-auto mb-2" />
+                          <h4 className="font-black text-lg">Successfully Authenticated</h4>
+                          <p className="text-xs opacity-80 mt-1">Direct deposits to {selectedBank.name} are authorized securely.</p>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-[10px] font-black uppercase tracking-wider opacity-60 ml-2">Account Holder Name</label>
+                            <input 
+                              type="text" 
+                              placeholder="e.g. Hassen Nabeel"
+                              className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm mt-1"
+                              value={newMethod.accountHolder}
+                              onChange={e => setNewMethod({...newMethod, accountHolder: e.target.value})}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[10px] font-black uppercase tracking-wider opacity-60 ml-2">Sort Code</label>
+                              <input 
+                                type="text" 
+                                placeholder="e.g. 04-00-04"
+                                className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm mt-1"
+                                value={newMethod.sortCode}
+                                maxLength={8}
+                                onChange={e => setNewMethod({...newMethod, sortCode: e.target.value})}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-black uppercase tracking-wider opacity-60 ml-2">Account Number</label>
+                              <input 
+                                type="text" 
+                                placeholder="e.g. 12345678"
+                                className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm mt-1"
+                                value={newMethod.last4}
+                                maxLength={8}
+                                onChange={e => {
+                                  const val = e.target.value.replace(/\D/g, '');
+                                  setNewMethod({...newMethod, last4: val});
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <button 
+                          onClick={handleAdd}
+                          disabled={!newMethod.accountHolder || !newMethod.sortCode || newMethod.last4.length < 4}
+                          className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all text-white font-black text-sm uppercase tracking-widest rounded-2xl shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-2"
+                        >
+                          <CheckCircle2 size={18} />
+                          FINALIZE SECURE LINK
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2 py-2 overflow-y-auto max-h-[40vh]">
+                        {REAL_BANKS.map((b, i) => (
+                          <button 
+                            key={i} 
+                            onClick={() => startOpenBankingLink(b)}
+                            className="p-4 bg-slate-50 hover:bg-slate-100 rounded-2xl font-black text-xs text-center border border-slate-100 hover:border-slate-200 transition-all flex flex-col justify-between items-center h-24"
+                          >
+                            <span className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black uppercase text-white shadow-md ${b.color}`}>
+                              {b.name[0]}
+                            </span>
+                            <span className="font-bold text-slate-800 truncate w-full">{b.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
-
-                <input 
-                  type="text" 
-                  placeholder={newMethod.type === 'bank' ? "Account Number (last 4)" : "Card Number (last 4)"}
-                  maxLength={4}
-                  className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500"
-                  onChange={e => setNewMethod({...newMethod, last4: e.target.value})}
-                />
-
-                <button 
-                  onClick={handleAdd}
-                  disabled={!newMethod.last4}
-                  className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <Plus size={20} />
-                  ADD METHOD
-                </button>
               </div>
             </motion.div>
           </div>
@@ -3037,6 +3338,63 @@ export default function App() {
       return 500.00;
     }
   });
+
+  const [activePayout, setActivePayout] = useState<{
+    amount: number;
+    bankName: string;
+    accountHolder: string;
+    last4: string;
+    sortCode: string;
+    status: 'handshake' | 'verify' | 'clearing' | 'settled';
+    reference: string;
+    isReal?: boolean;
+  } | null>(null);
+
+  const triggerPayout = (amount: number) => {
+    if (amount <= 0) return;
+    
+    // Find default bank account from paymentMethods or use default Monzo
+    const defaultBank = (user.paymentMethods || []).find(m => m.type === 'bank' && m.isDefault) || 
+                        (user.paymentMethods || []).find(m => m.type === 'bank') || 
+                        { bankName: 'Monzo', last4: '9876', accountHolder: 'Hassen Nabeel', sortCode: '04-00-04', isReal: false };
+    
+    const reference = "FPS-" + Math.floor(100000 + Math.random() * 900000) + "-DRV";
+    
+    setActivePayout({
+      amount,
+      bankName: defaultBank.bankName || 'Monzo',
+      accountHolder: defaultBank.accountHolder || 'Hassen Nabeel',
+      last4: defaultBank.last4,
+      sortCode: defaultBank.sortCode || '04-00-04',
+      status: 'handshake',
+      reference,
+      isReal: defaultBank.isReal
+    });
+    
+    // Animate stage transitions
+    setTimeout(() => {
+      setActivePayout(prev => prev ? { ...prev, status: 'verify' } : null);
+    }, 1200); 
+    
+    setTimeout(() => {
+      setActivePayout(prev => prev ? { ...prev, status: 'clearing' } : null);
+    }, 2800); 
+    
+    setTimeout(() => {
+      setActivePayout(prev => {
+        if (!prev) return null;
+        // Payout successfully settled! Add to bank balance and reset earnings
+        setBankBalance(balance => balance + amount);
+        setEarnings(0);
+        sendNotification(
+          "Payout Settled Instantly", 
+          `£${amount.toFixed(2)} has been successfully deposited to your linked ${prev.bankName} account via Faster Payments. Reference: ${prev.reference}`, 
+          "success"
+        );
+        return { ...prev, status: 'settled' };
+      });
+    }, 4500); 
+  };
   const [purchasedItems, setPurchasedItems] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('uber_purchased_items');
@@ -7548,25 +7906,48 @@ export default function App() {
                 <button 
                   onClick={() => {
                     if (earnings > 0) {
-                      setBankBalance(prev => prev + earnings);
-                      setEarnings(0);
-                      sendNotification("Cash Out Successful", "£" + earnings.toFixed(2) + " has been sent to your bank account.");
-                      setCurrentScreen('banking');
+                      triggerPayout(earnings);
                     }
                   }}
-                  className="mt-6 w-full py-4 bg-black text-white rounded-2xl font-black active:scale-95 transition-transform"
+                  disabled={earnings <= 0}
+                  className="mt-6 w-full py-4 bg-black text-white rounded-2xl font-black active:scale-95 transition-transform disabled:opacity-40"
                 >
                   CASH OUT
                 </button>
               </div>
               <div className="space-y-4">
-                <h3 className="font-black text-xl">Payment Methods</h3>
-                <div className="flex items-center justify-between p-4 border border-gray-100 rounded-2xl">
-                  <div className="flex items-center gap-4">
-                    <CreditCard className="text-blue-600" />
-                    <span className="font-bold">•••• 4242</span>
-                  </div>
-                  <span className="text-xs font-bold text-gray-400 uppercase">Default</span>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-black text-xl">Payout Accounts</h3>
+                  <button 
+                    onClick={() => setCurrentScreen('payment_methods')} 
+                    className="text-xs font-black text-blue-600 uppercase tracking-widest"
+                  >
+                    Manage
+                  </button>
+                </div>
+                
+                <div className="space-y-2">
+                  {(user.paymentMethods || [
+                    { id: '1', type: 'bank', last4: '9876', bankName: 'Monzo', isDefault: true, isReal: false }
+                  ]).map(method => (
+                    <div key={method.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-2xl">
+                      <div className="flex items-center gap-4">
+                        <div className="text-blue-600">
+                          {method.type === 'bank' ? <Landmark size={20} /> : <CreditCard size={20} />}
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm">
+                            {method.type === 'bank' ? method.bankName : 'Personal Card'}
+                            {method.isReal && <span className="ml-2 text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-black uppercase">Real Link</span>}
+                          </p>
+                          <p className="text-xs text-gray-400">•••• {method.last4}</p>
+                        </div>
+                      </div>
+                      {method.isDefault && (
+                        <span className="text-[10px] font-black text-gray-400 uppercase">Default</span>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             </motion.div>
@@ -7802,6 +8183,8 @@ export default function App() {
               earnings={earnings} 
               onClose={() => setCurrentScreen('account')} 
               theme={theme} 
+              onCashOut={triggerPayout}
+              setCurrentScreen={setCurrentScreen}
             />
           )}
 
@@ -8741,6 +9124,210 @@ export default function App() {
 
         {showShiftSummary && (
           <ShiftSummaryModal stats={shiftStats} onClose={() => setShowShiftSummary(false)} />
+        )}
+
+        {activePayout && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[8000] bg-black/85 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 50, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: 50, opacity: 0 }}
+              className={`w-full max-w-xl rounded-[40px] p-8 shadow-2xl overflow-hidden relative ${
+                theme === 'dark' ? 'bg-[#121214] text-white border border-white/5' : 'bg-white text-black'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-100/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                    <Shield size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-lg uppercase tracking-tight">Secure Faster Payments Gateway</h3>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Direct API Clearing Tunnel</p>
+                  </div>
+                </div>
+                {activePayout.status === 'settled' && (
+                  <button 
+                    onClick={() => setActivePayout(null)}
+                    className="p-2 hover:bg-gray-100/10 rounded-full transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                )}
+              </div>
+
+              {/* Amount & Destination Header */}
+              <div className="text-center py-6 bg-gradient-to-br from-emerald-500/5 via-teal-500/5 to-transparent rounded-[32px] mb-8 border border-emerald-500/5">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Transferring Earnings</p>
+                <h2 className="text-5xl font-black text-emerald-500 mb-4 animate-pulse">£{activePayout.amount.toFixed(2)}</h2>
+                
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gray-100/5 rounded-full border border-gray-100/15">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  <span className="text-[10px] uppercase tracking-wider font-extrabold text-gray-400">
+                    To: {activePayout.bankName} Account ending in •••• {activePayout.last4}
+                  </span>
+                </div>
+              </div>
+
+              {/* Clearing Stages Pipeline Progress */}
+              <div className="space-y-6 mb-8">
+                {/* Stage 1: Handshake */}
+                <div className="flex items-start gap-4">
+                  <div className="mt-1 shrink-0">
+                    {['handshake'].includes(activePayout.status) ? (
+                      <div className="w-6 h-6 rounded-full bg-blue-500/10 border border-blue-500 flex items-center justify-center text-blue-500">
+                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="w-3 h-3 border-2 border-transparent border-t-current rounded-full" />
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-black">✓</div>
+                    )}
+                  </div>
+                  <div>
+                    <p className={`font-black text-[13px] leading-snug ${activePayout.status === 'handshake' ? 'text-blue-500 font-black' : 'text-gray-400 font-bold'}`}>
+                      1. Establishing Secure Handshake Tunnel
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-0.5 font-medium">Opening secure, read-write encrypted payout routes via banking consent gateway.</p>
+                  </div>
+                </div>
+
+                {/* Stage 2: Verify */}
+                <div className="flex items-start gap-4">
+                  <div className="mt-1 shrink-0">
+                    {activePayout.status === 'handshake' ? (
+                      <div className="w-6 h-6 rounded-full bg-gray-100/10 border border-transparent" />
+                    ) : activePayout.status === 'verify' ? (
+                      <div className="w-6 h-6 rounded-full bg-blue-500/10 border border-blue-500 flex items-center justify-center text-blue-500">
+                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="w-3 h-3 border-2 border-transparent border-t-current rounded-full" />
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-black">✓</div>
+                    )}
+                  </div>
+                  <div>
+                    <p className={`font-black text-[13px] leading-snug ${activePayout.status === 'verify' ? 'text-blue-500 font-black' : (['clearing', 'settled'].includes(activePayout.status) ? 'text-gray-400 font-bold' : 'text-gray-300 opacity-60')}`}>
+                      2. Confirmation of Payee Auths
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-0.5 font-medium">Verifying recipient name "{activePayout.accountHolder}" against bank sort code {activePayout.sortCode || '••-••-••'}.</p>
+                  </div>
+                </div>
+
+                {/* Stage 3: Clearing */}
+                <div className="flex items-start gap-4">
+                  <div className="mt-1 shrink-0">
+                    {['handshake', 'verify'].includes(activePayout.status) ? (
+                      <div className="w-6 h-6 rounded-full bg-gray-100/10 border border-transparent" />
+                    ) : activePayout.status === 'clearing' ? (
+                      <div className="w-6 h-6 rounded-full bg-blue-500/10 border border-blue-500 flex items-center justify-center text-blue-500">
+                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="w-3 h-3 border-2 border-transparent border-t-current rounded-full" />
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-black">✓</div>
+                    )}
+                  </div>
+                  <div>
+                    <p className={`font-black text-[13px] leading-snug ${activePayout.status === 'clearing' ? 'text-blue-500 font-black' : (['settled'].includes(activePayout.status) ? 'text-gray-400 font-bold' : 'text-gray-300 opacity-60')}`}>
+                      3. Broadcasting uk.co.fasterpayments Command
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-0.5 font-medium">Broadcasting instant clearing instruction inside UK Faster Payments centralized credit network.</p>
+                  </div>
+                </div>
+
+                {/* Stage 4: Settled */}
+                <div className="flex items-start gap-4">
+                  <div className="mt-1 shrink-0">
+                    {activePayout.status !== 'settled' ? (
+                      <div className="w-6 h-6 rounded-full bg-gray-100/10 border border-transparent" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-black">✓</div>
+                    )}
+                  </div>
+                  <div>
+                    <p className={`font-black text-[13px] leading-snug ${activePayout.status === 'settled' ? 'text-emerald-500 font-black' : 'text-gray-300 opacity-60'}`}>
+                      4. Ledger Cleared & Settled Instantly
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-0.5 font-medium">Funds successfully deposited. Reference ID: {activePayout.reference}</p>
+                  </div>
+                </div>
+              </div>
+
+              {activePayout.status === 'settled' ? (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }} 
+                  animate={{ opacity: 1, height: 'auto' }} 
+                  className="space-y-4 pt-4 border-t border-gray-100/10"
+                >
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center gap-4 text-emerald-400">
+                    <CheckCircle2 size={24} />
+                    <div>
+                      <h4 className="font-extrabold text-sm text-emerald-300">Fast Bank Cash Out Complete</h4>
+                      <p className="text-xs text-emerald-400/80 leading-snug">The funds have successfully left our Uber payout vaults and are fully settled inside your linked {activePayout.bankName} account.</p>
+                    </div>
+                  </div>
+
+                  {/* Production Payout Info Area */}
+                  <div className="bg-slate-950 p-6 rounded-3xl border border-white/5 font-mono text-left">
+                    <div className="flex items-center justify-between mb-3 text-[10px] text-emerald-400 uppercase tracking-widest font-bold font-sans">
+                      <span>Developer API Integration Guide</span>
+                      <span className="bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Stripe Connect Production</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-normal font-sans mb-4">
+                      How to implement real GBP payouts in your Node.js backend using Stripe Connected Accounts:
+                    </p>
+                    
+                    <pre className="text-[9px] text-slate-400 overflow-x-auto p-3.5 bg-black/55 rounded-xl border border-white/5 select-all leading-relaxed whitespace-pre font-mono">
+{`// Create dynamic real bank transfer in production
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+app.post('/api/cashout', async (req, res) => {
+  const { amountInPence, bankAccountId, driverId } = req.body;
+  try {
+    const payout = await stripe.payouts.create({
+      amount: amountInPence, // e.g., 4500 (£45.00)
+      currency: 'gbp',
+      destination: bankAccountId, // External Account Target
+      method: 'instant', // uk.co.fasterpayments instantly
+      statement_descriptor: 'UBER PAYOUT',
+    }, {
+      stripeAccount: driverId, // Connected Account ID
+    });
+    res.json({ success: true, ref: payout.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});`}
+                    </pre>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <button 
+                      onClick={() => {
+                        setActivePayout(null);
+                        setCurrentScreen('banking');
+                      }}
+                      className="py-4 bg-emerald-600 hover:bg-emerald-700 font-black text-xs text-white uppercase tracking-widest rounded-2xl shadow-xl shadow-emerald-600/10 transition-colors"
+                    >
+                      OPEN SIMULATOR BANK CLONE
+                    </button>
+                    <button 
+                      onClick={() => setActivePayout(null)}
+                      className="py-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-black text-xs uppercase tracking-widest rounded-2xl transition-colors"
+                    >
+                      ACKNOWLEDGE RECEIPT
+                    </button>
+                  </div>
+                </motion.div>
+              ) : (
+                <div className="flex items-center justify-center py-6">
+                  <span className="text-xs text-gray-400 font-extrabold tracking-wider animate-pulse uppercase">TRANSACTION CLEARING IN PROGRESS (DO NOT CLOSE)...</span>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 

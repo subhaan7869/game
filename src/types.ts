@@ -146,5 +146,8 @@ export interface UserProfile {
     last4: string;
     bankName?: string;
     isDefault: boolean;
+    accountHolder?: string;
+    sortCode?: string;
+    isReal?: boolean;
   }[];
 }
