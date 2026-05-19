@@ -135,6 +135,7 @@ export interface UserProfile {
     make: string;
     model: string;
     year: number;
+    color?: string;
     plate: string;
     type: string;
     photo?: string;
