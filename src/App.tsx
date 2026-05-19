@@ -2069,9 +2069,9 @@ const PaymentMethodsScreen = ({
         </div>
 
         <div className="space-y-3">
-          {paymentMethods.map(method => (
+          {paymentMethods.map((method, idx) => (
             <div 
-              key={method.id} 
+              key={`payment-method-${method.id}-${idx}`} 
               className={`p-5 rounded-3xl border-2 flex items-center justify-between transition-all ${
                 theme === 'dark' 
                   ? 'bg-white/5 border-white/5 hover:border-white/10' 
@@ -7929,8 +7929,8 @@ export default function App() {
                 <div className="space-y-2">
                   {(user.paymentMethods || [
                     { id: '1', type: 'bank', last4: '9876', bankName: 'Monzo', isDefault: true, isReal: false }
-                  ]).map(method => (
-                    <div key={method.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-2xl">
+                  ]).map((method, idx) => (
+                    <div key={`payout-acc-${method.id}-${idx}`} className="flex items-center justify-between p-4 border border-gray-100 rounded-2xl">
                       <div className="flex items-center gap-4">
                         <div className="text-blue-600">
                           {method.type === 'bank' ? <Landmark size={20} /> : <CreditCard size={20} />}
