@@ -339,45 +339,39 @@ const ShiftSummaryModal = ({ stats, onClose }: { stats: any, onClose: () => void
 
 const Heatmap = ({ busynessMode, isLowPerformance }: { busynessMode: 'Low' | 'Medium' | 'High', isLowPerformance?: boolean }) => {
   const intensity = busynessMode === 'High' ? 1 : busynessMode === 'Medium' ? 0.6 : 0.3;
-  if (intensity < 0.4 || isLowPerformance) return null; // Disable heatmap on low-perf devices
+  
+  // Disable heatmap on low-perf devices or if intensity is too low
+  if (intensity < 0.4 || isLowPerformance) return null; 
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-[5]">
       {/* Cluster 1 */}
-      <div className="absolute left-[30%] top-[40%] -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px]">
+      <div className="absolute left-[30%] top-[40%] -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[400px] sm:h-[400px]">
         <motion.div 
           animate={{ 
-            scale: [1, 1.1, 1],
-            opacity: [0.1 * intensity, 0.3 * intensity, 0.1 * intensity]
+            scale: [1, 1.05, 1],
+            opacity: [0.1 * intensity, 0.2 * intensity, 0.1 * intensity]
           }}
-          transition={{ duration: 5, repeat: Infinity }}
-          className="absolute inset-0 rounded-full bg-orange-600 blur-[80px]"
-        />
-        <motion.div 
-          animate={{ 
-            scale: [1, 1.2, 1],
-            opacity: [0.2 * intensity, 0.4 * intensity, 0.2 * intensity]
-          }}
-          transition={{ duration: 4, repeat: Infinity }}
-          className="absolute inset-[25%] rounded-full bg-red-600 blur-[50px]"
+          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+          className="absolute inset-0 rounded-full bg-orange-600 blur-[40px] sm:blur-[60px]"
         />
       </div>
 
       {/* Cluster 2 */}
-      <div className="absolute left-[70%] top-[60%] -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px]">
+      <div className="absolute left-[70%] top-[60%] -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px] sm:w-[350px] sm:h-[350px]">
         <motion.div 
           animate={{ 
-            scale: [1, 1.15, 1],
-            opacity: [0.1 * intensity, 0.25 * intensity, 0.1 * intensity]
+            scale: [1, 1.1, 1],
+            opacity: [0.1 * intensity, 0.2 * intensity, 0.1 * intensity]
           }}
-          transition={{ duration: 6, repeat: Infinity }}
-          className="absolute inset-0 rounded-full bg-yellow-600 blur-[70px]"
+          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+          className="absolute inset-0 rounded-full bg-yellow-600 blur-[30px] sm:blur-[50px]"
         />
       </div>
 
       {/* Center Surge Glow */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px]">
-        <div className={`absolute inset-0 rounded-full blur-[100px] transition-opacity duration-1000 ${busynessMode === 'High' ? 'bg-orange-500 opacity-20' : 'bg-transparent opacity-0'}`} />
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px]">
+        <div className={`absolute inset-0 rounded-full blur-[60px] sm:blur-[80px] transition-opacity duration-1000 ${busynessMode === 'High' ? 'bg-orange-500 opacity-10' : 'bg-transparent opacity-0'}`} />
       </div>
     </div>
   );
@@ -3060,11 +3054,30 @@ export default function App() {
     }
   });
 
-  // New Maintenance/Update States
+  // Enhanced Performance Detection
   const [isLowPerformance, setIsLowPerformance] = useState(() => {
+    const fromStorage = localStorage.getItem('uber_low_performance');
+    if (fromStorage !== null) return fromStorage === 'true';
+    
     const ua = navigator.userAgent;
-    return /iPhone/i.test(ua) && (/6s/i.test(ua) || /iPhone 8/i.test(ua));
+    const isOldiPhone = /iPhone/i.test(ua) && (/6s/i.test(ua) || /iPhone 8/i.test(ua) || /iPhone 7/i.test(ua));
+    // Check for some Android devices or generic mobile that might struggle
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    
+    // Default to low performance on mobile if we suspect issues, or if device memory is low
+    if (isOldiPhone) return true;
+    
+    // Explicitly check for Samsung S22 Plus context (User mentioned it)
+    if (/SM-S906/i.test(ua)) {
+       // S22+ is high performance but the user reported glitches, so let's allow easy toggle
+    }
+
+    return false;
   });
+
+  useEffect(() => {
+    localStorage.setItem('uber_low_performance', isLowPerformance.toString());
+  }, [isLowPerformance]);
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(() => localStorage.getItem('uber_has_seen_onboarding') === 'true');
   const [isScanning, setIsScanning] = useState(false);
   const [isUnderMaintenance, setIsUnderMaintenance] = useState(false);
@@ -3627,6 +3640,12 @@ export default function App() {
 
   const [isBackgrounded, setIsBackgrounded] = useState(false);
 
+  const locationRef = useRef(location);
+  const currentStopRef = useRef(currentStop);
+  
+  useEffect(() => { locationRef.current = location; }, [location]);
+  useEffect(() => { currentStopRef.current = currentStop; }, [currentStop]);
+
   // Simulated Map Movement
   useEffect(() => {
     if (!isNavigating || !user.isOnline || activeOrders.length === 0 || !location || !currentStop) {
@@ -3635,12 +3654,14 @@ export default function App() {
     }
 
     const moveInterval = setInterval(() => {
-      if (!currentStop || !location) return;
+      // Use refs to avoid interval re-triggering on every location update
+      const loc = locationRef.current;
+      const targetStop = currentStopRef.current;
+      if (!targetStop || !loc) return;
       
-      const target = currentStop.location;
-      
-      const dLat = target.latitude - location.latitude;
-      const dLng = target.longitude - location.longitude;
+      const target = targetStop.location;
+      const dLat = target.latitude - loc.latitude;
+      const dLng = target.longitude - loc.longitude;
       const distance = Math.sqrt(dLat * dLat + dLng * dLng);
       
       const speed = 0.00015; 
@@ -3648,8 +3669,7 @@ export default function App() {
       if (distance < speed * 1.5) {
         setLocation(target);
         setIsNavigating(false);
-        const order = activeOrders.find(o => o.id === currentStop.orderId);
-        sendNotification("Arrived", `You have arrived at ${currentStop.label}`, "success");
+        sendNotification("Arrived", `You have arrived at ${targetStop.label}`, "success");
         return;
       }
 
@@ -3670,11 +3690,11 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(moveInterval);
-  }, [isNavigating, user.isOnline, activeOrders, location === null, currentStop]);
+  }, [isNavigating, user.isOnline, activeOrders.length > 0, location === null]);
 
   // GPS Drift Effect (Subtle jitter when online but stationary)
   useEffect(() => {
-    if (!user.isOnline || isNavigating || !location) return;
+    if (!user.isOnline || isNavigating || !location || isLowPerformance) return;
 
     const driftInterval = setInterval(() => {
       // Very small drift: ~0.000005 degrees is approx 0.5 meters
@@ -3688,10 +3708,10 @@ export default function App() {
           longitude: prev.longitude + lngDrift
         };
       });
-    }, 3000); // Drift every 3 seconds
+    }, 5000); // Drastically reduced frequency for stability
 
     return () => clearInterval(driftInterval);
-  }, [user.isOnline, isNavigating, location === null]);
+  }, [user.isOnline, isNavigating, location === null, isLowPerformance]);
 
   // Customer Response Timer Logic
   useEffect(() => {
@@ -5559,7 +5579,7 @@ export default function App() {
                   className="cursor-pointer group"
                 >
                   <div className="relative">
-                    <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-20" />
+                    <div className={`absolute inset-0 bg-blue-500 rounded-full opacity-20 ${isLowPerformance ? '' : 'animate-ping'}`} />
                     <div className="relative w-12 h-12 bg-white dark:bg-black rounded-3xl shadow-2xl flex items-center justify-center border-2 border-blue-600 group-hover:scale-110 transition-transform">
                       {order.type === 'ride' ? <User size={20} className="text-blue-600" /> : <Coffee size={20} className="text-orange-500" />}
                     </div>
@@ -5738,8 +5758,8 @@ export default function App() {
                         <div className="flex items-center gap-5">
                           <div className="bg-blue-600 p-3 rounded-2xl shadow-[0_0_25px_rgba(37,99,235,0.4)]">
                             <motion.div
-                               animate={{ rotate: [45, 55, 45] }}
-                               transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                               animate={isLowPerformance ? {} : { rotate: [45, 55, 45] }}
+                               transition={isLowPerformance ? {} : { duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
                             >
                               <Navigation size={28} className="fill-white text-white" />
                             </motion.div>
@@ -8102,6 +8122,27 @@ export default function App() {
                   </button>
                 ))}
                 
+                <div className={`p-4 rounded-2xl mt-4 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="text-blue-500"><Zap size={24} /></div>
+                      <div>
+                        <p className="font-bold">Battery Saver</p>
+                        <p className="text-xs text-gray-400 font-bold">Disable heavy map effects</p>
+                      </div>
+                    </div>
+                    <div 
+                      onClick={() => setIsLowPerformance(!isLowPerformance)}
+                      className={`w-12 h-6 rounded-full relative p-1 transition-colors cursor-pointer ${isLowPerformance ? 'bg-blue-500' : 'bg-gray-300'}`}
+                    >
+                      <motion.div 
+                        animate={{ x: isLowPerformance ? 24 : 0 }}
+                        className="w-4 h-4 bg-white rounded-full shadow-sm" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className={`p-4 rounded-2xl mt-4 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
