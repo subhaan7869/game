@@ -56,7 +56,7 @@ service cloud.firestore {
              (!('level' in data) || (data.level is number && data.level > 0)) &&
              (!('deliveries' in data) || (data.deliveries is number && data.deliveries >= 0)) &&
              (!('walletBalance' in data) || (data.walletBalance is number && data.walletBalance >= 0)) &&
-             (!('documentExpiries' in data) || (data.documentExpiries is shadow && data.documentExpiries.keys().size() < 20));
+             (!('documentExpiries' in data) || (data.documentExpiries is map && data.documentExpiries.keys().size() < 20));
     }
 
     function isValidStatusTransition(oldStatus, newStatus) {

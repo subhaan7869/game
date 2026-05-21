@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -63,4 +63,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 // Auth helpers
 export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+export const registerWithEmail = (email, password) => createUserWithEmailAndPassword(auth, email, password);
+export const logInWithEmail = (email, password) => signInWithEmailAndPassword(auth, email, password);
+export const sendEmailVerificationLink = (user: User) => sendEmailVerification(user);
 export const logout = () => auth.signOut();

@@ -35,6 +35,8 @@ import {
   Code,
   MessageSquare,
   LogOut,
+  LogIn,
+  UserPlus,
   Power,
   Plus,
   Minus,
@@ -97,7 +99,7 @@ import {
 } from 'recharts';
 import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, UberProTier, ScheduledOrder, CompletedTrip, NavSimulation } from './types';
 import { EarningsDetail } from './components/EarningsDetail';
-import { auth, db, signInWithGoogle, logout, handleFirestoreError, OperationType } from './firebase';
+import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 
@@ -511,7 +513,7 @@ const NewDashboard = ({
     <div className="h-full w-full bg-gray-50 flex flex-col font-sans overflow-y-auto no-scrollbar pb-32">
       {/* Header */}
       <div className="px-6 pt-12 pb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-black tracking-tighter">Uber</h1>
+        <h1 className="text-3xl font-black tracking-tighter">Hyper Driver</h1>
         <div className="flex items-center gap-3">
           <button className="w-10 h-10 bg-white shadow-sm border border-gray-100 rounded-full flex items-center justify-center text-gray-700 active:scale-90 transition-transform">
             <Camera size={20} />
@@ -786,11 +788,11 @@ const SideMenu = ({
       {/* Menu Items */}
       <div className="space-y-1 mb-10">
         {[
-          { icon: <Zap size={20} />, label: "Work Hub", screen: 'uber_services' },
+          { icon: <Zap size={20} />, label: "Work Hub", screen: 'hyper_driver_services' },
           { icon: <Mail size={20} />, label: "Inbox", screen: 'inbox' },
           { icon: <Clock size={20} />, label: "Scheduled", screen: 'scheduled_orders' },
           { icon: <History size={20} />, label: "Trip History", screen: 'trip_history' },
-          { icon: <Target size={20} />, label: "Rewards", screen: 'uber_pro' },
+          { icon: <Target size={20} />, label: "Rewards", screen: 'hyper_driver_pro' },
           { icon: <Gift size={20} />, label: "Promotions", screen: 'opportunities' },
           { icon: <Shield size={20} />, label: "Safety", screen: 'safety' },
           { icon: <Smartphone size={20} />, label: isCarPlaySynced ? "CarPlay Active" : "Sync CarPlay", action: () => setIsCarPlaySynced(!isCarPlaySynced), active: isCarPlaySynced },
@@ -974,10 +976,10 @@ const TripPreferencesModal = ({
   };
 
   const services = [
-    { id: 'delivery', label: 'Uber Eats', desc: 'Food and grocery delivery', icon: <Coffee size={20} /> },
+    { id: 'delivery', label: 'Hyper Eats', desc: 'Food and grocery delivery', icon: <Coffee size={20} /> },
     { 
       id: 'ride', 
-      label: 'UberX', 
+      label: 'HyperX', 
       desc: isInsuranceExpired ? 'Insurance Required' : 'Passenger trips', 
       icon: <User size={20} />, 
       disabled: vehicleType !== 'Car' || isInsuranceExpired,
@@ -1014,7 +1016,7 @@ const TripPreferencesModal = ({
             </div>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { type: 'Car', icon: <CarIcon size={20} />, label: "UberX / Eats" },
+                { type: 'Car', icon: <CarIcon size={20} />, label: "HyperX / Eats" },
                 { type: 'Bike', icon: <BikeIcon size={20} />, label: "Eats Only" },
                 { type: 'Scooter', icon: <Zap size={20} />, label: "Eats Only" }
               ].map(v => (
@@ -1088,7 +1090,7 @@ const TripPreferencesModal = ({
                 </div>
               </div>
             </div>
-            <p className="text-[9px] text-gray-500 font-bold mt-4 text-center">Some features require Uber Pro Gold status.</p>
+            <p className="text-[9px] text-gray-500 font-bold mt-4 text-center">Some features require Hyper Pro Gold status.</p>
           </div>
         </div>
 
@@ -1127,136 +1129,429 @@ const NewUserForm = ({
   setCurrentScreen: (screen: AppScreen) => void,
   sendNotification: (title: string, body: string) => void,
   setHasSeenOnboarding: (val: boolean) => void
-}) => (
-  <div className="fixed inset-0 z-[500] flex items-center justify-center p-3 sm:p-4">
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/70" />
-    <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-sm rounded-[28px] p-5 shadow-2xl relative z-10 max-h-[94vh] flex flex-col">
-      <div className="overflow-y-auto flex-1 no-scrollbar">
-        <h2 className="text-xl font-black mb-1 leading-tight tracking-tighter">New User?</h2>
-        <p className="text-gray-500 font-bold mb-4 text-[10px]">Create an account to start earning.</p>
-        
-        <div className="space-y-2.5 mb-4">
-          {!firebaseUser && (
-            <button 
-              onClick={async () => {
-                try {
-                  await signInWithGoogle();
-                } catch (error) {
-                  console.error("Login failed", error);
-                }
-              }}
-              className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-blue-600/10 active:scale-95 transition-transform text-sm"
-            >
-              <Globe size={16} />
-              SIGN IN WITH GOOGLE
-            </button>
+}) => {
+  const [authMode, setAuthMode] = useState<'options' | 'email_login' | 'email_register' | 'unverified'>('options');
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [nameInput, setNameInput] = useState('');
+  const [dobInput, setDobInput] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
+  const [addressInput, setAddressInput] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Sync state if Google/Auth fills it
+  useEffect(() => {
+    if (firebaseUser) {
+      if (firebaseUser.emailVerified === false && firebaseUser.providerData.some(p => p.providerId === 'password')) {
+        setAuthMode('unverified');
+      } else {
+        setNameInput(newUserDetails.name || nameInput || firebaseUser.displayName || '');
+        setEmailInput(newUserDetails.email || emailInput || firebaseUser.email || '');
+        setAuthMode('email_register');
+      }
+    }
+  }, [firebaseUser]);
+
+  const handleEmailRegister = async () => {
+    if (!emailInput || !passwordInput || !nameInput) {
+      setErrorMessage("Please fill in Name, Email and Password.");
+      return;
+    }
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const cred = await registerWithEmail(emailInput, passwordInput);
+      await sendEmailVerificationLink(cred.user);
+      sendNotification("Verification Sent", "Please check your email inbox to verify your account!");
+      setAuthMode('unverified');
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to register.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEmailLogin = async () => {
+    if (!emailInput || !passwordInput) {
+      setErrorMessage("Please fill in Email and Password.");
+      return;
+    }
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const cred = await logInWithEmail(emailInput, passwordInput);
+      if (!cred.user.emailVerified) {
+        setErrorMessage("Please verify your email. Verification email has been sent.");
+        setAuthMode('unverified');
+      } else {
+        sendNotification("Success", "Logged in successfully!");
+        // The background onAuthStateChanged in App.tsx automatically loads the profile and closes this modal.
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || "Login failed. Check details.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCheckVerification = async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      if (auth.currentUser) {
+        await auth.currentUser.reload();
+        if (auth.currentUser.emailVerified) {
+          sendNotification("Email Verified!", "Perfect! Finish filling your profile.");
+          setNameInput(nameInput || auth.currentUser.displayName || '');
+          setEmailInput(auth.currentUser.email || '');
+          setAuthMode('email_register');
+        } else {
+          setErrorMessage("Email is still not verified. Please click the link we emailed you, then try again.");
+        }
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendLink = async () => {
+    try {
+      if (auth.currentUser) {
+        await sendEmailVerificationLink(auth.currentUser);
+        sendNotification("Re-sent", "A new verification link has been emailed to you.");
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    }
+  };
+
+  const handleCreateProfile = async () => {
+    try {
+      const uid = firebaseUser?.uid || auth.currentUser?.uid;
+      if (!uid) return;
+
+      const newUserProfile: UserProfile = {
+        ...user,
+        name: nameInput || newUserDetails.name,
+        email: emailInput || newUserDetails.email,
+        dob: dobInput || newUserDetails.dob,
+        phone: phoneInput || newUserDetails.phone,
+        address: addressInput || newUserDetails.address,
+        uid: uid,
+        documentsUploaded: true,
+        faceVerified: true,
+        rating: 5.0,
+        tier: 'Blue',
+        points: 0,
+        deliveries: 0,
+        isOnline: false,
+        walletBalance: 0,
+        profilePic: newUserDetails.profilePic || "",
+        documentExpiries: {
+          "Driving Licence": "2027-01-01",
+          "Vehicle Insurance": "2027-01-01",
+          "Bank Statement": "2027-01-01"
+        },
+        faceSignature: newUserDetails.faceSignature || ""
+      } as any;
+
+      await setDoc(doc(db, 'users', uid), newUserProfile);
+      setUser(newUserProfile);
+      setIsNewUserFormOpen(false);
+      setHasSeenOnboarding(true);
+      localStorage.setItem('hyper_driver_has_seen_onboarding', 'true');
+      setCurrentScreen('home');
+      sendNotification("Profile Synced", `Welcome to Hyper Driver, ${nameInput}!`);
+    } catch (error) {
+      console.error("Create account failed:", error);
+      sendNotification("Error", "Could not complete account configuration.");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-3 sm:p-4">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/70" />
+      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-sm rounded-[28px] p-5 shadow-2xl relative z-10 max-h-[94vh] flex flex-col">
+        <div className="overflow-y-auto flex-1 no-scrollbar space-y-4">
+          
+          {authMode === 'options' && (
+            <div className="space-y-4 text-center">
+              <div className="flex justify-center mb-1 text-blue-600">
+                <Globe size={44} className="animate-pulse" />
+              </div>
+              <h2 className="text-2xl font-black tracking-tight">Access Cloud Sync</h2>
+              <p className="text-gray-500 font-bold text-xs leading-relaxed px-2">
+                Connect your account to save earnings, stats, and deliveries securely to the cloud. Access your same level and wallet balance instantly on iPad, iPhone, or Laptop!
+              </p>
+              
+              {errorMessage && (
+                <p className="text-red-500 font-bold text-xs bg-red-50 p-2.5 rounded-xl border border-red-100">{errorMessage}</p>
+              )}
+
+              <div className="space-y-2.5 pt-2">
+                <button 
+                  onClick={async () => {
+                    try {
+                      await signInWithGoogle();
+                    } catch (error) {
+                      console.error("Login failed", error);
+                    }
+                  }}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-blue-600/10 active:scale-95 transition-transform text-sm"
+                >
+                  <Globe size={16} />
+                  SIGN IN WITH GOOGLE
+                </button>
+
+                <div className="relative flex py-2 items-center text-center">
+                  <div className="flex-grow border-t border-gray-100"></div>
+                  <span className="flex-shrink mx-4 text-gray-400 font-black text-[10px] uppercase tracking-wider">OR EMAIL</span>
+                  <div className="flex-grow border-t border-gray-100"></div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setAuthMode('email_login')}
+                    className="flex-1 py-3 bg-gray-50 border border-gray-200 hover:bg-gray-100 text-black rounded-xl font-black flex items-center justify-center gap-2 active:scale-95 transition-transform text-xs"
+                  >
+                    <LogIn size={14} />
+                    SIGN IN
+                  </button>
+
+                  <button 
+                    onClick={() => setAuthMode('email_register')}
+                    className="flex-1 py-3 bg-black hover:bg-neutral-900 text-white rounded-xl font-black flex items-center justify-center gap-2 active:scale-95 transition-transform text-xs"
+                  >
+                    <UserPlus size={14} />
+                    REGISTER
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
-          <div className="flex flex-col gap-0.5">
-            <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Full Name</label>
-            <input 
-              type="text" 
-              className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
-              value={newUserDetails.name}
-              onChange={e => setNewUserDetails({...newUserDetails, name: e.target.value})}
-              placeholder="Full name"
-            />
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Email</label>
-            <input 
-              type="email" 
-              className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
-              value={newUserDetails.email}
-              onChange={e => setNewUserDetails({...newUserDetails, email: e.target.value})}
-              placeholder="Email"
-            />
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Date of Birth</label>
-            <input 
-              type="date" 
-              className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
-              value={newUserDetails.dob}
-              onChange={e => setNewUserDetails({...newUserDetails, dob: e.target.value})}
-            />
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Phone Number</label>
-            <input 
-              type="tel" 
-              className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
-              value={newUserDetails.phone}
-              onChange={e => setNewUserDetails({...newUserDetails, phone: e.target.value})}
-              placeholder="+1 234 567 8900"
-            />
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Home Address</label>
-            <input 
-              type="text" 
-              className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
-              value={newUserDetails.address}
-              onChange={e => setNewUserDetails({...newUserDetails, address: e.target.value})}
-              placeholder="Address"
-            />
-          </div>
+
+          {authMode === 'email_login' && (
+            <div className="space-y-3.5">
+              <div>
+                <h2 className="text-2xl font-black tracking-tight leading-tight">Log In</h2>
+                <p className="text-gray-400 font-bold text-[10px]">Access your existing Hyper Driver cloud account.</p>
+              </div>
+
+              {errorMessage && (
+                <p className="text-red-500 font-bold text-xs bg-red-50 p-2.5 rounded-xl border border-red-100">{errorMessage}</p>
+              )}
+
+              <div className="space-y-3">
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Email Address</label>
+                  <input 
+                    type="email" 
+                    className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
+                    value={emailInput}
+                    onChange={e => setEmailInput(e.target.value)}
+                    placeholder="Enter email"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Password</label>
+                  <input 
+                    type="password" 
+                    className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
+                    value={passwordInput}
+                    onChange={e => setPasswordInput(e.target.value)}
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 text-center">
+                <button 
+                  disabled={isLoading}
+                  onClick={handleEmailLogin}
+                  className="w-full py-3.5 bg-black text-white hover:bg-neutral-900 rounded-xl font-black text-sm active:scale-95 transition-transform shadow-lg shadow-black/10 flex items-center justify-center gap-2"
+                >
+                  {isLoading ? "LOADING..." : "SIGN IN"}
+                </button>
+                <button 
+                  onClick={() => { setAuthMode('options'); setErrorMessage(null); }}
+                  className="mt-3 text-xs text-blue-600 font-black uppercase tracking-wider"
+                >
+                  Back to options
+                </button>
+              </div>
+            </div>
+          )}
+
+          {authMode === 'email_register' && (
+            <div className="space-y-3">
+              <div>
+                <h2 className="text-2xl font-black tracking-tight leading-tight">Driver Profile</h2>
+                <p className="text-gray-400 font-bold text-[10px]">Create or complete your cloud synchronization profile.</p>
+              </div>
+
+              {errorMessage && (
+                <p className="text-red-500 font-bold text-xs bg-red-50 p-2 rounded-xl border border-red-100">{errorMessage}</p>
+              )}
+
+              <div className="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1 no-scrollbar">
+                {!firebaseUser && (
+                  <>
+                    <div className="flex flex-col gap-0.5">
+                      <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Email Address</label>
+                      <input 
+                        type="email" 
+                        className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
+                        value={emailInput}
+                        onChange={e => setEmailInput(e.target.value)}
+                        placeholder="Enter email"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Password</label>
+                      <input 
+                        type="password" 
+                        className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
+                        value={passwordInput}
+                        onChange={e => setPasswordInput(e.target.value)}
+                        placeholder="Choose password"
+                      />
+                    </div>
+                  </>
+                )}
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Full Name</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
+                    value={nameInput}
+                    onChange={e => setNameInput(e.target.value)}
+                    placeholder="Full name"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Date of Birth</label>
+                  <input 
+                    type="date" 
+                    className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
+                    value={dobInput}
+                    onChange={e => setDobInput(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Phone Number</label>
+                  <input 
+                    type="tel" 
+                    className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
+                    value={phoneInput}
+                    onChange={e => setPhoneInput(e.target.value)}
+                    placeholder="+44 7700 900077"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Home Address</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-3 bg-gray-50 rounded-xl border-none font-bold text-sm"
+                    value={addressInput}
+                    onChange={e => setAddressInput(e.target.value)}
+                    placeholder="Address"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <button 
+                  onClick={() => {
+                    if (firebaseUser) {
+                      logout();
+                    }
+                    setAuthMode('options');
+                    setErrorMessage(null);
+                  }} 
+                  className="px-4 py-3.5 bg-gray-100 text-black rounded-xl font-black text-xs active:scale-95 transition-transform"
+                >
+                  BACK
+                </button>
+                {firebaseUser ? (
+                  <button 
+                    disabled={!nameInput || !emailInput || !dobInput || !phoneInput || isLoading}
+                    onClick={handleCreateProfile}
+                    className={`flex-1 py-3.5 rounded-xl font-black transition-all text-xs flex items-center justify-center gap-1 ${(!nameInput || !emailInput) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-black text-white shadow-xl active:scale-95 hover:bg-neutral-900'}`}
+                  >
+                    SYNC PROFILE
+                  </button>
+                ) : (
+                  <button 
+                    disabled={!nameInput || !emailInput || !passwordInput || isLoading}
+                    onClick={handleEmailRegister}
+                    className={`flex-1 py-3.5 rounded-xl font-black transition-all text-xs flex items-center justify-center gap-1 ${(isLoading || !nameInput || !emailInput || !passwordInput) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-black text-white shadow-xl active:scale-95 hover:bg-neutral-900'}`}
+                  >
+                    {isLoading ? "CREATING..." : "VERIFY & REGISTER"}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {authMode === 'unverified' && (
+            <div className="space-y-4 text-center">
+              <div className="flex justify-center mb-1 text-amber-500">
+                <ShieldCheck size={48} className="animate-pulse" />
+              </div>
+              <h2 className="text-xl font-black tracking-tight">Verify Your Email</h2>
+              <p className="text-gray-500 font-bold text-xs leading-relaxed px-1">
+                We sent a real verification code/link to <span className="text-black font-extrabold">{emailInput}</span>. Open your email inbox, click the link to confirm your account, then click the check button below.
+              </p>
+
+              {errorMessage && (
+                <p className="text-red-500 font-bold text-xs bg-red-50 p-2.5 rounded-xl border border-red-100">{errorMessage}</p>
+              )}
+
+              <div className="space-y-2.5 pt-2">
+                <button 
+                  disabled={isLoading}
+                  onClick={handleCheckVerification}
+                  className="w-full py-3.5 bg-black text-white rounded-xl font-black flex items-center justify-center gap-2 active:scale-95 transition-transform text-sm shadow-xl"
+                >
+                  {isLoading ? "RELOADING STATE..." : "I HAVE VERIFIED MY EMAIL"}
+                </button>
+
+                <button 
+                  onClick={handleResendLink}
+                  className="w-full py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5"
+                >
+                  <Mail size={14} />
+                  Resend verification code
+                </button>
+
+                <button 
+                  onClick={() => {
+                    logout();
+                    setAuthMode('options');
+                    setErrorMessage(null);
+                  }}
+                  className="text-xs text-blue-600 font-black uppercase tracking-wider block mx-auto pt-2"
+                >
+                  Back to options
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
-      </div>
 
-      <div className="flex gap-3 mt-2">
-        <button onClick={() => setIsNewUserFormOpen(false)} className="px-5 py-4 bg-gray-100 text-black rounded-xl font-black text-sm">EXIT</button>
-        <button 
-          disabled={!firebaseUser || !newUserDetails.name || !newUserDetails.email || !newUserDetails.dob || !newUserDetails.phone}
-          onClick={async () => {
-            try {
-              const uid = firebaseUser?.uid;
-              if (!uid) return;
-
-              const newUserProfile: UserProfile = {
-                ...user,
-                name: newUserDetails.name,
-                email: newUserDetails.email,
-                dob: newUserDetails.dob,
-                phone: newUserDetails.phone,
-                address: newUserDetails.address,
-                uid: uid,
-                documentsUploaded: true,
-                faceVerified: true,
-                rating: 5.0,
-                tier: 'Blue',
-                points: 0,
-                deliveries: 0,
-                isOnline: false,
-                walletBalance: 0,
-                profilePic: newUserDetails.profilePic || "",
-                documentExpiries: {
-                  "Driving Licence": "2027-01-01",
-                  "Vehicle Insurance": "2027-01-01",
-                  "Bank Statement": "2027-01-01"
-                },
-                faceSignature: newUserDetails.faceSignature || ""
-              } as any;
-
-              await setDoc(doc(db, 'users', uid), newUserProfile);
-              setUser(newUserProfile);
-              setIsNewUserFormOpen(false);
-              setHasSeenOnboarding(true);
-              localStorage.setItem('uber_has_seen_onboarding', 'true');
-              setCurrentScreen('home');
-              sendNotification("Account Created", `Welcome to Uber Eats, ${newUserDetails.name}!`);
-            } catch (error) {
-              console.error("Create account failed:", error);
-              sendNotification("Error", "Could not create account.");
-            }
-          }} 
-          className={`flex-1 py-4 rounded-xl font-black transition-all text-sm ${(!firebaseUser || !newUserDetails.name || !newUserDetails.email) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-black text-white shadow-xl active:scale-95'}`}
-        >
-          CREATE ACCOUNT
-        </button>
-      </div>
-    </motion.div>
-  </div>
-);
+        {authMode === 'options' && (
+          <button onClick={() => setIsNewUserFormOpen(false)} className="w-full py-3.5 mt-3 bg-gray-100 hover:bg-gray-200 text-black rounded-xl font-black text-xs">
+            CANCEL / CLOSE
+          </button>
+        )}
+      </motion.div>
+    </div>
+  );
+};
 
 const PersonalDetailsScreen = ({ 
   user,
@@ -1581,13 +1876,28 @@ const OnboardingFlow = ({
 }) => {
   const [step, setStep] = useState(0);
   const [localUser, setLocalUser] = useState(user);
-  const [vehicle, setVehicle] = useState(user.vehicleInfo || { make: '', model: '', year: 2024, plate: '', type: 'Uber Eats', photo: '' });
+  const [vehicle, setVehicle] = useState(user.vehicleInfo || { make: '', model: '', year: 2024, plate: '', type: 'Hyper Eats', photo: '' });
 
   const nextStep = () => setStep(s => s + 1);
   const prevStep = () => setStep(s => s - 1);
 
   const handleFinish = () => {
-    setUser({ ...localUser, vehicleInfo: vehicle, documentsUploaded: false, faceVerified: false });
+    const singleVehicle = {
+      id: Math.random().toString(36).substring(2, 11),
+      make: vehicle.make,
+      model: vehicle.model,
+      year: vehicle.year || 2024,
+      plate: vehicle.plate.toUpperCase(),
+      type: vehicle.type,
+      photo: vehicle.photo || ''
+    };
+    setUser({ 
+      ...localUser, 
+      vehicleInfo: vehicle, 
+      vehiclesList: [singleVehicle],
+      documentsUploaded: false, 
+      faceVerified: false 
+    });
     onComplete();
   };
 
@@ -1665,8 +1975,8 @@ const OnboardingFlow = ({
             <p className="text-gray-400 font-bold mb-8">How do you want to earn?</p>
             <div className="grid gap-4">
                   {[
-                    { id: 'UberX', label: 'Uber X', desc: 'Carry passengers around the city', icon: <CarIcon size={32} /> },
-                    { id: 'Uber Eats', label: 'Uber Eats', desc: 'Deliver food and groceries', icon: <BikeIcon size={32} /> },
+                    { id: 'HyperX', label: 'Hyper X', desc: 'Carry passengers around the city', icon: <CarIcon size={32} /> },
+                    { id: 'Hyper Eats', label: 'Hyper Eats', desc: 'Deliver food and groceries', icon: <BikeIcon size={32} /> },
                   ].map(item => (
                     <button 
                       key={`service-type-${item.id}`}
@@ -1737,26 +2047,167 @@ const OnboardingFlow = ({
 const VehicleDetailsScreen = ({ 
   user, 
   setUser, 
+  setVehicleType,
   onClose,
   theme
 }: { 
   user: UserProfile, 
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
+  setVehicleType?: React.Dispatch<React.SetStateAction<'Car' | 'Bike' | 'Scooter'>>,
   onClose: () => void,
   theme: string
 }) => {
-  const [vehicle, setVehicle] = useState(user.vehicleInfo || { make: '', model: '', year: 2024, plate: '', type: 'Car' });
-  const [insuranceDate, setInsuranceDate] = useState(user.documentExpiries?.["Vehicle Insurance"] || "");
+  // Initialize vehicles from user.vehiclesList or fallback to user.vehicleInfo
+  const [vehiclesList, setVehiclesList] = useState<any[]>(() => {
+    if (user.vehiclesList && user.vehiclesList.length > 0) {
+      return user.vehiclesList;
+    }
+    if (user.vehicleInfo) {
+      return [{
+        id: 'vel_default',
+        make: user.vehicleInfo.make,
+        model: user.vehicleInfo.model,
+        year: user.vehicleInfo.year || 2024,
+        plate: user.vehicleInfo.plate || '',
+        type: user.vehicleInfo.type || 'Car',
+        photo: user.vehicleInfo.photo || '',
+        insuranceExpiry: user.documentExpiries?.["Vehicle Insurance"] || ''
+      }];
+    }
+    return [];
+  });
 
-  const handleSave = () => {
-    setUser(u => ({ 
-      ...u, 
-      vehicleInfo: vehicle,
-      documentExpiries: {
-        ...u.documentExpiries,
-        "Vehicle Insurance": insuranceDate
+  // Name of the active vehicle plate
+  const [activePlate, setActivePlate] = useState(user.vehicleInfo?.plate || '');
+
+  // Form states for adding / editing a vehicle
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
+
+  const [formMake, setFormMake] = useState('');
+  const [formModel, setFormModel] = useState('');
+  const [formYear, setFormYear] = useState(2024);
+  const [formPlate, setFormPlate] = useState('');
+  const [formType, setFormType] = useState('Car');
+  const [formPhoto, setFormPhoto] = useState('');
+  const [formInsurance, setFormInsurance] = useState('');
+
+  // Pre-fill form when editing
+  const startEdit = (veh: any) => {
+    setEditingVehicleId(veh.id);
+    setFormMake(veh.make);
+    setFormModel(veh.model);
+    setFormYear(veh.year);
+    setFormPlate(veh.plate);
+    setFormType(veh.type);
+    setFormPhoto(veh.photo || '');
+    setFormInsurance(veh.insuranceExpiry || '');
+    setIsFormOpen(true);
+  };
+
+  const startCreate = () => {
+    setEditingVehicleId(null);
+    setFormMake('');
+    setFormModel('');
+    setFormYear(2024);
+    setFormPlate('');
+    setFormType('Car');
+    setFormPhoto('');
+    setFormInsurance('');
+    setIsFormOpen(true);
+  };
+
+  const handleSaveVehicle = () => {
+    if (!formMake.trim() || !formModel.trim() || !formPlate.trim()) {
+      alert("Please enter make, model, and plate number.");
+      return;
+    }
+
+    if (editingVehicleId) {
+      // Edit existing
+      setVehiclesList(prev => prev.map(v => {
+        if (v.id === editingVehicleId) {
+          return {
+            ...v,
+            make: formMake,
+            model: formModel,
+            year: formYear,
+            plate: formPlate.toUpperCase(),
+            type: formType,
+            photo: formPhoto,
+            insuranceExpiry: formInsurance
+          };
+        }
+        return v;
+      }));
+    } else {
+      // Add new
+      const newVeh = {
+        id: 'vel_' + Math.random().toString(36).substring(2, 11),
+        make: formMake,
+        model: formModel,
+        year: formYear,
+        plate: formPlate.toUpperCase(),
+        type: formType,
+        photo: formPhoto,
+        insuranceExpiry: formInsurance
+      };
+      setVehiclesList(prev => [...prev, newVeh]);
+      if (!activePlate) {
+        setActivePlate(newVeh.plate);
       }
-    }));
+    }
+
+    setIsFormOpen(false);
+    setEditingVehicleId(null);
+  };
+
+  const handleDeleteVehicle = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const vehToDelete = vehiclesList.find(v => v.id === id);
+    if (!vehToDelete) return;
+
+    if (vehiclesList.length <= 1) {
+      alert("You must keep at least one vehicle registered.");
+      return;
+    }
+    if (activePlate.toUpperCase() === vehToDelete.plate.toUpperCase()) {
+      alert("You cannot delete your active vehicle. Please select a different active vehicle first.");
+      return;
+    }
+
+    setVehiclesList(prev => prev.filter(v => v.id !== id));
+  };
+
+  const handleAllChangesSave = () => {
+    const selectedVeh = vehiclesList.find(v => v.plate.toUpperCase() === activePlate.toUpperCase()) || vehiclesList[0];
+    if (!selectedVeh) return;
+
+    setUser(u => {
+      const updatedExpiries = { ...u.documentExpiries };
+      if (selectedVeh.insuranceExpiry) {
+        updatedExpiries["Vehicle Insurance"] = selectedVeh.insuranceExpiry;
+      }
+      return {
+        ...u,
+        vehicleInfo: {
+          make: selectedVeh.make,
+          model: selectedVeh.model,
+          year: selectedVeh.year,
+          plate: selectedVeh.plate,
+          type: selectedVeh.type,
+          photo: selectedVeh.photo || ''
+        },
+        vehiclesList: vehiclesList,
+        documentExpiries: updatedExpiries
+      };
+    });
+
+    const mappedType = selectedVeh.type === 'Bike' ? 'Bike' : selectedVeh.type === 'Scooter' ? 'Scooter' : 'Car';
+    localStorage.setItem('hyper_driver_vehicle_type', mappedType);
+    if (setVehicleType) {
+      setVehicleType(mappedType);
+    }
     onClose();
   };
 
@@ -1765,81 +2216,135 @@ const VehicleDetailsScreen = ({
       initial={{ x: '100%' }} 
       animate={{ x: 0 }} 
       exit={{ x: '100%' }} 
-      className={`h-full w-full p-6 overflow-y-auto ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
+      className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
     >
-      <div className="flex items-center gap-4 mb-8">
-        <button onClick={onClose} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={24} /></button>
-        <h1 className="text-3xl font-black">Vehicle Details</h1>
-      </div>
-      
-      <div className="flex flex-col lg:flex-row gap-8">
-        <div className="flex-1 space-y-6">
-          <div className="space-y-4">
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Make</label>
-              <input 
-                type="text" 
-                value={vehicle.make}
-                onChange={e => setVehicle({...vehicle, make: e.target.value})}
-                placeholder="e.g. Toyota"
-                className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Model</label>
-              <input 
-                type="text" 
-                value={vehicle.model}
-                onChange={e => setVehicle({...vehicle, model: e.target.value})}
-                placeholder="e.g. Prius"
-                className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Year</label>
-                <input 
-                  type="number" 
-                  value={vehicle.year}
-                  onChange={e => setVehicle({...vehicle, year: parseInt(e.target.value) || 2024})}
-                  className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">License Plate</label>
-                <input 
-                  type="text" 
-                  value={vehicle.plate}
-                  onChange={e => setVehicle({...vehicle, plate: e.target.value.toUpperCase()})}
-                  placeholder="e.g. AB12 CDE"
-                  className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Insurance Expiry Date</label>
-              <input 
-                type="date" 
-                value={insuranceDate}
-                onChange={e => setInsuranceDate(e.target.value)}
-                className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 focus:border-blue-500' : 'bg-gray-50 border-transparent focus:bg-white focus:border-blue-500'}`}
-              />
-              <p className="mt-2 text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-                Updating this date will automatically refresh the alert in your Account screen if nearing expiry.
-              </p>
-            </div>
+      <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-4">
+          <button onClick={onClose} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={24} /></button>
+          <div>
+            <h1 className="text-3xl font-black">My Vehicles</h1>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Manage multiple vehicles & swap status</p>
           </div>
         </div>
+        {!isFormOpen && (
+          <button 
+            onClick={startCreate}
+            className="flex items-center gap-2 px-5 py-3.5 bg-blue-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-blue-500/20 active:scale-95 transition-transform"
+          >
+            <Plus size={16} /> ADD VEHICLE
+          </button>
+        )}
+      </div>
 
-        <div className="w-full lg:w-72 space-y-4">
-          <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Vehicle Photo</label>
-          <div className="relative aspect-square w-full rounded-3xl overflow-hidden border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center group transition-all hover:border-blue-500">
-            {vehicle.photo ? (
-              <>
-                <img src={vehicle.photo} alt="Vehicle" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <label className="cursor-pointer p-4 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">
-                    Change Photo
+      {isFormOpen ? (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`p-6 rounded-[32px] border-2 border-dashed ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200'} mb-8`}
+        >
+          <h2 className="text-xl font-black mb-6 uppercase tracking-wider">{editingVehicleId ? 'Edit Vehicle' : 'Register New Vehicle'}</h2>
+          
+          <div className="flex flex-col lg:flex-row gap-8">
+            <div className="flex-1 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Make</label>
+                  <input 
+                    type="text" 
+                    value={formMake}
+                    onChange={e => setFormMake(e.target.value)}
+                    placeholder="e.g. Toyota"
+                    className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/10 border-white/5 focus:border-blue-500 text-white' : 'bg-white border-gray-100 focus:border-blue-500'}`}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Model</label>
+                  <input 
+                    type="text" 
+                    value={formModel}
+                    onChange={e => setFormModel(e.target.value)}
+                    placeholder="e.g. Prius"
+                    className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/10 border-white/5 focus:border-blue-500 text-white' : 'bg-white border-gray-100 focus:border-blue-500'}`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Year</label>
+                  <input 
+                    type="number" 
+                    value={formYear}
+                    onChange={e => setFormYear(parseInt(e.target.value) || 2024)}
+                    className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/10 border-white/5 focus:border-blue-500 text-white' : 'bg-white border-gray-100 focus:border-blue-500'}`}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">License Plate</label>
+                  <input 
+                    type="text" 
+                    value={formPlate}
+                    onChange={e => setFormPlate(e.target.value)}
+                    placeholder="e.g. AB12 CDE"
+                    className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/10 border-white/5 focus:border-blue-500 text-white' : 'bg-white border-gray-100 focus:border-blue-500'}`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Vehicle Class</label>
+                  <select 
+                    value={formType}
+                    onChange={e => setFormType(e.target.value)}
+                    className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/5 focus:border-blue-500 text-white' : 'bg-white border-gray-100 focus:border-blue-500'}`}
+                  >
+                    <option value="Car">Car / Sedan</option>
+                    <option value="Bike">Motorcycle / Scooter</option>
+                    <option value="Scooter">Bicycle</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Insurance Expiry</label>
+                  <input 
+                    type="date" 
+                    value={formInsurance}
+                    onChange={e => setFormInsurance(e.target.value)}
+                    className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/5 focus:border-blue-500 text-white' : 'bg-white border-gray-100 focus:border-blue-500'}`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="w-full lg:w-64 space-y-4">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Vehicle Image</label>
+              <div className={`relative aspect-square w-full rounded-3xl overflow-hidden border-2 border-dashed flex flex-col items-center justify-center group transition-all ${theme === 'dark' ? 'bg-white/5 border-white/10 hover:border-blue-550' : 'bg-gray-100 border-gray-200 hover:border-blue-500'}`}>
+                {formPhoto ? (
+                  <>
+                    <img src={formPhoto} alt="Preview" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <label className="cursor-pointer p-3 bg-white text-black rounded-xl font-bold text-xs uppercase tracking-wider shadow">
+                        Upload New
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => setFormPhoto(reader.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </>
+                ) : (
+                  <label className="cursor-pointer flex flex-col items-center p-6 text-center">
+                    <Camera size={32} className="text-gray-400 mb-2 group-hover:text-blue-500 transition-colors" />
+                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400 group-hover:text-blue-500 transition-colors">Select Photo</span>
                     <input 
                       type="file" 
                       accept="image/*" 
@@ -1848,46 +2353,122 @@ const VehicleDetailsScreen = ({
                         const file = e.target.files?.[0];
                         if (file) {
                           const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setVehicle({...vehicle, photo: reader.result as string});
-                          };
+                          reader.onloadend = () => setFormPhoto(reader.result as string);
                           reader.readAsDataURL(file);
                         }
                       }}
                     />
                   </label>
-                </div>
-              </>
-            ) : (
-              <label className="cursor-pointer flex flex-col items-center p-8 text-center">
-                <Camera size={32} className="text-gray-400 mb-2 group-hover:text-blue-500 transition-colors" />
-                <span className="text-xs font-bold text-gray-400 group-hover:text-blue-500 transition-colors">Upload vehicle photo</span>
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setVehicle({...vehicle, photo: reader.result as string});
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                />
-              </label>
-            )}
+                )}
+              </div>
+            </div>
           </div>
+
+          <div className="flex gap-4 mt-8">
+            <button 
+              onClick={handleSaveVehicle}
+              className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-blue-500/10"
+            >
+              SAVE VEHICLE
+            </button>
+            <button 
+              onClick={() => {
+                setIsFormOpen(false);
+                setEditingVehicleId(null);
+              }}
+              className={`px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-all ${theme === 'dark' ? 'bg-white/10 text-white' : 'bg-gray-200 text-gray-600'}`}
+            >
+              CANCEL
+            </button>
+          </div>
+        </motion.div>
+      ) : null}
+
+      <div className="space-y-4">
+        <h2 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Registered Fleet</h2>
+        <div className="grid md:grid-cols-2 gap-4">
+          {vehiclesList.map((item) => {
+            const isActive = activePlate.toUpperCase() === item.plate.toUpperCase();
+            return (
+              <div 
+                key={item.id}
+                onClick={() => setActivePlate(item.plate)}
+                className={`p-5 rounded-[28px] border-2 cursor-pointer transition-all flex items-center justify-between relative group ${
+                  isActive 
+                    ? (theme === 'dark' ? 'border-blue-500 bg-blue-950/20 shadow-xl shadow-blue-500/5' : 'border-blue-600 bg-blue-50/50 shadow-xl shadow-blue-500/5') 
+                    : (theme === 'dark' ? 'border-white/5 bg-white/5 hover:border-white/10' : 'border-gray-100 bg-gray-50/30 hover:border-gray-200')
+                }`}
+              >
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className={`w-14 h-14 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-150'} border border-black/5`}>
+                    {item.photo ? (
+                      <img src={item.photo} alt="Vehicle thumbnail" className="w-full h-full object-cover" />
+                    ) : item.type === 'Bike' ? (
+                      <BikeIcon size={24} className="text-gray-400 animate-pulse" />
+                    ) : (
+                      <CarIcon size={24} className="text-gray-400" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-black text-base truncate">{item.make} {item.model}</h3>
+                      <span className={`text-[9px] uppercase tracking-widest px-2 py-0.5 rounded font-black ${
+                        item.type === 'Bike' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'
+                      }`}>
+                        {item.type}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap text-xs font-bold text-gray-400">
+                      <span>{item.year}</span>
+                      <span>•</span>
+                      <span className="text-[10px] font-mono tracking-wider text-blue-600 font-bold uppercase">{item.plate}</span>
+                    </div>
+                    {item.insuranceExpiry && (
+                      <p className="text-[9px] text-gray-400 italic mt-1 uppercase tracking-wider">
+                        Insurance Exp: <span className="font-mono">{item.insuranceExpiry}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 ml-4">
+                  {isActive ? (
+                    <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-green-500 mr-2">
+                      <span className="w-2 h-2 rounded-full bg-green-500 animate-ping"></span> ACTIVE
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">Swap to drive</span>
+                  )}
+                  
+                  <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEdit(item);
+                      }}
+                      className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-white hover:bg-gray-100 border border-gray-150 text-gray-600'} transition-all`}
+                    >
+                      <Edit2 size={13} />
+                    </button>
+                    <button 
+                      onClick={(e) => handleDeleteVehicle(item.id, e)}
+                      className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400' : 'bg-white hover:bg-red-50 border border-gray-150 text-red-500'} transition-all`}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
-      
+
       <button 
-        onClick={handleSave}
-        className="w-full py-5 bg-black text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform mt-12"
+        onClick={handleAllChangesSave}
+        className="w-full py-5 bg-black text-white hover:bg-gray-900 rounded-[28px] font-black text-xl shadow-xl active:scale-95 transition-transform mt-12 block"
       >
-        SAVE CHANGES
+        SAVE FLEET STATUS
       </button>
     </motion.div>
   );
@@ -2097,7 +2678,7 @@ const PaymentMethodsScreen = ({
             <AlertCircle size={22} />
           </div>
           <div className="space-y-2">
-            <h4 className="font-black text-sm uppercase tracking-wider">Uber Driver Sandbox Simulation</h4>
+            <h4 className="font-black text-sm uppercase tracking-wider">Hyper Driver Driver Sandbox Simulation</h4>
             <p className="text-xs leading-relaxed opacity-85">
               This application is an <strong>educational game simulator</strong> designed to demonstrate open-banking and driver ledger flows. No real currency is generated or held by this app, so payouts are completed with <strong>virtual sandbox bank deposits</strong>.
             </p>
@@ -2199,9 +2780,9 @@ const PaymentMethodsScreen = ({
           <h3 className="font-black text-xl mb-4">Payout Statements</h3>
           <div className="space-y-3">
             {[
-              { id: 'tx-2', date: 'Yesterday', amount: 45.20, type: 'earnings', title: 'Uber Driver Earnings Settled', ref: 'FPS-831902-DRV', bank: 'Monzo' },
+              { id: 'tx-2', date: 'Yesterday', amount: 45.20, type: 'earnings', title: 'Hyper Driver Driver Earnings Settled', ref: 'FPS-831902-DRV', bank: 'Monzo' },
               { id: 'tx-1', date: '3 days ago', amount: -65.00, type: 'payout', title: 'Faster Payments Payout', ref: 'FPS-491932-DRV', bank: 'Barclays' },
-              { id: 'tx-3', date: '5 days ago', amount: 38.50, type: 'earnings', title: 'Uber Driver Earnings Settled', ref: 'FPS-193021-DRV', bank: 'Monzo' },
+              { id: 'tx-3', date: '5 days ago', amount: 38.50, type: 'earnings', title: 'Hyper Driver Driver Earnings Settled', ref: 'FPS-193021-DRV', bank: 'Monzo' },
             ].map(tx => (
               <div key={tx.id} className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                 <div>
@@ -2578,7 +3159,7 @@ const InsuranceScreen = ({
   sendNotification: (t: string, b: string, type?: any) => void
 }) => {
   const [isChangingVehicle, setIsChangingVehicle] = useState(false);
-  const [tempVehicle, setTempVehicle] = useState(user.vehicleInfo || { make: '', model: '', year: 2024, plate: '', type: 'UberX' });
+  const [tempVehicle, setTempVehicle] = useState(user.vehicleInfo || { make: '', model: '', year: 2024, plate: '', type: 'HyperX' });
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'taxi' | 'food' | 'all'>('all');
   const [addDrivers, setAddDrivers] = useState(false);
@@ -3119,7 +3700,7 @@ const ReceiptScanModal = ({
         <button onClick={onClose} className="p-2 bg-white/10 rounded-full"><X size={24} /></button>
       </div>
       <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center pb-10">
-        <p className="text-gray-400 font-bold mb-4 text-center text-sm">Scan the physical Uber Eats receipt to confirm you've picked up the correct order.</p>
+        <p className="text-gray-400 font-bold mb-4 text-center text-sm">Scan the physical Hyper Eats receipt to confirm you've picked up the correct order.</p>
         <div className="w-full max-w-[320px] aspect-[4/5] bg-gray-900 rounded-3xl overflow-hidden relative border-2 border-dashed border-gray-700">
            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
            <div className="absolute inset-0 border-[30px] border-black/40 pointer-events-none" />
@@ -3188,7 +3769,7 @@ const LoadingScreen = () => {
           </motion.div>
         </div>
         
-        <h1 className="text-white text-4xl font-black tracking-tighter uppercase italic mb-2 drop-shadow-2xl">Uber Eats</h1>
+        <h1 className="text-white text-4xl font-black tracking-tighter uppercase italic mb-2 drop-shadow-2xl">Hyper Eats</h1>
           <div className="flex flex-col items-center gap-6">
             <div className="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-[0.3em] animate-pulse">
               <span>Systems Ready</span>
@@ -3309,9 +3890,9 @@ export default function App() {
   // App State
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(() => {
     try {
-      const hasSeen = localStorage.getItem('uber_has_seen_onboarding') === 'true';
+      const hasSeen = localStorage.getItem('hyper_driver_has_seen_onboarding') === 'true';
       if (!hasSeen) return 'onboarding';
-      const saved = localStorage.getItem('uber_current_screen');
+      const saved = localStorage.getItem('hyper_driver_current_screen');
       const screen = (saved as AppScreen) || 'home';
       if (['onboarding', 'documents', 'face_verification'].includes(screen)) return 'home';
       return screen;
@@ -3341,7 +3922,7 @@ export default function App() {
   const [isCarPlayRemoteMode, setIsCarPlayRemoteMode] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     try {
-      const saved = localStorage.getItem('uber_theme');
+      const saved = localStorage.getItem('hyper_driver_theme');
       return (saved as 'light' | 'dark') || 'light';
     } catch (e) {
       return 'light';
@@ -3409,7 +3990,7 @@ export default function App() {
         year: 2024,
         color: "Midnight Silver",
         plate: "UB3R DRV",
-        type: "UberX"
+        type: "HyperX"
       },
       documentExpiries: {
         "Driving Licence": "2027-05-01",
@@ -3418,7 +3999,7 @@ export default function App() {
       }
     };
     try {
-      const saved = localStorage.getItem('uber_eats_user');
+      const saved = localStorage.getItem('hyper_driver_eats_user');
       if (saved) {
         const parsed = JSON.parse(saved);
         return { ...baseUser, ...parsed, isOnline: false };
@@ -3431,7 +4012,7 @@ export default function App() {
 
   // Persist user profile
   useEffect(() => {
-    localStorage.setItem('uber_eats_user', JSON.stringify({
+    localStorage.setItem('hyper_driver_eats_user', JSON.stringify({
       ...user,
       isOnline: false // Don't persist online status
     }));
@@ -3478,7 +4059,7 @@ export default function App() {
   const [zoom, setZoom] = useState(1);
   const [vehicleType, setVehicleType] = useState<'Car' | 'Bike' | 'Scooter'>(() => {
     try {
-      const saved = localStorage.getItem('uber_vehicle_type');
+      const saved = localStorage.getItem('hyper_driver_vehicle_type');
       return (saved as any) || 'Car';
     } catch (e) {
       return 'Car';
@@ -3487,7 +4068,7 @@ export default function App() {
   const [isVehicleSettingsOpen, setIsVehicleSettingsOpen] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('uber_vehicle_type', vehicleType);
+    localStorage.setItem('hyper_driver_vehicle_type', vehicleType);
     if (vehicleType === 'Bike' || vehicleType === 'Scooter') {
       setSelectedServices(prev => prev.filter(s => s !== 'ride'));
     }
@@ -3533,7 +4114,7 @@ export default function App() {
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
   const [earnings, setEarnings] = useState(() => {
     try {
-      const saved = localStorage.getItem('uber_earnings');
+      const saved = localStorage.getItem('hyper_driver_earnings');
       return saved ? parseFloat(saved) : 0.00;
     } catch (e) {
       return 0.00;
@@ -3541,14 +4122,14 @@ export default function App() {
   });
   const [todayEarningsTotal, setTodayEarningsTotal] = useState(() => {
     try {
-      const saved = localStorage.getItem('uber_today_earnings_total');
+      const saved = localStorage.getItem('hyper_driver_today_earnings_total');
       return saved ? parseFloat(saved) : 0.00;
     } catch (e) {
       return 0.00;
     }
   });
 
-  const playUberSound = React.useCallback((type: 'order' | 'accept' | 'message' | 'complete' | 'radar') => {
+  const playHyperSound = React.useCallback((type: 'order' | 'accept' | 'message' | 'complete' | 'radar') => {
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioContextClass) return;
@@ -3604,14 +4185,14 @@ export default function App() {
 
   // Persist today's total earnings
   useEffect(() => {
-    localStorage.setItem('uber_today_earnings_total', todayEarningsTotal.toString());
+    localStorage.setItem('hyper_driver_today_earnings_total', todayEarningsTotal.toString());
   }, [todayEarningsTotal]);
 
-  const [topBarMode, setTopBarMode] = useState<'today' | 'last_trip' | 'uber_pro'>('today');
+  const [topBarMode, setTopBarMode] = useState<'today' | 'last_trip' | 'hyper_driver_pro'>('today');
 
   const [bankBalance, setBankBalance] = useState(() => {
     try {
-      const saved = localStorage.getItem('uber_bank_balance');
+      const saved = localStorage.getItem('hyper_driver_bank_balance');
       return saved ? parseFloat(saved) : 500.00;
     } catch (e) {
       return 500.00;
@@ -3676,7 +4257,7 @@ export default function App() {
   };
   const [purchasedItems, setPurchasedItems] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem('uber_purchased_items');
+      const saved = localStorage.getItem('hyper_driver_purchased_items');
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
       return [];
@@ -3684,7 +4265,7 @@ export default function App() {
   });
   const [completedTrips, setCompletedTrips] = useState<CompletedTrip[]>(() => {
     try {
-      const saved = localStorage.getItem('uber_completed_trips');
+      const saved = localStorage.getItem('hyper_driver_completed_trips');
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
       return [];
@@ -3693,7 +4274,7 @@ export default function App() {
 
   // Enhanced Performance Detection
   const [isLowPerformance, setIsLowPerformance] = useState(() => {
-    const fromStorage = localStorage.getItem('uber_low_performance');
+    const fromStorage = localStorage.getItem('hyper_driver_low_performance');
     if (fromStorage !== null) return fromStorage === 'true';
     
     const ua = navigator.userAgent;
@@ -3712,9 +4293,9 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('uber_low_performance', isLowPerformance.toString());
+    localStorage.setItem('hyper_driver_low_performance', isLowPerformance.toString());
   }, [isLowPerformance]);
-  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(() => localStorage.getItem('uber_has_seen_onboarding') === 'true');
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(() => localStorage.getItem('hyper_driver_has_seen_onboarding') === 'true');
   const [isScanning, setIsScanning] = useState(false);
   const [isUnderMaintenance, setIsUnderMaintenance] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -3744,23 +4325,23 @@ export default function App() {
 
   // Persist theme and earnings
   useEffect(() => {
-    localStorage.setItem('uber_theme', theme);
+    localStorage.setItem('hyper_driver_theme', theme);
   }, [theme]);
 
   useEffect(() => {
-    localStorage.setItem('uber_earnings', earnings.toString());
+    localStorage.setItem('hyper_driver_earnings', earnings.toString());
   }, [earnings]);
 
   useEffect(() => {
-    localStorage.setItem('uber_bank_balance', bankBalance.toString());
+    localStorage.setItem('hyper_driver_bank_balance', bankBalance.toString());
   }, [bankBalance]);
 
   useEffect(() => {
-    localStorage.setItem('uber_purchased_items', JSON.stringify(purchasedItems));
+    localStorage.setItem('hyper_driver_purchased_items', JSON.stringify(purchasedItems));
   }, [purchasedItems]);
 
   useEffect(() => {
-    localStorage.setItem('uber_completed_trips', JSON.stringify(completedTrips));
+    localStorage.setItem('hyper_driver_completed_trips', JSON.stringify(completedTrips));
   }, [completedTrips]);
   
   // Chat & Notifications
@@ -3880,7 +4461,7 @@ export default function App() {
         ];
         const randomEvent = events[Math.floor(Math.random() * events.length)];
         setRoadEvent(randomEvent);
-        playUberSound('message');
+        playHyperSound('message');
         
         if (randomEvent.delay) {
           setNavSimulation(prev => ({
@@ -3927,27 +4508,55 @@ export default function App() {
 
     const interval = setInterval(() => {
       if (radarOrders.length >= 3 || isOnBreak) return;
-      if (Math.random() > 0.7) {
-        const newRadar = generateSmartOrder();
-        newRadar.isMatching = true; // Mark as matching trip
+      if (Math.random() > 0.6) {
+        // Generate 1 or 2 distinct radar orders at once to give multiple matching opportunities
+        const countToGen = Math.random() > 0.6 ? 2 : 1;
+        const generated: Order[] = [];
         
-        setRadarOrders(prev => {
-          if (prev.length >= 3) return prev;
-          
-          // Remove after 20 seconds if not taken
-          setTimeout(() => {
-            setRadarOrders(curr => curr.filter(o => o.id !== newRadar.id));
-          }, 20000);
-          
-          return [...prev, newRadar];
-        });
-
-        playUberSound('radar');
+        for (let i = 0; i < countToGen; i++) {
+          if (radarOrders.length + generated.length < 3) {
+            const newOrder = generateSmartOrder();
+            if (newOrder) {
+              newOrder.isMatching = true;
+              
+              // Ensure different pricing, names and distance factors to make them unique
+              const priceModifier = 0.8 + Math.random() * 0.5; // vary price -20% to +30%
+              newOrder.estimatedPay = Number((newOrder.estimatedPay * priceModifier).toFixed(2));
+              newOrder.estimatedDistance = Number((newOrder.estimatedDistance * (0.85 + Math.random() * 0.3)).toFixed(1));
+              
+              // Offset coordinate targets slightly for the radar rendering points on map
+              newOrder.restaurantLocation = {
+                latitude: newOrder.restaurantLocation.latitude + (Math.random() - 0.5) * 0.004,
+                longitude: newOrder.restaurantLocation.longitude + (Math.random() - 0.5) * 0.004
+              };
+              
+              generated.push(newOrder);
+            }
+          }
+        }
+        
+        if (generated.length > 0) {
+          setRadarOrders(prev => {
+            const finalOrders = [...prev];
+            generated.forEach(item => {
+              if (finalOrders.length < 4) {
+                finalOrders.push(item);
+                
+                // Clear order after 25 seconds if not picked
+                setTimeout(() => {
+                  setRadarOrders(curr => curr.filter(o => o.id !== item.id));
+                }, 25000);
+              }
+            });
+            return finalOrders;
+          });
+          playHyperSound('radar');
+        }
       }
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [user.isOnline, isNavigating, activeOrders.length, pendingOrder, isOnBreak, radarOrders.length, radarDisplayMode, playUberSound]);
+  }, [user.isOnline, isNavigating, activeOrders.length, pendingOrder, isOnBreak, radarOrders.length, radarDisplayMode, playHyperSound]);
 
   const currentStop = currentStops[0];
   const currentOrder = useMemo(() => {
@@ -3956,7 +4565,7 @@ export default function App() {
   }, [currentStop, activeOrders]);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
-      const saved = localStorage.getItem('uber_chat_messages');
+      const saved = localStorage.getItem('hyper_driver_chat_messages');
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
       return [];
@@ -3964,7 +4573,7 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('uber_chat_messages', JSON.stringify(messages));
+    localStorage.setItem('hyper_driver_chat_messages', JSON.stringify(messages));
   }, [messages]);
   const [activeChatOrderId, setActiveChatOrderId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState("");
@@ -3994,7 +4603,7 @@ export default function App() {
   const [viewingOrderDetailsId, setViewingOrderDetailsId] = useState<string | null>(null);
   const [earningsGoal, setEarningsGoal] = useState(() => {
     try {
-      const saved = localStorage.getItem('uber_earnings_goal');
+      const saved = localStorage.getItem('hyper_driver_earnings_goal');
       return saved ? parseFloat(saved) : 50.00;
     } catch (e) {
       return 50.00;
@@ -4002,7 +4611,7 @@ export default function App() {
   });
   
   useEffect(() => {
-    localStorage.setItem('uber_earnings_goal', earningsGoal.toString());
+    localStorage.setItem('hyper_driver_earnings_goal', earningsGoal.toString());
   }, [earningsGoal]);
   const [hotspots, setHotspots] = useState<{ latitude: number, longitude: number, intensity: number, size: number }[]>([]);
   
@@ -4040,7 +4649,7 @@ export default function App() {
 
   const [jobTypePreference, setJobTypePreference] = useState<'normal' | 'matching' | 'both'>(() => {
     try {
-      const saved = localStorage.getItem('uber_job_preference');
+      const saved = localStorage.getItem('hyper_driver_job_preference');
       return (saved as any) || 'both';
     } catch (e) {
       return 'both';
@@ -4070,7 +4679,7 @@ export default function App() {
       
       if (newSurge > 1.2 && user.isOnline) {
         sendNotification("Surge Alert!", `Demand is spiking! Earnings are now ${newSurge.toFixed(1)}x higher in your area.`);
-        playUberSound('order');
+        playHyperSound('order');
       }
     };
 
@@ -4116,7 +4725,7 @@ export default function App() {
   }, [busynessMode]);
 
   useEffect(() => {
-    localStorage.setItem('uber_job_preference', jobTypePreference);
+    localStorage.setItem('hyper_driver_job_preference', jobTypePreference);
   }, [jobTypePreference]);
 
   const [selectedRestaurant, setSelectedRestaurant] = useState<typeof MOCK_RESTAURANTS[0] | null>(null);
@@ -4148,7 +4757,7 @@ export default function App() {
   const [lastTrip, setLastTrip] = useState<{ amount: number, time: string, type: string } | null>({
     amount: 7.75,
     time: getArrivalTime(-45),
-    type: "Uber Eats"
+    type: "Hyper Eats"
   });
 
   // CarPlay Remote Sync
@@ -4245,7 +4854,7 @@ export default function App() {
   
   const [selectedServices, setSelectedServices] = useState<JobType[]>(() => {
     try {
-      const saved = localStorage.getItem('uber_selected_services');
+      const saved = localStorage.getItem('hyper_driver_selected_services');
       return saved ? JSON.parse(saved) : ['delivery', 'ride'];
     } catch (e) {
       return ['delivery', 'ride'];
@@ -4253,7 +4862,7 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('uber_selected_services', JSON.stringify(selectedServices));
+    localStorage.setItem('hyper_driver_selected_services', JSON.stringify(selectedServices));
   }, [selectedServices]);
   const currentCity = useMemo(() => {
     if (!location) return "London";
@@ -4409,6 +5018,7 @@ export default function App() {
           if (userDoc.exists()) {
             const userData = { ...userDoc.data(), uid: fUser.uid } as UserProfile;
             setUser(userData);
+            setIsNewUserFormOpen(false);
           } else {
             // New user from Google Auth, but profile not created yet
             setNewUserDetails({ 
@@ -4418,6 +5028,7 @@ export default function App() {
               phone: '',
               address: ''
             });
+            setIsNewUserFormOpen(true);
           }
           setIsProfileLoaded(true);
         }).catch(error => {
@@ -4425,6 +5036,10 @@ export default function App() {
         });
       } else {
         setIsProfileLoaded(false);
+        const hasSeenOnboard = localStorage.getItem('hyper_driver_has_seen_onboarding') === 'true';
+        if (!hasSeenOnboard) {
+          setIsNewUserFormOpen(true);
+        }
       }
     });
     
@@ -4472,7 +5087,7 @@ export default function App() {
   }, [firebaseUser]);
   useEffect(() => {
     const checkMidnightTransfer = () => {
-      const lastTransfer = localStorage.getItem('uber_last_transfer');
+      const lastTransfer = localStorage.getItem('hyper_driver_last_transfer');
       const today = new Date().toISOString().split('T')[0];
       
       if (lastTransfer !== today) {
@@ -4481,7 +5096,7 @@ export default function App() {
           setEarnings(0);
           sendNotification("Daily Transfer", "Your earnings from yesterday have been moved to your wallet.");
         }
-        localStorage.setItem('uber_last_transfer', today);
+        localStorage.setItem('hyper_driver_last_transfer', today);
       }
     };
     
@@ -4497,10 +5112,10 @@ export default function App() {
         const rand = Math.random();
         if (rand < 0.1) {
           sendNotification("New Quest Available", "Complete 5 trips to earn an extra £10!");
-          playUberSound('order');
+          playHyperSound('order');
         } else if (rand < 0.2) {
           sendNotification("Surge Alert", "High demand in your area! Earnings are 1.5x.");
-          playUberSound('order');
+          playHyperSound('order');
         }
       }, 120000); // Every 2 mins check for random events
       return () => clearInterval(interval);
@@ -4673,7 +5288,7 @@ export default function App() {
                       timestamp: Date.now()
                     }]);
                     sendNotification("Message from Customer", text);
-                    playUberSound('message');
+                    playHyperSound('message');
                   }, 1000);
                 }
               }
@@ -4778,9 +5393,9 @@ export default function App() {
     }
 
     // Play sound based on type if needed
-    if (type === 'success') playUberSound('complete');
-    if (type === 'alert') playUberSound('order');
-    if (type === 'message') playUberSound('message');
+    if (type === 'success') playHyperSound('complete');
+    if (type === 'alert') playHyperSound('order');
+    if (type === 'message') playHyperSound('message');
 
     addToast(title, body, type);
     setNotifications(prev => [body, ...prev.slice(0, 49)]);
@@ -4920,7 +5535,7 @@ export default function App() {
     if (availableServices.length === 0) return null;
 
       const getJobType = () => {
-        // Absolute priority for UberX (ride) if user has a Car and ride service is enabled
+        // Absolute priority for HyperX (ride) if user has a Car and ride service is enabled
         if (vehicleType === 'Car' && availableServices.includes('ride')) {
           const isRideSelected = selectedServices.length === 0 || selectedServices.includes('ride');
           if (isRideSelected) return 'ride';
@@ -4931,7 +5546,7 @@ export default function App() {
     // 1. Generate 5 candidate orders
     const candidates = Array.from({ length: 5 }).map(() => {
       const type = getJobType();
-      const variant = type === 'ride' ? (Math.random() > 0.8 ? 'Premier' : Math.random() > 0.6 ? 'UberXL' : 'UberX') : 'Uber Eats';
+      const variant = type === 'ride' ? (Math.random() > 0.8 ? 'Premier' : Math.random() > 0.6 ? 'HyperXL' : 'HyperX') : 'Hyper Eats';
       const customerName = MOCK_CUSTOMERS[Math.floor(Math.random() * MOCK_CUSTOMERS.length)];
       
       const restOffset = MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)].offset;
@@ -4953,16 +5568,17 @@ export default function App() {
         }
       });
 
-      const baseFee = variant === 'Premier' ? 5.00 : variant === 'UberXL' ? 3.50 : type === 'ride' ? 2.50 : 1.50;
-      const mileRate = variant === 'Premier' ? 2.80 : variant === 'UberXL' ? 2.10 : type === 'ride' ? 1.45 : 1.10;
+      const baseFee = variant === 'Premier' ? 5.00 : variant === 'HyperXL' ? 3.50 : type === 'ride' ? 2.50 : 1.50;
+      const mileRate = variant === 'Premier' ? 2.80 : variant === 'HyperXL' ? 2.10 : type === 'ride' ? 1.45 : 1.10;
       const minuteRate = variant === 'Premier' ? 0.35 : 0.15;
       const estTime = Math.floor((tripDist + distToPickup) * 4 + 3);
       
       const calculatedPay = baseFee + ((tripDist + distToPickup) * mileRate) + (estTime * minuteRate);
-      const minPay = variant === 'Premier' ? 12.00 : variant === 'UberXL' ? 8.00 : type === 'ride' ? 5.00 : 4.00;
+      const minPay = variant === 'Premier' ? 12.00 : variant === 'HyperXL' ? 8.00 : type === 'ride' ? 5.00 : 4.00;
       const finalBasePay = Math.max(calculatedPay, minPay);
       
-      const isStacked = type === 'delivery' && Math.random() < 0.3; // 30% chance for double orders
+      // Force single order type if already has 2 or more active orders (makes it exactly 3 trips max)
+      const isStacked = type === 'delivery' && activeOrders.length < 2 && Math.random() < 0.3; // 30% chance for double orders
       let batchCount = isStacked ? 2 : 1;
       
       const pay = (finalBasePay + (Math.random() * 2)) * activeSurge * (isStacked ? 1.7 : 1);
@@ -4993,7 +5609,7 @@ export default function App() {
         isMatching: activeOrders.length > 0 || Math.random() < 0.25,
         surge: activeSurge > 1.0 ? activeSurge : undefined,
         riderRating: type === 'ride' ? Number((4.6 + Math.random() * 0.4).toFixed(2)) : undefined,
-        isUberX: type === 'ride',
+        isHyperX: type === 'ride',
         isStacked,
         batchCount,
         verificationMethod,
@@ -5039,7 +5655,8 @@ export default function App() {
       const waitTime = baseWait + Math.random() * randomRange;
 
       timer = setTimeout(() => {
-        const canReceive = user.isOnline && !isOnBreak && activeOrders.length < 3 && !pendingOrder && location;
+        // Block normal trips if Trip Radar has active matches (radarOrders.length > 0)
+        const canReceive = user.isOnline && !isOnBreak && activeOrders.length < 3 && !pendingOrder && location && radarOrders.length === 0;
         
         if (!canReceive) {
           if (user.isOnline && !isOnBreak) scheduleNextOrder();
@@ -5094,8 +5711,8 @@ export default function App() {
             setOrderExpiryTimer(18); // Give 18 seconds to decide
             const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
             const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
-            sendNotification(prefix + (shouldPickScheduled ? "Scheduled" : "High Priority") + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "UberX"}`);
-            playUberSound('order');
+            sendNotification(prefix + (shouldPickScheduled ? "Scheduled" : "High Priority") + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "HyperX"}`);
+            playHyperSound('order');
           } else {
             scheduleNextOrder();
           }
@@ -5115,8 +5732,8 @@ export default function App() {
     // Check total order limit - stacked counts as 2
     const orderCountToAdd = (pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1)) ? 2 : 1;
     
-    if (activeOrders.length + orderCountToAdd > 4) { // Increased limit slightly for batches
-      sendNotification("Limit Reached", "You can only handle up to 4 active orders at a time.");
+    if (activeOrders.length + orderCountToAdd > 3) {
+      sendNotification("Limit Reached", "You can only handle up to 3 active orders / trips at a time.");
       setPendingOrder(null);
       return;
     }
@@ -5178,7 +5795,7 @@ export default function App() {
       }
 
       setMapOffset({ x: 0, y: 0 }); // Snap map back to driver on acceptance
-      playUberSound('accept');
+      playHyperSound('accept');
 
       // Simulated Customer Greeting after 5 seconds
       const orderIds = orderCountToAdd === 2 
@@ -5203,7 +5820,7 @@ export default function App() {
             timestamp: Date.now()
           }]);
           sendNotification("New Message", randomGreeting);
-          playUberSound('message');
+          playHyperSound('message');
         });
       }, 5000);
     };
@@ -5213,12 +5830,14 @@ export default function App() {
       setTimeout(() => {
         const isSuccess = Math.random() > 0.3; // 70% chance to match
         if (isSuccess) {
+          setRadarOrders(prev => prev.filter(r => r.id !== pendingOrder.id));
           processOrder();
           setIsMatchingLoading(false);
         } else {
+          setRadarOrders(prev => prev.filter(r => r.id !== pendingOrder.id));
           setIsMatchingLoading(false);
           setIsMatchFailed(true);
-          playUberSound('message');
+          playHyperSound('message');
           setTimeout(() => {
             setIsMatchFailed(false);
             setPendingOrder(null);
@@ -5247,7 +5866,7 @@ export default function App() {
       startShift();
     } else {
       setIsVerifyingToOnline(true);
-      playUberSound('order');
+      playHyperSound('order');
       setCurrentScreen('face_verification');
     }
   };
@@ -5260,7 +5879,7 @@ export default function App() {
       earnings: 0,
       startTime: Date.now()
     });
-    playUberSound('accept');
+    playHyperSound('accept');
   };
 
   const endShift = () => {
@@ -5270,9 +5889,12 @@ export default function App() {
   };
 
   const handleDeclineOrder = () => {
+    if (pendingOrder) {
+      setRadarOrders(prev => prev.filter(r => r.id !== pendingOrder.id));
+    }
     setPendingOrder(null);
     setOrderExpiryTimer(10);
-    playUberSound('accept');
+    playHyperSound('accept');
   };
 
   const handleCancelOrder = (orderId: string, reason: string) => {
@@ -5291,7 +5913,7 @@ export default function App() {
     setCancellingOrderId(null);
     setSelectedCancelReason(null);
     sendNotification("Trip Cancelled", `Trip cancelled: ${reason}`);
-    playUberSound('accept');
+    playHyperSound('accept');
   };
 
   const handleSendMessage = (text: string) => {
@@ -5341,7 +5963,7 @@ export default function App() {
 
       setMessages(prev => [...prev, customerMsg]);
       setIsCustomerTyping(false);
-      playUberSound('message');
+      playHyperSound('message');
       
       // Stop timer on reply
       setCustomerTimers(prev => {
@@ -5359,7 +5981,7 @@ export default function App() {
     try {
       const { GoogleGenAI } = await import("@google/genai");
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
-      const prompt = "Analyze this image. Is it a receipt from Uber Eats? Answer strictly 'true' or 'false'. We are verifying it for a driver app.";
+      const prompt = "Analyze this image. Is it a receipt from Hyper Eats? Answer strictly 'true' or 'false'. We are verifying it for a driver app.";
       const imagePart = {
         inlineData: {
           mimeType: "image/jpeg",
@@ -5376,9 +5998,9 @@ export default function App() {
         setActiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'picked_up', receiptVerified: true } : o));
         setIsScanningReceipt(null);
         sendNotification("Receipt Verified", "Order confirmed. Heading to customer.");
-        playUberSound('accept');
+        playHyperSound('accept');
       } else {
-        sendNotification("Invalid Receipt", "The scanned image does not appear to be an Uber Eats receipt. Please try again or find a clearer view.");
+        sendNotification("Invalid Receipt", "The scanned image does not appear to be an Hyper Eats receipt. Please try again or find a clearer view.");
       }
     } catch (error) {
       console.error("Receipt verification failed:", error);
@@ -5421,7 +6043,7 @@ export default function App() {
           if (activeChatOrderId !== randomOrder.id) {
             sendNotification(`Message from ${randomOrder.customerName}`, randomProd);
           }
-          playUberSound('message');
+          playHyperSound('message');
           setIsCustomerTyping(false);
         }, 3000);
       }
@@ -5460,7 +6082,7 @@ export default function App() {
 
         const msg = order.type === 'ride' ? `Rider ${order.customerName} picked up` : `Order from ${order.restaurantName} picked up`;
         sendNotification(order.type === 'ride' ? "Trip Started" : "Order Picked Up", msg);
-        playUberSound('accept');
+        playHyperSound('accept');
       }
     } else if (order.status === 'scanning_receipt') {
         setIsScanningReceipt(orderId);
@@ -5501,7 +6123,7 @@ export default function App() {
       {
         id: order.id,
         type: order.type,
-        restaurantName: order.restaurantName || "UberX Trip",
+        restaurantName: order.restaurantName || "HyperX Trip",
         customerName: order.customerName,
         earnings: earnedPay,
         distance: order.estimatedDistance,
@@ -5559,7 +6181,7 @@ export default function App() {
         const isNowCompleted = newProgress >= m.goal;
         if (isNowCompleted) {
           sendNotification("Mission Completed!", `You earned £${m.cashReward} and ${m.pointsReward} pts: ${m.title}`);
-          playUberSound('accept');
+          playHyperSound('accept');
         }
 
         return {
@@ -5624,10 +6246,10 @@ export default function App() {
     setLastTrip({
       amount: order.estimatedPay,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type: order.type === 'ride' ? "UberX" : "Uber Eats"
+      type: order.type === 'ride' ? "HyperX" : "Hyper Eats"
     });
     setShowLastTripCard(true);
-    playUberSound('accept');
+    playHyperSound('accept');
   };
 
   const distanceToTarget = (order: Order) => {
@@ -5717,7 +6339,7 @@ export default function App() {
         setUser(u => ({ ...u, faceVerified: true }));
         setIsVerifying(false);
         setHasSeenOnboarding(true);
-        localStorage.setItem('uber_has_seen_onboarding', 'true');
+        localStorage.setItem('hyper_driver_has_seen_onboarding', 'true');
         setTimeout(() => {
           setCurrentScreen('home');
           if (isVerifyingToOnline) {
@@ -5897,7 +6519,7 @@ export default function App() {
                 setUser={setUser}
                 theme={theme}
                 onComplete={() => {
-                  localStorage.setItem('uber_has_seen_onboarding', 'true');
+                  localStorage.setItem('hyper_driver_has_seen_onboarding', 'true');
                   setCurrentScreen('documents');
                 }}
               />
@@ -6331,14 +6953,13 @@ export default function App() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none snap-x">
+                        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x">
                           {radarOrders.map(order => (
-                            <motion.button 
+                            <motion.div 
                               key={`radar-list-item-${order.id}`}
                               initial={{ scale: 0.9, opacity: 0 }}
                               animate={{ scale: 1, opacity: 1 }}
-                              onClick={() => setPendingOrder(order)}
-                              className="min-w-[320px] snap-center bg-white/5 hover:bg-white/10 rounded-2xl p-5 border border-white/5 transition-all text-left group"
+                              className="min-w-[325px] max-w-[325px] snap-center bg-white/5 hover:bg-white/10 rounded-[24px] p-5 border border-white/5 transition-all text-left relative"
                             >
                               <div className="flex justify-between items-start mb-6">
                                 <div className="flex items-center gap-3">
@@ -6350,21 +6971,36 @@ export default function App() {
                                     <p className="text-[10px] font-black opacity-30 uppercase tracking-widest leading-none">{order.estimatedDistance.toFixed(1)} mi • {order.estimatedTime} min</p>
                                   </div>
                                 </div>
-                                <div className="px-3 py-1 bg-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest group-hover:scale-110 transition-transform">
-                                  MATCH
+                                <div className="flex gap-1.5 shrink-0">
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setRadarOrders(prev => prev.filter(r => r.id !== order.id));
+                                    }}
+                                    className="px-2.5 py-1.5 bg-red-600/20 hover:bg-red-600 border border-red-500/30 hover:border-red-500 text-red-400 hover:text-white rounded-full text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer active:scale-90"
+                                    title="Decline"
+                                  >
+                                    DECLINE
+                                  </button>
+                                  <button 
+                                    onClick={() => setPendingOrder(order)}
+                                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-lg shadow-blue-500/20 active:scale-95 hover:scale-105"
+                                  >
+                                    MATCH
+                                  </button>
                                 </div>
                               </div>
                               <div className="flex flex-col gap-2">
                                 <div className="flex items-center gap-2">
                                   <MapPin size={12} className="text-blue-500" />
-                                  <span className="text-sm font-bold truncate opacity-80">{order.type === 'ride' ? 'Pickup' : order.restaurantName}</span>
+                                  <span className="text-xs font-bold truncate opacity-80">{order.type === 'ride' ? 'Pickup Location' : order.restaurantName}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <Navigation size={12} className="text-gray-500" />
-                                  <span className="text-sm font-bold truncate opacity-80">{order.customerName}</span>
+                                  <Navigation size={12} className="text-gray-400" />
+                                  <span className="text-xs font-medium truncate opacity-60">{order.customerName}</span>
                                 </div>
                               </div>
-                            </motion.button>
+                            </motion.div>
                           ))}
                         </div>
                       )}
@@ -6393,7 +7029,7 @@ export default function App() {
                   transform: `translate(${mapOffset.x}px, ${mapOffset.y}px)`,
                   willChange: 'transform'
                 }}>
-                  {/* Uber-like Road Base */}
+                  {/* Hyper Driver-like Road Base */}
                   <div className="absolute inset-[-1500px] border-none" style={{ backgroundColor: theme === 'dark' || isNightMode ? '#181a1f' : '#f0ece1' }} />
                   
                   {/* Fine Road Grid */}
@@ -7292,7 +7928,7 @@ export default function App() {
                       onClick={() => {
                         setTopBarMode(prev => {
                           if (prev === 'today') return 'last_trip';
-                          if (prev === 'last_trip') return 'uber_pro';
+                          if (prev === 'last_trip') return 'hyper_driver_pro';
                           return 'today';
                         });
                       }}
@@ -7300,21 +7936,21 @@ export default function App() {
                       <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none">
                         {topBarMode === 'today' && "Today's Earnings"}
                         {topBarMode === 'last_trip' && "Last Trip Payout"}
-                        {topBarMode === 'uber_pro' && `Uber Pro - ${user.tier || 'Diamond'}`}
+                        {topBarMode === 'hyper_driver_pro' && `Hyper Pro - ${user.tier || 'Diamond'}`}
                       </span>
 
                       <div className="flex items-center gap-1.5 justify-center leading-none">
                         <span className="font-display text-lg font-black tracking-tight select-none">
                           {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
                           {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
-                          {topBarMode === 'uber_pro' && `${user.points || 350} XP`}
+                          {topBarMode === 'hyper_driver_pro' && `${user.points || 350} XP`}
                         </span>
                       </div>
 
                       <div className="flex gap-1 mt-1 justify-center select-none">
                         <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? 'bg-blue-500 w-2.5' : 'bg-white/30'}`} />
                         <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? 'bg-blue-500 w-2.5' : 'bg-white/30'}`} />
-                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'uber_pro' ? 'bg-blue-500 w-2.5' : 'bg-white/30'}`} />
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? 'bg-blue-500 w-2.5' : 'bg-white/30'}`} />
                       </div>
                     </motion.div>
                   )}
@@ -8037,7 +8673,7 @@ export default function App() {
                         key={pref.id}
                         onClick={() => {
                           setJobTypePreference(pref.id as any);
-                          localStorage.setItem('uber_job_preference', pref.id);
+                          localStorage.setItem('hyper_driver_job_preference', pref.id);
                           sendNotification("Preferences Updated", `Now receiving ${pref.label}`);
                         }}
                         className={`w-full p-4 rounded-2xl text-left transition-all border-2 ${
@@ -8064,11 +8700,11 @@ export default function App() {
               </div>
             </motion.div>
           )}
-          {currentScreen === 'uber_pro' && (
+          {currentScreen === 'hyper_driver_pro' && (
             <motion.div key="pro" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform"><X size={24} /></button>
-                <h1 className="text-3xl font-black">Uber Pro</h1>
+                <h1 className="text-3xl font-black">Hyper Pro</h1>
               </div>
               <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-[40px] p-8 text-white mb-8 relative overflow-hidden shadow-2xl shadow-blue-600/30">
                 <div className="relative z-10">
@@ -8395,8 +9031,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {currentScreen === 'uber_services' && (
-            <motion.div key="uber_services" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
+          {currentScreen === 'hyper_driver_services' && (
+            <motion.div key="hyper_driver_services" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen('home')} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><X size={24} /></button>
                 <h1 className="text-3xl font-black">Work Hub</h1>
@@ -8409,7 +9045,7 @@ export default function App() {
                         <Car size={32} />
                       </div>
                       <div>
-                        <h3 className="text-xl font-black">UberX</h3>
+                        <h3 className="text-xl font-black">HyperX</h3>
                         <p className="text-xs font-bold opacity-60 italic">Accept passenger requests</p>
                       </div>
                     </div>
@@ -8426,7 +9062,7 @@ export default function App() {
                   </div>
                   <div className="flex gap-2">
                     <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-black uppercase tracking-widest">Insurance Verified</span>
-                    <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-black uppercase tracking-widest">UberX Eligible</span>
+                    <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-black uppercase tracking-widest">HyperX Eligible</span>
                   </div>
                 </div>
 
@@ -8437,7 +9073,7 @@ export default function App() {
                         <ShoppingBag size={32} />
                       </div>
                       <div>
-                        <h3 className="text-xl font-black">Uber Eats</h3>
+                        <h3 className="text-xl font-black">Hyper Eats</h3>
                         <p className="text-xs font-bold opacity-60 italic">Accept food delivery requests</p>
                       </div>
                     </div>
@@ -8552,6 +9188,7 @@ export default function App() {
             <VehicleDetailsScreen 
               user={user} 
               setUser={setUser} 
+              setVehicleType={setVehicleType}
               onClose={() => setCurrentScreen('account')} 
               theme={theme} 
             />
@@ -8647,7 +9284,7 @@ export default function App() {
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">System Update</p>
                         </div>
                         <p className="font-black text-lg leading-tight mb-2">{note}</p>
-                        <p className="text-xs text-gray-400 font-bold">Just now • Uber Eats Driver</p>
+                        <p className="text-xs text-gray-400 font-bold">Just now • Hyper Eats Driver</p>
                       </div>
                     </motion.div>
                   ))
@@ -8712,7 +9349,7 @@ export default function App() {
                 <div className="grid grid-cols-1 gap-4">
                   {[
                     { id: 'coffee', name: 'Premium Coffee', price: 3.50, icon: <Coffee /> },
-                    { id: 'jacket', name: 'Uber Eats Jacket', price: 45.00, icon: <Zap /> },
+                    { id: 'jacket', name: 'Hyper Eats Jacket', price: 45.00, icon: <Zap /> },
                     { id: 'ebike', name: 'Electric Delivery Bike', price: 1200.00, icon: <Zap /> },
                     { id: 'iphone', name: 'iPhone 15 Pro', price: 999.00, icon: <Smartphone /> },
                     { id: 'tesla', name: 'Tesla Model 3', price: 35000.00, icon: <Zap /> },
@@ -9170,7 +9807,7 @@ export default function App() {
                 <h2 className="text-2xl font-black mb-2 tracking-tighter uppercase">Opportunities</h2>
                 <p className="text-gray-400 font-bold mb-8">Manage your working preferences and discover new ways to earn.</p>
                 <div className="w-full grid grid-cols-1 gap-4">
-                  <button onClick={() => setCurrentScreen('uber_services')} className="flex items-center justify-between p-6 bg-gray-50 rounded-3xl border border-gray-100 shadow-sm active:scale-95 transition-transform">
+                  <button onClick={() => setCurrentScreen('hyper_driver_services')} className="flex items-center justify-between p-6 bg-gray-50 rounded-3xl border border-gray-100 shadow-sm active:scale-95 transition-transform">
                     <div className="flex items-center gap-4">
                       <div className="p-3 bg-blue-600 text-white rounded-xl"><Zap size={20} /></div>
                       <div className="text-left">
@@ -9225,14 +9862,14 @@ export default function App() {
               setBankBalance={setBankBalance}
               setEarnings={setEarnings}
               sendNotification={sendNotification}
-              playUberSound={playUberSound}
+              playHyperSound={playHyperSound}
               completedTrips={completedTrips}
               theme={theme}
             />
           )}
 
           {/* Safety Fallback for unhandled screens */}
-          {!['onboarding', 'documents', 'face_verification', 'home', 'earnings', 'inbox', 'account', 'chat', 'uber_pro', 'wallet', 'opportunities', 'safety', 'earnings_detail', 'banking', 'scheduled_orders', 'rewards', 'carplay_dashboard', 'trip_history', 'work_hub', 'ratings', 'planner', 'uber_services', 'vehicle_details', 'payment_methods', 'trip_preferences', 'personal_details', 'insurance'].includes(currentScreen) && (
+          {!['onboarding', 'documents', 'face_verification', 'home', 'earnings', 'inbox', 'account', 'chat', 'hyper_driver_pro', 'wallet', 'opportunities', 'safety', 'earnings_detail', 'banking', 'scheduled_orders', 'rewards', 'carplay_dashboard', 'trip_history', 'work_hub', 'ratings', 'planner', 'hyper_driver_services', 'vehicle_details', 'payment_methods', 'trip_preferences', 'personal_details', 'insurance'].includes(currentScreen) && (
             <motion.div 
               key="fallback" 
               initial={{ opacity: 0 }} 
@@ -9350,7 +9987,7 @@ export default function App() {
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${pendingOrder.type === 'ride' ? 'bg-white text-black' : pendingOrder.isMatching ? 'bg-orange-500 text-white' : 'bg-blue-600 text-white shadow-[0_5px_15px_rgba(37,99,235,0.3)]'}`}>
-                        {pendingOrder.type === 'ride' ? 'UberX' : pendingOrder.isStacked ? 'Stacked • Max+1' : pendingOrder.isMatching ? 'Matching Trip' : 'New Trip'}
+                        {pendingOrder.type === 'ride' ? 'HyperX' : pendingOrder.isStacked ? 'Stacked • Max+1' : pendingOrder.isMatching ? 'Matching Trip' : 'New Trip'}
                       </span>
                       {pendingOrder.surge && (
                         <span className="px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-blue-500 text-white flex items-center gap-1">
@@ -9646,7 +10283,7 @@ export default function App() {
                     <CheckCircle2 size={24} />
                     <div>
                       <h4 className="font-extrabold text-sm text-emerald-300">Fast Bank Cash Out Complete</h4>
-                      <p className="text-xs text-emerald-400/80 leading-snug">The funds have successfully left our Uber payout vaults and are fully settled inside your linked {activePayout.bankName} account.</p>
+                      <p className="text-xs text-emerald-400/80 leading-snug">The funds have successfully left our Hyper Driver payout vaults and are fully settled inside your linked {activePayout.bankName} account.</p>
                     </div>
                   </div>
 
@@ -9672,7 +10309,7 @@ app.post('/api/cashout', async (req, res) => {
       currency: 'gbp',
       destination: bankAccountId, // External Account Target
       method: 'instant', // uk.co.fasterpayments instantly
-      statement_descriptor: 'UBER PAYOUT',
+      statement_descriptor: 'HYPER DRIVER PAYOUT',
     }, {
       stripeAccount: driverId, // Connected Account ID
     });
@@ -9826,7 +10463,7 @@ const PolicyDocumentModal = ({
               </p>
               <div className="p-4 border-l-4 border-blue-600 bg-blue-50 text-blue-900">
                 <p className="font-bold mb-1">Exclusions</p>
-                <p className="text-xs">Coverage does not apply for off-platform commercial activities not authorized via the Uber interface.</p>
+                <p className="text-xs">Coverage does not apply for off-platform commercial activities not authorized via the Hyper Driver interface.</p>
               </div>
             </section>
 
@@ -10181,7 +10818,7 @@ export const InsuranceRenewalChat = ({
           <h2 className="font-black text-lg truncate leading-tight">Sarah (Compliance)</h2>
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <p className="text-[9px] text-gray-400 font-black tracking-widest uppercase truncate">Uber Support • Compliance</p>
+            <p className="text-[9px] text-gray-400 font-black tracking-widest uppercase truncate">Hyper Driver Support • Compliance</p>
           </div>
         </div>
         <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg">

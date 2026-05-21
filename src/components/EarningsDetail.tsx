@@ -17,7 +17,7 @@ export const EarningsDetail = ({
   setBankBalance, 
   setEarnings, 
   sendNotification, 
-  playUberSound,
+  playHyperSound,
   completedTrips,
   theme
 }: { 
@@ -29,7 +29,7 @@ export const EarningsDetail = ({
   setBankBalance: React.Dispatch<React.SetStateAction<number>>,
   setEarnings: React.Dispatch<React.SetStateAction<number>>,
   sendNotification: (title: string, body: string) => void,
-  playUberSound: (type: 'order' | 'accept' | 'complete') => void,
+  playHyperSound: (type: 'order' | 'accept' | 'complete') => void,
   completedTrips: CompletedTrip[],
   theme: 'light' | 'dark'
 }) => {
@@ -64,7 +64,7 @@ export const EarningsDetail = ({
     if (earnings <= 0 || isCashOutLoading) return;
     
     setIsCashOutLoading(true);
-    playUberSound('accept');
+    playHyperSound('accept');
     
     setTimeout(() => {
       const amount = earnings;
@@ -80,7 +80,7 @@ export const EarningsDetail = ({
       }));
       setIsCashOutLoading(false);
       sendNotification("Instant Pay Received", `£${amount.toFixed(2)} has been transferred to your bank ending in ...4421`);
-      playUberSound('complete');
+      playHyperSound('complete');
     }, 2000);
   };
 
@@ -106,7 +106,7 @@ export const EarningsDetail = ({
           <div className="text-center">
             <p className="text-gray-500 font-black text-xs uppercase tracking-[0.2em] mb-2">{new Date(selectedTrip.timestamp).toLocaleDateString()} • {new Date(selectedTrip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
             <h1 className="text-6xl font-black mb-2">£{selectedTrip.earnings.toFixed(2)}</h1>
-            <p className="text-blue-500 font-bold mb-6">{selectedTrip.type === 'ride' ? 'UberX Trip' : 'Delivery Trip'}</p>
+            <p className="text-blue-500 font-bold mb-6">{selectedTrip.type === 'ride' ? 'HyperX Trip' : 'Delivery Trip'}</p>
           </div>
 
           <div className={`rounded-[32px] overflow-hidden border-2 ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/5 shadow-2xl' : 'bg-gray-50 border-gray-100'}`}>
@@ -165,7 +165,7 @@ export const EarningsDetail = ({
                 <div className="absolute bottom-4 left-4 right-4 flex gap-2">
                    <div className={`flex-1 p-3 rounded-2xl ${theme === 'dark' ? 'bg-black/40' : 'bg-white/80'} backdrop-blur-md`}>
                       <p className="text-[8px] font-black uppercase opacity-60">Pickup</p>
-                      <p className="text-[10px] font-bold truncate">{selectedTrip.restaurantName || "UberX Pick-up"}</p>
+                      <p className="text-[10px] font-bold truncate">{selectedTrip.restaurantName || "HyperX Pick-up"}</p>
                    </div>
                    <div className={`flex-1 p-3 rounded-2xl ${theme === 'dark' ? 'bg-black/40' : 'bg-white/80'} backdrop-blur-md`}>
                       <p className="text-[8px] font-black uppercase opacity-60">Drop-off</p>
