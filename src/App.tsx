@@ -33,6 +33,9 @@ import {
   Landmark,
   Bell,
   Code,
+  Bug,
+  Activity,
+  Terminal,
   MessageSquare,
   LogOut,
   LogIn,
@@ -2387,11 +2390,12 @@ const VehicleDetailsScreen = ({
       <div className="space-y-4">
         <h2 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Registered Fleet</h2>
         <div className="grid md:grid-cols-2 gap-4">
-          {vehiclesList.map((item) => {
+          {vehiclesList.map((item, idx) => {
             const isActive = activePlate.toUpperCase() === item.plate.toUpperCase();
+            const uniqueKey = item.id || `veh-${item.plate}-${idx}`;
             return (
               <div 
-                key={item.id}
+                key={uniqueKey}
                 onClick={() => setActivePlate(item.plate)}
                 className={`p-5 rounded-[28px] border-2 cursor-pointer transition-all flex items-center justify-between relative group ${
                   isActive 
@@ -3888,6 +3892,61 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
 
 export default function App() {
   // App State
+  // --- Developer Diagnostic & Glitch System Monitor State ---
+  const [debugLogs, setDebugLogs] = React.useState<{ id: string; type: 'info' | 'warn' | 'error' | 'success'; message: string; timestamp: Date }[]>([]);
+  const [showDebugMonitor, setShowDebugMonitor] = React.useState(false);
+
+  const addDebugLog = React.useCallback((type: 'info' | 'warn' | 'error' | 'success', message: string) => {
+    setDebugLogs(prev => [
+      { id: Math.random().toString(36).substring(2, 9), type, message, timestamp: new Date() },
+      ...prev.slice(0, 99)
+    ]);
+  }, []);
+
+  React.useEffect(() => {
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    const originalError = console.error;
+
+    console.log = (...args) => {
+      originalLog(...args);
+      const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+      addDebugLog('info', msg);
+    };
+
+    console.warn = (...args) => {
+      originalWarn(...args);
+      const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+      addDebugLog('warn', msg);
+    };
+
+    console.error = (...args) => {
+      originalError(...args);
+      const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+      addDebugLog('error', msg);
+    };
+
+    const handleGlobalError = (event: ErrorEvent) => {
+      addDebugLog('error', `Global Unhandled: ${event.message} at ${event.filename}:${event.lineno}`);
+    };
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      addDebugLog('error', `Unhandled Promise Rejection: ${event.reason}`);
+    };
+
+    window.addEventListener('error', handleGlobalError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    addDebugLog('success', 'Hyper Driver Diagnostics Console Loaded - Ready to record anomalies.');
+
+    return () => {
+      console.log = originalLog;
+      console.warn = originalWarn;
+      console.error = originalError;
+      window.removeEventListener('error', handleGlobalError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, [addDebugLog]);
+
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(() => {
     try {
       const hasSeen = localStorage.getItem('hyper_driver_has_seen_onboarding') === 'true';
@@ -9477,6 +9536,7 @@ export default function App() {
                     sendNotification("Signed Out", "Session cleared.");
                   } }] : []),
                   { icon: <SlidersHorizontal />, label: "Trip Preferences", action: () => setCurrentScreen('trip_preferences') },
+                  { icon: <Bug size={18} className="text-blue-500" />, label: "System Glitch Diagnostics (Telemetry)", action: () => setShowDebugMonitor(true) },
                   { icon: <ShieldAlert />, label: "Simulate Bug Scan", action: () => {
                     setIsScanning(true);
                     setTimeout(() => {
@@ -10349,11 +10409,534 @@ app.post('/api/cashout', async (req, res) => {
         )}
       </AnimatePresence>
 
+      {/* System Diagnostic Floating Trigger Button */}
+      {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && (
+        <div className="fixed bottom-24 right-4 z-[4000] pointer-events-auto">
+          <button 
+            id="dev-diagnostic-floating-btn"
+            onClick={() => setShowDebugMonitor(true)}
+            className="w-12 h-12 bg-slate-900 border border-slate-850 text-blue-400 hover:text-blue-300 rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-transform relative group border-2 border-blue-500/30 shadow-blue-500/10"
+            title="Open Diagnostic Glitch System Monitor"
+          >
+            <Bug size={18} className="text-blue-400 animate-pulse" />
+            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-slate-900 flex items-center justify-center">
+              <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span>
+            </span>
+            <span className="absolute right-14 bg-slate-900 text-[10px] text-blue-400 border border-slate-800 font-mono tracking-widest px-3 py-1.5 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none uppercase font-black">
+              Telemetry Debug
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Glitch and System Diagnostic Monitor Overlay */}
+      <AnimatePresence>
+        {showDebugMonitor && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[5000] bg-slate-950/95 backdrop-blur-xl text-slate-100 flex flex-col font-sans overflow-hidden"
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-white/5 bg-slate-900/40 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                  <Terminal size={20} className="animate-pulse" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black tracking-wider uppercase font-mono">GLITCH & SYSTEM DIAGNOSTICS</h2>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest text-emerald-400 font-extrabold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ONLINE
+                    </span>
+                    <span className="text-[9px] font-mono uppercase tracking-widest text-[#a855f7] font-extrabold bg-[#a855f7]/10 px-2 py-0.5 rounded border border-[#a855f7]/20">
+                      SANDBOX MODE
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setShowDebugMonitor(false)}
+                className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors active:scale-95"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Diagnostic Metrics Row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-6 border-b border-white/5 bg-slate-950/80">
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 font-mono">Simulated Speed</p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-xl font-black font-mono text-blue-400">{navSimulation.active ? navSimulation.speed.toFixed(1) : '0.0'}</span>
+                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">MPH</span>
+                </div>
+              </div>
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 font-mono">Active Deliveries</p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-xl font-black font-mono text-amber-500">{activeOrders.length}</span>
+                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">/ 3 Max</span>
+                </div>
+              </div>
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 font-mono">Trip Radar Size</p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-xl font-black font-mono text-cyan-400">{radarOrders.length}</span>
+                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">Offers</span>
+                </div>
+              </div>
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 font-mono">Logged Anomalies</p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-xl font-black font-mono text-rose-500">{debugLogs.filter(l => l.type === 'error').length}</span>
+                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">Errors</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Dashboard Content split */}
+            <DebugMonitorView 
+              debugLogs={debugLogs} 
+              setDebugLogs={setDebugLogs}
+              currentScreen={currentScreen} 
+              setCurrentScreen={setCurrentScreen}
+              location={location}
+              setLocation={setLocation}
+              activeOrders={activeOrders} 
+              setActiveOrders={setActiveOrders}
+              pendingOrder={pendingOrder} 
+              setPendingOrder={setPendingOrder}
+              radarOrders={radarOrders}
+              setRadarOrders={setRadarOrders}
+              addDebugLog={addDebugLog}
+              addToast={addToast}
+              user={user}
+              setUser={setUser}
+              theme={theme}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
       )}
     </AppErrorBoundary>
   );
 }
+
+const DebugMonitorView = ({
+  debugLogs,
+  setDebugLogs,
+  currentScreen,
+  setCurrentScreen,
+  location,
+  setLocation,
+  activeOrders,
+  setActiveOrders,
+  pendingOrder,
+  setPendingOrder,
+  radarOrders,
+  setRadarOrders,
+  addDebugLog,
+  addToast,
+  user,
+  setUser,
+  theme
+}: any) => {
+  const [activeTab, setActiveTab] = React.useState<'logs' | 'telemetry' | 'glitchbox' | 'rescue'>('logs');
+  const [logFilter, setLogFilter] = React.useState<'all' | 'info' | 'warn' | 'error' | 'success'>('all');
+  const [searchQuery, setSearchQuery] = React.useState('');
+
+  const filteredLogs = debugLogs.filter((log: any) => {
+    const matchesFilter = logFilter === 'all' || log.type === logFilter;
+    const matchesSearch = log.message.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
+  const handleCopyLogs = () => {
+    const text = debugLogs.map((l: any) => `[${l.timestamp.toLocaleTimeString()}] [${l.type.toUpperCase()}] ${l.message}`).join('\n');
+    navigator.clipboard.writeText(text);
+    addToast("Copied", "Diagnostic logs exported to your clipboard successfully.", "success");
+  };
+
+  const handleMockLog = () => {
+    addDebugLog('info', `Simulating info event: System parameter checked at ${new Date().toLocaleTimeString()}`);
+    addDebugLog('warn', `Simulating a warnings alert: Low storage threshold on user avatar filesystem cache`);
+  };
+
+  const triggerSimulatedFirebaseError = () => {
+    addDebugLog('error', `Firestore Error: {"error":"Missing or insufficient permissions.","authInfo":{"userId":"${user.uid || 'unauth_sandbox'}","email":"${user.email || 'testing@user.com'}"},"operationType":"write","path":"users/${user.uid || 'unauth_sandbox'}"}`);
+    addToast("Firestore Exception Triggered", "Missing or insufficient permissions simulator rule tripped.", "alert");
+  };
+
+  const triggerGlobalRejection = () => {
+    const fakePromise = Promise.reject(new Error("Global Unhandled Database Promise Failure (Simulated)"));
+    fakePromise.catch(() => {});
+    window.dispatchEvent(new PromiseRejectionEvent('unhandledrejection', {
+      promise: fakePromise,
+      reason: "Simulation Thread lock - database synchronization failed directly."
+    }));
+  };
+
+  const triggerInjectBigOrder = () => {
+    const highTierOrder = {
+      id: 'mock_ord_' + Math.random().toString(36).substring(2, 9),
+      type: 'delivery',
+      restaurantName: "Alain Ducasse at The Dorchester (Michelin Star)",
+      restaurantLocation: { latitude: 51.5074 + 0.005, longitude: -0.1278 - 0.005 },
+      customerName: "VIP Client Royal Suite",
+      customerLocation: { latitude: 51.5074 + 0.015, longitude: -0.1278 + 0.015 },
+      items: [
+        { name: "Sauté gourmand de homard", quantity: 2, price: 190.00 },
+        { name: "Dom Pérignon Vintage Champagne", quantity: 1, price: 299.00 }
+      ],
+      estimatedEarnings: 82.50,
+      baseFare: 12.00,
+      surgeEarnings: 45.50,
+      tips: 25.00,
+      distance: 2.4,
+      duration: 18,
+      status: 'pending',
+      timestamp: new Date().toISOString(),
+      serviceType: 'delivery',
+      verificationMethod: 'pin',
+      verificationCode: '7729',
+      isHighPaying: true
+    };
+    setPendingOrder(highTierOrder);
+    addToast("Injected Ultra High Paying Order!", "An £82.50 order is flashing on your screen.", "success");
+  };
+
+  const handleClearLockedDeliveries = () => {
+    setActiveOrders([]);
+    setPendingOrder(null);
+    setRadarOrders([]);
+    addDebugLog('success', 'Clear stuck deliveries action completed.');
+    addToast("System Re-calibrated", "Clear action completed safely.", "success");
+  };
+
+  const handleRecenterLocation = () => {
+    setLocation({ latitude: 51.5074, longitude: -0.1278 });
+    addDebugLog('info', 'GPS location forced to standard London coordinates.');
+    addToast("GPS Aligned", "Location coordinate stabilized.", "success");
+  };
+
+  const handleFullStorageWipe = () => {
+    localStorage.clear();
+    addDebugLog('warn', 'Sandbox cache and mock databases cleared completely.');
+    addToast("Full Storage Cleared", "The application will reload momentarily.", "info");
+    setTimeout(() => {
+      window.location.reload();
+    }, 1200);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col md:flex-row min-h-0 bg-slate-900/10">
+      {/* Sidebar navigation */}
+      <div className="w-full md:w-56 border-b md:border-b-0 md:border-r border-white/5 bg-slate-950/40 p-3 flex flex-row md:flex-col gap-1 overflow-x-auto shrink-0 md:overflow-x-visible">
+        <button 
+          onClick={() => setActiveTab('logs')}
+          className={`flex-1 md:flex-none flex items-center justify-center md:justify-start gap-2.5 px-4 py-3 rounded-xl font-mono text-xs uppercase tracking-wider font-extrabold transition-all outline-none ${
+            activeTab === 'logs' ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          <Terminal size={14} /> LOG STREAM
+        </button>
+        <button 
+          onClick={() => setActiveTab('telemetry')}
+          className={`flex-1 md:flex-none flex items-center justify-center md:justify-start gap-2.5 px-4 py-3 rounded-xl font-mono text-xs uppercase tracking-wider font-extrabold transition-all outline-none ${
+            activeTab === 'telemetry' ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          <Activity size={14} /> TELEMETRY SPECS
+        </button>
+        <button 
+          onClick={() => setActiveTab('glitchbox')}
+          className={`flex-1 md:flex-none flex items-center justify-center md:justify-start gap-2.5 px-4 py-3 rounded-xl font-mono text-xs uppercase tracking-wider font-extrabold transition-all outline-none ${
+            activeTab === 'glitchbox' ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          <Bug size={14} /> GLITCH BOX
+        </button>
+        <button 
+          onClick={() => setActiveTab('rescue')}
+          className={`flex-1 md:flex-none flex items-center justify-center md:justify-start gap-2.5 px-4 py-3 rounded-xl font-mono text-xs uppercase tracking-wider font-extrabold transition-all outline-none ${
+            activeTab === 'rescue' ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          <SlidersHorizontal size={14} /> RESCUE TOOLS
+        </button>
+      </div>
+
+      {/* Main tab viewer panel */}
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 p-6">
+        {activeTab === 'logs' && (
+          <div className="flex-1 flex flex-col min-h-0 bg-black/40 rounded-3xl border border-white/5 p-4">
+            {/* Log filter bar */}
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between mb-4 pb-4 border-b border-white/5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {['all', 'info', 'warn', 'error', 'success'].map((f: any) => (
+                  <button
+                    key={f}
+                    onClick={() => setLogFilter(f)}
+                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest font-mono border outline-none ${
+                      logFilter === f 
+                        ? 'bg-blue-600 text-white border-blue-500' 
+                        : 'bg-white/5 text-slate-400 border-white/5 hover:bg-white/10'
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+
+              <div className="w-full sm:w-64 relative">
+                <input 
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Filter logs by keyword..."
+                  className="w-full bg-[#0a0a0c] border border-white/5 rounded-xl px-4 py-2 font-mono text-xs outline-none focus:border-blue-500 transition-colors placeholder:text-gray-650 text-white"
+                />
+              </div>
+            </div>
+
+            {/* Micro Terminal Screen */}
+            <div className="flex-1 bg-[#040406] border border-white/10 p-4 rounded-2xl overflow-y-auto font-mono text-[11px] leading-relaxed space-y-2">
+              {filteredLogs.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-gray-600 py-16 text-center">
+                  <Terminal size={24} className="mb-2 opacity-50 text-blue-400" />
+                  <p className="font-extrabold uppercase tracking-wider text-xs">No matching logs recorded</p>
+                  <p className="text-[10px] lowercase mt-1 text-gray-500">Wait for actions or tap mock log buttons to inspect events</p>
+                </div>
+              ) : (
+                filteredLogs.map((log: any) => {
+                  let colorClass = 'text-cyan-400/90';
+                  if (log.type === 'warn') colorClass = 'text-amber-400';
+                  if (log.type === 'error') colorClass = 'text-rose-500 font-bold';
+                  if (log.type === 'success') colorClass = 'text-emerald-400';
+                  
+                  return (
+                    <div key={log.id} className="border-b border-white/5 pb-1.5 flex items-start gap-2.5">
+                      <span className="text-gray-605 shrink-0 select-none text-slate-500">[{log.timestamp.toLocaleTimeString()}]</span>
+                      <span className={`uppercase font-extrabold tracking-widest text-[9px] px-1.5 py-0.5 rounded shrink-0 ${
+                        log.type === 'error' ? 'bg-rose-500/10 text-rose-500' :
+                        log.type === 'warn' ? 'bg-amber-500/10 text-amber-500' :
+                        log.type === 'success' ? 'bg-emerald-500/10 text-emerald-500' :
+                        'bg-cyan-500/10 text-cyan-500'
+                      }`}>
+                        {log.type}
+                      </span>
+                      <span className={`break-words select-all ${colorClass}`}>{log.message}</span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Log utility buttons footer */}
+            <div className="flex flex-wrap gap-2 mt-4 pt-1">
+              <button 
+                onClick={handleCopyLogs}
+                className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl font-mono text-[10px] uppercase font-extrabold tracking-wider transition-all"
+              >
+                COPY TELEMETRY TEXT
+              </button>
+              <button 
+                onClick={handleMockLog}
+                className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl font-mono text-[10px] uppercase font-extrabold tracking-wider transition-all"
+              >
+                MOCK LOG ENTRY
+              </button>
+              <button 
+                onClick={() => {
+                  setDebugLogs([]);
+                  addDebugLog('success', 'Diagnostics logger console cleared.');
+                }}
+                className="px-4 py-2.5 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-xl font-mono text-[10px] uppercase font-extrabold tracking-wider transition-all sm:ml-auto"
+              >
+                CLEAR TELEMETRY
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'telemetry' && (
+          <div className="flex-1 overflow-y-auto space-y-6">
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 font-mono">Live React States & Envs</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-black/25 rounded-2xl border border-white/5 space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <span className="text-gray-400 text-[10px] font-mono uppercase font-black tracking-wider">currentScreen</span>
+                    <span className="font-mono text-xs font-bold text-blue-400">{currentScreen}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <span className="text-gray-400 text-[10px] font-mono uppercase font-black tracking-wider">userOnline</span>
+                    <span className={`font-mono text-xs font-bold ${user.isOnline ? 'text-green-400' : 'text-rose-500'}`}>{user.isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <span className="text-gray-400 text-[10px] font-mono uppercase font-black tracking-wider">GPS Coordinates</span>
+                    <span className="font-mono text-xs text-slate-300 font-bold">
+                      {location ? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}` : 'NULL'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-black/25 rounded-2xl border border-white/5 space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <span className="text-gray-400 text-[10px] font-mono uppercase font-black tracking-wider">Pending Order</span>
+                    <span className="font-mono text-xs font-bold text-yellow-400 truncate max-w-[150px]">{pendingOrder ? `ID: ${pendingOrder.id}` : 'NULL'}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <span className="text-gray-400 text-[10px] font-mono uppercase font-black tracking-wider">Active Assignments</span>
+                    <span className="font-mono text-xs font-bold text-slate-300">{activeOrders.length} current</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <span className="text-gray-400 text-[10px] font-mono uppercase font-black tracking-wider">Trip Radar queue</span>
+                    <span className="font-mono text-xs font-bold text-slate-300">{radarOrders.length} available</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 font-mono">Linked Accounts & Environment</h3>
+              <div className="p-4 bg-black/25 rounded-2xl border border-white/5 space-y-3 font-mono text-xs">
+                <div className="flex justify-between border-b border-white/5 pb-2">
+                  <span className="text-gray-500">FIREBASE UID:</span>
+                  <span className="text-[#a855f7] font-bold text-right truncate max-w-[200px]" title={user.uid}>{user.uid || 'Anonymous / Guest'}</span>
+                </div>
+                <div className="flex justify-between border-b border-white/5 pb-2">
+                  <span className="text-gray-500">MAPPED DRIVER EMAIL:</span>
+                  <span className="text-slate-200 text-right truncate max-w-[200px]">{user.email || 'None / Not Authenticated'}</span>
+                </div>
+                <div className="flex justify-between border-b border-white/5 pb-2">
+                  <span className="text-gray-500">STORM RATING STATUS:</span>
+                  <span className="text-yellow-550 text-yellow-500 font-bold">{user.rating.toFixed(2)} ★</span>
+                </div>
+                <div className="flex justify-between border-b border-white/5 pb-2">
+                  <span className="text-gray-500">DRIVING AS CLASS:</span>
+                  <span className="text-blue-400 font-bold">{user.vehicleInfo?.make} ({user.vehicleInfo?.plate})</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'glitchbox' && (
+          <div className="flex-1 overflow-y-auto space-y-6">
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 font-mono">Simulate Errors & Exceptions</h3>
+              <p className="text-xs text-gray-450 text-gray-400 mb-4 leading-relaxed">
+                Trigger simulated anomalies instantly to verify how application exception boundary guards and state managers self-heal.
+              </p>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <button 
+                  onClick={triggerSimulatedFirebaseError}
+                  className="p-4 bg-slate-950/60 border border-white/5 hover:border-blue-500/35 rounded-2xl text-left active:scale-95 transition-all outline-none"
+                >
+                  <h4 className="font-bold text-sm text-blue-400 uppercase tracking-wide">Firebase Insufficient Permissions</h4>
+                  <p className="text-[10px] text-gray-400 mt-1 leading-normal">Injects the exact write/read permissions fail code experienced when Firestore rules are tripped.</p>
+                </button>
+
+                <button 
+                  onClick={triggerGlobalRejection}
+                  className="p-4 bg-slate-950/60 border border-white/5 hover:border-blue-500/35 rounded-2xl text-left active:scale-95 transition-all outline-none"
+                >
+                  <h4 className="font-bold text-sm text-blue-400 uppercase tracking-wide">Global Unhandled DB Rejection</h4>
+                  <p className="text-[10px] text-gray-400 mt-1 leading-normal">Forces a telemetry error listener catch alert for window rejections.</p>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 font-mono">Simulate Dispatch & Ride Demands</h3>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <button 
+                  onClick={triggerInjectBigOrder}
+                  className="p-4 bg-slate-950/60 border border-white/5 hover:border-blue-500/35 rounded-2xl text-left active:scale-95 transition-all outline-none"
+                >
+                  <h4 className="font-bold text-sm text-[#c084fc] uppercase tracking-wide">Force High Payout £82.50 Stack</h4>
+                  <p className="text-[10px] text-gray-400 mt-1 leading-normal">Injects dual fine dining bookings with luxury VIP high fees.</p>
+                </button>
+                <button 
+                  onClick={() => {
+                    const fakeCrash = () => { throw new Error("Triggered simulated core stack memory dump."); };
+                    try {
+                      fakeCrash();
+                    } catch(e) {
+                      console.error(e);
+                    }
+                  }}
+                  className="p-4 bg-slate-950/60 border border-white/5 hover:border-blue-500/35 rounded-2xl text-left active:scale-95 transition-all outline-none"
+                >
+                  <h4 className="font-bold text-sm text-[#f43f5e] uppercase tracking-wide">Simulate App Crash dump</h4>
+                  <p className="text-[10px] text-gray-400 mt-1 leading-normal">Dumps a simulated error log to verify real-time monitoring catches.</p>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'rescue' && (
+          <div className="flex-1 overflow-y-auto space-y-6">
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-widest text-rose-400 mb-3 font-mono">Self-Heal State Rescues</h3>
+              <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+                If the dispatch simulation locks up, coordinates freeze, or user configurations mismatch, trigger these functions to force-clean the applet memory.
+              </p>
+              
+              <div className="space-y-3.5">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-red-950/10 border border-red-500/10 rounded-2xl gap-3">
+                  <div>
+                    <h4 className="font-black text-sm text-slate-200">CLEAN ACTIVE DISPATCH QUEUES</h4>
+                    <p className="text-[11px] text-slate-400 leading-normal mt-0.5">Wipes all active order loops, rejects pending match and flushes any frozen items.</p>
+                  </div>
+                  <button 
+                    onClick={handleClearLockedDeliveries}
+                    className="w-full sm:w-auto px-5 py-3 bg-red-650/40 hover:bg-red-600 hover:text-white text-red-400 rounded-xl text-xs uppercase font-black tracking-wider transition-all border border-red-500/20"
+                  >
+                    Calibrate Queues
+                  </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl gap-3">
+                  <div>
+                    <h4 className="font-black text-sm text-slate-200">REALIGN GPS LINK SENSORS</h4>
+                    <p className="text-[11px] text-slate-400 leading-normal mt-0.5">Repositions coordinate parameters back to main coordinate hotspots.</p>
+                  </div>
+                  <button 
+                    onClick={handleRecenterLocation}
+                    className="w-full sm:w-auto px-5 py-3 bg-white/10 hover:bg-white/20 text-slate-200 rounded-xl text-xs uppercase font-black tracking-wider transition-all"
+                  >
+                    Stabilize Location
+                  </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-rose-950/20 border border-rose-500/20 rounded-2xl gap-3">
+                  <div>
+                    <h4 className="font-black text-xs text-rose-300">PURGE CACHED LOCAL STORAGE</h4>
+                    <p className="text-[11px] text-slate-400 leading-normal mt-0.5">Completely destroys simulation persistent keys and forces a driver profile reload.</p>
+                  </div>
+                  <button 
+                    onClick={handleFullStorageWipe}
+                    className="w-full sm:w-auto px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs uppercase font-black tracking-wider transition-all shadow-lg shadow-red-500/10"
+                  >
+                    Purge All Storage
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 function NavButton({ active, onClick, icon, label, badgeCount }: { active: boolean, onClick: () => void, icon: ReactNode, label: string, badgeCount?: number }) {
   return (
