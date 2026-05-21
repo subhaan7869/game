@@ -102,7 +102,10 @@ import {
 } from 'recharts';
 import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, HyperProTier, ScheduledOrder, CompletedTrip, NavSimulation } from './types';
 import { HyperDriverLogo } from './components/HyperDriverLogo';
+import { MediaControls } from './components/MediaControls';
+import { InteractiveMap } from './components/InteractiveMap';
 import { EarningsDetail } from './components/EarningsDetail';
+import { WebAnalyticsDashboard } from './components/WebAnalyticsDashboard';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
@@ -1811,11 +1814,11 @@ const CarPlayDashboard = ({
         </div>
 
         {/* Main Dashboard Area */}
-        <div className="flex-1 flex flex-col p-6 gap-6">
+        <div className="flex-1 flex flex-col p-6 gap-6 min-h-0">
           {activeOrder ? (
-            <div className="flex-1 flex gap-6">
+            <div className="flex-1 flex gap-6 min-h-0">
               {/* Navigation Card */}
-              <div className="flex-[2] bg-white/5 rounded-[32px] p-8 border border-white/10 flex flex-col relative overflow-hidden">
+              <div className="flex-[1.2] bg-white/5 rounded-[32px] p-8 border border-white/10 flex flex-col relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-8 opacity-10">
                   <Navigation size={120} className="rotate-45" />
                 </div>
@@ -1825,20 +1828,20 @@ const CarPlayDashboard = ({
                     <Navigation size={32} className="text-white" style={{ transform: 'rotate(45deg)' }} />
                   </div>
                   <div>
-                    <h2 className="text-4xl font-black mb-1">
+                    <h2 className="text-3xl font-black mb-1">
                       {activeOrder.status === 'accepted' ? 'Heading to Pickup' : 'Heading to Dropoff'}
                     </h2>
-                    <p className="text-xl text-gray-400 font-bold">
+                    <p className="text-lg text-gray-400 font-bold">
                       {activeOrder.status === 'accepted' ? activeOrder.restaurantName : activeOrder.customerName}
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-auto space-y-2">
-                  <p className="text-6xl font-black tracking-tighter">
+                  <p className="text-5xl font-black tracking-tighter">
                     {activeOrder.status === 'accepted' ? 'Main St' : 'Arriving Soon'}
                   </p>
-                  <div className="flex items-center gap-4 text-2xl text-gray-400 font-bold">
+                  <div className="flex items-center gap-4 text-xl text-gray-400 font-bold">
                     <span>{activeOrder.estimatedDistance.toFixed(1)} mi</span>
                     <div className="w-2 h-2 bg-white/20 rounded-full" />
                     <span className="text-blue-400">{Math.floor(activeOrder.estimatedTime / 2)} min</span>
@@ -1846,33 +1849,46 @@ const CarPlayDashboard = ({
                 </div>
               </div>
 
-              {/* Order Info Card */}
+              {/* Middle Section: Order Stack */}
               <div className="flex-1 flex flex-col gap-6">
                 <div className="flex-1 bg-white/5 rounded-[32px] p-6 border border-white/10 flex flex-col justify-center">
-                  <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2">Order Items</p>
+                  <p className="text-xs font-black text-gray-505 uppercase tracking-widest mb-2">Order Items</p>
                   <div className="space-y-1">
                     {(activeOrder.items || []).slice(0, 3).map((item, i) => (
-                      <p key={i} className="text-lg font-bold truncate">• {item}</p>
+                      <p key={i} className="text-base font-bold truncate">• {item}</p>
                     ))}
                     {(activeOrder.items?.length || 0) > 3 && (
-                      <p className="text-sm text-gray-500 font-bold">+{(activeOrder.items?.length || 0) - 3} more items</p>
+                      <p className="text-xs text-gray-400 font-bold">+{(activeOrder.items?.length || 0) - 3} more items</p>
                     )}
                   </div>
                 </div>
                 <div className="flex-1 bg-green-600/10 rounded-[32px] p-6 border border-green-500/20 flex flex-col justify-center">
                   <p className="text-xs font-black text-green-500 uppercase tracking-widest mb-1">Estimated Pay</p>
-                  <h3 className="text-4xl font-black text-green-500">£{activeOrder.estimatedPay.toFixed(2)}</h3>
+                  <h3 className="text-3xl font-black text-green-500">£{activeOrder.estimatedPay.toFixed(2)}</h3>
                 </div>
+              </div>
+
+              {/* Right Section: Media Receiver */}
+              <div className="flex-[1.3] min-w-0">
+                <MediaControls isCarPlay={true} theme="dark" />
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center bg-white/5 rounded-[40px] border border-white/10">
-              <div className="text-center">
-                <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Navigation size={48} className="text-gray-600" />
+            <div className="flex-1 flex gap-6 min-h-0">
+              {/* Left Column: Waiting state */}
+              <div className="flex-1 flex items-center justify-center bg-white/5 rounded-[40px] border border-white/10 p-8">
+                <div className="text-center">
+                  <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Navigation size={40} className="text-gray-500" />
+                  </div>
+                  <h2 className="text-2xl font-black mb-1">No Active Trips</h2>
+                  <p className="text-gray-400 font-bold text-sm">Trip feeds and high-priority requests will map here</p>
                 </div>
-                <h2 className="text-3xl font-black mb-2">No Active Trips</h2>
-                <p className="text-gray-500 font-bold">New requests will appear here</p>
+              </div>
+
+              {/* Right Column: Interactive Media Receiver */}
+              <div className="flex-[1.2] min-w-0">
+                <MediaControls isCarPlay={true} theme="dark" />
               </div>
             </div>
           )}
@@ -4005,6 +4021,7 @@ export default function App() {
     }
   });
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showWebAnalytics, setShowWebAnalytics] = useState(false);
 
   // --- Ambient Background Keep-Alive Audio (Engine Idle Hum) ---
   const [isKeepAliveActive, setIsKeepAliveActive] = useState(() => {
@@ -4491,6 +4508,23 @@ export default function App() {
   const [roadEvent, setRoadEvent] = useState<{ id: string, title: string, description: string, bonus?: number, delay?: number } | null>(null);
   const [vigilanteAdActive, setVigilanteAdActive] = useState(false);
   const [isInsuranceRenewalChatOpen, setIsInsuranceRenewalChatOpen] = useState(false);
+  const [isRadioExpanded, setIsRadioExpanded] = useState(false);
+
+  // Google Maps Platform Integration Key Checkers
+  const hasGoogleMapsCoreKey = useMemo(() => {
+    const key = process.env.GOOGLE_MAPS_PLATFORM_KEY || 
+                (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY || 
+                "";
+    return Boolean(key) && key !== "YOUR_API_KEY" && key.trim() !== "";
+  }, []);
+
+  const [mapCoreMode, setMapCoreMode] = useState<'cyber' | 'google'>(() => {
+    const key = process.env.GOOGLE_MAPS_PLATFORM_KEY || 
+                (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY || 
+                "";
+    const hasKey = Boolean(key) && key !== "YOUR_API_KEY" && key.trim() !== "";
+    return hasKey ? 'google' : 'cyber';
+  });
 
   const insuranceExpiry = user.documentExpiries?.["Vehicle Insurance"];
   const insuranceDaysLeft = useMemo(() => {
@@ -6987,7 +7021,45 @@ export default function App() {
             <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden">
               {user.isOnline ? (
                 <div className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
-                  <MapGrid />
+                  {mapCoreMode === 'google' ? (
+                    <InteractiveMap
+                      location={location}
+                      heading={heading}
+                      isOnline={user.isOnline}
+                      isNavigating={isNavigating}
+                      currentStops={currentStops}
+                      pendingOrder={pendingOrder}
+                      theme={theme}
+                    />
+                  ) : (
+                    <MapGrid />
+                  )}
+
+                  {/* Map Mode Controller Selector Pill */}
+                  <div className="absolute top-28 left-4 z-50 flex items-center bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl p-1 shadow-2xl pointer-events-auto">
+                    <button
+                      onClick={() => setMapCoreMode('cyber')}
+                      className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 ${
+                        mapCoreMode === 'cyber' 
+                          ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <Zap size={10} />
+                      Cyber
+                    </button>
+                    <button
+                      onClick={() => setMapCoreMode('google')}
+                      className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 ${
+                        mapCoreMode === 'google' 
+                          ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      <MapPin size={10} />
+                      Google Maps
+                    </button>
+                  </div>
                   
                   {!location && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center z-50 bg-[#0c0c0d]/80 backdrop-blur-sm">
@@ -7021,10 +7093,10 @@ export default function App() {
               </div>
               
                   {/* Heatmap Simulation */}
-                  {user.isOnline && !isNavigating && <Heatmap busynessMode={busynessMode} isLowPerformance={isLowPerformance} />}
+                  {user.isOnline && !isNavigating && mapCoreMode === 'cyber' && <Heatmap busynessMode={busynessMode} isLowPerformance={isLowPerformance} />}
                   
                   {/* Navigation Simulation Overlay */}
-                  <MapSimulationView sim={navSimulation} />
+                  {mapCoreMode === 'cyber' && <MapSimulationView sim={navSimulation} />}
 
               {/* Background Mode Indicator */}
               {user.isOnline && !isNavigating && (
@@ -7109,6 +7181,45 @@ export default function App() {
                     </span>
                     <span className="text-[8px] font-black opacity-60 uppercase tracking-widest">mph</span>
                   </div>
+                </div>
+              )}
+
+              {/* Floating Music/Radio Controller Overlay */}
+              {user.isOnline && !pendingOrder && (
+                <div className="absolute right-6 bottom-64 z-[2100] flex flex-col items-end gap-3">
+                  <AnimatePresence>
+                    {isRadioExpanded && (
+                      <motion.div
+                        key="floating-radio-container"
+                        initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.8, y: 20 }}
+                        className="w-[320px] shadow-2xl rounded-3xl overflow-hidden shadow-black/80"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MediaControls theme={theme} compact={false} />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setIsRadioExpanded(!isRadioExpanded); }}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-all border relative ${
+                      isRadioExpanded 
+                        ? 'bg-blue-600 text-white border-blue-500' 
+                        : theme === 'dark' 
+                          ? 'bg-neutral-900 border-white/10 text-blue-400' 
+                          : 'bg-white border-gray-150 text-blue-600'
+                    }`}
+                  >
+                    <Music size={22} className={isRadioExpanded ? '' : 'animate-pulse'} />
+                    {!isRadioExpanded && (
+                      <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                      </span>
+                    )}
+                  </button>
                 </div>
               )}
 
@@ -7648,316 +7759,320 @@ export default function App() {
                   />
                 </svg>
 
-                  {/* Driver Marker */}
-                  <motion.div 
-                    className="absolute z-[220]"
-                    animate={{ 
-                      left: (centerX || window.innerWidth/2) + (mapOffset.x || 0),
-                      top: (centerY || window.innerHeight/2) + (mapOffset.y || 0),
-                      rotate: heading || 0
-                    }}
-                  transition={{ type: "spring", stiffness: 60, damping: 20 }}
-                >
-                  <div className="relative group -translate-x-1/2 -translate-y-1/2">
-                    <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity rounded-full scale-150" />
-                    <div className="w-12 h-12 bg-[#0a0a0a] rounded-2xl border-2 border-blue-500 shadow-[0_0_25px_0_rgba(59,130,246,0.6)] flex items-center justify-center p-2 relative overflow-hidden transition-transform hover:scale-110">
-                      <CarIcon className="text-blue-500 w-full h-full fill-blue-500/10" strokeWidth={2.5} />
-                      <div className="absolute inset-0 bg-gradient-to-t from-blue-500/10 to-transparent" />
-                    </div>
-                    {/* Animated Heading Arrow */}
-                    <div className="absolute -top-5 left-1/2 -translate-x-1/2">
-                      <motion.div 
-                        animate={{ y: [0, -4, 0] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                        className="w-3 h-3 bg-blue-500 rotate-45 shadow-[0_0_10px_rgba(59,130,246,0.5)] border border-white/20"
-                      />
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Active and Pending Trip Paths */}
-                {location && (isNavigating || pendingOrder) && (
-                  <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-[100]">
-                    {/* Path for Pending Order */}
-                    {pendingOrder && (
-                      <>
-                        <motion.path 
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 0.4 }}
-                          d={`M ${(centerX || window.innerWidth/2) + (mapOffset.x || 0)} ${(centerY || window.innerHeight/2) + (mapOffset.y || 0)} L ${((centerX || window.innerWidth/2) + (pendingOrder.pickupLocation.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0))} ${((centerY || window.innerHeight/2) + (location.latitude - pendingOrder.pickupLocation.latitude) * MAP_SCALE + (mapOffset.y || 0))} L ${((centerX || window.innerWidth/2) + (pendingOrder.customerLocation.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0))} ${((centerY || window.innerHeight/2) + (location.latitude - pendingOrder.customerLocation.latitude) * MAP_SCALE + (mapOffset.y || 0))}`}
-                          fill="none" 
-                          stroke="#3b82f6" 
-                          strokeWidth={6 * zoom} 
-                          strokeLinecap="round" 
-                          strokeLinejoin="round"
-                          strokeDasharray="12,12"
-                        />
-                      </>
-                    )}
-                    
-                    {/* Main Nav Path */}
-                    {isNavigating && routeWaypoints.length > 0 && (
-                      <>
-                        <motion.path 
-                          initial={{ pathLength: 0, opacity: 0 }}
-                          animate={{ pathLength: 1, opacity: 1 }}
-                          transition={{ duration: 0.8 }}
-                          d={`M ${(centerX || window.innerWidth/2) + (mapOffset.x || 0)} ${(centerY || window.innerHeight/2) + (mapOffset.y || 0)} ${routeWaypoints.map(wp => {
-                            const x = (wp.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
-                            const y = (location.latitude - wp.latitude) * MAP_SCALE + (mapOffset.y || 0);
-                            return `L ${(centerX || window.innerWidth/2) + x} ${(centerY || window.innerHeight/2) + y}`;
-                          }).join(' ')}`}
-                          fill="none" 
-                          stroke="#2563eb" 
-                          strokeWidth={8 * zoom} 
-                          strokeLinecap="round" 
-                          strokeLinejoin="round"
-                        />
-                        <motion.path 
-                          d={`M ${(centerX || window.innerWidth/2) + (mapOffset.x || 0)} ${(centerY || window.innerHeight/2) + (mapOffset.y || 0)} ${routeWaypoints.map(wp => {
-                            const x = (wp.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
-                            const y = (location.latitude - wp.latitude) * MAP_SCALE + (mapOffset.y || 0);
-                            return `L ${(centerX || window.innerWidth/2) + x} ${(centerY || window.innerHeight/2) + y}`;
-                          }).join(' ')}`}
-                          fill="none" 
-                          stroke="white" 
-                          strokeWidth={2 * zoom} 
-                          strokeDasharray="4,12"
-                          strokeLinecap="round"
-                          animate={{ strokeDashoffset: [-16, 0] }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        />
-                      </>
-                    )}
-                  </svg>
-                )}
-
-                {/* Pending Order Pins on Main Map */}
-                {location && pendingOrder && (
-                   <div className="absolute inset-0 pointer-events-none z-[220]">
-                      {[
-                        { loc: pendingOrder.pickupLocation, type: 'pickup', name: pendingOrder.type === 'delivery' ? pendingOrder.restaurantName : 'Rider Pickup' },
-                        { loc: pendingOrder.customerLocation, type: 'dropoff', name: pendingOrder.type === 'delivery' ? 'Customer' : 'Dropoff' }
-                      ].map((pin, pidx) => {
-                        const x = (pin.loc.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
-                        const y = (location.latitude - pin.loc.latitude) * MAP_SCALE + (mapOffset.y || 0);
-                        return (
-                          <motion.div
-                            key={`pending-pin-${pidx}`}
-                            initial={{ scale: 0, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="absolute flex flex-col items-center"
-                            style={{ 
-                              left: (centerX || window.innerWidth/2) + x,
-                              top: (centerY || window.innerHeight/2) + y,
-                              transform: 'translate(-50%, -100%)'
-                            }}
-                          >
-                            <div className="bg-orange-500 p-2 rounded-full border-2 border-white shadow-xl">
-                              {pin.type === 'pickup' ? <Coffee size={14} className="text-white" /> : <Navigation size={14} className="text-white" />}
-                            </div>
-                            <div className="mt-1 px-2 py-0.5 bg-black/80 rounded text-[8px] font-black text-white whitespace-nowrap">
-                              {pin.name}
-                            </div>
-                            <div className="w-0.5 h-3 bg-orange-500" />
-                          </motion.div>
-                        );
-                      })}
-                   </div>
-                )}
-
-                {/* All Active Trip Markers (Pickup/Dropoff) */}
-                {location && currentStops.map((stop, i) => {
-                  const x = (stop.location.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
-                  const y = (location.latitude - stop.location.latitude) * MAP_SCALE + (mapOffset.y || 0);
-                  
-                  const isCurrentTarget = i === 0 && isNavigating;
-                  const order = activeOrders.find(o => o.id === stop.orderId);
-                  
-                  if (!order) return null;
-
-                  return (
+                {mapCoreMode === 'cyber' && (
+                  <>
+                    {/* Driver Marker */}
                     <motion.div 
-                      key={`stop-pin-${stop.orderId}-${stop.type}`}
-                      initial={{ scale: 0 }}
-                      animate={{ scale: isCurrentTarget ? 1.2 : 1 }}
-                      className="absolute z-[210] flex flex-col items-center"
-                      style={{ 
-                        left: (centerX || window.innerWidth/2) + x,
-                        top: (centerY || window.innerHeight/2) + y,
-                        transform: 'translate(-50%, -100%)'
+                      className="absolute z-[220]"
+                      animate={{ 
+                        left: (centerX || window.innerWidth/2) + (mapOffset.x || 0),
+                        top: (centerY || window.innerHeight/2) + (mapOffset.y || 0),
+                        rotate: heading || 0
                       }}
-                    >
-                      <div className={`relative ${isCurrentTarget ? 'z-[250]' : 'z-[210]'}`}>
-                        <div className={`w-10 h-10 rounded-full shadow-2xl flex items-center justify-center border-4 border-[#1a1a1a] transition-all ${
-                          stop.type === 'pickup' ? 'bg-blue-600 scale-110 shadow-blue-600/30' : 'bg-green-600 shadow-green-600/30'
-                        }`}>
-                          {stop.type === 'pickup' ? (
-                            activeOrders.find(o => o.id === stop.orderId)?.type === 'delivery' ? <Utensils size={18} className="text-white" /> : <User size={18} className="text-white" />
-                          ) : (
-                            <MapPin size={18} className="text-white" />
-                          )}
-                        </div>
-                        {isCurrentTarget && (
-                          <motion.div 
-                            animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
-                            transition={{ duration: 1.5, repeat: Infinity }}
-                            className="absolute -inset-2 bg-blue-500 rounded-full blur-md -z-10"
-                          />
-                        )}
-                        <div className="absolute top-1/2 left-full ml-3 -translate-y-1/2 px-3 py-1.5 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 shadow-2xl whitespace-nowrap">
-                          <p className="text-[10px] font-black text-white uppercase tracking-wider">
-                            {stop.label}
-                          </p>
-                        </div>
+                    transition={{ type: "spring", stiffness: 60, damping: 20 }}
+                  >
+                    <div className="relative group -translate-x-1/2 -translate-y-1/2">
+                      <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity rounded-full scale-150" />
+                      <div className="w-12 h-12 bg-[#0a0a0a] rounded-2xl border-2 border-blue-500 shadow-[0_0_25px_0_rgba(59,130,246,0.6)] flex items-center justify-center p-2 relative overflow-hidden transition-transform hover:scale-110">
+                        <CarIcon className="text-blue-500 w-full h-full fill-blue-500/10" strokeWidth={2.5} />
+                        <div className="absolute inset-0 bg-gradient-to-t from-blue-500/10 to-transparent" />
                       </div>
-                      <div className={`w-1.5 h-6 ${stop.type === 'pickup' ? 'bg-blue-600' : 'bg-green-600'} rounded-full mt-[-2px] border border-[#1a1a1a]`} />
-                    </motion.div>
-                  );
-                })}
-
-                {location && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    {/* Pulsing blue dot for driver */}
-                    <div className="relative z-10" style={{ transform: `translate(${mapOffset.x}px, ${mapOffset.y}px)` }}>
-                      {user.isOnline ? (
-                        <div className="w-10 h-10 bg-white rounded-full shadow-xl flex items-center justify-center border-2 border-blue-500">
-                          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                            <Navigation size={18} className="text-white fill-white" style={{ transform: 'rotate(45deg)' }} />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="w-8 h-8 bg-blue-500 rounded-full border-4 border-white shadow-[0_0_20px_rgba(59,130,246,0.8)] flex items-center justify-center">
-                          <Navigation size={16} className="text-white fill-white" style={{ transform: 'rotate(45deg)' }} />
-                        </div>
-                      )}
-                      <div className="absolute -inset-6 bg-blue-500/30 rounded-full animate-ping" />
-                      {pendingOrder && (
+                      {/* Animated Heading Arrow */}
+                      <div className="absolute -top-5 left-1/2 -translate-x-1/2">
                         <motion.div 
-                          animate={{ scale: [1, 4], opacity: [0.5, 0] }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                          className="absolute inset-0 bg-blue-400 rounded-full"
+                          animate={{ y: [0, -4, 0] }}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                          className="w-3 h-3 bg-blue-500 rotate-45 shadow-[0_0_10px_rgba(59,130,246,0.5)] border border-white/20"
                         />
-                      )}
+                      </div>
                     </div>
+                  </motion.div>
 
-                    {/* Surge Badges and More Buttons */}
-                    {user.isOnline && !isNavigating && (
-                      <>
-                        <div className="absolute top-1/4 right-1/4 bg-blue-600 text-white px-3 py-1 rounded-lg font-black shadow-lg flex items-center gap-1">
-                          <span>1.4x</span>
-                        </div>
-                        <motion.button 
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => {
-                            sendNotification("Trip Planner", "New high-demand area detected in Shoreditch. Head there for 1.5x surge!");
-                            setIsDestFilterOpen(true);
-                          }}
-                          className="absolute bottom-40 left-4 bg-blue-600 text-white px-3 py-2 rounded-xl font-black shadow-xl flex items-center gap-2 pointer-events-auto z-40"
-                        >
-                          <ArrowUp size={14} />
-                          <span className="text-xs">More...</span>
-                        </motion.button>
-                        <motion.button 
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => {
-                            sendNotification("Surge Alert", "Surge is active in your current area. Earn an extra £2 per delivery!");
-                            setIsSafetyToolkitOpen(true);
-                          }}
-                          className="absolute top-40 right-4 bg-blue-600 text-white px-3 py-2 rounded-xl font-black shadow-xl flex items-center gap-2 pointer-events-auto z-40"
-                        >
-                          <ArrowUp size={14} />
-                          <span className="text-xs">More...</span>
-                        </motion.button>
-                      </>
-                    )}
-
-                    {/* Restaurant and Customer markers */}
-                    {location && activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map(order => {
-                      const isPickup = order.status === 'accepted';
-                      const target = isPickup 
-                        ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
-                        : order.customerLocation;
+                  {/* Active and Pending Trip Paths */}
+                  {location && (isNavigating || pendingOrder) && (
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-[100]">
+                      {/* Path for Pending Order */}
+                      {pendingOrder && (
+                        <>
+                          <motion.path 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 0.4 }}
+                            d={`M ${(centerX || window.innerWidth/2) + (mapOffset.x || 0)} ${(centerY || window.innerHeight/2) + (mapOffset.y || 0)} L ${((centerX || window.innerWidth/2) + (pendingOrder.pickupLocation.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0))} ${((centerY || window.innerHeight/2) + (location.latitude - pendingOrder.pickupLocation.latitude) * MAP_SCALE + (mapOffset.y || 0))} L ${((centerX || window.innerWidth/2) + (pendingOrder.customerLocation.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0))} ${((centerY || window.innerHeight/2) + (location.latitude - pendingOrder.customerLocation.latitude) * MAP_SCALE + (mapOffset.y || 0))}`}
+                            fill="none" 
+                            stroke="#3b82f6" 
+                            strokeWidth={6 * zoom} 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                            strokeDasharray="12,12"
+                          />
+                        </>
+                      )}
                       
-                      if (!target) return null;
+                      {/* Main Nav Path */}
+                      {isNavigating && routeWaypoints.length > 0 && (
+                        <>
+                          <motion.path 
+                            initial={{ pathLength: 0, opacity: 0 }}
+                            animate={{ pathLength: 1, opacity: 1 }}
+                            transition={{ duration: 0.8 }}
+                            d={`M ${(centerX || window.innerWidth/2) + (mapOffset.x || 0)} ${(centerY || window.innerHeight/2) + (mapOffset.y || 0)} ${routeWaypoints.map(wp => {
+                              const x = (wp.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
+                              const y = (location.latitude - wp.latitude) * MAP_SCALE + (mapOffset.y || 0);
+                              return `L ${(centerX || window.innerWidth/2) + x} ${(centerY || window.innerHeight/2) + y}`;
+                            }).join(' ')}`}
+                            fill="none" 
+                            stroke="#2563eb" 
+                            strokeWidth={8 * zoom} 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                          />
+                          <motion.path 
+                            d={`M ${(centerX || window.innerWidth/2) + (mapOffset.x || 0)} ${(centerY || window.innerHeight/2) + (mapOffset.y || 0)} ${routeWaypoints.map(wp => {
+                              const x = (wp.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
+                              const y = (location.latitude - wp.latitude) * MAP_SCALE + (mapOffset.y || 0);
+                              return `L ${(centerX || window.innerWidth/2) + x} ${(centerY || window.innerHeight/2) + y}`;
+                            }).join(' ')}`}
+                            fill="none" 
+                            stroke="white" 
+                            strokeWidth={2 * zoom} 
+                            strokeDasharray="4,12"
+                            strokeLinecap="round"
+                            animate={{ strokeDashoffset: [-16, 0] }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          />
+                        </>
+                      )}
+                    </svg>
+                  )}
 
-                      const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
-                      const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
-                      const isSelected = selectedMarkerId === order.id;
-                      
-                      return (
-                        <div 
-                          key={order.id} 
-                          className="absolute transition-transform duration-1000 pointer-events-auto cursor-pointer" 
-                          style={{ transform: `translate(${x}px, ${y}px)`, zIndex: isSelected ? 100 : 10 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedMarkerId(isSelected ? null : order.id);
-                          }}
-                        >
-                          {isSelected && (
-                            <motion.div 
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black text-white p-2 rounded-lg shadow-2xl border border-white/20 min-w-[120px] z-50"
-                            >
-                              <div className="text-[10px] font-black uppercase text-blue-400 mb-1">
-                                {isPickup ? 'Pickup' : 'Dropoff'}
-                              </div>
-                              <div className="text-xs font-bold leading-tight mb-1">
-                                {isPickup ? order.restaurantName : order.customerName}
-                              </div>
-                              <div className="flex justify-between items-center gap-4">
-                                <div className="flex items-center gap-1 text-[10px] font-bold">
-                                  <Navigation size={10} />
-                                  {distanceToTarget(order)} mi
-                                </div>
-                                <div className="flex items-center gap-1 text-[10px] font-bold">
-                                  <Clock size={10} />
-                                  {Math.floor(parseFloat(distanceToTarget(order)) * 5 + 2)} min
-                                </div>
-                              </div>
-                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-black" />
-                            </motion.div>
-                          )}
-                          <div className={`p-2 rounded-full border-2 border-white shadow-xl transition-transform ${isSelected ? 'scale-125' : ''} ${isPickup ? 'bg-green-500' : 'bg-blue-600'}`}>
-                            {isPickup ? <Coffee size={16} className="text-white" /> : <User size={16} className="text-white" />}
-                          </div>
-                          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-black/80 backdrop-blur-sm px-2 py-1 rounded text-[8px] font-bold text-white whitespace-nowrap">
-                            {isPickup ? order.restaurantName : order.customerName}
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {/* Pending Order Marker (Matching) */}
-                    {location && pendingOrder && (
-                      <>
-                        {[(pendingOrder.type === 'delivery' ? pendingOrder.restaurantLocation : pendingOrder.pickupLocation), pendingOrder.customerLocation].map((target, i) => {
-                          if (!target) return null;
-                          const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
-                          const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
+                  {/* Pending Order Pins on Main Map */}
+                  {location && pendingOrder && (
+                     <div className="absolute inset-0 pointer-events-none z-[220]">
+                        {[
+                          { loc: pendingOrder.pickupLocation, type: 'pickup', name: pendingOrder.type === 'delivery' ? pendingOrder.restaurantName : 'Rider Pickup' },
+                          { loc: pendingOrder.customerLocation, type: 'dropoff', name: pendingOrder.type === 'delivery' ? 'Customer' : 'Dropoff' }
+                        ].map((pin, pidx) => {
+                          const x = (pin.loc.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
+                          const y = (location.latitude - pin.loc.latitude) * MAP_SCALE + (mapOffset.y || 0);
                           return (
-                            <motion.div 
-                              key={`pending-${i}`}
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              className="absolute transition-transform duration-1000 pointer-events-none" 
-                              style={{ transform: `translate(${x}px, ${y}px)`, zIndex: 150 }}
+                            <motion.div
+                              key={`pending-pin-${pidx}`}
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              className="absolute flex flex-col items-center"
+                              style={{ 
+                                left: (centerX || window.innerWidth/2) + x,
+                                top: (centerY || window.innerHeight/2) + y,
+                                transform: 'translate(-50%, -100%)'
+                              }}
                             >
-                              <div className={`p-2 rounded-full border-2 border-white shadow-xl ${pendingOrder.isMatching ? 'bg-orange-500 animate-pulse' : 'bg-blue-500'}`}>
-                                {i === 0 ? <Coffee size={16} className="text-white" /> : <User size={16} className="text-white" />}
+                              <div className="bg-orange-500 p-2 rounded-full border-2 border-white shadow-xl">
+                                {pin.type === 'pickup' ? <Coffee size={14} className="text-white" /> : <Navigation size={14} className="text-white" />}
                               </div>
-                              <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 rounded text-[8px] font-black text-white whitespace-nowrap shadow-lg ${pendingOrder.isMatching ? 'bg-orange-600' : 'bg-blue-600'}`}>
-                                {i === 0 ? (pendingOrder.isMatching ? 'PICKUP MATCH' : 'PICKUP TRIP') : (pendingOrder.isMatching ? 'DROPOFF MATCH' : 'DROPOFF TRIP')}
+                              <div className="mt-1 px-2 py-0.5 bg-black/80 rounded text-[8px] font-black text-white whitespace-nowrap">
+                                {pin.name}
                               </div>
+                              <div className="w-0.5 h-3 bg-orange-500" />
                             </motion.div>
                           );
                         })}
-                      </>
-                    )}
-                  </div>
-                )}
+                     </div>
+                  )}
+
+                  {/* All Active Trip Markers (Pickup/Dropoff) */}
+                  {location && currentStops.map((stop, i) => {
+                    const x = (stop.location.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
+                    const y = (location.latitude - stop.location.latitude) * MAP_SCALE + (mapOffset.y || 0);
+                    
+                    const isCurrentTarget = i === 0 && isNavigating;
+                    const order = activeOrders.find(o => o.id === stop.orderId);
+                    
+                    if (!order) return null;
+
+                    return (
+                      <motion.div 
+                        key={`stop-pin-${stop.orderId}-${stop.type}`}
+                        initial={{ scale: 0 }}
+                        animate={{ scale: isCurrentTarget ? 1.2 : 1 }}
+                        className="absolute z-[210] flex flex-col items-center"
+                        style={{ 
+                          left: (centerX || window.innerWidth/2) + x,
+                          top: (centerY || window.innerHeight/2) + y,
+                          transform: 'translate(-50%, -100%)'
+                        }}
+                      >
+                        <div className={`relative ${isCurrentTarget ? 'z-[250]' : 'z-[210]'}`}>
+                          <div className={`w-10 h-10 rounded-full shadow-2xl flex items-center justify-center border-4 border-[#1a1a1a] transition-all ${
+                            stop.type === 'pickup' ? 'bg-blue-600 scale-110 shadow-blue-600/30' : 'bg-green-600 shadow-green-600/30'
+                          }`}>
+                            {stop.type === 'pickup' ? (
+                              activeOrders.find(o => o.id === stop.orderId)?.type === 'delivery' ? <Utensils size={18} className="text-white" /> : <User size={18} className="text-white" />
+                            ) : (
+                              <MapPin size={18} className="text-white" />
+                            )}
+                          </div>
+                          {isCurrentTarget && (
+                            <motion.div 
+                              animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
+                              transition={{ duration: 1.5, repeat: Infinity }}
+                              className="absolute -inset-2 bg-blue-500 rounded-full blur-md -z-10"
+                            />
+                          )}
+                          <div className="absolute top-1/2 left-full ml-3 -translate-y-1/2 px-3 py-1.5 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 shadow-2xl whitespace-nowrap">
+                            <p className="text-[10px] font-black text-white uppercase tracking-wider">
+                              {stop.label}
+                            </p>
+                          </div>
+                        </div>
+                        <div className={`w-1.5 h-6 ${stop.type === 'pickup' ? 'bg-blue-600' : 'bg-green-600'} rounded-full mt-[-2px] border border-[#1a1a1a]`} />
+                      </motion.div>
+                    );
+                  })}
+
+                  {location && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      {/* Pulsing blue dot for driver */}
+                      <div className="relative z-10" style={{ transform: `translate(${mapOffset.x}px, ${mapOffset.y}px)` }}>
+                        {user.isOnline ? (
+                          <div className="w-10 h-10 bg-white rounded-full shadow-xl flex items-center justify-center border-2 border-blue-500">
+                            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                              <Navigation size={18} className="text-white fill-white" style={{ transform: 'rotate(45deg)' }} />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-8 h-8 bg-blue-500 rounded-full border-4 border-white shadow-[0_0_20px_rgba(59,130,246,0.8)] flex items-center justify-center">
+                            <Navigation size={16} className="text-white fill-white" style={{ transform: 'rotate(45deg)' }} />
+                          </div>
+                        )}
+                        <div className="absolute -inset-6 bg-blue-500/30 rounded-full animate-ping" />
+                        {pendingOrder && (
+                          <motion.div 
+                            animate={{ scale: [1, 4], opacity: [0.5, 0] }}
+                            transition={{ duration: 2, repeat: Infinity }}
+                            className="absolute inset-0 bg-blue-400 rounded-full"
+                          />
+                        )}
+                      </div>
+
+                      {/* Surge Badges and More Buttons */}
+                      {user.isOnline && !isNavigating && (
+                        <>
+                          <div className="absolute top-1/4 right-1/4 bg-blue-600 text-white px-3 py-1 rounded-lg font-black shadow-lg flex items-center gap-1">
+                            <span>1.4x</span>
+                          </div>
+                          <motion.button 
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => {
+                              sendNotification("Trip Planner", "New high-demand area detected in Shoreditch. Head there for 1.5x surge!");
+                              setIsDestFilterOpen(true);
+                            }}
+                            className="absolute bottom-40 left-4 bg-blue-600 text-white px-3 py-2 rounded-xl font-black shadow-xl flex items-center gap-2 pointer-events-auto z-40"
+                          >
+                            <ArrowUp size={14} />
+                            <span className="text-xs">More...</span>
+                          </motion.button>
+                          <motion.button 
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => {
+                              sendNotification("Surge Alert", "Surge is active in your current area. Earn an extra £2 per delivery!");
+                              setIsSafetyToolkitOpen(true);
+                            }}
+                            className="absolute top-40 right-4 bg-blue-600 text-white px-3 py-2 rounded-xl font-black shadow-xl flex items-center gap-2 pointer-events-auto z-40"
+                          >
+                            <ArrowUp size={14} />
+                            <span className="text-xs">More...</span>
+                          </motion.button>
+                        </>
+                      )}
+
+                      {/* Restaurant and Customer markers */}
+                      {location && activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map(order => {
+                        const isPickup = order.status === 'accepted';
+                        const target = isPickup 
+                          ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
+                          : order.customerLocation;
+                        
+                        if (!target) return null;
+
+                        const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
+                        const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
+                        const isSelected = selectedMarkerId === order.id;
+                        
+                        return (
+                          <div 
+                            key={order.id} 
+                            className="absolute transition-transform duration-1000 pointer-events-auto cursor-pointer" 
+                            style={{ transform: `translate(${x}px, ${y}px)`, zIndex: isSelected ? 100 : 10 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedMarkerId(isSelected ? null : order.id);
+                            }}
+                          >
+                            {isSelected && (
+                              <motion.div 
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black text-white p-2 rounded-lg shadow-2xl border border-white/20 min-w-[120px] z-50"
+                              >
+                                <div className="text-[10px] font-black uppercase text-blue-400 mb-1">
+                                  {isPickup ? 'Pickup' : 'Dropoff'}
+                                </div>
+                                <div className="text-xs font-bold leading-tight mb-1">
+                                  {isPickup ? order.restaurantName : order.customerName}
+                                </div>
+                                <div className="flex justify-between items-center gap-4">
+                                  <div className="flex items-center gap-1 text-[10px] font-bold">
+                                    <Navigation size={10} />
+                                    {distanceToTarget(order)} mi
+                                  </div>
+                                  <div className="flex items-center gap-1 text-[10px] font-bold">
+                                    <Clock size={10} />
+                                    {Math.floor(parseFloat(distanceToTarget(order)) * 5 + 2)} min
+                                  </div>
+                                </div>
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-black" />
+                              </motion.div>
+                            )}
+                            <div className={`p-2 rounded-full border-2 border-white shadow-xl transition-transform ${isSelected ? 'scale-125' : ''} ${isPickup ? 'bg-green-500' : 'bg-blue-600'}`}>
+                              {isPickup ? <Coffee size={16} className="text-white" /> : <User size={16} className="text-white" />}
+                            </div>
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-black/80 backdrop-blur-sm px-2 py-1 rounded text-[8px] font-bold text-white whitespace-nowrap">
+                              {isPickup ? order.restaurantName : order.customerName}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Pending Order Marker (Matching) */}
+                      {location && pendingOrder && (
+                        <>
+                          {[(pendingOrder.type === 'delivery' ? pendingOrder.restaurantLocation : pendingOrder.pickupLocation), pendingOrder.customerLocation].map((target, i) => {
+                            if (!target) return null;
+                            const x = (target.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
+                            const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
+                            return (
+                              <motion.div 
+                                key={`pending-${i}`}
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="absolute transition-transform duration-1000 pointer-events-none" 
+                                style={{ transform: `translate(${x}px, ${y}px)`, zIndex: 150 }}
+                              >
+                                <div className={`p-2 rounded-full border-2 border-white shadow-xl ${pendingOrder.isMatching ? 'bg-orange-500 animate-pulse' : 'bg-blue-500'}`}>
+                                  {i === 0 ? <Coffee size={16} className="text-white" /> : <User size={16} className="text-white" />}
+                                </div>
+                                <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 rounded text-[8px] font-black text-white whitespace-nowrap shadow-lg ${pendingOrder.isMatching ? 'bg-orange-600' : 'bg-blue-600'}`}>
+                                  {i === 0 ? (pendingOrder.isMatching ? 'PICKUP MATCH' : 'PICKUP TRIP') : (pendingOrder.isMatching ? 'DROPOFF MATCH' : 'DROPOFF TRIP')}
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
 
                 {/* Map Action Buttons */}
                 {user.isOnline && (
@@ -9769,6 +9884,7 @@ export default function App() {
 
               <div className="space-y-1.5">
                 {[
+                  { icon: <Activity size={18} className="text-[#10b981]" />, label: "Vercel Web Analytics (Live HUD)", action: () => setShowWebAnalytics(true) },
                   { icon: <User size={18} />, label: "Personal Information", action: () => setCurrentScreen('personal_details') },
                   { icon: <ShieldCheck size={18} />, label: "Insurance & Plan", action: () => setCurrentScreen('insurance') },
                   { icon: <CarIcon size={18} />, label: "Vehicle Details", action: () => setCurrentScreen('vehicle_details') },
@@ -10768,6 +10884,21 @@ app.post('/api/cashout', async (req, res) => {
               theme={theme}
             />
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showWebAnalytics && (
+          <WebAnalyticsDashboard 
+            theme={theme}
+            onClose={() => setShowWebAnalytics(false)}
+            currentScreen={currentScreen}
+            isOnline={user.isOnline}
+            activeOrdersCount={activeOrders.length}
+            completedTripsCount={completedTrips.length}
+            isLowPerformance={isLowPerformance}
+            isSimulatingMovement={isSimulatingMovement}
+          />
         )}
       </AnimatePresence>
 
