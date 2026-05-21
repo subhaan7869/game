@@ -100,6 +100,7 @@ export interface Mission {
 
 export interface UserProfile {
   uid?: string;
+  email?: string;
   name: string;
   rating: number;
   tier: UberProTier;

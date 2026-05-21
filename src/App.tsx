@@ -957,7 +957,9 @@ const TripPreferencesModal = ({
   onClose,
   theme,
   isInsuranceExpired,
-  user
+  user,
+  isKeepAliveActive,
+  toggleKeepAlive
 }: { 
   vehicleType: 'Car' | 'Bike' | 'Scooter', 
   setVehicleType: (val: 'Car' | 'Bike' | 'Scooter') => void,
@@ -966,7 +968,9 @@ const TripPreferencesModal = ({
   onClose: () => void,
   theme: string,
   isInsuranceExpired: boolean,
-  user: UserProfile
+  user: UserProfile,
+  isKeepAliveActive: boolean,
+  toggleKeepAlive: () => void
 }) => {
   const toggleService = (service: JobType) => {
     if (selectedServices.includes(service)) {
@@ -1072,6 +1076,34 @@ const TripPreferencesModal = ({
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Background Stability / Device Keep-Alive */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest text-left">Background Battery Optimization</p>
+              <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${isKeepAliveActive ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'}`}>
+                {isKeepAliveActive ? 'Optimized' : 'Standard'}
+              </span>
+            </div>
+            
+            <button 
+              onClick={toggleKeepAlive}
+              className={`w-full p-5 rounded-[32px] flex items-center justify-between border-2 transition-all active:scale-[0.98] ${isKeepAliveActive ? 'border-emerald-600 bg-[#10b981]/5' : 'border-transparent bg-gray-50 dark:bg-white/5'}`}
+            >
+              <div className="flex items-center gap-4 text-left">
+                <div className={`p-4 rounded-2xl ${isKeepAliveActive ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-white dark:bg-[#2a2a2a] text-gray-400'}`}>
+                  <Zap size={20} className={isKeepAliveActive ? "animate-pulse" : ""} />
+                </div>
+                <div>
+                  <p className="font-black text-lg leading-none mb-1 text-left">Engine Hum Stay-Alive</p>
+                  <p className="text-[10px] font-bold text-gray-400 leading-tight">Plays looping low-vibe engine purr to keep browser connected in background</p>
+                </div>
+              </div>
+              <div className={`w-12 h-6 shrink-0 rounded-full p-0.5 transition-colors duration-200 ${isKeepAliveActive ? 'bg-emerald-600' : 'bg-gray-300 dark:bg-white/10'}`}>
+                <div className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-200 ${isKeepAliveActive ? 'translate-x-6' : 'translate-x-0'}`} />
+              </div>
+            </button>
           </div>
 
           {/* Advanced Filters */}
@@ -3897,10 +3929,20 @@ export default function App() {
   const [showDebugMonitor, setShowDebugMonitor] = React.useState(false);
 
   const addDebugLog = React.useCallback((type: 'info' | 'warn' | 'error' | 'success', message: string) => {
-    setDebugLogs(prev => [
-      { id: Math.random().toString(36).substring(2, 9), type, message, timestamp: new Date() },
-      ...prev.slice(0, 99)
-    ]);
+    // Defeats concurrent rendering conflict by executing state update outside of React's synchronous render loops
+    setTimeout(() => {
+      setDebugLogs(prev => {
+        // Debounce exact string logs within 100ms to avoid feedback loops if console methods are triggered during updates
+        const exactMatchIndex = prev.findIndex(log => log.message === message);
+        if (exactMatchIndex !== -1 && (Date.now() - prev[exactMatchIndex].timestamp.getTime() < 100)) {
+          return prev;
+        }
+        return [
+          { id: Math.random().toString(36).substring(2, 9), type, message, timestamp: new Date() },
+          ...prev.slice(0, 99)
+        ];
+      });
+    }, 0);
   }, []);
 
   React.useEffect(() => {
@@ -3960,6 +4002,83 @@ export default function App() {
     }
   });
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // --- Ambient Background Keep-Alive Audio (Engine Idle Hum) ---
+  const [isKeepAliveActive, setIsKeepAliveActive] = useState(() => {
+    try {
+      const saved = localStorage.getItem('hyper_driver_keep_alive_engine');
+      return saved === null ? true : saved === 'true'; // Default to true so background mode works out of the box!
+    } catch (e) {
+      return true;
+    }
+  });
+  const engineNodeRef = useRef<{ osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode; filter: BiquadFilterNode; ctx: AudioContext } | null>(null);
+
+  const startEngineKeepAlive = React.useCallback(() => {
+    try {
+      if (engineNodeRef.current) return;
+      
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      
+      const ctx = (window as any).__sharedAudioCtx || new AudioContextClass();
+      if (!(window as any).__sharedAudioCtx) {
+        (window as any).__sharedAudioCtx = ctx;
+      }
+      
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const filter = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(42, ctx.currentTime);
+      
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(63, ctx.currentTime);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(100, ctx.currentTime);
+
+      // Keep it extremely quiet/eye-safe (just to trigger operational background media connection)
+      gain.gain.setValueAtTime(0.005, ctx.currentTime);
+
+      osc1.connect(filter);
+      osc2.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start();
+      osc2.start();
+
+      engineNodeRef.current = { osc1, osc2, filter, gain, ctx };
+      addDebugLog('success', 'Ambient Engine Purr (Stay-Alive Audio) started.');
+    } catch (e) {
+      console.error("Failed to start stay-alive audio", e);
+    }
+  }, [addDebugLog]);
+
+  const stopEngineKeepAlive = React.useCallback(() => {
+    if (engineNodeRef.current) {
+      const { osc1, osc2 } = engineNodeRef.current;
+      try { osc1.stop(); } catch(e) {}
+      try { osc2.stop(); } catch(e) {}
+      engineNodeRef.current = null;
+      addDebugLog('info', 'Ambient Engine Purr (Stay-Alive Audio) stopped.');
+    }
+  }, [addDebugLog]);
+
+  const toggleKeepAlive = () => {
+    setIsKeepAliveActive(prev => {
+      const newVal = !prev;
+      localStorage.setItem('hyper_driver_keep_alive_engine', String(newVal));
+      return newVal;
+    });
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -4548,6 +4667,18 @@ export default function App() {
   const [radarDisplayMode, setRadarDisplayMode] = useState<'couple' | 'none'>('couple');
   const [isRadarDropdownOpen, setIsRadarDropdownOpen] = useState(false);
   const [isRadarDrawerOpen, setIsRadarDrawerOpen] = useState(false);
+
+  // --- Ambient Background Keep-Alive Audio Controller Effect ---
+  useEffect(() => {
+    if (user.isOnline && !isOnBreak && isKeepAliveActive) {
+      startEngineKeepAlive();
+    } else {
+      stopEngineKeepAlive();
+    }
+    return () => {
+      stopEngineKeepAlive();
+    };
+  }, [user.isOnline, isOnBreak, isKeepAliveActive, startEngineKeepAlive, stopEngineKeepAlive]);
 
   // Auto close/reset radar drawer state when no active radar orders are left
   useEffect(() => {
@@ -5441,13 +5572,36 @@ export default function App() {
     // Real Notifications
     if ("Notification" in window && Notification.permission === "granted") {
       try {
-        new Notification(title, { 
-          body, 
-          icon: "https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png", // Or app icon 
-          tag: title // Group same titles
-        });
+        // Prefer service worker showNotification details when available for reliable background dispatch on Android/PWA
+        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+          navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification(title, {
+              body,
+              icon: "https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png",
+              vibrate: [200, 100, 200],
+              tag: title,
+              renotify: true,
+              silent: false
+            } as any).catch(() => {
+              // Fail-safe to standard Notification
+              new Notification(title, { 
+                body, 
+                tag: title
+              });
+            });
+          });
+        } else {
+          new Notification(title, { 
+            body, 
+            icon: "https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png",
+            tag: title
+          });
+        }
       } catch (e) {
-        console.warn("Notification API failed");
+        console.warn("Notification API failed, trying direct notification fallback");
+        try {
+          new Notification(title, { body, tag: title });
+        } catch (err) {}
       }
     }
 
@@ -5908,6 +6062,72 @@ export default function App() {
     }
   };
 
+  const handleAcceptBothRadarOrders = () => {
+    if (radarOrders.length < 2) return;
+    
+    const countToAdd = Math.min(radarOrders.length, 3 - activeOrders.length);
+    if (countToAdd <= 0) {
+      sendNotification("Limit Reached", "You can only handle up to 3 active orders / trips at a time. Please complete or decline existing ones.");
+      return;
+    }
+
+    const ordersToAccept = radarOrders.slice(0, countToAdd).map(r => ({ ...r, status: 'accepted' as any }));
+
+    setActiveOrders(prev => [...prev, ...ordersToAccept]);
+    
+    // Remove accepted ones from radarOrders queue
+    const acceptedIds = new Set(ordersToAccept.map(o => o.id));
+    setRadarOrders(prev => prev.filter(r => !acceptedIds.has(r.id)));
+    setIsRadarDrawerOpen(false);
+
+    // Set navigation for the first of the newly accepted orders
+    setIsNavigating(true);
+    setMapOffset({ x: 0, y: 0 }); // Snap map back to driver
+    playHyperSound('accept');
+
+    const firstOrder = ordersToAccept[0];
+    if (firstOrder.pickupPos || firstOrder.pickupLocation) {
+      const pPos = firstOrder.pickupPos || { lat: firstOrder.pickupLocation.latitude, lng: firstOrder.pickupLocation.longitude };
+      setNavSimulation({
+        active: true,
+        orderId: firstOrder.id,
+        type: 'pickup',
+        startPos: { lat: location.latitude, lng: location.longitude },
+        endPos: pPos,
+        currentPos: { lat: location.latitude, lng: location.longitude },
+        progress: 0,
+        distanceRemaining: firstOrder.estimatedDistance / 2,
+        eta: firstOrder.estimatedTime / 2,
+        speed: 15 + Math.random() * 10
+      });
+    }
+
+    // Interactive customer greetings simulation for accepted orders
+    setTimeout(() => {
+      ordersToAccept.forEach(order => {
+        const greetings = [
+          "Hi! Please leave it at the door. Thanks!",
+          "On my way down to meet you soon.",
+          "Please call when you arrive!",
+          "The buzzer is #404. Let me know if you have trouble."
+        ];
+        const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+        
+        setMessages((prev: any) => [...prev, {
+          id: Math.random().toString(36).substr(2, 9),
+          orderId: order.id,
+          sender: 'customer',
+          text: randomGreeting,
+          timestamp: Date.now()
+        }]);
+        sendNotification("New Message", randomGreeting);
+        playHyperSound('message');
+      });
+    }, 5000);
+
+    sendNotification("Trips Accepted!", `Successfully matched and assigned ${ordersToAccept.length} Trip Radar runs.`);
+  };
+
   const isInsuranceExpired = insuranceDaysLeft !== null && insuranceDaysLeft <= 0;
 
   const handleGoOnline = () => {
@@ -5939,6 +6159,19 @@ export default function App() {
       startTime: Date.now()
     });
     playHyperSound('accept');
+
+    // Proactively request browser/device notification permissions to guarantee background trip offers ring
+    if ("Notification" in window) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission().then(permission => {
+          if (permission === "granted") {
+            sendNotification("Notifications Activated", "You will now receive customer trip request alerts in the background.", "success");
+          }
+        });
+      } else if (Notification.permission === "denied") {
+        console.warn("Notifications are blocked by the browser. Driver may not receive alerts while minimized.");
+      }
+    }
   };
 
   const endShift = () => {
@@ -6982,6 +7215,16 @@ export default function App() {
 
                         {/* Minimize button on top right of Trip Radar */}
                         <div className="flex items-center gap-3">
+                          {radarOrders.length >= 2 && (
+                            <button
+                              id="accept-both-radar-trips-btn"
+                              onClick={handleAcceptBothRadarOrders}
+                              className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all outline-none animate-pulse shadow-lg shadow-emerald-500/20 active:scale-95"
+                            >
+                              <Zap size={11} fill="currentColor" />
+                              <span>{radarOrders.length === 2 ? 'Accept Both Trips' : 'Accept All Trips'}</span>
+                            </button>
+                          )}
                           <span className="text-[10px] font-bold opacity-40 uppercase tracking-widest hidden sm:inline">
                             {radarDisplayMode === 'none' ? 'MUTED' : `${radarOrders.length} TRIP${radarOrders.length !== 1 ? 'S' : ''} DISCOVERED`}
                           </span>
@@ -9536,7 +9779,9 @@ export default function App() {
                     sendNotification("Signed Out", "Session cleared.");
                   } }] : []),
                   { icon: <SlidersHorizontal />, label: "Trip Preferences", action: () => setCurrentScreen('trip_preferences') },
-                  { icon: <Bug size={18} className="text-blue-500" />, label: "System Glitch Diagnostics (Telemetry)", action: () => setShowDebugMonitor(true) },
+                  ...((auth.currentUser?.email === 'hassennabeel9@gmail.com' || user?.email === 'hassennabeel9@gmail.com') ? [
+                    { icon: <Bug size={18} className="text-blue-500" />, label: "System Glitch Diagnostics (Telemetry)", action: () => setShowDebugMonitor(true) }
+                  ] : []),
                   { icon: <ShieldAlert />, label: "Simulate Bug Scan", action: () => {
                     setIsScanning(true);
                     setTimeout(() => {
@@ -9977,6 +10222,8 @@ export default function App() {
               theme={theme}
               isInsuranceExpired={isInsuranceExpired}
               user={user}
+              isKeepAliveActive={isKeepAliveActive}
+              toggleKeepAlive={toggleKeepAlive}
             />
           )}
         </AnimatePresence>
@@ -10410,7 +10657,7 @@ app.post('/api/cashout', async (req, res) => {
       </AnimatePresence>
 
       {/* System Diagnostic Floating Trigger Button */}
-      {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && (
+      {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && (auth.currentUser?.email === 'hassennabeel9@gmail.com' || user?.email === 'hassennabeel9@gmail.com') && (
         <div className="fixed bottom-24 right-4 z-[4000] pointer-events-auto">
           <button 
             id="dev-diagnostic-floating-btn"
