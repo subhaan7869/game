@@ -5724,7 +5724,7 @@ export default function App() {
 
     scheduleNextOrder();
     return () => clearTimeout(timer);
-  }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference, busynessMode, isOnBreak]);
+  }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference, busynessMode, isOnBreak, radarOrders.length]);
 
   const handleAcceptOrder = () => {
     if (!pendingOrder) return;

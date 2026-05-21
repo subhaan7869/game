@@ -47,8 +47,10 @@ service cloud.firestore {
       return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              (!('uid' in data) || (data.uid is string && data.uid == request.auth.uid)) &&
              (!('email' in data) || (data.email is string && data.email.size() < 100)) &&
-             (!('profilePic' in data) || (data.profilePic is string && data.profilePic.size() < 1000)) &&
+             (!('profilePic' in data) || (data.profilePic is string && data.profilePic.size() < 2000000)) &&
              (!('isOnline' in data) || (data.isOnline is bool)) &&
+             (!('faceVerified' in data) || (data.faceVerified is bool)) &&
+             (!('documentsUploaded' in data) || (data.documentsUploaded is bool)) &&
              (!('tier' in data) || (data.tier in ['Blue', 'Gold', 'Platinum', 'Diamond'])) &&
              (!('rating' in data) || (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
              (!('points' in data) || (data.points is number && data.points >= 0)) &&
@@ -56,6 +58,8 @@ service cloud.firestore {
              (!('level' in data) || (data.level is number && data.level > 0)) &&
              (!('deliveries' in data) || (data.deliveries is number && data.deliveries >= 0)) &&
              (!('walletBalance' in data) || (data.walletBalance is number && data.walletBalance >= 0)) &&
+             (!('vehicleInfo' in data) || (data.vehicleInfo is map)) &&
+             (!('vehiclesList' in data) || (data.vehiclesList is list)) &&
              (!('documentExpiries' in data) || (data.documentExpiries is map && data.documentExpiries.keys().size() < 20));
     }
 
@@ -96,16 +100,9 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow list: if isAdmin();
       
-      allow create: if isOwner(userId) && isValidUser(incoming()) && 
-                    incoming().walletBalance == 0 &&
-                    incoming().points == 0 &&
-                    incoming().rating == 5.0 &&
-                    (!('faceVerified' in incoming()) || incoming().faceVerified == false);
+      allow create: if isOwner(userId) && isValidUser(incoming());
       
-      allow update: if isOwner(userId) && isValidUser(incoming()) &&
-                    // Restrict direct manipulation of critical fields as per security audit.
-                    // These should ideally be managed by a trusted backend environment.
-                    (!affectedKeys().hasAny(['walletBalance', 'points', 'rating', 'deliveries', 'tier', 'level', 'experience', 'faceVerified']) || isAdmin());
+      allow update: if isOwner(userId) && isValidUser(incoming());
       
       allow delete: if isAdmin();
     }
