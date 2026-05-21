@@ -100,7 +100,8 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, UberProTier, ScheduledOrder, CompletedTrip, NavSimulation } from './types';
+import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, HyperProTier, ScheduledOrder, CompletedTrip, NavSimulation } from './types';
+import { HyperDriverLogo } from './components/HyperDriverLogo';
 import { EarningsDetail } from './components/EarningsDetail';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -516,7 +517,9 @@ const NewDashboard = ({
     <div className="h-full w-full bg-gray-50 flex flex-col font-sans overflow-y-auto no-scrollbar pb-32">
       {/* Header */}
       <div className="px-6 pt-12 pb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-black tracking-tighter">Hyper Driver</h1>
+        <div className="bg-black/95 py-2 px-4 rounded-2xl flex items-center shadow-lg shadow-black/10 select-none hover:scale-[1.01] transition-transform">
+          <HyperDriverLogo size="sm" />
+        </div>
         <div className="flex items-center gap-3">
           <button className="w-10 h-10 bg-white shadow-sm border border-gray-100 rounded-full flex items-center justify-center text-gray-700 active:scale-90 transition-transform">
             <Camera size={20} />
@@ -1945,14 +1948,14 @@ const OnboardingFlow = ({
     >
       <AnimatePresence mode="wait">
         {step === 0 && (
-          <motion.div key="step0" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} className="flex-1 flex flex-col justify-center">
-            <div className="w-20 h-20 bg-black rounded-3xl flex items-center justify-center mb-10 shadow-2xl">
-              <span className="text-white text-4xl font-black">U</span>
+          <motion.div key="step0" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} className="flex-1 flex flex-col justify-center items-center text-center">
+            <div className="mb-8 p-6 bg-black rounded-[40px] shadow-2xl border border-white/5">
+              <HyperDriverLogo size="lg" />
             </div>
-            <h1 className="text-5xl font-black leading-none tracking-tighter mb-6 underline decoration-blue-600 underline-offset-8">WELCOME TO<br/>THE FUTURE.</h1>
-            <p className="text-gray-500 font-bold text-lg mb-12">Let's get you set up to start earning. We'll need a few details to create your driver profile.</p>
-            <button onClick={nextStep} className="w-full py-6 bg-black text-white rounded-3xl font-black text-2xl tracking-tight shadow-xl active:scale-95 transition-all">
-              GET STARTED
+            <h1 className="text-4xl font-black leading-none tracking-tighter mb-4 uppercase italic">WELCOME TO THE TEAM</h1>
+            <p className="text-gray-400 font-bold text-base max-w-sm mb-12">Let's get you set up to start earning. We'll need a few details to activate your high-priority request queue.</p>
+            <button onClick={nextStep} className="w-full max-w-sm py-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white rounded-3xl font-black text-xl tracking-wide shadow-xl shadow-blue-600/20 active:scale-95 transition-all">
+              ACTIVATE PROFILE
             </button>
           </motion.div>
         )}
@@ -5817,7 +5820,7 @@ export default function App() {
         estimatedDistance: Number(((tripDist + distToPickup) * (isStacked ? 1.4 : 1)).toFixed(1)),
         estimatedTime: Math.floor(((tripDist + distToPickup) * 5 + 4) * (isStacked ? 1.5 : 1)),
         status: 'pending' as const,
-        items: type === 'delivery' ? ["Meal Deal", "UberEats Order"] : undefined,
+        items: type === 'delivery' ? ["Meal Deal", "Hyper Eats Order"] : undefined,
         pin: Math.floor(1000 + Math.random() * 9000).toString(),
         isMatching: activeOrders.length > 0 || Math.random() < 0.25,
         surge: activeSurge > 1.0 ? activeSurge : undefined,

@@ -1,6 +1,6 @@
 {
-  "name": "Uber Eats Driver Dashboard",
-  "short_name": "Uber Driver",
+  "name": "Hyper Driver Dashboard",
+  "short_name": "Hyper Driver",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
