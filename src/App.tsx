@@ -15,6 +15,7 @@ import {
   Clock, 
   DollarSign, 
   ChevronUp, 
+  ChevronDown,
   X, 
   Check, 
   ArrowRight,
@@ -1914,9 +1915,10 @@ const PaymentMethodsScreen = ({
   const [selectedBank, setSelectedBank] = useState<{ name: string, color: string, textColor: string } | null>(null);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [authState, setAuthState] = useState<string>('');
+  const [showRealMoneyGuide, setShowRealMoneyGuide] = useState(false);
   
   const [newMethod, setNewMethod] = useState<{
-    type: 'card' | 'bank', 
+    type: 'card' | 'bank' | 'stripe', 
     last4: string, 
     bankName?: string,
     accountHolder?: string,
@@ -1991,6 +1993,36 @@ const PaymentMethodsScreen = ({
     }, 4500);
   };
 
+  const startStripeOnboarding = () => {
+    setSelectedBank({ name: 'Stripe Express', color: 'bg-[#635BFF]', textColor: 'text-white' });
+    setIsAuthorizing(true);
+    setAuthState('Establishing secure sandbox handshake with Stripe Connect services...');
+    
+    setTimeout(() => {
+      setAuthState('Redirecting to Stripe Express onboarding consent gateway...');
+    }, 1200);
+
+    setTimeout(() => {
+      setAuthState('Verifying driver identity, KYC criteria, and bank routing structures...');
+    }, 2400);
+
+    setTimeout(() => {
+      setAuthState('Generating secure Connect Account reference token (acct_1N9A32)...');
+    }, 3600);
+
+    setTimeout(() => {
+      setIsAuthorizing(false);
+      setNewMethod({
+        type: 'stripe',
+        bankName: 'Stripe Express',
+        isReal: true,
+        last4: '4321',
+        sortCode: 'STRIPE-API-v3',
+        accountHolder: user.name || 'Hassen Nabeel'
+      });
+    }, 4800);
+  };
+
   const makeDefault = (id: string) => {
     setUser(u => ({
       ...u,
@@ -2054,6 +2086,36 @@ const PaymentMethodsScreen = ({
         <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 blur-3xl rounded-full" />
       </div>
 
+      {/* Sandbox Disclosure & Developer Payout Portal Toggle */}
+      <div className={`p-6 rounded-[32px] border-2 mb-8 ${
+        theme === 'dark' 
+          ? 'bg-amber-500/5 border-amber-500/10 text-amber-200' 
+          : 'bg-amber-500/5 border-amber-500/10 text-amber-900'
+      }`}>
+        <div className="flex gap-4 items-start">
+          <div className="p-2 bg-amber-500/10 rounded-xl text-amber-600 dark:text-amber-400">
+            <AlertCircle size={22} />
+          </div>
+          <div className="space-y-2">
+            <h4 className="font-black text-sm uppercase tracking-wider">Uber Driver Sandbox Simulation</h4>
+            <p className="text-xs leading-relaxed opacity-85">
+              This application is an <strong>educational game simulator</strong> designed to demonstrate open-banking and driver ledger flows. No real currency is generated or held by this app, so payouts are completed with <strong>virtual sandbox bank deposits</strong>.
+            </p>
+            <p className="text-xs leading-relaxed opacity-85">
+              If you are a developer or business owner looking to pay <strong>real money</strong> to physical bank accounts, you must integrate a transaction layer using Stripe or Wise payouts.
+            </p>
+            <div className="pt-2">
+              <button 
+                onClick={() => setShowRealMoneyGuide(true)}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-md shadow-amber-500/10 active:scale-95"
+              >
+                Learn How to Enable Real Money Payouts 🔑
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h3 className="font-black text-xl">Payment & Bank Methods</h3>
@@ -2080,23 +2142,27 @@ const PaymentMethodsScreen = ({
             >
               <div className="flex items-center gap-4">
                 <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 text-white ${
-                  method.type === 'bank' 
-                    ? method.isReal 
-                      ? (method.bankName === 'Monzo' ? 'bg-[#FF5640]' : method.bankName === 'Barclays' ? 'bg-blue-500' : method.bankName === 'Revolut' ? 'bg-[#17171d]' : 'bg-blue-600')
-                      : 'bg-[#ff5640]' 
-                    : 'bg-neutral-800'
+                  method.type === 'stripe'
+                    ? 'bg-[#635BFF]'
+                    : method.type === 'bank' 
+                      ? method.isReal 
+                        ? (method.bankName === 'Monzo' ? 'bg-[#FF5640]' : method.bankName === 'Barclays' ? 'bg-blue-500' : method.bankName === 'Revolut' ? 'bg-[#17171d]' : 'bg-blue-600')
+                        : 'bg-[#ff5640]' 
+                      : 'bg-neutral-800'
                 }`}>
-                  {method.type === 'bank' ? <Landmark size={24} /> : <CreditCard size={24} />}
+                  {method.type === 'stripe' ? <Shield size={24} /> : method.type === 'bank' ? <Landmark size={24} /> : <CreditCard size={24} />}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-black leading-tight">{method.type === 'bank' ? method.bankName : 'Personal Card'}</p>
-                    {method.isReal && (
+                    <p className="font-black leading-tight">{method.type === 'stripe' ? 'Stripe Connect' : method.type === 'bank' ? method.bankName : 'Personal Card'}</p>
+                    {method.type === 'stripe' ? (
+                      <span className="text-[7px] font-black uppercase tracking-widest bg-indigo-500 text-white px-2 py-0.5 rounded shadow-sm">Stripe Sandbox</span>
+                    ) : method.isReal && (
                       <span className="text-[7px] font-black uppercase tracking-widest bg-emerald-500 text-white px-2 py-0.5 rounded shadow-sm shadow-emerald-500/20">Real Linked</span>
                     )}
                   </div>
                   <p className="text-xs text-gray-400 font-bold mt-1">
-                    {method.type === 'bank' ? `Sort: ${method.sortCode || '••-••-••'} • Acc: ` : ''}•••• {method.last4}
+                    {method.type === 'stripe' ? `ID: acct_••••${method.last4}` : (method.type === 'bank' ? `Sort: ${method.sortCode || '••-••-••'} • Acc: ` : '') + `•••• ${method.last4}`}
                   </p>
                   {method.accountHolder && (
                     <p className="text-[9px] uppercase tracking-widest opacity-55 font-bold mt-1">{method.accountHolder}</p>
@@ -2172,23 +2238,29 @@ const PaymentMethodsScreen = ({
               <div className="space-y-5">
                 {!addingRealBank ? (
                   <>
-                    <div className="flex bg-gray-100 p-1 rounded-2xl">
+                    <div className="flex bg-gray-100 p-1 rounded-2xl gap-1">
                       <button 
                         onClick={() => setNewMethod({...newMethod, type: 'card'})} 
-                        className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${newMethod.type === 'card' ? 'bg-black text-white' : 'text-gray-400'}`}
+                        className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all ${newMethod.type === 'card' ? 'bg-black text-white' : 'text-gray-400'}`}
                       >
-                        Payment Card
+                        Personal Card
                       </button>
                       <button 
                         onClick={() => setNewMethod({...newMethod, type: 'bank'})} 
-                        className={`flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${newMethod.type === 'bank' ? 'bg-black text-white' : 'text-gray-400'}`}
+                        className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all ${newMethod.type === 'bank' ? 'bg-black text-white' : 'text-gray-400'}`}
                       >
                         Bank Account
+                      </button>
+                      <button 
+                        onClick={() => setNewMethod({...newMethod, type: 'stripe'})} 
+                        className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all ${newMethod.type === 'stripe' ? 'bg-[#635BFF] text-white shadow-sm' : 'text-gray-400'}`}
+                      >
+                        Stripe Connect
                       </button>
                     </div>
 
                     {newMethod.type === 'bank' && (
-                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-3xl p-5 text-center">
+                      <div className="bg-gradient-to-br from-blue-55 to-indigo-50 border border-blue-100 rounded-3xl p-5 text-center">
                         <Landmark size={32} className="mx-auto text-blue-600 mb-2 animate-bounce" />
                         <h4 className="font-black text-blue-900 text-sm mb-1">Instant UK Faster Payments Payouts</h4>
                         <p className="text-xs text-blue-700 leading-tight mb-4">Connect your real bank account via Open Banking. It takes 5 seconds and receives cased-out money automatically.</p>
@@ -2204,52 +2276,75 @@ const PaymentMethodsScreen = ({
                       </div>
                     )}
 
-                    <div className="space-y-3">
-                      {newMethod.type === 'bank' && (
-                        <input 
-                          type="text" 
-                          placeholder="Bank Name (e.g. Barclays, Monzo)"
-                          className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm"
-                          value={newMethod.bankName || ''}
-                          onChange={e => setNewMethod({...newMethod, bankName: e.target.value, isReal: false})}
-                        />
-                      )}
+                    {newMethod.type === 'stripe' ? (
+                      <div className="bg-gradient-to-br from-[#635bff]/10 to-indigo-50 border border-[#635bff]/20 rounded-3xl p-5 text-center my-2">
+                        <div className="w-12 h-12 bg-[#635BFF] text-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-[#635bff]/20">
+                          <Shield size={24} />
+                        </div>
+                        <h4 className="font-black text-indigo-950 text-sm mb-1 uppercase tracking-wide">Connect Stripe Account</h4>
+                        <p className="text-xs text-indigo-800 leading-normal mb-6">
+                          Simulate linking your profile with a digital Stripe Connected Account (Express) registry to verify secure instant payout pipelines.
+                        </p>
+                        
+                        <button 
+                          onClick={startStripeOnboarding}
+                          className="w-full py-3.5 bg-[#635BFF] hover:bg-[#544ee4] active:scale-95 transition-all text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-[#635bff]/20 flex items-center justify-center gap-2"
+                        >
+                          LAUNCH STRIPE ONBOARDING 🚀
+                        </button>
+                        
+                        <div className="text-[9px] uppercase tracking-widest text-[#635bff] font-bold mt-3">Link real Stripe Connected Accounts</div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-3">
+                          {newMethod.type === 'bank' && (
+                            <input 
+                              type="text" 
+                              placeholder="Bank Name (e.g. Barclays, Monzo)"
+                              className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm"
+                              value={newMethod.bankName || ''}
+                              onChange={e => setNewMethod({...newMethod, bankName: e.target.value, isReal: false})}
+                            />
+                          )}
 
-                      <input 
-                        type="text" 
-                        placeholder={newMethod.type === 'bank' ? "Account Holder's Name" : "Cardholder's Full Name"}
-                        className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm"
-                        value={newMethod.accountHolder || ''}
-                        onChange={e => setNewMethod({...newMethod, accountHolder: e.target.value})}
-                      />
+                          <input 
+                            type="text" 
+                            placeholder={newMethod.type === 'bank' ? "Account Holder's Name" : "Cardholder's Full Name"}
+                            className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm"
+                            value={newMethod.accountHolder || ''}
+                            onChange={e => setNewMethod({...newMethod, accountHolder: e.target.value})}
+                          />
 
-                      <input 
-                        type="text" 
-                        placeholder={newMethod.type === 'bank' ? "Sort Code (6 digits)" : "Expiry Date (MM/YY)"}
-                        className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm"
-                        value={newMethod.sortCode || ''}
-                        maxLength={newMethod.type === 'bank' ? 6 : 5}
-                        onChange={e => setNewMethod({...newMethod, sortCode: e.target.value})}
-                      />
+                          <input 
+                            type="text" 
+                            placeholder={newMethod.type === 'bank' ? "Sort Code (6 digits)" : "Expiry Date (MM/YY)"}
+                            className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm"
+                            value={newMethod.sortCode || ''}
+                            maxLength={newMethod.type === 'bank' ? 6 : 5}
+                            onChange={e => setNewMethod({...newMethod, sortCode: e.target.value})}
+                          />
 
-                      <input 
-                        type="text" 
-                        placeholder={newMethod.type === 'bank' ? "Account Number (last 4 digits)" : "Card Number (last 4 digits)"}
-                        maxLength={4}
-                        className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm"
-                        value={newMethod.last4}
-                        onChange={e => setNewMethod({...newMethod, last4: e.target.value.replace(/\D/g, '')})}
-                      />
-                    </div>
+                          <input 
+                            type="text" 
+                            placeholder={newMethod.type === 'bank' ? "Account Number (last 4 digits)" : "Card Number (last 4 digits)"}
+                            maxLength={4}
+                            className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 text-sm"
+                            value={newMethod.last4}
+                            onChange={e => setNewMethod({...newMethod, last4: e.target.value.replace(/\D/g, '')})}
+                          />
+                        </div>
 
-                    <button 
-                      onClick={handleAdd}
-                      disabled={!newMethod.last4 || (newMethod.type === 'bank' && !newMethod.bankName)}
-                      className="w-full py-4 bg-black text-white hover:bg-neutral-800 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-40"
-                    >
-                      <Plus size={16} />
-                      ADD ACCOUNT
-                    </button>
+                        <button 
+                          onClick={handleAdd}
+                          disabled={!newMethod.last4 || (newMethod.type === 'bank' && !newMethod.bankName)}
+                          className="w-full py-4 bg-black text-white hover:bg-neutral-800 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-40"
+                        >
+                          <Plus size={16} />
+                          ADD ACCOUNT
+                        </button>
+                      </>
+                    )}
                   </>
                 ) : isAuthorizing ? (
                   <div className="py-12 text-center flex flex-col items-center justify-center">
@@ -2352,6 +2447,114 @@ const PaymentMethodsScreen = ({
                     )}
                   </div>
                 )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showRealMoneyGuide && (
+          <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-hidden">
+            <motion.div 
+              initial={{ scale: 0.95, y: 30, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 30, opacity: 0 }}
+              className={`w-full max-w-lg rounded-[40px] p-6 shadow-2xl overflow-y-auto max-h-[90vh] ${
+                theme === 'dark' ? 'bg-[#121214] border border-white/5 text-white' : 'bg-white text-black'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                    <Shield size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-lg">Real Money Pay Out Blueprint</h3>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Production Setup Guide</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowRealMoneyGuide(false)}
+                  className="p-2 hover:bg-gray-100/10 rounded-full transition-colors text-gray-400"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-6 text-sm">
+                <div className="bg-gradient-to-br from-indigo-500/10 via-blue-500/5 to-transparent p-5 rounded-3xl border border-blue-500/10 text-left">
+                  <h4 className="font-extrabold text-blue-400 mb-1">How Real Money Systems Operate</h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    This interactive dashboard is currently in <strong>Sandbox Scenario Simulator mode</strong> to demonstrate mobile driver banking flows and on-road pizza/ride ledger mechanics. No actual fiat currency can be transfered directly because no real-world rides or deliveries are taking place.
+                  </p>
+                </div>
+
+                <div className="space-y-4 text-left">
+                  <h4 className="font-black text-xs uppercase tracking-widest text-gray-400">Step-by-Step Production Requirements</h4>
+
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-blue-500 text-white shrink-0 font-black flex items-center justify-center text-xs">1</div>
+                    <div>
+                      <h5 className="font-extrabold leading-snug">Register a Stripe Connect Account</h5>
+                      <p className="text-xs text-gray-400 mt-1 leading-normal">
+                        Create a free Stripe merchant profile and enable Connect (Express or Custom) from your Stripe developer dashboard. It provides the secure routing registry for your active drivers.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-blue-500 text-white shrink-0 font-black flex items-center justify-center text-xs">2</div>
+                    <div>
+                      <h5 className="font-extrabold leading-snug">Obtain Authorized Payout Access</h5>
+                      <p className="text-xs text-gray-400 mt-1 leading-normal">
+                        Drivers must coordinate-link their real bank details (Sort Code & Account numbers) via a Stripe-hosted Express KYC dashboard, safe from client-side script inspection.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-blue-500 text-white shrink-0 font-black flex items-center justify-center text-xs">3</div>
+                    <div>
+                      <h5 className="font-extrabold leading-snug">Establish Server Backend Security</h5>
+                      <p className="text-xs text-gray-400 mt-1 leading-normal">
+                        Create a Node/Express backend endpoint with your secret access token to receive the cash-out command:
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-neutral-950 p-4 rounded-2xl border border-white/5 font-mono text-left overflow-x-auto text-[10px] text-slate-300">
+                  <span className="text-emerald-400">// production_server.js snippet</span>
+                  <pre className="mt-1 leading-relaxed">
+{`const stripe = require('stripe')('sk_live_...');
+
+app.post('/api/payout', async (req, res) => {
+  const { amountInPence, connectAccountId } = req.body;
+  
+  // Initiates instant Faster Payments bank clearance
+  const payout = await stripe.payouts.create({
+    amount: amountInPence,
+    currency: 'gbp',
+    method: 'instant', 
+    statement_descriptor: 'DRIVER EARNINGS',
+  }, {
+    stripeAccount: connectAccountId,
+  });
+
+  res.json({ success: true, ref: payout.id });
+});`}
+                  </pre>
+                </div>
+
+                <div className="pt-2 text-left">
+                  <button 
+                    onClick={() => setShowRealMoneyGuide(false)}
+                    className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-blue-500/20 transition-all text-center"
+                  >
+                    RETURN TO SIMULATOR PLAY
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -3251,8 +3454,13 @@ export default function App() {
       if (lastResetDate !== todayDate) {
         setUser(prev => ({
           ...prev,
-          deliveriesToday: 0
+          deliveriesToday: 0,
+          earningsStats: prev.earningsStats ? {
+            ...prev.earningsStats,
+            daily: 0
+          } : { daily: 0, weekly: 0, monthly: 0, ytd: 0 }
         }));
+        setTodayEarningsTotal(0.00);
         localStorage.setItem('last_reset_date', todayDate);
       }
     };
@@ -3294,6 +3502,7 @@ export default function App() {
         setVigilanteAdActive(true);
         addToast("Vigilante Ad", "A Vigilante Ad is currently active. +£5.00 sponsorship bonus applied!", "success");
         setEarnings(prev => prev + 5);
+        setTodayEarningsTotal(prev => prev + 5);
         setBankBalance(prev => prev + 5);
         // Automatically hide after 15 seconds
         setTimeout(() => setVigilanteAdActive(false), 15000);
@@ -3330,6 +3539,76 @@ export default function App() {
       return 0.00;
     }
   });
+  const [todayEarningsTotal, setTodayEarningsTotal] = useState(() => {
+    try {
+      const saved = localStorage.getItem('uber_today_earnings_total');
+      return saved ? parseFloat(saved) : 0.00;
+    } catch (e) {
+      return 0.00;
+    }
+  });
+
+  const playUberSound = React.useCallback((type: 'order' | 'accept' | 'message' | 'complete' | 'radar') => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+
+      if (!(window as any).__sharedAudioCtx) {
+        (window as any).__sharedAudioCtx = new AudioContextClass();
+      }
+      const audioCtx = (window as any).__sharedAudioCtx;
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+      
+      const playTone = (freq: number, startTime: number, duration: number, type: OscillatorType = 'sine', volume = 0.1) => {
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(freq, startTime);
+        gainNode.gain.setValueAtTime(volume, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration);
+      };
+
+      if (type === 'order') {
+        const now = audioCtx.currentTime;
+        for (let i = 0; i < 3; i++) {
+          playTone(880, now + i * 0.4, 0.3, 'sine', 0.15);
+          playTone(1760, now + i * 0.4 + 0.05, 0.1, 'sine', 0.05);
+        }
+      } else if (type === 'radar') {
+        // High-tech, double-pulse sonar sweeping sound for radar trips
+        const now = audioCtx.currentTime;
+        playTone(1000, now, 0.15, 'sine', 0.12);
+        playTone(1350, now + 0.1, 0.25, 'sine', 0.08);
+      } else if (type === 'accept') {
+        playTone(440, audioCtx.currentTime, 0.1, 'sine', 0.1);
+        playTone(880, audioCtx.currentTime + 0.1, 0.2, 'sine', 0.05);
+      } else if (type === 'message') {
+        playTone(523.25, audioCtx.currentTime, 0.1, 'sine', 0.1);
+        playTone(523.25, audioCtx.currentTime + 0.15, 0.1, 'sine', 0.1);
+      } else if (type === 'complete') {
+        const now = audioCtx.currentTime;
+        playTone(523.25, now, 0.1);
+        playTone(659.25, now + 0.1, 0.1);
+        playTone(783.99, now + 0.2, 0.3);
+      }
+    } catch (e) {
+      console.warn("Audio not supported or blocked", e);
+    }
+  }, []);
+
+  // Persist today's total earnings
+  useEffect(() => {
+    localStorage.setItem('uber_today_earnings_total', todayEarningsTotal.toString());
+  }, [todayEarningsTotal]);
+
+  const [topBarMode, setTopBarMode] = useState<'today' | 'last_trip' | 'uber_pro'>('today');
+
   const [bankBalance, setBankBalance] = useState(() => {
     try {
       const saved = localStorage.getItem('uber_bank_balance');
@@ -3614,6 +3893,7 @@ export default function App() {
         if (randomEvent.bonus) {
           setBankBalance(prev => prev + (randomEvent.bonus || 0));
           setEarnings(prev => prev + (randomEvent.bonus || 0));
+          setTodayEarningsTotal(prev => prev + (randomEvent.bonus || 0));
         }
         
         // Auto-clear after 10 seconds
@@ -3625,21 +3905,34 @@ export default function App() {
   }, [isNavigating, user.isOnline, roadEvent]);
   const [radarOrders, setRadarOrders] = useState<Order[]>([]);
   const [selectedRadarOrder, setSelectedRadarOrder] = useState<Order | null>(null);
+  const [radarDisplayMode, setRadarDisplayMode] = useState<'couple' | 'none'>('couple');
+  const [isRadarDropdownOpen, setIsRadarDropdownOpen] = useState(false);
+  const [isRadarDrawerOpen, setIsRadarDrawerOpen] = useState(false);
+
+  // Auto close/reset radar drawer state when no active radar orders are left
+  useEffect(() => {
+    if (radarOrders.length === 0) {
+      setIsRadarDrawerOpen(false);
+    }
+  }, [radarOrders.length]);
 
   // Generate Radar Orders periodically when idle
   useEffect(() => {
-    if (!user.isOnline || isNavigating || activeOrders.length >= 4 || pendingOrder) {
-      setRadarOrders([]);
+    if (!user.isOnline || isNavigating || activeOrders.length >= 4 || pendingOrder || radarDisplayMode === 'none') {
+      if (radarOrders.length > 0) {
+        setRadarOrders([]);
+      }
       return;
     }
 
     const interval = setInterval(() => {
       if (radarOrders.length >= 3 || isOnBreak) return;
       if (Math.random() > 0.7) {
+        const newRadar = generateSmartOrder();
+        newRadar.isMatching = true; // Mark as matching trip
+        
         setRadarOrders(prev => {
           if (prev.length >= 3) return prev;
-          const newRadar = generateSmartOrder();
-          newRadar.isMatching = true; // Mark as matching trip
           
           // Remove after 20 seconds if not taken
           setTimeout(() => {
@@ -3648,11 +3941,13 @@ export default function App() {
           
           return [...prev, newRadar];
         });
+
+        playUberSound('radar');
       }
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [user.isOnline, isNavigating, activeOrders.length, pendingOrder, isOnBreak, radarOrders.length]);
+  }, [user.isOnline, isNavigating, activeOrders.length, pendingOrder, isOnBreak, radarOrders.length, radarDisplayMode, playUberSound]);
 
   const currentStop = currentStops[0];
   const currentOrder = useMemo(() => {
@@ -5195,6 +5490,7 @@ export default function App() {
     const earnedPay = Number(((base + distancePay + timePay) * surge + tip).toFixed(2));
 
     setEarnings(prev => prev + earnedPay);
+    setTodayEarningsTotal(prev => prev + earnedPay);
     setBankBalance(prev => prev + earnedPay);
     setShiftStats(prev => ({
       ...prev,
@@ -5374,55 +5670,6 @@ export default function App() {
   };
 
   const [isFlashing, setIsFlashing] = useState(false);
-
-  const playUberSound = (type: 'order' | 'accept' | 'message' | 'complete') => {
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioContextClass) return;
-
-      if (!(window as any).__sharedAudioCtx) {
-        (window as any).__sharedAudioCtx = new AudioContextClass();
-      }
-      const audioCtx = (window as any).__sharedAudioCtx;
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume().catch(() => {});
-      }
-      
-      const playTone = (freq: number, startTime: number, duration: number, type: OscillatorType = 'sine', volume = 0.1) => {
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        oscillator.type = type;
-        oscillator.frequency.setValueAtTime(freq, startTime);
-        gainNode.gain.setValueAtTime(volume, startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        oscillator.start(startTime);
-        oscillator.stop(startTime + duration);
-      };
-
-      if (type === 'order') {
-        const now = audioCtx.currentTime;
-        for (let i = 0; i < 3; i++) {
-          playTone(880, now + i * 0.4, 0.3, 'sine', 0.15);
-          playTone(1760, now + i * 0.4 + 0.05, 0.1, 'sine', 0.05);
-        }
-      } else if (type === 'accept') {
-        playTone(440, audioCtx.currentTime, 0.1, 'sine', 0.1);
-        playTone(880, audioCtx.currentTime + 0.1, 0.2, 'sine', 0.05);
-      } else if (type === 'message') {
-        playTone(523.25, audioCtx.currentTime, 0.1, 'sine', 0.1);
-        playTone(523.25, audioCtx.currentTime + 0.15, 0.1, 'sine', 0.1);
-      } else if (type === 'complete') {
-        const now = audioCtx.currentTime;
-        playTone(523.25, now, 0.1);
-        playTone(659.25, now + 0.1, 0.1);
-        playTone(783.99, now + 0.2, 0.3);
-      }
-    } catch (e) {
-      console.warn("Audio not supported or blocked", e);
-    }
-  };
 
   const handleVerify = async () => {
     if (isVerifying || (lockoutUntil && Date.now() < lockoutUntil)) return;
@@ -5960,9 +6207,33 @@ export default function App() {
                 </div>
               )}
 
+              {/* Trip Radar Floating Little Toggle Button */}
+              <AnimatePresence>
+                {user.isOnline && !isNavigating && !pendingOrder && !isBottomMenuOpen && radarOrders.length > 0 && !isRadarDrawerOpen && (
+                  <div className="absolute inset-x-0 bottom-[140px] flex justify-center z-[2400] pointer-events-none">
+                    <motion.button 
+                      key="radar-toggle-btn"
+                      initial={{ scale: 0, y: 30, opacity: 0 }}
+                      animate={{ scale: 1, y: 0, opacity: 1 }}
+                      exit={{ scale: 0, y: 30, opacity: 0 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setIsRadarDrawerOpen(true)}
+                      className="pointer-events-auto bg-blue-600 hover:bg-blue-700 font-display font-black text-xs text-white uppercase tracking-wider px-5 py-3 rounded-full flex items-center gap-2.5 shadow-[0_8px_30px_rgba(37,99,235,0.4)] border border-blue-450 cursor-pointer transition-colors relative"
+                    >
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+                      </span>
+                      <span>Trip Radar • {radarOrders.length} Available</span>
+                      <ChevronUp size={14} />
+                    </motion.button>
+                  </div>
+                )}
+              </AnimatePresence>
+
               {/* Trip Radar Matcher Drawer */}
               <AnimatePresence>
-                {user.isOnline && !isNavigating && !pendingOrder && !isBottomMenuOpen && radarOrders.length > 0 && (
+                {user.isOnline && !isNavigating && !pendingOrder && !isBottomMenuOpen && isRadarDrawerOpen && radarOrders.length > 0 && (
                   <motion.div 
                     initial={{ y: 300 }} 
                     animate={{ y: 0 }} 
@@ -5973,48 +6244,130 @@ export default function App() {
                     <div className="mx-4 bg-black/95 text-white rounded-[32px] p-6 shadow-[0_-20px_60px_rgba(0,0,0,0.5)] border-t border-white/10 pointer-events-auto overflow-hidden">
                       <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.8)]" />
-                          <h3 className="text-sm font-black uppercase tracking-[0.25em]">Trip Radar Match</h3>
+                          <div className={`w-3 h-3 rounded-full animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.8)] ${radarDisplayMode === 'none' ? 'bg-gray-500' : 'bg-blue-500'}`} />
+                          <h3 className="text-sm font-black uppercase tracking-[0.25em] shrink-0">Trip Radar</h3>
+                          
+                          {/* Dropdown Menu */}
+                          <div className="relative inline-block">
+                            <button 
+                              onClick={() => setIsRadarDropdownOpen(!isRadarDropdownOpen)}
+                              className="px-3 py-1.5 bg-white/10 hover:bg-white/15 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all outline-none"
+                            >
+                              <span>{radarDisplayMode === 'couple' ? 'Couple of Trips' : 'None'}</span>
+                              <ChevronDown size={11} className={`transition-transform duration-200 ${isRadarDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {isRadarDropdownOpen && (
+                              <>
+                                <div 
+                                  className="fixed inset-0 z-[3000]" 
+                                  onClick={() => setIsRadarDropdownOpen(false)}
+                                />
+                                <div className="absolute left-0 mt-2 w-48 bg-neutral-900 border border-white/10 rounded-2xl p-2 shadow-2xl z-[3100]">
+                                  <button 
+                                    onClick={() => {
+                                      setRadarDisplayMode('couple');
+                                      setIsRadarDropdownOpen(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-xs font-bold rounded-xl transition-colors flex items-center justify-between ${
+                                      radarDisplayMode === 'couple' 
+                                        ? 'bg-blue-600/25 text-blue-400' 
+                                        : 'hover:bg-white/5 text-gray-300'
+                                    }`}
+                                  >
+                                    <span>Couple of Trips (Active)</span>
+                                    {radarDisplayMode === 'couple' && <Check size={12} />}
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      setRadarDisplayMode('none');
+                                      setRadarOrders([]);
+                                      setIsRadarDropdownOpen(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-xs font-bold rounded-xl transition-colors flex items-center justify-between ${
+                                      radarDisplayMode === 'none' 
+                                        ? 'bg-blue-600/25 text-blue-400' 
+                                        : 'hover:bg-white/5 text-gray-300'
+                                    }`}
+                                  >
+                                    <span>None (Muted)</span>
+                                    {radarDisplayMode === 'none' && <Check size={12} />}
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <span className="text-[10px] font-bold opacity-40 uppercase tracking-widest">{radarOrders.length} TRIP{radarOrders.length > 1 ? 'S' : ''} DISCOVERED</span>
+
+                        {/* Minimize button on top right of Trip Radar */}
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-bold opacity-40 uppercase tracking-widest hidden sm:inline">
+                            {radarDisplayMode === 'none' ? 'MUTED' : `${radarOrders.length} TRIP${radarOrders.length !== 1 ? 'S' : ''} DISCOVERED`}
+                          </span>
+                          <button 
+                            onClick={() => setIsRadarDrawerOpen(false)}
+                            className="w-8 h-8 bg-white/10 hover:bg-white/15 rounded-full flex items-center justify-center transition-colors text-white outline-none active:scale-90"
+                            title="Collapse"
+                          >
+                            <ChevronDown size={16} />
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none snap-x">
-                        {radarOrders.map(order => (
-                          <motion.button 
-                            key={`radar-list-item-${order.id}`}
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            onClick={() => setPendingOrder(order)}
-                            className="min-w-[320px] snap-center bg-white/5 hover:bg-white/10 rounded-2xl p-5 border border-white/5 transition-all text-left group"
-                          >
-                            <div className="flex justify-between items-start mb-6">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${order.type === 'ride' ? 'bg-blue-600/20 text-blue-500' : 'bg-orange-500/20 text-orange-500'}`}>
-                                  {order.type === 'ride' ? <User size={24} /> : <Coffee size={24} />}
+                      {radarDisplayMode === 'none' ? (
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-4 text-center">
+                          <p className="text-xs text-gray-400 leading-normal font-medium">
+                            Trip Radar matched offers are disabled. Update to <strong className="text-white">Couple of Trips</strong> to start scanning again.
+                          </p>
+                        </div>
+                      ) : radarOrders.length === 0 ? (
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5 text-center flex flex-col items-center justify-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                            </span>
+                            <span className="text-xs text-gray-400 font-medium animate-pulse">Scanning for nearby rides and pizza runs...</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none snap-x">
+                          {radarOrders.map(order => (
+                            <motion.button 
+                              key={`radar-list-item-${order.id}`}
+                              initial={{ scale: 0.9, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              onClick={() => setPendingOrder(order)}
+                              className="min-w-[320px] snap-center bg-white/5 hover:bg-white/10 rounded-2xl p-5 border border-white/5 transition-all text-left group"
+                            >
+                              <div className="flex justify-between items-start mb-6">
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${order.type === 'ride' ? 'bg-blue-600/20 text-blue-500' : 'bg-orange-500/20 text-orange-500'}`}>
+                                    {order.type === 'ride' ? <User size={24} /> : <Coffee size={24} />}
+                                  </div>
+                                  <div>
+                                    <p className="text-2xl font-black">£{order.estimatedPay.toFixed(2)}</p>
+                                    <p className="text-[10px] font-black opacity-30 uppercase tracking-widest leading-none">{order.estimatedDistance.toFixed(1)} mi • {order.estimatedTime} min</p>
+                                  </div>
                                 </div>
-                                <div>
-                                  <p className="text-2xl font-black">£{order.estimatedPay.toFixed(2)}</p>
-                                  <p className="text-[10px] font-black opacity-30 uppercase tracking-widest leading-none">{order.estimatedDistance.toFixed(1)} mi • {order.estimatedTime} min</p>
+                                <div className="px-3 py-1 bg-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest group-hover:scale-110 transition-transform">
+                                  MATCH
                                 </div>
                               </div>
-                              <div className="px-3 py-1 bg-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest group-hover:scale-110 transition-transform">
-                                MATCH
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-2">
+                                  <MapPin size={12} className="text-blue-500" />
+                                  <span className="text-sm font-bold truncate opacity-80">{order.type === 'ride' ? 'Pickup' : order.restaurantName}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Navigation size={12} className="text-gray-500" />
+                                  <span className="text-sm font-bold truncate opacity-80">{order.customerName}</span>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                              <div className="flex items-center gap-2">
-                                <MapPin size={12} className="text-blue-500" />
-                                <span className="text-sm font-bold truncate opacity-80">{order.type === 'ride' ? 'Pickup' : order.restaurantName}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Navigation size={12} className="text-gray-500" />
-                                <span className="text-sm font-bold truncate opacity-80">{order.customerName}</span>
-                              </div>
-                            </div>
-                          </motion.button>
-                        ))}
-                      </div>
+                            </motion.button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -6932,14 +7285,38 @@ export default function App() {
                   </button>
                   
                   {user.isOnline && (
-                    <motion.button 
-                      initial={{ y: -50 }}
-                      animate={{ y: 0 }}
-                      onClick={() => setCurrentScreen('earnings')}
-                      className="bg-black text-white px-6 py-2.5 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform border border-white/10"
+                    <motion.div 
+                      initial={{ y: -50, scale: 0.9 }}
+                      animate={{ y: 0, scale: 1 }}
+                      className="bg-black text-white px-5 py-2 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 border border-white/10 cursor-pointer select-none min-w-[170px] max-w-[210px] min-h-[44px] transition-all relative"
+                      onClick={() => {
+                        setTopBarMode(prev => {
+                          if (prev === 'today') return 'last_trip';
+                          if (prev === 'last_trip') return 'uber_pro';
+                          return 'today';
+                        });
+                      }}
                     >
-                      <span className="font-display text-2xl font-black tracking-tighter">£{earnings.toFixed(2)}</span>
-                    </motion.button>
+                      <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none">
+                        {topBarMode === 'today' && "Today's Earnings"}
+                        {topBarMode === 'last_trip' && "Last Trip Payout"}
+                        {topBarMode === 'uber_pro' && `Uber Pro - ${user.tier || 'Diamond'}`}
+                      </span>
+
+                      <div className="flex items-center gap-1.5 justify-center leading-none">
+                        <span className="font-display text-lg font-black tracking-tight select-none">
+                          {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
+                          {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
+                          {topBarMode === 'uber_pro' && `${user.points || 350} XP`}
+                        </span>
+                      </div>
+
+                      <div className="flex gap-1 mt-1 justify-center select-none">
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? 'bg-blue-500 w-2.5' : 'bg-white/30'}`} />
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? 'bg-blue-500 w-2.5' : 'bg-white/30'}`} />
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'uber_pro' ? 'bg-blue-500 w-2.5' : 'bg-white/30'}`} />
+                      </div>
+                    </motion.div>
                   )}
 
                   <div className="flex items-center gap-3">
@@ -7932,13 +8309,17 @@ export default function App() {
                   ]).map((method, idx) => (
                     <div key={`payout-acc-${method.id}-${idx}`} className="flex items-center justify-between p-4 border border-gray-100 rounded-2xl">
                       <div className="flex items-center gap-4">
-                        <div className="text-blue-600">
-                          {method.type === 'bank' ? <Landmark size={20} /> : <CreditCard size={20} />}
+                        <div className={method.type === 'stripe' ? 'text-[#635BFF]' : 'text-blue-600'}>
+                          {method.type === 'stripe' ? <Shield size={20} /> : method.type === 'bank' ? <Landmark size={20} /> : <CreditCard size={20} />}
                         </div>
                         <div>
                           <p className="font-bold text-sm">
-                            {method.type === 'bank' ? method.bankName : 'Personal Card'}
-                            {method.isReal && <span className="ml-2 text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-black uppercase">Real Link</span>}
+                            {method.type === 'stripe' ? 'Stripe Connect' : method.type === 'bank' ? method.bankName : 'Personal Card'}
+                            {method.type === 'stripe' ? (
+                              <span className="ml-2 text-[8px] bg-indigo-50 text-[#635BFF] border border-[#635bff]/10 px-1.5 py-0.5 rounded font-black uppercase">Stripe Sandbox</span>
+                            ) : method.isReal && (
+                              <span className="ml-2 text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-black uppercase">Real Link</span>
+                            )}
                           </p>
                           <p className="text-xs text-gray-400">•••• {method.last4}</p>
                         </div>

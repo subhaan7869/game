@@ -142,7 +142,7 @@ export interface UserProfile {
   };
   paymentMethods?: {
     id: string;
-    type: 'card' | 'bank';
+    type: 'card' | 'bank' | 'stripe';
     last4: string;
     bankName?: string;
     isDefault: boolean;
