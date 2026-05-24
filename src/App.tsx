@@ -4208,6 +4208,17 @@ export default function App() {
     return baseUser;
   });
 
+  // Looping Status Text ("Finding trips" <-> "You're online")
+  const [onlineStatusLoopText, setOnlineStatusLoopText] = useState<'finding_trips' | 'youre_online'>('youre_online');
+
+  useEffect(() => {
+    if (!user.isOnline) return;
+    const interval = setInterval(() => {
+      setOnlineStatusLoopText(prev => prev === 'finding_trips' ? 'youre_online' : 'finding_trips');
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [user.isOnline]);
+
   // Persist user profile
   useEffect(() => {
     localStorage.setItem('hyper_driver_eats_user', JSON.stringify({
@@ -8438,6 +8449,23 @@ export default function App() {
                     animate={{ y: 0 }}
                     className="w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.2)] flex flex-col rounded-t-[32px] overflow-hidden"
                   >
+                    {/* Uber-style scanning progress bar */}
+                    {user.isOnline && !isOnBreak && activeOrders.length === 0 && (
+                      <div className="w-full h-[4px] bg-blue-500/10 relative overflow-hidden shrink-0">
+                        <motion.div 
+                          animate={{ 
+                            left: ['-50%', '110%'] 
+                          }}
+                          transition={{ 
+                            duration: 1.8, 
+                            repeat: Infinity, 
+                            ease: "easeInOut" 
+                          }}
+                          className="absolute top-0 bottom-0 w-[40%] bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]"
+                        />
+                      </div>
+                    )}
+
                     <div 
                       onClick={() => setIsBottomMenuOpen(true)}
                       className="flex items-center justify-between px-8 py-5 cursor-pointer active:bg-gray-50 transition-colors"
@@ -8464,11 +8492,31 @@ export default function App() {
                           </motion.button>
                         ) : (
                           <div className="flex flex-col items-center">
-                            <span className="font-display text-2xl font-black text-black tracking-tight leading-none">
-                              {activeOrders.length > 0 
-                                ? `${activeOrders.length} ${activeOrders.length === 1 ? 'Trip' : 'Trips'} • £${activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}`
-                                : 'Finding trips'}
-                            </span>
+                            <div className="h-8 overflow-hidden flex items-center justify-center relative w-64">
+                              <AnimatePresence mode="wait">
+                                {activeOrders.length > 0 ? (
+                                  <motion.span
+                                    key="active-trips"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="absolute font-display text-2xl font-black text-black tracking-tight leading-none text-center"
+                                  >
+                                    {activeOrders.length === 1 ? '1 Trip' : `${activeOrders.length} Trips`} • £{activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}
+                                  </motion.span>
+                                ) : (
+                                  <motion.span
+                                    key={onlineStatusLoopText}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="absolute font-display text-2xl font-black text-black tracking-tight leading-none text-center"
+                                  >
+                                    {onlineStatusLoopText === 'finding_trips' ? 'Finding trips' : "You're online"}
+                                  </motion.span>
+                                )}
+                              </AnimatePresence>
+                            </div>
                             <div className="flex items-center gap-3 mt-1.5">
                               <div className="flex items-center gap-1">
                                 <motion.div 
@@ -8566,9 +8614,26 @@ export default function App() {
                                 <Navigation size={28} className="animate-pulse" />
                               </div>
                             </div>
-                            <span className={`text-[10px] font-black tracking-widest uppercase ${isOnBreak ? 'text-orange-500' : 'text-blue-600'}`}>
-                              {isOnBreak ? 'On Break' : 'Finding trips'}
-                            </span>
+                            <div className="h-4 overflow-hidden relative w-32 flex justify-center items-center">
+                              {isOnBreak ? (
+                                <span className="text-[10px] font-black tracking-widest uppercase text-orange-500 text-center">
+                                  On Break
+                                </span>
+                              ) : (
+                                <AnimatePresence mode="wait">
+                                  <motion.span
+                                    key={onlineStatusLoopText}
+                                    initial={{ opacity: 0, y: 6 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -6 }}
+                                    transition={{ duration: 0.25 }}
+                                    className="absolute text-[10px] font-black tracking-widest uppercase text-blue-600 text-center"
+                                  >
+                                    {onlineStatusLoopText === 'finding_trips' ? 'Finding trips' : "You're online"}
+                                  </motion.span>
+                                </AnimatePresence>
+                              )}
+                            </div>
                           </div>
 
                           <button onClick={() => setIsSearchOpen(true)} className="flex flex-col items-center gap-2">
@@ -8585,11 +8650,46 @@ export default function App() {
                               className={`w-3 h-3 rounded-full ${isOnBreak ? 'bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]' : 'bg-blue-500'}`}
                             />
                             <div>
-                                <p className={`font-black text-lg leading-none ${isOnBreak ? 'text-orange-500' : theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
-                                   {isOnBreak ? 'On Break' : 'Finding trips'}
-                                </p>
+                                <div className="h-6 overflow-hidden relative w-48 flex items-center">
+                                  {isOnBreak ? (
+                                    <p className="font-black text-lg leading-none text-orange-500 absolute">
+                                      On Break
+                                    </p>
+                                  ) : (
+                                    <AnimatePresence mode="wait">
+                                      <motion.p
+                                        key={onlineStatusLoopText}
+                                        initial={{ opacity: 0, y: 8 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -8 }}
+                                        transition={{ duration: 0.25 }}
+                                        className={`absolute font-black text-lg leading-none ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}
+                                      >
+                                        {onlineStatusLoopText === 'finding_trips' ? 'Finding trips' : "You're online"}
+                                      </motion.p>
+                                    </AnimatePresence>
+                                  )}
+                                </div>
+                                
+                                {/* Sleek inline sweep line inside side card */}
+                                {!isOnBreak && activeOrders.length === 0 && (
+                                  <div className="w-24 h-[3px] bg-blue-500/15 rounded-full overflow-hidden mt-1.5 relative">
+                                    <motion.div 
+                                      animate={{ 
+                                        left: ['-55%', '115%'] 
+                                      }}
+                                      transition={{ 
+                                        duration: 1.5, 
+                                        repeat: Infinity, 
+                                        ease: "easeInOut" 
+                                      }}
+                                      className="absolute top-0 bottom-0 w-[40%] bg-blue-500 rounded-full"
+                                    />
+                                  </div>
+                                )}
+
                                 {globalSurge > 1.0 && !isOnBreak && (
-                                  <div className="flex items-center gap-1 bg-orange-500/20 px-2 py-0.5 rounded-full border border-orange-500/20 mt-1">
+                                  <div className="flex items-center gap-1 bg-orange-500/20 px-2 py-0.5 rounded-full border border-orange-500/20 mt-1.5 max-w-max">
                                     <Zap size={10} className="text-orange-500 fill-orange-500" />
                                     <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest">{globalSurge.toFixed(1)}x Surge</span>
                                   </div>
