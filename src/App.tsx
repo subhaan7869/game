@@ -106,6 +106,7 @@ import { MediaControls } from './components/MediaControls';
 import { InteractiveMap } from './components/InteractiveMap';
 import { EarningsDetail } from './components/EarningsDetail';
 import { WebAnalyticsDashboard } from './components/WebAnalyticsDashboard';
+import SimulatedHomeScreen from './components/SimulatedHomeScreen';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
@@ -955,6 +956,13 @@ const ScheduledOrdersScreen = ({
   );
 };
 
+const extractYouTubeVideoId = (url: string) => {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+};
+
 const TripPreferencesModal = ({ 
   vehicleType, 
   setVehicleType, 
@@ -965,7 +973,19 @@ const TripPreferencesModal = ({
   isInsuranceExpired,
   user,
   isKeepAliveActive,
-  toggleKeepAlive
+  toggleKeepAlive,
+  customSoundName,
+  customSoundUrl,
+  soundPreference,
+  setSoundPreference,
+  youtubeUrl,
+  setYoutubeUrl,
+  youtubeStartTime,
+  setYoutubeStartTime,
+  youtubeVolume,
+  setYoutubeVolume,
+  onCustomSoundUpload,
+  onClearCustomSound
 }: { 
   vehicleType: 'Car' | 'Bike' | 'Scooter', 
   setVehicleType: (val: 'Car' | 'Bike' | 'Scooter') => void,
@@ -976,7 +996,19 @@ const TripPreferencesModal = ({
   isInsuranceExpired: boolean,
   user: UserProfile,
   isKeepAliveActive: boolean,
-  toggleKeepAlive: () => void
+  toggleKeepAlive: () => void,
+  customSoundName: string | null,
+  customSoundUrl: string | null,
+  soundPreference: 'synthesized' | 'custom_file' | 'youtube',
+  setSoundPreference: (val: 'synthesized' | 'custom_file' | 'youtube') => void,
+  youtubeUrl: string,
+  setYoutubeUrl: (val: string) => void,
+  youtubeStartTime: number,
+  setYoutubeStartTime: (val: number) => void,
+  youtubeVolume: number,
+  setYoutubeVolume: (val: number) => void,
+  onCustomSoundUpload: (event: React.ChangeEvent<HTMLInputElement>) => void,
+  onClearCustomSound: () => void
 }) => {
   const toggleService = (service: JobType) => {
     if (selectedServices.includes(service)) {
@@ -1110,6 +1142,186 @@ const TripPreferencesModal = ({
                 <div className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-200 ${isKeepAliveActive ? 'translate-x-6' : 'translate-x-0'}`} />
               </div>
             </button>
+          </div>
+
+          {/* Incoming Order Sound Selection */}
+          <div>
+            <div className="flex justify-between items-center mb-3">
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest text-left">Incoming Order Ping Sound</p>
+              <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${
+                soundPreference === 'youtube' ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/20' : 
+                soundPreference === 'custom_file' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 
+                'bg-blue-500/15 text-blue-400 border border-blue-500/20'
+              }`}>
+                {soundPreference === 'youtube' ? 'YouTube Stream' : soundPreference === 'custom_file' ? 'Custom File' : 'Synthesized'}
+              </span>
+            </div>
+            
+            <div className="space-y-3">
+              {/* Option 1: Classic Synthesized Ring */}
+              <button
+                type="button"
+                onClick={() => setSoundPreference('synthesized')}
+                className={`w-full p-4 rounded-[24px] flex items-center justify-between border-2 transition-all text-left ${soundPreference === 'synthesized' ? 'border-blue-500 bg-blue-500/5' : 'border-transparent bg-gray-50 dark:bg-white/5'}`}
+              >
+                <div>
+                  <p className="font-sans text-[13px] font-black">🔊 Hyper Synthesized Ping</p>
+                  <p className="font-sans text-[9px] text-gray-400 font-bold mt-0.5">High-fidelity digital simulation of the driver alarm</p>
+                </div>
+                {soundPreference === 'synthesized' && <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center"><Check size={10} className="text-white font-black" strokeWidth={4} /></div>}
+              </button>
+
+              {/* Option 2: Upload Custom Sound */}
+              <div className={`w-full p-4 rounded-[24px] border-2 transition-all ${soundPreference === 'custom_file' ? 'border-emerald-500 bg-emerald-500/5' : 'border-transparent bg-gray-50 dark:bg-white/5'}`}>
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (customSoundUrl) {
+                        setSoundPreference('custom_file');
+                      }
+                    }}
+                    disabled={!customSoundUrl}
+                    className={`flex-1 text-left ${!customSoundUrl ? 'opacity-50' : 'cursor-pointer'}`}
+                  >
+                    <p className="font-sans text-[13px] font-black">📁 Custom Sound File</p>
+                    <p className="font-sans text-[9px] text-gray-400 font-bold mt-0.5">
+                      {customSoundName ? `Active: ${customSoundName}` : "No file uploaded yet"}
+                    </p>
+                  </button>
+                  <div className="flex items-center gap-2">
+                    {customSoundUrl && soundPreference === 'custom_file' && (
+                      <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center"><Check size={10} className="text-white font-black" strokeWidth={4} /></div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <label className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black text-center cursor-pointer transition-all active:scale-[0.98]">
+                    <span>{customSoundUrl ? 'Replace File' : 'Upload MP3/WAV/etc'}</span>
+                    <input 
+                      type="file" 
+                      accept="audio/*" 
+                      onChange={onCustomSoundUpload} 
+                      className="hidden" 
+                    />
+                  </label>
+                  
+                  {customSoundUrl && (
+                    <button
+                      type="button"
+                      onClick={onClearCustomSound}
+                      className="py-1.5 px-3 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-xl text-[10px] font-black transition-all"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Option 3: YouTube Audio Stream */}
+              <div className={`w-full p-4 rounded-[24px] border-2 transition-all ${soundPreference === 'youtube' ? 'border-indigo-500 bg-indigo-500/5' : 'border-transparent bg-gray-50 dark:bg-white/5'}`}>
+                <button
+                  type="button"
+                  onClick={() => setSoundPreference('youtube')}
+                  className="w-full flex items-center justify-between text-left mb-2"
+                >
+                  <div>
+                    <p className="font-sans text-[13px] font-black">📺 YouTube Video Audio Stream</p>
+                    <p className="font-sans text-[9px] text-gray-400 font-bold mt-0.5">Stream the exact notification sound from any YouTube video</p>
+                  </div>
+                  {soundPreference === 'youtube' && <div className="w-4 h-4 bg-indigo-500 rounded-full flex items-center justify-center"><Check size={10} className="text-white font-black" strokeWidth={4} /></div>}
+                </button>
+
+                {soundPreference === 'youtube' && (
+                  <div className="mt-4 p-3 bg-white dark:bg-black/20 rounded-2xl border border-gray-100 dark:border-white/5 space-y-3">
+                    {/* YouTube Video URL Input */}
+                    <div>
+                      <label className="block text-[8px] font-black uppercase text-gray-400 tracking-widest mb-1 text-left">YouTube Video URL / ID</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 rounded-xl border-none focus:ring-1 focus:ring-indigo-500 text-[11px] font-mono text-gray-700 dark:text-gray-300"
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        value={youtubeUrl}
+                        onChange={(e) => setYoutubeUrl(e.target.value)}
+                      />
+                      {extractYouTubeVideoId(youtubeUrl) && (
+                        <p className="text-[8px] text-gray-400 mt-1 font-mono text-left">Parsed Video Token: {extractYouTubeVideoId(youtubeUrl)}</p>
+                      )}
+                    </div>
+
+                    {/* Start Time Config */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[8px] font-black uppercase text-gray-400 tracking-widest mb-1 text-left">Start Offset (seconds)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 rounded-xl border-none text-[11px] font-mono text-gray-700 dark:text-gray-300"
+                          value={youtubeStartTime}
+                          onChange={(e) => setYoutubeStartTime(parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[8px] font-black uppercase text-gray-400 tracking-widest mb-1 text-left">Volume Intensity</label>
+                        <div className="flex items-center gap-2 h-9">
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            className="flex-1 accent-indigo-500"
+                            value={youtubeVolume}
+                            onChange={(e) => setYoutubeVolume(parseInt(e.target.value, 10))}
+                          />
+                          <span className="text-[10px] font-mono font-black shrink-0">{youtubeVolume}%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Presets and Testing */}
+                    <div>
+                      <p className="text-[8px] font-black uppercase text-gray-400 tracking-widest mb-1.5 text-left text-indigo-400">🔥 Quick Uber Sound Presets</p>
+                      <div className="flex flex-wrap gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setYoutubeUrl('https://www.youtube.com/watch?v=R96S9V-35ko');
+                            setYoutubeStartTime(0);
+                            setYoutubeVolume(90);
+                          }}
+                          className="px-2 py-1 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 rounded-lg text-[9px] font-black hover:bg-indigo-100 dark:hover:bg-indigo-950/40 transition-colors"
+                        >
+                          Eats Incoming Sound (Video)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setYoutubeUrl('https://www.youtube.com/watch?v=Zf1rA2VdFCE');
+                            setYoutubeStartTime(0);
+                            setYoutubeVolume(90);
+                          }}
+                          className="px-2 py-1 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 rounded-lg text-[9px] font-black hover:bg-indigo-100 dark:hover:bg-indigo-950/40 transition-colors"
+                        >
+                          Uber Eats Delivery Request
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setYoutubeUrl('https://www.youtube.com/watch?v=q6e0bV83j14');
+                            setYoutubeStartTime(0.8);
+                            setYoutubeVolume(95);
+                          }}
+                          className="px-2 py-1 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 rounded-lg text-[9px] font-black hover:bg-indigo-100 dark:hover:bg-indigo-950/40 transition-colors"
+                        >
+                          Uber Passenger Trip Ping
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Advanced Filters */}
@@ -3450,6 +3662,277 @@ const InsuranceScreen = ({
   );
 };
 
+const AudioSettingsScreen = ({
+  theme,
+  onClose,
+  soundPreference,
+  setSoundPreference,
+  customSoundName,
+  customSoundUrl,
+  youtubeUrl,
+  setYoutubeUrl,
+  youtubeStartTime,
+  setYoutubeStartTime,
+  youtubeVolume,
+  setYoutubeVolume,
+  onCustomSoundUpload,
+  onClearCustomSound,
+  playHyperSound
+}: {
+  theme: string,
+  onClose: () => void,
+  soundPreference: 'synthesized' | 'custom_file' | 'youtube',
+  setSoundPreference: (val: 'synthesized' | 'custom_file' | 'youtube') => void,
+  customSoundName: string | null,
+  customSoundUrl: string | null,
+  youtubeUrl: string,
+  setYoutubeUrl: (val: string) => void,
+  youtubeStartTime: number,
+  setYoutubeStartTime: (val: number) => void,
+  youtubeVolume: number,
+  setYoutubeVolume: (val: number) => void,
+  onCustomSoundUpload: (event: React.ChangeEvent<HTMLInputElement>) => void,
+  onClearCustomSound: () => void,
+  playHyperSound: (type: any) => void
+}) => {
+  const isDark = theme === 'dark';
+  
+  return (
+    <motion.div 
+      key="audio_settings" 
+      initial={{ x: '100%' }} 
+      animate={{ x: 0 }} 
+      exit={{ x: '100%' }} 
+      className={`h-full w-full p-6 overflow-y-auto pb-32 ${isDark ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
+    >
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={onClose} className={`p-2 rounded-full ${isDark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'} transition-colors`} aria-label="Back">
+          <ChevronRight className="rotate-180" size={24} />
+        </button>
+        <div>
+          <h1 className="text-2xl font-black leading-tight">Audio Pings & Sounds</h1>
+          <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Customize how incoming deliveries sound</p>
+        </div>
+      </div>
+
+      <div className="space-y-6 max-w-md mx-auto">
+        {/* Test Block */}
+        <div className={`p-6 rounded-[32px] border-2 flex flex-col items-center gap-4 text-center ${
+          soundPreference === 'youtube' ? 'bg-indigo-600/10 border-indigo-500/25 shadow-lg shadow-indigo-600/5' :
+          soundPreference === 'custom_file' ? 'bg-emerald-600/10 border-emerald-500/25 shadow-lg shadow-emerald-500/5' :
+          'bg-blue-600/10 border-blue-500/25 shadow-lg shadow-blue-600/5'
+        }`}>
+          <div>
+            <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-1">Active Output Preference</p>
+            <h3 className="text-xl font-black">
+              {soundPreference === 'youtube' && '📺 YouTube Stream Alert'}
+              {soundPreference === 'custom_file' && '📁 Custom Uploaded File'}
+              {soundPreference === 'synthesized' && '🔊 Classic Synthesized Chime'}
+            </h3>
+            {soundPreference === 'custom_file' && (
+              <p className="text-[11px] font-mono font-bold text-emerald-500 mt-1">{customSoundName || 'Selected file'}</p>
+            )}
+            {soundPreference === 'youtube' && (
+              <p className="text-[10px] font-mono text-indigo-400 mt-1 truncate max-w-xs">{youtubeUrl}</p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => playHyperSound('order')}
+            className={`px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95 shadow-md ${
+              soundPreference === 'youtube' ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/30 shadow-lg' :
+              soundPreference === 'custom_file' ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 shadow-lg' :
+              'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/30 shadow-lg'
+            }`}
+          >
+            <Volume2 size={16} className="animate-pulse" />
+            <span>📢 Test Alert Ping</span>
+          </button>
+        </div>
+
+        {/* Option Selectors */}
+        <div className="space-y-4">
+          <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest leading-none mb-1 text-left">Configure Routing Option</p>
+
+          {/* Option 1: Classic Synthesized */}
+          <div 
+            onClick={() => setSoundPreference('synthesized')}
+            className={`p-5 rounded-[32px] border-2 flex flex-col gap-4 cursor-pointer transition-all active:scale-[0.99] ${soundPreference === 'synthesized' ? 'border-blue-500 bg-blue-500/5' : 'bg-gray-50 dark:bg-white/5 border-transparent'}`}
+          >
+            <div className="flex justify-between items-start">
+              <div className="flex gap-4">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${soundPreference === 'synthesized' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-white dark:bg-white/10 text-gray-400'}`}>
+                  <Volume2 size={24} />
+                </div>
+                <div className="text-left">
+                  <h4 className="font-black text-base">🔊 Hyper Synthesized</h4>
+                  <p className="text-[10px] font-semibold text-gray-400">High-fidelity synthesiser chime simulation</p>
+                </div>
+              </div>
+              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${soundPreference === 'synthesized' ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                {soundPreference === 'synthesized' && <Check size={14} className="text-white" strokeWidth={4} />}
+              </div>
+            </div>
+            <p className="text-[11px] font-bold leading-relaxed text-gray-400 text-left">
+              Our standard robust offline synthesizer. Generates real-time custom sound waves instantly without requiring internet network latency. Great for deep reliability.
+            </p>
+          </div>
+
+          {/* Option 2: Upload Custom Sound */}
+          <div 
+            className={`p-5 rounded-[32px] border-2 flex flex-col gap-4 transition-all ${soundPreference === 'custom_file' ? 'border-emerald-500 bg-emerald-500/5' : 'bg-gray-50 dark:bg-white/5 border-transparent'}`}
+          >
+            <div className="flex justify-between items-start">
+              <div onClick={() => { if (customSoundUrl) setSoundPreference('custom_file'); }} className="flex gap-4 cursor-pointer flex-1">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${soundPreference === 'custom_file' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-white dark:bg-white/10 text-gray-400'}`}>
+                  <Music size={24} />
+                </div>
+                <div className="text-left">
+                  <h4 className="font-black text-base">📁 Mobile MP3/WAV Uploader</h4>
+                  <p className="text-[10px] font-semibold text-gray-400 leading-tight">
+                    {customSoundName ? `Uploaded: ${customSoundName}` : 'Upload your favorite delivery sound'}
+                  </p>
+                </div>
+              </div>
+              <div onClick={() => { if (customSoundUrl) setSoundPreference('custom_file'); }} className={`w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer shrink-0 ${soundPreference === 'custom_file' ? 'bg-emerald-600 border-emerald-600' : 'border-gray-300'}`}>
+                {soundPreference === 'custom_file' && <Check size={14} className="text-white" strokeWidth={4} />}
+              </div>
+            </div>
+
+            <p className="text-[11px] font-bold leading-relaxed text-gray-400 text-left">
+              Select any audio file from your smartphone library, offline download files, or iCloud and stream this custom notification whenever orders emerge.
+            </p>
+
+            <div className="flex items-center gap-2 mt-1">
+              <label className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[11px] font-black tracking-widest uppercase text-center cursor-pointer transition-all active:scale-[0.98] shadow-sm">
+                <span>{customSoundUrl ? '🔄 Replace File' : '📥 Choose File From Mobile'}</span>
+                <input 
+                  type="file" 
+                  accept="audio/*" 
+                  onChange={onCustomSoundUpload} 
+                  className="hidden" 
+                />
+              </label>
+              
+              {customSoundUrl && (
+                <button
+                  type="button"
+                  onClick={onClearCustomSound}
+                  className="py-3 px-4 bg-red-600/15 hover:bg-red-600/25 text-red-500 rounded-2xl text-[11px] font-black tracking-widest uppercase transition-all"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+
+            {/* Instruction block */}
+            <div className="p-4 rounded-2xl bg-[#052e16]/30 border border-dashed border-emerald-800/30 text-left">
+              <p className="text-[10px] font-black text-emerald-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                💡 Tip: Upload via AI Chat box
+              </p>
+              <p className="text-[10px] text-gray-400 font-medium leading-relaxed">
+                If uploading from your phone browser storage is confusing, you can simply **drag, attach or send the file (.mp3 / .wav) directly to me right inside our conversation chat window**! Just send it here, and I will instantly save it and set it as the app's sound for you!
+              </p>
+            </div>
+          </div>
+
+          {/* Option 3: YouTube Video Audio Stream */}
+          <div 
+            className={`p-5 rounded-[32px] border-2 flex flex-col gap-4 transition-all ${soundPreference === 'youtube' ? 'border-indigo-500 bg-indigo-500/5' : 'bg-gray-50 dark:bg-white/5 border-transparent'}`}
+          >
+            <div onClick={() => setSoundPreference('youtube')} className="flex justify-between items-start cursor-pointer">
+              <div className="flex gap-4">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${soundPreference === 'youtube' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white dark:bg-white/10 text-gray-400'}`}>
+                  <Settings2 size={24} />
+                </div>
+                <div className="text-left">
+                  <h4 className="font-black text-base">📺 YouTube Video Stream</h4>
+                  <p className="text-[10px] font-semibold text-gray-400">Stream notification sound from any YouTube video</p>
+                </div>
+              </div>
+              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${soundPreference === 'youtube' ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
+                {soundPreference === 'youtube' && <Check size={14} className="text-white" strokeWidth={4} />}
+              </div>
+            </div>
+
+            <p className="text-[11px] font-bold text-gray-400 leading-relaxed text-left">
+              Provide any YouTube url containing your favorite Uber or Eats sound, choose the timestamp to play, and stream it live!
+            </p>
+
+            <div className="space-y-3 bg-white dark:bg-black/20 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
+              <div>
+                <label className="block text-[8px] font-black uppercase text-gray-400 tracking-widest mb-1 text-left">YouTube Video URL or ID</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 rounded-xl border-none focus:ring-1 focus:ring-indigo-500 text-[11px] font-mono text-gray-700 dark:text-gray-300"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  value={youtubeUrl}
+                  onChange={(e) => setYoutubeUrl(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[8px] font-black uppercase text-gray-400 tracking-widest mb-1 text-left">Start Offset (seconds)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 rounded-xl border-none text-[11px] font-mono text-gray-700 dark:text-gray-300"
+                    value={youtubeStartTime}
+                    onChange={(e) => setYoutubeStartTime(parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-black uppercase text-gray-400 tracking-widest mb-1 text-left">Volume Intensity</label>
+                  <div className="flex items-center gap-2 h-9">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      className="flex-1 accent-indigo-500"
+                      value={youtubeVolume}
+                      onChange={(e) => setYoutubeVolume(parseInt(e.target.value, 10))}
+                    />
+                    <span className="text-[10px] font-mono font-black shrink-0">{youtubeVolume}%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[8px] font-black uppercase text-gray-400 tracking-widest mb-2 text-left text-indigo-400">🔥 Pro Uber sound presets</p>
+                <div className="flex flex-col gap-1.5">
+                  {[
+                    { label: "🎵 Eats Incoming Sound (Classic Video)", url: "https://www.youtube.com/watch?v=R96S9V-35ko", start: 0, vol: 90 },
+                    { label: "🔔 Uber Eats Official Delivery Request", url: "https://www.youtube.com/watch?v=Zf1rA2VdFCE", start: 0, vol: 90 },
+                    { label: "🚗 Uber Passenger Trip Ping Tone", url: "https://www.youtube.com/watch?v=q6e0bV83j14", start: 0.8, vol: 95 }
+                  ].map((preset, pIdx) => (
+                    <button
+                      key={`preset-screen-${pIdx}`}
+                      type="button"
+                      onClick={() => {
+                        setYoutubeUrl(preset.url);
+                        setYoutubeStartTime(preset.start);
+                        setYoutubeVolume(preset.vol);
+                        setSoundPreference('youtube');
+                      }}
+                      className="w-full flex justify-between items-center text-left p-1.5 px-2 bg-indigo-50 dark:bg-indigo-950/20 hover:bg-indigo-100 dark:hover:bg-indigo-950/40 text-[9px] font-black rounded-lg text-indigo-700 dark:text-indigo-400 transition-colors"
+                    >
+                      <span>{preset.label}</span>
+                      <span className="text-[8px] opacity-60 font-mono">T={preset.start}s</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 const TripHistoryScreen = ({ 
   completedTrips, 
   onClose,
@@ -4115,6 +4598,7 @@ export default function App() {
     const arrival = new Date(currentTime.getTime() + validMins * 60000);
     return formatTime(arrival);
   };
+  const [isOffAppSimulated, setIsOffAppSimulated] = useState(false);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
   const [isCarPlaySynced, setIsCarPlaySynced] = useState(false);
   const [isCarPlayRemoteMode, setIsCarPlayRemoteMode] = useState(false);
@@ -4338,6 +4822,162 @@ export default function App() {
     }
   });
 
+  // --- Custom audio notification alert states ---
+  const [customSoundUrl, setCustomSoundUrl] = useState<string | null>(null);
+  const [customSoundName, setCustomSoundName] = useState<string | null>(null);
+  
+  // Three-way sound preference: 'synthesized' | 'custom_file' | 'youtube'
+  const [soundPreference, setSoundPreference] = useState<'synthesized' | 'custom_file' | 'youtube'>(() => {
+    try {
+      const saved = localStorage.getItem('hyper_driver_sound_pref');
+      return (saved as 'synthesized' | 'custom_file' | 'youtube') || 'synthesized';
+    } catch (e) {
+      return 'synthesized';
+    }
+  });
+
+  const [youtubeUrl, setYoutubeUrl] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('hyper_driver_youtube_url');
+      return saved || 'https://www.youtube.com/watch?v=R96S9V-35ko';
+    } catch (e) {
+      return 'https://www.youtube.com/watch?v=R96S9V-35ko';
+    }
+  });
+
+  const [youtubeStartTime, setYoutubeStartTime] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('hyper_driver_youtube_start');
+      return saved ? parseFloat(saved) : 0;
+    } catch (e) {
+      return 0;
+    }
+  });
+
+  const [youtubeVolume, setYoutubeVolume] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('hyper_driver_youtube_volume');
+      return saved ? parseInt(saved, 10) : 80;
+    } catch (e) {
+      return 80;
+    }
+  });
+
+  // Track isCustomSoundEnabled as a computed helper for backward compatibility inside components
+  const isCustomSoundEnabled = soundPreference === 'custom_file';
+
+  // Persistence hooks
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('hyper_driver_sound_pref', soundPreference);
+    } catch (e) {}
+  }, [soundPreference]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('hyper_driver_youtube_url', youtubeUrl);
+    } catch (e) {}
+  }, [youtubeUrl]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('hyper_driver_youtube_start', youtubeStartTime.toString());
+    } catch (e) {}
+  }, [youtubeStartTime]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('hyper_driver_youtube_volume', youtubeVolume.toString());
+    } catch (e) {}
+  }, [youtubeVolume]);
+
+  const setIsCustomSoundEnabled = (val: boolean) => {
+    setSoundPreference(val ? 'custom_file' : 'synthesized');
+  };
+
+  // Load custom sound from IndexedDB on startup
+  React.useEffect(() => {
+    try {
+      const request = indexedDB.open("hyper_driver_audio_db", 1);
+      request.onupgradeneeded = (e: any) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains("audio_store")) {
+          db.createObjectStore("audio_store");
+        }
+      };
+      request.onsuccess = (e: any) => {
+        const db = e.target.result;
+        const transaction = db.transaction("audio_store", "readonly");
+        const store = transaction.objectStore("audio_store");
+        const getFile = store.get("custom_alert");
+        getFile.onsuccess = () => {
+          if (getFile.result) {
+            const blob = getFile.result.blob;
+            const name = getFile.result.name;
+            const url = URL.createObjectURL(blob);
+            setCustomSoundUrl(url);
+            setCustomSoundName(name);
+            // Only force custom file option if previous preference was custom_file
+            const savedPref = localStorage.getItem('hyper_driver_sound_pref');
+            if (savedPref === 'custom_file') {
+              setSoundPreference('custom_file');
+            }
+            addDebugLog('success', `Loaded custom sound file: ${name}`);
+          }
+        };
+      };
+    } catch (e) {
+      console.warn("IndexedDB not supported or blocked", e);
+    }
+  }, [addDebugLog]);
+
+  const handleCustomSoundUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const url = URL.createObjectURL(file);
+      setCustomSoundUrl(url);
+      setCustomSoundName(file.name);
+      setSoundPreference('custom_file');
+
+      const request = indexedDB.open("hyper_driver_audio_db", 1);
+      request.onupgradeneeded = (e: any) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains("audio_store")) {
+          db.createObjectStore("audio_store");
+        }
+      };
+      request.onsuccess = (e: any) => {
+        const db = e.target.result;
+        const transaction = db.transaction("audio_store", "readwrite");
+        const store = transaction.objectStore("audio_store");
+        store.put({ blob: file, name: file.name }, "custom_alert");
+        addDebugLog('success', `Saved custom alert sound in IndexedDB: ${file.name}`);
+      };
+    } catch (e) {
+      console.error("Failed to save custom sound", e);
+    }
+  };
+
+  const handleClearCustomSound = () => {
+    setCustomSoundUrl(null);
+    setCustomSoundName(null);
+    if (soundPreference === 'custom_file') {
+      setSoundPreference('synthesized');
+    }
+    try {
+      const request = indexedDB.open("hyper_driver_audio_db", 1);
+      request.onsuccess = (e: any) => {
+        const db = e.target.result;
+        const transaction = db.transaction("audio_store", "readwrite");
+        const store = transaction.objectStore("audio_store");
+        store.delete("custom_alert");
+        addDebugLog('info', "Removed custom sound file.");
+      };
+    } catch (e) {}
+  };
+
   const playHyperSound = React.useCallback((type: 'order' | 'accept' | 'message' | 'complete' | 'radar') => {
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -4367,48 +5007,120 @@ export default function App() {
       if (type === 'order') {
         const now = audioCtx.currentTime;
         
-        // Exact high-fidelity replication of the bright, dual-chime Uber Eats mobile notification sound
-        const playBrightChime = (freq: number, startTime: number, duration: number, volume = 0.15) => {
-          const osc1 = audioCtx.createOscillator();
-          const osc2 = audioCtx.createOscillator();
-          const gainNode = audioCtx.createGain();
+        let customFilePlayed = false;
+        
+        // 1. YouTube Audio Alert Playback
+        if (soundPreference === 'youtube') {
+          const iframe = document.getElementById('youtube-alert-player') as HTMLIFrameElement;
+          if (iframe && iframe.contentWindow) {
+            try {
+              iframe.contentWindow.postMessage(JSON.stringify({
+                event: 'command',
+                func: 'seekTo',
+                args: [youtubeStartTime, true]
+              }), '*');
+              
+              iframe.contentWindow.postMessage(JSON.stringify({
+                event: 'command',
+                func: 'setVolume',
+                args: [youtubeVolume]
+              }), '*');
 
-          osc1.type = 'sine';
-          osc2.type = 'sine';
+              iframe.contentWindow.postMessage(JSON.stringify({
+                event: 'command',
+                func: 'playVideo',
+                args: []
+              }), '*');
+            } catch (e) {
+              console.warn("YouTube play message failed", e);
+            }
+          }
+          return;
+        }
+        
+        // 2. Custom Uploaded Audio File Alert Playback
+        if (soundPreference === 'custom_file' && customSoundUrl) {
+          try {
+            const audio = new Audio(customSoundUrl);
+            audio.volume = 0.7;
+            audio.play().then(() => {
+              customFilePlayed = true;
+            }).catch(err => {
+              console.warn("Custom sound playback failed, trying preloaded file", err);
+              playPublicFilesAndFallback();
+            });
+          } catch(e) {
+            playPublicFilesAndFallback();
+          }
+        } else {
+          playPublicFilesAndFallback();
+        }
 
-          osc1.frequency.setValueAtTime(freq, startTime);
-          osc2.frequency.setValueAtTime(freq * 2, startTime); // Rich double-octave purity
+        function playPublicFilesAndFallback() {
+          // 3. Try playing /order.mp3 from public folder
+          const audioMp3 = new Audio('/order.mp3');
+          audioMp3.volume = 0.6;
+          audioMp3.play()
+            .then(() => { customFilePlayed = true; })
+            .catch(() => {
+              // 4. Try playing /order.wav from public folder
+              const audioWav = new Audio('/order.wav');
+              audioWav.volume = 0.6;
+              audioWav.play()
+                .then(() => { customFilePlayed = true; })
+                .catch(() => {
+                  // 5. Synthesizer replica of the crisp, high-pitch rhythmic alarm chime
+                  playSynthesizedIncomingRadar(audioCtx, now);
+                });
+            });
+        }
 
-          gainNode.gain.setValueAtTime(0.001, startTime);
-          gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.012);
-          gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        function playSynthesizedIncomingRadar(ctx: AudioContext, startTime: number) {
+          const playPingNode = (freq: number, triggerTime: number, duration: number, vol = 0.18) => {
+            const oscRes = ctx.createOscillator();
+            const oscSubNode = ctx.createOscillator();
+            const filterDef = ctx.createBiquadFilter();
+            const gainDef = ctx.createGain();
 
-          osc1.connect(gainNode);
-          osc2.connect(gainNode);
-          gainNode.connect(audioCtx.destination);
+            oscRes.type = 'sine';
+            oscSubNode.type = 'triangle';
 
-          osc1.start(startTime);
-          osc2.start(startTime);
+            oscRes.frequency.setValueAtTime(freq, triggerTime);
+            oscRes.frequency.exponentialRampToValueAtTime(freq * 0.9, triggerTime + duration);
 
-          osc1.stop(startTime + duration);
-          osc2.stop(startTime + duration);
-        };
+            oscSubNode.frequency.setValueAtTime(freq * 0.5, triggerTime);
+            oscSubNode.frequency.exponentialRampToValueAtTime(freq * 0.45, triggerTime + duration);
 
-        // First dual chime (B5 followed by E6 in rapid 0.05s arpeggio resonance)
-        playBrightChime(987.77, now, 0.22, 0.16);         // B5 fundamental
-        playBrightChime(1318.51, now + 0.05, 0.32, 0.14);  // E6 fundamental
+            filterDef.type = 'lowpass';
+            filterDef.frequency.setValueAtTime(freq * 2.2, triggerTime);
+            filterDef.Q.setValueAtTime(2, triggerTime);
 
-        // Second dual chime (repeating the pattern 0.35s later for a perfect bouncy rhythm)
-        playBrightChime(987.77, now + 0.35, 0.22, 0.16);
-        playBrightChime(1318.51, now + 0.40, 0.32, 0.14);
+            gainDef.gain.setValueAtTime(0.001, triggerTime);
+            gainDef.gain.linearRampToValueAtTime(vol, triggerTime + 0.015);
+            gainDef.gain.exponentialRampToValueAtTime(0.001, triggerTime + duration);
+
+            oscRes.connect(filterDef);
+            oscSubNode.connect(filterDef);
+            filterDef.connect(gainDef);
+            gainDef.connect(ctx.destination);
+
+            oscRes.start(triggerTime);
+            oscSubNode.start(triggerTime);
+
+            oscRes.stop(triggerTime + duration);
+            oscSubNode.stop(triggerTime + duration);
+          };
+
+          // Highly recognizable dual-ping alarm sound spacing
+          playPingNode(1046.50, startTime, 0.45, 0.22); // C6 Note
+          playPingNode(1046.50, startTime + 0.35, 0.45, 0.22); // C6 secondary bounce
+        }
 
       } else if (type === 'radar') {
-        // High-tech, double-pulse sonar sweeping sound for radar trips
         const now = audioCtx.currentTime;
         playTone(1000, now, 0.15, 'sine', 0.12);
         playTone(1350, now + 0.1, 0.25, 'sine', 0.08);
       } else if (type === 'accept') {
-        // High-fidelity ascending soft synth sweep resolver from the video
         const now = audioCtx.currentTime;
         playTone(554.37, now, 0.08, 'sine', 0.08);
         playTone(659.25, now + 0.06, 0.08, 'sine', 0.08);
@@ -4425,21 +5137,52 @@ export default function App() {
     } catch (e) {
       console.warn("Audio not supported or blocked", e);
     }
-  }, []);
+  }, [soundPreference, customSoundUrl, youtubeUrl, youtubeStartTime, youtubeVolume]);
 
   // Loop high-fidelity order sound while pending order is open
   useEffect(() => {
-    if (!pendingOrder) return;
+    if (!pendingOrder) {
+      if (soundPreference === 'youtube') {
+        const iframe = document.getElementById('youtube-alert-player') as HTMLIFrameElement;
+        if (iframe && iframe.contentWindow) {
+          try {
+            iframe.contentWindow.postMessage(JSON.stringify({
+              event: 'command',
+              func: 'pauseVideo',
+              args: []
+            }), '*');
+          } catch (e) {}
+        }
+      }
+      return;
+    }
     
     // Play immediately
     playHyperSound('order');
     
+    // Youtube alert loops on a longer timer to feel more natural and not click too closely
+    const intervalTime = soundPreference === 'youtube' ? 2500 : 1200;
+    
     const interval = setInterval(() => {
       playHyperSound('order');
-    }, 1200);
+    }, intervalTime);
     
-    return () => clearInterval(interval);
-  }, [pendingOrder, playHyperSound]);
+    return () => {
+      clearInterval(interval);
+      if (soundPreference === 'youtube') {
+        const iframe = document.getElementById('youtube-alert-player') as HTMLIFrameElement;
+        if (iframe && iframe.contentWindow) {
+          try {
+            iframe.contentWindow.postMessage(JSON.stringify({
+              event: 'command',
+              func: 'pauseVideo',
+              args: []
+            }), '*');
+          } catch (e) {}
+        }
+      }
+    };
+  }, [pendingOrder, playHyperSound, soundPreference]);
 
   // Persist today's total earnings
   useEffect(() => {
@@ -5683,8 +6426,10 @@ export default function App() {
     }
     lastNoteRef.current = { title, body, time: now };
     
-    // Real Notifications
-    if ("Notification" in window && Notification.permission === "granted") {
+    // Real Notifications: Only dispatch system browser alerts when the driver is ONLINE and NOT ON THE ACTIVE APP!
+    // "not on the app" means: standard window is hidden OR they have simulated background / off-app mode toggled on.
+    const isOffApp = document.visibilityState === 'hidden' || document.hidden || isOffAppSimulated;
+    if (user.isOnline && isOffApp && "Notification" in window && Notification.permission === "granted") {
       try {
         // Prefer service worker showNotification details when available for reliable background dispatch on Android/PWA
         if (navigator.serviceWorker && navigator.serviceWorker.ready) {
@@ -6926,8 +7671,21 @@ export default function App() {
         </AnimatePresence>
 
         <div className="flex-1 relative overflow-hidden flex flex-col">
-          <AnimatePresence>
-            {currentScreen === 'onboarding' && (
+          <AnimatePresence mode="wait">
+            {isOffAppSimulated ? (
+              <SimulatedHomeScreen
+                pendingOrder={pendingOrder}
+                isOnline={user.isOnline}
+                onOpenApp={() => setIsOffAppSimulated(false)}
+                activeOrders={activeOrders}
+                navSimulation={navSimulation}
+                onAcceptOrder={handleAcceptOrder}
+                onRejectOrder={handleDeclineOrder}
+                orderExpiryTimer={orderExpiryTimer}
+                addToast={addToast}
+                addDebugLog={addDebugLog}
+              />
+            ) : currentScreen === 'onboarding' && (
               <OnboardingFlow 
                 user={user}
                 setUser={setUser}
@@ -8470,7 +9228,19 @@ export default function App() {
                     </motion.div>
                   )}
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    {user.isOnline && (
+                      <button 
+                        onClick={() => {
+                          setIsOffAppSimulated(true);
+                          addToast("Off-App Mode", "Simulating background execution. Tap the floating dot/notification overlay to restore.", "info");
+                        }}
+                        className="w-12 h-12 bg-slate-950 border border-white/10 hover:border-white/20 rounded-full shadow-xl flex items-center justify-center text-blue-400 hover:text-white active:scale-95 transition-all text-sm uppercase font-black shrink-0"
+                        title="Simulate Minimize (Go Off-App)"
+                      >
+                        <Smartphone size={22} className="text-blue-400 animate-pulse" />
+                      </button>
+                    )}
                     <button 
                       onClick={() => setIsSearchOpen(true)}
                       className="w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-black active:scale-95 transition-transform"
@@ -10123,6 +10893,7 @@ export default function App() {
 
               <div className="space-y-1.5">
                 {[
+                  { icon: <Music size={18} className="text-emerald-500 animate-pulse" />, label: "🔊 Alert Pings & Custom Sounds", action: () => setCurrentScreen('audio_settings') },
                   { icon: <Activity size={18} className="text-[#10b981]" />, label: "Vercel Web Analytics (Live HUD)", action: () => setShowWebAnalytics(true) },
                   { icon: <User size={18} />, label: "Personal Information", action: () => setCurrentScreen('personal_details') },
                   { icon: <ShieldCheck size={18} />, label: "Insurance & Plan", action: () => setCurrentScreen('insurance') },
@@ -10349,6 +11120,26 @@ export default function App() {
             />
           )}
 
+          {currentScreen === 'audio_settings' && (
+            <AudioSettingsScreen
+              theme={theme}
+              onClose={() => setCurrentScreen('account')}
+              soundPreference={soundPreference}
+              setSoundPreference={setSoundPreference}
+              customSoundName={customSoundName}
+              customSoundUrl={customSoundUrl}
+              youtubeUrl={youtubeUrl}
+              setYoutubeUrl={setYoutubeUrl}
+              youtubeStartTime={youtubeStartTime}
+              setYoutubeStartTime={setYoutubeStartTime}
+              youtubeVolume={youtubeVolume}
+              setYoutubeVolume={setYoutubeVolume}
+              onCustomSoundUpload={handleCustomSoundUpload}
+              onClearCustomSound={handleClearCustomSound}
+              playHyperSound={playHyperSound}
+            />
+          )}
+
           {currentScreen === 'earnings' && (
             <motion.div key="earnings" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
               <div className="flex items-center gap-4 mb-8">
@@ -10532,7 +11323,7 @@ export default function App() {
           )}
 
           {/* Safety Fallback for unhandled screens */}
-          {!['onboarding', 'documents', 'face_verification', 'home', 'earnings', 'inbox', 'account', 'chat', 'hyper_driver_pro', 'wallet', 'opportunities', 'safety', 'earnings_detail', 'banking', 'scheduled_orders', 'rewards', 'carplay_dashboard', 'trip_history', 'work_hub', 'ratings', 'planner', 'hyper_driver_services', 'vehicle_details', 'payment_methods', 'trip_preferences', 'personal_details', 'insurance'].includes(currentScreen) && (
+          {!['onboarding', 'documents', 'face_verification', 'home', 'earnings', 'inbox', 'account', 'chat', 'hyper_driver_pro', 'wallet', 'opportunities', 'safety', 'earnings_detail', 'banking', 'scheduled_orders', 'rewards', 'carplay_dashboard', 'trip_history', 'work_hub', 'ratings', 'planner', 'hyper_driver_services', 'vehicle_details', 'payment_methods', 'trip_preferences', 'personal_details', 'insurance', 'audio_settings'].includes(currentScreen) && (
             <motion.div 
               key="fallback" 
               initial={{ opacity: 0 }} 
@@ -10582,9 +11373,34 @@ export default function App() {
               user={user}
               isKeepAliveActive={isKeepAliveActive}
               toggleKeepAlive={toggleKeepAlive}
+              customSoundName={customSoundName}
+              customSoundUrl={customSoundUrl}
+              soundPreference={soundPreference}
+              setSoundPreference={setSoundPreference}
+              youtubeUrl={youtubeUrl}
+              setYoutubeUrl={setYoutubeUrl}
+              youtubeStartTime={youtubeStartTime}
+              setYoutubeStartTime={setYoutubeStartTime}
+              youtubeVolume={youtubeVolume}
+              setYoutubeVolume={setYoutubeVolume}
+              onCustomSoundUpload={handleCustomSoundUpload}
+              onClearCustomSound={handleClearCustomSound}
             />
           )}
         </AnimatePresence>
+
+        {/* Hidden YouTube player for custom alerts */}
+        {soundPreference === 'youtube' && (
+          <iframe
+            id="youtube-alert-player"
+            width="1"
+            height="1"
+            src={`https://www.youtube.com/embed/${extractYouTubeVideoId(youtubeUrl) || 'R96S9V-35ko'}?enablejsapi=1&autoplay=0&controls=0&mute=0`}
+            title="YouTube Audio Alert"
+            className="opacity-0 absolute -top-10 -left-10 pointer-events-none"
+            allow="autoplay"
+          />
+        )}
 
         {/* Global Trip Request Overlay - Visible on any screen */}
         <AnimatePresence>
@@ -10711,7 +11527,7 @@ export default function App() {
       </div>
 
       {/* Bottom Nav */}
-      {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && (
+      {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && !isOffAppSimulated && (
         <div className="h-20 bg-white border-t border-gray-100 flex items-center justify-around px-2 z-[2000] shrink-0 relative pb-4 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
           <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={22} />} label="Home" badgeCount={activeOrders.length > 0 ? activeOrders.length : undefined} />
           <NavButton 
@@ -11098,6 +11914,8 @@ app.post('/api/cashout', async (req, res) => {
               user={user}
               setUser={setUser}
               theme={theme}
+              isOffAppSimulated={isOffAppSimulated}
+              setIsOffAppSimulated={setIsOffAppSimulated}
             />
           </motion.div>
         )}
@@ -11142,7 +11960,9 @@ const DebugMonitorView = ({
   addToast,
   user,
   setUser,
-  theme
+  theme,
+  isOffAppSimulated,
+  setIsOffAppSimulated
 }: any) => {
   const [activeTab, setActiveTab] = React.useState<'logs' | 'telemetry' | 'glitchbox' | 'rescue'>('logs');
   const [logFilter, setLogFilter] = React.useState<'all' | 'info' | 'warn' | 'error' | 'success'>('all');
@@ -11397,6 +12217,10 @@ const DebugMonitorView = ({
                     <span className="text-gray-400 text-[10px] font-mono uppercase font-black tracking-wider">Trip Radar queue</span>
                     <span className="font-mono text-xs font-bold text-slate-300">{radarOrders.length} available</span>
                   </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 text-[10px] font-mono uppercase font-black tracking-wider">Off-App status</span>
+                    <span className={`font-mono text-xs font-bold ${isOffAppSimulated ? 'text-yellow-400 animate-pulse' : 'text-slate-500'}`}>{isOffAppSimulated ? 'HIDDEN (HOME SCREEN)' : 'LIVE DRIVER VIEW'}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -11454,6 +12278,17 @@ const DebugMonitorView = ({
             <div>
               <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 font-mono">Simulate Dispatch & Ride Demands</h3>
               <div className="grid sm:grid-cols-2 gap-3">
+                <button 
+                  onClick={() => {
+                    setIsOffAppSimulated(prev => !prev);
+                    addToast(!isOffAppSimulated ? "Minimised App" : "Restored App", !isOffAppSimulated ? "Simulating mobile desktop layout background execution." : "Switched back to driver viewport.", "info");
+                  }}
+                  className="p-4 bg-slate-950/60 border border-amber-500/20 hover:border-amber-500/50 rounded-2xl text-left active:scale-95 transition-all outline-none"
+                >
+                  <h4 className="font-bold text-sm text-amber-500 uppercase tracking-wide">Toggle Off-App Simulation</h4>
+                  <p className="text-[10px] text-gray-400 mt-1 leading-normal">Instantly minimizes or maximizes the driver app layout to test off-app pings & floating bubble widget.</p>
+                </button>
+
                 <button 
                   onClick={triggerInjectBigOrder}
                   className="p-4 bg-slate-950/60 border border-white/5 hover:border-blue-500/35 rounded-2xl text-left active:scale-95 transition-all outline-none"
