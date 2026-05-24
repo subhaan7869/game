@@ -190,7 +190,8 @@ export const WebAnalyticsDashboard: React.FC<WebAnalyticsDashboardProps> = ({
       if (found) {
         return prev.map(e => e.name === eventName ? { ...e, count: e.count + 1, lastTriggered: 'Just now' } : e);
       } else {
-        return [{ id: Date.now().toString(), name: eventName, count: 1, lastTriggered: 'Just now' }, ...prev];
+        const uniqueId = `${eventName}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        return [{ id: uniqueId, name: eventName, count: 1, lastTriggered: 'Just now' }, ...prev];
       }
     });
   }, [currentScreen, trackerActive]);
@@ -204,7 +205,8 @@ export const WebAnalyticsDashboard: React.FC<WebAnalyticsDashboardProps> = ({
       if (found) {
         return prev.map(e => e.name === eventName ? { ...e, count: e.count + 1, lastTriggered: 'Just now' } : e);
       } else {
-        return [{ id: Date.now().toString(), name: eventName, count: 1, lastTriggered: 'Just now' }, ...prev];
+        const uniqueId = `${eventName}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        return [{ id: uniqueId, name: eventName, count: 1, lastTriggered: 'Just now' }, ...prev];
       }
     });
   }, [isOnline]);
