@@ -25,6 +25,7 @@ export interface WebAnalyticsDashboardProps {
   completedTripsCount: number;
   isLowPerformance: boolean;
   isSimulatingMovement: boolean;
+  targetPrice?: number;
 }
 
 // Generate static sample data for Referrers, Countries, Browsers, etc.
@@ -75,7 +76,8 @@ export const WebAnalyticsDashboard: React.FC<WebAnalyticsDashboardProps> = ({
   activeOrdersCount,
   completedTripsCount,
   isLowPerformance,
-  isSimulatingMovement
+  isSimulatingMovement,
+  targetPrice = 5.00
 }) => {
   // Main local state for stats
   const [visitors, setVisitors] = useState(248);
@@ -621,6 +623,7 @@ export const WebAnalyticsDashboard: React.FC<WebAnalyticsDashboardProps> = ({
                       { name: 'is_online_persistence', value: isOnline ? 'ONLINE' : 'OFFLINE', desc: 'Driver went live on core network map' },
                       { name: 'simulate_movement', value: isSimulatingMovement ? 'ACTIVE' : 'INACTIVE', desc: 'GPS automatic mock location walker settings' },
                       { name: 'use_google_maps', value: 'ENABLED', desc: 'Interactive Google Maps Platform component binding' },
+                      { name: 'target_price_limit', value: `£${targetPrice.toFixed(2)}`, desc: 'Minimum acceptable payout filter for matched jobs' },
                     ].map(flag => (
                       <div key={flag.name} className="p-3 rounded-xl bg-[#12141f]/35 border border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
                         <div>

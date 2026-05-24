@@ -4883,6 +4883,23 @@ export default function App() {
     }
   });
 
+  const [targetPrice, setTargetPrice] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('hyper_driver_target_price');
+      return saved ? parseFloat(saved) : 5.00;
+    } catch (e) {
+      return 5.00;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('hyper_driver_target_price', targetPrice.toString());
+    } catch (e) {
+      console.error(e);
+    }
+  }, [targetPrice]);
+
   const [busynessMode, setBusynessMode] = useState<'Low' | 'Medium' | 'High'>('Medium');
   const [globalSurge, setGlobalSurge] = useState(1.0);
 
@@ -5950,19 +5967,27 @@ export default function App() {
           newOrder = generateSmartOrder();
         }
 
-        // Apply final job preference filter
+        // Apply final job preference filter and target price filter
         if (newOrder) {
           const isMatchPref = jobTypePreference === 'both' || 
             (jobTypePreference === 'matching' && newOrder.isMatching) || 
             (jobTypePreference === 'normal' && !newOrder.isMatching);
 
+          const meetsTargetPrice = newOrder.estimatedPay >= targetPrice;
+
           if (isMatchPref) {
-            setPendingOrder(newOrder);
-            setOrderExpiryTimer(18); // Give 18 seconds to decide
-            const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
-            const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
-            sendNotification(prefix + (shouldPickScheduled ? "Scheduled" : "High Priority") + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "HyperX"}`);
-            playHyperSound('order');
+            if (meetsTargetPrice) {
+              setPendingOrder(newOrder);
+              setOrderExpiryTimer(18); // Give 18 seconds to decide
+              const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
+              const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
+              sendNotification(prefix + (shouldPickScheduled ? "Scheduled" : "High Priority") + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "HyperX"}`);
+              playHyperSound('order');
+            } else {
+              // Auto-skipped/declined!
+              sendNotification("Auto-Skip Filter", `Skipped £${newOrder.estimatedPay.toFixed(2)} trip - below £${targetPrice.toFixed(2)} target price.`);
+              scheduleNextOrder();
+            }
           } else {
             scheduleNextOrder();
           }
@@ -5974,7 +5999,7 @@ export default function App() {
 
     scheduleNextOrder();
     return () => clearTimeout(timer);
-  }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference, busynessMode, isOnBreak, radarOrders.length]);
+  }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference, targetPrice, busynessMode, isOnBreak, radarOrders.length]);
 
   const handleAcceptOrder = () => {
     if (!pendingOrder) return;
@@ -7059,6 +7084,16 @@ export default function App() {
                       <MapPin size={10} />
                       Google Maps
                     </button>
+                  </div>
+
+                  {/* Target Price Float indicator */}
+                  <div 
+                    onClick={() => setCurrentScreen('trip_preferences')}
+                    className="absolute top-28 right-4 z-50 flex items-center gap-2 bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2 shadow-2xl pointer-events-auto cursor-pointer active:scale-95 hover:border-white/20 transition-all"
+                  >
+                    <Target size={12} className="text-blue-500" />
+                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Target Pay:</span>
+                    <span className="text-xs font-black text-green-400">≥£{targetPrice.toFixed(2)}</span>
                   </div>
                   
                   {!location && (
@@ -9110,10 +9145,65 @@ export default function App() {
                 </div>
 
                 <div className={`p-6 rounded-[32px] border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}>
+                  <h3 className="font-black text-xl mb-2 flex items-center gap-2">
+                    <Target size={20} className="text-blue-500" />
+                    Target Price Filter
+                  </h3>
+                  <p className="text-sm text-gray-400 font-bold mb-4">Minimum trip payout you are willing to accept. Auto-declines lower paying trips.</p>
+                  
+                  <div className="flex flex-col gap-4">
+                    <div className={`flex items-center justify-between p-4 rounded-2xl shadow-sm ${theme === 'dark' ? 'bg-black/20 border border-white/5' : 'bg-white'}`}>
+                      <div className="flex flex-col">
+                        <span className="font-black text-xs text-gray-400 uppercase tracking-wider">Accepting Over</span>
+                        <span className="text-2xl font-black text-blue-600">£{targetPrice.toFixed(2)}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setTargetPrice(prev => Math.max(2.00, Number((prev - 0.50).toFixed(2))))}
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg ${theme === 'dark' ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'} active:scale-95 transition-transform`}
+                        >
+                          -
+                        </button>
+                        <button 
+                          onClick={() => setTargetPrice(prev => Math.min(50.00, Number((prev + 0.50).toFixed(2))))}
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg ${theme === 'dark' ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'} active:scale-95 transition-transform`}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { label: 'Any (£2)', val: 2.00 },
+                        { label: '£5.00', val: 5.00 },
+                        { label: '£10.00', val: 10.00 },
+                        { label: '£15.00', val: 15.00 }
+                      ].map(preset => (
+                        <button
+                          key={preset.val}
+                          onClick={() => {
+                            setTargetPrice(preset.val);
+                            sendNotification("Target Price Updated", `Minimum order limit set to £${preset.val.toFixed(2)}`);
+                          }}
+                          className={`py-2 px-1 rounded-xl font-bold text-xs text-center border transition-all ${
+                            targetPrice === preset.val 
+                              ? 'bg-blue-600 border-blue-600 text-white font-black shadow-md'
+                              : theme === 'dark' ? 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10' : 'bg-gray-50 border-transparent text-gray-650 hover:bg-gray-100'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`p-6 rounded-[32px] border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}>
                   <h3 className="font-black text-xl mb-2">Delivery Limit</h3>
                   <p className="text-sm text-gray-400 font-bold mb-4">Maximum active deliveries at one time.</p>
-                  <div className="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm">
-                    <span className="font-black text-blue-900">Current Limit</span>
+                  <div className={`flex items-center justify-between p-4 rounded-2xl shadow-sm ${theme === 'dark' ? 'bg-black/20 border border-white/5 text-white' : 'bg-white text-blue-900'}`}>
+                    <span className="font-black">Current Limit</span>
                     <span className="text-2xl font-black text-blue-600">3</span>
                   </div>
                 </div>
@@ -10898,6 +10988,7 @@ app.post('/api/cashout', async (req, res) => {
             completedTripsCount={completedTrips.length}
             isLowPerformance={isLowPerformance}
             isSimulatingMovement={isSimulatingMovement}
+            targetPrice={targetPrice}
           />
         )}
       </AnimatePresence>

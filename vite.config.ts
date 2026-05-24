@@ -20,12 +20,24 @@ export default defineConfig(({mode}) => {
           navigateFallback: '/index.html'
         },
         manifest: {
-          name: 'Uber Clone',
-          short_name: 'Uber',
-          description: 'Uber Clone offline app',
-          theme_color: '#000000',
-          background_color: '#000000',
-          display: 'standalone'
+          name: 'Hyper Driver Dashboard',
+          short_name: 'Hyper Driver',
+          description: 'Interactive High-Fidelity Open Banking & Driver Ledger Simulator',
+          theme_color: '#090a0f',
+          background_color: '#090a0f',
+          display: 'standalone',
+          icons: [
+            {
+              src: '/icon.png',
+              sizes: '192x192',
+              type: 'image/png'
+            },
+            {
+              src: '/icon.png',
+              sizes: '512x512',
+              type: 'image/png'
+            }
+          ]
         }
       })
     ],
