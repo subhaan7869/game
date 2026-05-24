@@ -4366,14 +4366,42 @@ export default function App() {
 
       if (type === 'order') {
         const now = audioCtx.currentTime;
-        // Perfect representation of the dual-chord "Plop-pleep" chimes in the video, played twice
-        // First chime
-        playTone(659.25, now, 0.15, 'sine', 0.15);
-        playTone(880.00, now + 0.08, 0.22, 'sine', 0.12);
+        
+        // Exact high-fidelity replication of the bright, dual-chime Uber Eats mobile notification sound
+        const playBrightChime = (freq: number, startTime: number, duration: number, volume = 0.15) => {
+          const osc1 = audioCtx.createOscillator();
+          const osc2 = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
 
-        // Second chime 0.45 seconds later
-        playTone(659.25, now + 0.45, 0.15, 'sine', 0.15);
-        playTone(880.00, now + 0.53, 0.22, 'sine', 0.12);
+          osc1.type = 'sine';
+          osc2.type = 'sine';
+
+          osc1.frequency.setValueAtTime(freq, startTime);
+          osc2.frequency.setValueAtTime(freq * 2, startTime); // Rich double-octave purity
+
+          gainNode.gain.setValueAtTime(0.001, startTime);
+          gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.012);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+          osc1.connect(gainNode);
+          osc2.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+
+          osc1.start(startTime);
+          osc2.start(startTime);
+
+          osc1.stop(startTime + duration);
+          osc2.stop(startTime + duration);
+        };
+
+        // First dual chime (B5 followed by E6 in rapid 0.05s arpeggio resonance)
+        playBrightChime(987.77, now, 0.22, 0.16);         // B5 fundamental
+        playBrightChime(1318.51, now + 0.05, 0.32, 0.14);  // E6 fundamental
+
+        // Second dual chime (repeating the pattern 0.35s later for a perfect bouncy rhythm)
+        playBrightChime(987.77, now + 0.35, 0.22, 0.16);
+        playBrightChime(1318.51, now + 0.40, 0.32, 0.14);
+
       } else if (type === 'radar') {
         // High-tech, double-pulse sonar sweeping sound for radar trips
         const now = audioCtx.currentTime;
@@ -4408,7 +4436,7 @@ export default function App() {
     
     const interval = setInterval(() => {
       playHyperSound('order');
-    }, 1800);
+    }, 1200);
     
     return () => clearInterval(interval);
   }, [pendingOrder, playHyperSound]);
@@ -10576,7 +10604,7 @@ export default function App() {
               <div className="flex items-center justify-between px-6 pt-3 pb-2 shrink-0">
                 <div className="flex items-center gap-2 bg-[#00b050] text-white px-4 py-2 rounded-full font-black text-xs uppercase tracking-wider shadow-sm">
                   <span className="text-base leading-none">🍴</span>
-                  <span className="align-middle">Ajouter une livraison</span>
+                  <span className="align-middle">Add delivery</span>
                 </div>
                 
                 <button 
@@ -10591,12 +10619,12 @@ export default function App() {
               {/* Main payout and details */}
               <div className="px-6 py-2 shrink-0">
                 <h2 className="font-sans text-[48px] font-black text-gray-900 tracking-tight leading-none">
-                  +{pendingOrder.estimatedPay.toFixed(2).replace('.', ',')} €
+                  +£{pendingOrder.estimatedPay.toFixed(2)}
                 </h2>
                 
                 <div className="flex items-center gap-2 mt-2.5 text-gray-700 font-bold text-sm">
                   <span className="text-base">⏱️</span>
-                  <span className="text-black font-black">+{ (pendingOrder.estimatedDistance * 1.609).toFixed(1) } km</span>
+                  <span className="text-black font-black">+{ pendingOrder.estimatedDistance.toFixed(1) } mi</span>
                   <span className="text-gray-300">•</span>
                   <span>{pendingOrder.estimatedTime} min</span>
                 </div>
@@ -10612,12 +10640,12 @@ export default function App() {
 
                   <div>
                     <p className="font-sans text-lg font-black text-gray-900 leading-tight">
-                      {pendingOrder.restaurantName || "Chamas Tacos - Dijon Garibaldi"}
+                      {pendingOrder.restaurantName || "Pizza Express - Holborn"}
                     </p>
                     <p className="font-sans text-xs text-gray-500 font-bold mt-1">
                       {pendingOrder.type === 'delivery' 
-                        ? "2 Rue du Mouton, 21000 Dijon, France" 
-                        : "Lieu de prise en charge"}
+                        ? "12 Kingsway, Holborn, London WC2B 6YB" 
+                        : "Driver Pickup Point"}
                     </p>
                   </div>
 
@@ -10628,12 +10656,12 @@ export default function App() {
 
                   <div className="pt-2">
                     <p className="font-sans text-[15px] text-gray-600 font-black leading-tight">
-                      {pendingOrder.type === 'delivery' ? `O'Tacos ou Client: ${pendingOrder.customerName}` : "Lieu de destination"}
+                      {pendingOrder.type === 'delivery' ? `Customer: ${pendingOrder.customerName}` : "Passenger Dropoff"}
                     </p>
                     <p className="font-sans text-xs text-gray-400 font-bold mt-1">
                       {pendingOrder.type === 'delivery' 
-                        ? `${Math.floor(4 + Math.random() * 25)} Rue de la Liberté, 21000 Dijon, France`
-                        : "Adresse de destination finale"}
+                        ? "48 High Holborn, London WC1V 6RL"
+                        : "Final Destination Address"}
                     </p>
                   </div>
                 </div>
@@ -10665,13 +10693,13 @@ export default function App() {
                           transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
                           className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full"
                         />
-                        <span>Chargement...</span>
+                        <span>Matching...</span>
                       </>
                     ) : isMatchFailed ? (
-                      <span>Un autre livreur a accepté</span>
+                      <span>Another driver accepted</span>
                     ) : (
                       <span className="tracking-wide uppercase font-sans font-black">
-                        Accepter • {orderExpiryTimer}s
+                        Accept • {orderExpiryTimer}s
                       </span>
                     )}
                   </span>
