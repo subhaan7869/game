@@ -4351,13 +4351,13 @@ export default function App() {
         audioCtx.resume().catch(() => {});
       }
       
-      const playTone = (freq: number, startTime: number, duration: number, type: OscillatorType = 'sine', volume = 0.1) => {
+      const playTone = (freq: number, startTime: number, duration: number, toneType: OscillatorType = 'sine', volume = 0.1) => {
         const oscillator = audioCtx.createOscillator();
         const gainNode = audioCtx.createGain();
-        oscillator.type = type;
+        oscillator.type = toneType;
         oscillator.frequency.setValueAtTime(freq, startTime);
         gainNode.gain.setValueAtTime(volume, startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
         oscillator.connect(gainNode);
         gainNode.connect(audioCtx.destination);
         oscillator.start(startTime);
@@ -4366,18 +4366,25 @@ export default function App() {
 
       if (type === 'order') {
         const now = audioCtx.currentTime;
-        for (let i = 0; i < 3; i++) {
-          playTone(880, now + i * 0.4, 0.3, 'sine', 0.15);
-          playTone(1760, now + i * 0.4 + 0.05, 0.1, 'sine', 0.05);
-        }
+        // Perfect representation of the dual-chord "Plop-pleep" chimes in the video, played twice
+        // First chime
+        playTone(659.25, now, 0.15, 'sine', 0.15);
+        playTone(880.00, now + 0.08, 0.22, 'sine', 0.12);
+
+        // Second chime 0.45 seconds later
+        playTone(659.25, now + 0.45, 0.15, 'sine', 0.15);
+        playTone(880.00, now + 0.53, 0.22, 'sine', 0.12);
       } else if (type === 'radar') {
         // High-tech, double-pulse sonar sweeping sound for radar trips
         const now = audioCtx.currentTime;
         playTone(1000, now, 0.15, 'sine', 0.12);
         playTone(1350, now + 0.1, 0.25, 'sine', 0.08);
       } else if (type === 'accept') {
-        playTone(440, audioCtx.currentTime, 0.1, 'sine', 0.1);
-        playTone(880, audioCtx.currentTime + 0.1, 0.2, 'sine', 0.05);
+        // High-fidelity ascending soft synth sweep resolver from the video
+        const now = audioCtx.currentTime;
+        playTone(554.37, now, 0.08, 'sine', 0.08);
+        playTone(659.25, now + 0.06, 0.08, 'sine', 0.08);
+        playTone(880.00, now + 0.12, 0.18, 'sine', 0.08);
       } else if (type === 'message') {
         playTone(523.25, audioCtx.currentTime, 0.1, 'sine', 0.1);
         playTone(523.25, audioCtx.currentTime + 0.15, 0.1, 'sine', 0.1);
@@ -4391,6 +4398,20 @@ export default function App() {
       console.warn("Audio not supported or blocked", e);
     }
   }, []);
+
+  // Loop high-fidelity order sound while pending order is open
+  useEffect(() => {
+    if (!pendingOrder) return;
+    
+    // Play immediately
+    playHyperSound('order');
+    
+    const interval = setInterval(() => {
+      playHyperSound('order');
+    }, 1800);
+    
+    return () => clearInterval(interval);
+  }, [pendingOrder, playHyperSound]);
 
   // Persist today's total earnings
   useEffect(() => {
@@ -10545,139 +10566,116 @@ export default function App() {
               animate={{ y: 0 }} 
               exit={{ y: '100%' }} 
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="absolute inset-x-0 bottom-0 z-[5000] h-[75vh] bg-black/95 text-white rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden border-t border-white/10"
+              className="absolute inset-x-0 bottom-0 z-[5000] w-full max-w-md mx-auto bg-white text-black rounded-t-[36px] shadow-[0_-15px_45px_rgba(0,0,0,0.22)] flex flex-col overflow-hidden border-t border-gray-100 pb-2"
+              id="uber-incoming-trip-sheet"
             >
-              {/* Map Preview (Simulated) */}
-              <div className="h-48 w-full relative overflow-hidden bg-gray-900 shrink-0">
-                <div className="absolute inset-0 opacity-30" style={{ 
-                  backgroundImage: 'linear-gradient(90deg, #333 1px, transparent 1px), linear-gradient(#333 1px, transparent 1px)',
-                  backgroundSize: '20px 20px'
-                }} />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="relative w-full h-full max-w-[500px]">
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 500 300" preserveAspectRatio="xMidYMid meet">
-                      <motion.path 
-                        d="M 50 150 Q 150 50 250 150" 
-                        fill="none" 
-                        stroke="#3b82f6" 
-                        strokeWidth="8" 
-                        strokeDasharray="12,12"
-                        initial={{ strokeDashoffset: 100 }}
-                        animate={{ strokeDashoffset: 0 }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      />
-                      <motion.path 
-                        d="M 250 150 Q 350 250 450 150" 
-                        fill="none" 
-                        stroke="#10b981" 
-                        strokeWidth="8" 
-                        strokeDasharray="12,12"
-                        initial={{ strokeDashoffset: 100 }}
-                        animate={{ strokeDashoffset: 0 }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      />
-                    </svg>
-                    <div className="absolute left-[10%] top-[150px] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg" />
-                    <div className="absolute left-[50%] top-[150px] -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-green-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-                      <Coffee size={16} className="text-white" />
-                    </div>
-                    <div className="absolute left-[90%] top-[150px] -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-                      <User size={16} className="text-white" />
-                    </div>
-                  </div>
+              {/* Top Handle bar */}
+              <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mt-3 shrink-0" />
+
+              {/* Header section with badge & close button */}
+              <div className="flex items-center justify-between px-6 pt-3 pb-2 shrink-0">
+                <div className="flex items-center gap-2 bg-[#00b050] text-white px-4 py-2 rounded-full font-black text-xs uppercase tracking-wider shadow-sm">
+                  <span className="text-base leading-none">🍴</span>
+                  <span className="align-middle">Ajouter une livraison</span>
                 </div>
-                <div className="absolute top-4 left-6 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase border border-white/10">
-                  New Trip Request
+                
+                <button 
+                  onClick={handleDeclineOrder}
+                  className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors active:scale-90"
+                  aria-label="Decline"
+                >
+                  <X size={20} className="text-gray-600" />
+                </button>
+              </div>
+
+              {/* Main payout and details */}
+              <div className="px-6 py-2 shrink-0">
+                <h2 className="font-sans text-[48px] font-black text-gray-900 tracking-tight leading-none">
+                  +{pendingOrder.estimatedPay.toFixed(2).replace('.', ',')} €
+                </h2>
+                
+                <div className="flex items-center gap-2 mt-2.5 text-gray-700 font-bold text-sm">
+                  <span className="text-base">⏱️</span>
+                  <span className="text-black font-black">+{ (pendingOrder.estimatedDistance * 1.609).toFixed(1) } km</span>
+                  <span className="text-gray-300">•</span>
+                  <span>{pendingOrder.estimatedTime} min</span>
                 </div>
               </div>
 
-              <div className="flex-1 p-8 pt-4 flex flex-col relative">
-                <button 
-                  onClick={handleDeclineOrder}
-                  className="absolute top-4 right-4 w-12 h-12 bg-white/10 hover:bg-white/20 active:scale-90 rounded-full flex items-center justify-center transition-all z-30 border border-white/5"
-                  aria-label="Decline"
-                >
-                  <X size={24} className="text-gray-400" />
-                </button>
-                <div className="flex justify-between items-start mb-8">
+              {/* Delivery Addresses Chain */}
+              <div className="px-6 py-4 flex-1 overflow-y-auto">
+                <div className="relative pl-8 border-l-2 border-dashed border-gray-300 ml-3 py-1 space-y-5">
+                  {/* Pickup dot (black square with internal dot) */}
+                  <div className="absolute left-[-8px] top-[12px] w-4 h-4 bg-black rounded-sm flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                  </div>
+
                   <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${pendingOrder.type === 'ride' ? 'bg-white text-black' : pendingOrder.isMatching ? 'bg-orange-500 text-white' : 'bg-blue-600 text-white shadow-[0_5px_15px_rgba(37,99,235,0.3)]'}`}>
-                        {pendingOrder.type === 'ride' ? 'HyperX' : pendingOrder.isStacked ? 'Stacked • Max+1' : pendingOrder.isMatching ? 'Matching Trip' : 'New Trip'}
+                    <p className="font-sans text-lg font-black text-gray-900 leading-tight">
+                      {pendingOrder.restaurantName || "Chamas Tacos - Dijon Garibaldi"}
+                    </p>
+                    <p className="font-sans text-xs text-gray-500 font-bold mt-1">
+                      {pendingOrder.type === 'delivery' 
+                        ? "2 Rue du Mouton, 21000 Dijon, France" 
+                        : "Lieu de prise en charge"}
+                    </p>
+                  </div>
+
+                  {/* Dropoff destination point icon (blue circular dot) */}
+                  <div className="absolute left-[-7px] bottom-[10px] w-3.5 h-3.5 rounded-full bg-blue-600 flex items-center justify-center">
+                    <div className="w-1 h-1 bg-white rounded-full" />
+                  </div>
+
+                  <div className="pt-2">
+                    <p className="font-sans text-[15px] text-gray-600 font-black leading-tight">
+                      {pendingOrder.type === 'delivery' ? `O'Tacos ou Client: ${pendingOrder.customerName}` : "Lieu de destination"}
+                    </p>
+                    <p className="font-sans text-xs text-gray-400 font-bold mt-1">
+                      {pendingOrder.type === 'delivery' 
+                        ? `${Math.floor(4 + Math.random() * 25)} Rue de la Liberté, 21000 Dijon, France`
+                        : "Adresse de destination finale"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Accept Trigger Button section */}
+              <div className="p-6 pt-2 shrink-0">
+                <button 
+                  onClick={handleAcceptOrder}
+                  disabled={isMatchingLoading || isMatchFailed}
+                  className="relative w-full py-5 bg-[#00b050] hover:bg-[#009e48] active:scale-[0.98] transition-all text-white rounded-2xl font-black text-xl shadow-[0_12px_36px_rgba(0,176,80,0.32)] overflow-hidden flex items-center justify-center min-h-[64px]"
+                >
+                  {/* Action progress countdown line */}
+                  {!isMatchingLoading && !isMatchFailed && (
+                    <motion.div 
+                      key={`uber-timer-${pendingOrder.id}`}
+                      initial={{ width: '100%' }}
+                      animate={{ width: '0%' }}
+                      transition={{ duration: 18, ease: 'linear' }}
+                      className="absolute bottom-0 left-0 h-1.5 bg-white/35 z-20"
+                    />
+                  )}
+
+                  <span className="relative z-10 flex items-center gap-3">
+                    {isMatchingLoading ? (
+                      <>
+                        <motion.div 
+                          animate={{ rotate: 360 }}
+                          transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                          className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full"
+                        />
+                        <span>Chargement...</span>
+                      </>
+                    ) : isMatchFailed ? (
+                      <span>Un autre livreur a accepté</span>
+                    ) : (
+                      <span className="tracking-wide uppercase font-sans font-black">
+                        Accepter • {orderExpiryTimer}s
                       </span>
-                      {pendingOrder.surge && (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-blue-500 text-white flex items-center gap-1">
-                          <Zap size={10} fill="currentColor" />
-                          {pendingOrder.surge}x
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="font-display text-5xl font-black mb-1">£{pendingOrder.estimatedPay.toFixed(2)}</h2>
-                    <p className="text-gray-500 font-black tracking-widest uppercase text-[10px]">Estimated Earnings</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-display font-black text-2xl">{getArrivalTime(pendingOrder.estimatedTime)}</p>
-                    <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest">{pendingOrder.estimatedDistance.toFixed(1)} mi • {pendingOrder.estimatedTime} min</p>
-                  </div>
-                </div>
-
-                <div className="space-y-6 mb-8">
-                  <div className="flex items-start gap-4">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${pendingOrder.type === 'ride' ? 'bg-blue-500/20 text-blue-500' : 'bg-orange-500/20 text-orange-500'}`}>
-                      {pendingOrder.type === 'ride' ? <User size={20} /> : <Coffee size={20} />}
-                    </div>
-                    <div>
-                      <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${pendingOrder.type === 'ride' ? 'text-blue-500' : 'text-orange-500'}`}>{pendingOrder.type === 'ride' ? 'Rider Pickup' : 'Restaurant Pickup'}</p>
-                      <p className="text-xl font-bold">{pendingOrder.type === 'ride' ? `${pendingOrder.customerName}` : pendingOrder.restaurantName}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 shrink-0">
-                      <Navigation size={20} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Trip Destination</p>
-                      <p className="text-xl font-bold">{pendingOrder.type === 'ride' ? 'Dropoff Location' : pendingOrder.customerName}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-auto flex flex-col gap-3 pb-6 relative z-10">
-                  <button 
-                    onClick={handleAcceptOrder}
-                    disabled={isMatchingLoading || isMatchFailed}
-                    className={`relative w-full py-6 rounded-3xl font-black text-2xl shadow-[0_10px_30px_rgba(37,99,235,0.4)] active:scale-95 transition-all overflow-hidden ${isMatchFailed ? 'bg-red-600' : 'bg-blue-600'}`}
-                  >
-                    {!isMatchingLoading && !isMatchFailed && (
-                      <motion.div 
-                        key={`timer-${pendingOrder.id}`}
-                        initial={{ width: '100%' }}
-                        animate={{ width: '0%' }}
-                        transition={{ duration: 18, ease: 'linear' }}
-                        className="absolute inset-0 bg-white/20"
-                      />
                     )}
-                    <span className="relative z-10 uppercase tracking-widest flex items-center justify-center gap-3">
-                      {isMatchingLoading ? (
-                        <>
-                          <motion.div 
-                            animate={{ rotate: 360 }}
-                            transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                            className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full"
-                          />
-                          Matching...
-                        </>
-                      ) : isMatchFailed ? (
-                        <>
-                          <X size={24} />
-                          Another driver matched
-                        </>
-                      ) : (
-                        <>Accept Trip <span className="opacity-60 text-lg">•</span> {orderExpiryTimer}s</>
-                      )}
-                    </span>
-                  </button>
-                </div>
+                  </span>
+                </button>
               </div>
             </motion.div>
           )}
