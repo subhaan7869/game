@@ -111,31 +111,139 @@ import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmai
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 
-// Mock data for nearby restaurants (UK names)
-const MOCK_RESTAURANTS = [
-  { name: "Greggs", offset: { lat: 0.002, lng: 0.002 }, busyness: 'High' },
-  { name: "Costa Coffee", offset: { lat: -0.001, lng: 0.003 }, busyness: 'Medium' },
-  { name: "Nando's", offset: { lat: 0.003, lng: -0.001 }, busyness: 'Low' },
-  { name: "Wagamama", offset: { lat: -0.002, lng: -0.002 }, busyness: 'High' },
-  { name: "Local Chippy", offset: { lat: 0.001, lng: -0.003 }, busyness: 'Medium' },
-  { name: "McDonald's", offset: { lat: 0.004, lng: 0.004 }, busyness: 'High' },
-  { name: "Starbucks", offset: { lat: -0.003, lng: 0.005 }, busyness: 'Medium' },
-  { name: "Burger King", offset: { lat: 0.005, lng: -0.002 }, busyness: 'Low' },
-  { name: "Pizza Express", offset: { lat: -0.004, lng: -0.004 }, busyness: 'Medium' },
-  { name: "Subway", offset: { lat: 0.002, lng: -0.005 }, busyness: 'Low' },
-  { name: "Five Guys", offset: { lat: -0.005, lng: 0.002 }, busyness: 'High' },
-  { name: "KFC", offset: { lat: 0.006, lng: 0.001 }, busyness: 'Medium' },
-  { name: "Pret A Manger", offset: { lat: -0.002, lng: 0.006 }, busyness: 'High' },
-  { name: "Leon", offset: { lat: 0.003, lng: 0.007 }, busyness: 'Medium' },
-  { name: "Itsu", offset: { lat: -0.006, lng: -0.001 }, busyness: 'Low' },
-  { name: "Wasabi", offset: { lat: 0.001, lng: -0.007 }, busyness: 'Medium' },
-  { name: "Zizzi", offset: { lat: -0.007, lng: 0.003 }, busyness: 'Low' },
-  { name: "Ask Italian", offset: { lat: 0.004, lng: -0.006 }, busyness: 'Medium' },
-  { name: "Taco Bell", offset: { lat: -0.001, lng: -0.008 }, busyness: 'High' },
-  { name: "Shake Shack", offset: { lat: 0.008, lng: 0.001 }, busyness: 'High' },
-];
+// Mock data for UK cities and their local setups
+interface CityData {
+  center: { latitude: number; longitude: number };
+  streets: string[];
+  customers: string[];
+  restaurants: {
+    High: string[];
+    Medium: string[];
+    Low: string[];
+  };
+}
 
-const MOCK_CUSTOMERS = ["James", "Sophie", "Oliver", "Emily", "Jack", "Chloe"];
+const CITY_DATABASES: Record<string, CityData> = {
+  "London": {
+    center: { latitude: 51.5074, longitude: -0.1278 },
+    streets: ["Regent St", "Oxford St", "Kingsway", "Holborn", "Strand", "Piccadilly", "Leicester Sq", "Tottenham Court Rd", "Chancery Lane", "Southampton Row", "Aldwych", "High Holborn", "Shaftesbury Ave"],
+    customers: ["James", "Amelia", "Oliver", "Sophie", "William", "Emily", "Alexander", "Thomas", "Chloe", "Jack"],
+    restaurants: {
+      High: ["Greggs Holborn", "McDonald's Strand", "Nando's Kingsway", "Five Guys Covent Garden", "Burger King", "Shake Shack Leicester Sq", "Wagamama", "Dishoom", "Bleecker Burger"],
+      Medium: ["Costa Coffee", "Starbucks Midtown", "Subway Holborn", "Pizza Express", "Pret A Manger", "Leon", "Itsu", "Wasabi London"],
+      Low: ["Local Chippy", "Auntie Anne's", "The French Bistro", "Chancery Tea House", "Monmouth Coffee", "Chiquito", "Gourmet Burger Kitchen", "Zizzi"]
+    }
+  },
+  "Birmingham": {
+    center: { latitude: 52.4862, longitude: -1.8904 },
+    streets: ["New St", "Corporation St", "Broad St", "Colmore Row", "Digbeth High St", "Bullring Way", "Hurst St", "Great Charles St", "Great Hampton St", "Constitution Hill", "Gas St"],
+    customers: ["Brummie Dave", "Alfie", "Olivia", "Abbie", "Mohammed", "Imogen", "Ava", "Daniel", "Harry", "Mia"],
+    restaurants: {
+      High: ["Original Patty Men", "Bonehead Chicken", "Rudy's Pizza Digbeth", "Greggs New St", "McDonald's Bullring", "Nando's Broad St", "KFC Corporation St"],
+      Medium: ["Damascena", "Tiger Bites Pig", "Indian Brewery Co.", "Costa Coffee Colmore", "Starbucks New St", "Subway Broad St", "Pret Birmingham"],
+      Low: ["Lasan", "The Wilderness", "Bodega Cantina", "Purnell’s", "Adams", "The Briar Rose Pub", "Cherry Red's Cafe", "Peach Garden"]
+    }
+  },
+  "Manchester": {
+    center: { latitude: 53.4808, longitude: -2.2426 },
+    streets: ["Deansgate", "Market St", "Piccadilly", "Thomas St", "King St", "Peter St", "Oxford Rd", "Portland St", "Tib St", "Cross St", "Princess St"],
+    customers: ["Liam", "Noel", "Ruby", "Isla", "Elijah", "Mia", "Leo", "Sienna", "Marcus", "Freya"],
+    restaurants: {
+      High: ["Almost Famous", "Bundobust Piccadilly", "Mowgli Street Food", "McDonald's Market St", "Greggs Piccadilly", "Nando's Deansgate", "Five Guys Manchester"],
+      Medium: ["Rudys Neapolitan Pizza", "Albert's Schloss", "El Gato Negro", "Costa Manchester", "Starbucks Peter St", "Subway Piccadilly", "Federal Cafe"],
+      Low: ["Mana Ancoats", "Refuge by Volta", "Sugo Pasta Kitchen", "Trove Cafe", "Kala Bistro", "San Carlo", "The Marble Arch Pub", "Mackie Mayor"]
+    }
+  },
+  "Glasgow": {
+    center: { latitude: 55.8642, longitude: -4.2518 },
+    streets: ["Sauchiehall St", "Buchanan St", "Argyle St", "Bath St", "George St", "Hope St", "Renfield St", "West Nile St", "Ingram St", "High St", "Queen St"],
+    customers: ["Callum", "Fiona", "Lewis", "Maisie", "Hamish", "Kirsty", "Angus", "Eilidh", "Duncan", "Morag"],
+    restaurants: {
+      High: ["Mother India's Cafe", "Paesano Pizza Sauchiehall", "Bread Meats Bread", "McDonald's Argyle St", "Greggs Buchanan St", "Nando's Glasgow", "KFC Renfield St"],
+      Medium: ["Sugo Pasta Glasgow", "Six by Nico", "Hanoi Bike Shop", "Cafe Gandolfi", "Costa Glas", "Starbucks Hope St", "Subway Argyle", "Pret Buchanan"],
+      Low: ["The Gannet", "Ubiquitous Chip", "Ox and Finch", "Cail Bruich", "Kimchi Cult", "Stravaigin", "Singl-end Cafe", "The Butterfly and the Pig"]
+    }
+  },
+  "Cardiff": {
+    center: { latitude: 51.4816, longitude: -3.1791 },
+    streets: ["St Mary St", "Queen St", "City Rd", "Caroline St", "Castle St", "Westgate St", "Wellfield Rd", "Cowbridge Rd", "Cathays Terrace", "Senghennydd Rd"],
+    customers: ["Rhys", "Sian", "Dylan", "Megan", "Gareth", "Ffion", "Ioan", "Carys", "Alun", "Elin"],
+    restaurants: {
+      High: ["The Grazing Shed", "Chippy Lane Grill", "Greggs Queen St", "McDonald's St Mary St", "Nando's Cardiff", "Five Guys Cardiff", "Zizzi Card"],
+      Medium: ["Purple Poppadom", "Anatoni's Pizza", "City Road Kebab House", "Costa Queen St", "Starbucks Cardiff", "Subway City Rd", "Pret Cardiff"],
+      Low: ["The Clink", "Heaney's", "Bar 44 Tapas", "Dusty Knuckle Pizza", "Nook Cafe", "Spit & Sawdust", "Keralan Karavan", "The Potted Pig"]
+    }
+  },
+  "Bristol": {
+    center: { latitude: 51.4545, longitude: -2.5879 },
+    streets: ["Park St", "Baldwin St", "Whiteladies Rd", "Stokes Croft", "Gloucester Rd", "Corn St", "King St", "St Augustine's Parade", "Nelson St", "Waterfront Parade"],
+    customers: ["Toby", "Amber", "Jasper", "Luna", "Finn", "Daisy", "Barnaby", "Evie", "Max", "Lola"],
+    restaurants: {
+      High: ["Oowee Diner Baldwin", "Pieminister Stokes Croft", "Greggs Broadmead", "McDonald's Park St", "Nando's Cabin", "Five Guys Bristol", "KFC Baldwin"],
+      Medium: ["Pasta Loco", "Squeezed Burger", "Cargo Cantina", "Bravas Tapas", "Costa Park St", "Starbucks Bristol", "Subway Whiteladies", "Pret Bristol"],
+      Low: ["Casamia", "The Ox Steakhouse", "Paco Tapas", "Nutmeg Indian", "Thali Cafe", "Small St Espresso", "Hart's Bakery", "The Kenny Tavern"]
+    }
+  },
+  "Leeds": {
+    center: { latitude: 53.8008, longitude: -1.5491 },
+    streets: ["The Headrow", "Briggate", "Vicar Lane", "Boar Lane", "Albion St", "Merrion St", "Park Row", "Wellington St", "Cookridge St", "Great George St"],
+    customers: ["Harvey", "Layla", "Arthur", "Mila", "Seth", "Imogen", "Oscar", "Heidi", "Leo", "Ella"],
+    restaurants: {
+      High: ["Bundobust Leeds", "Red's True BBQ Briggate", "House of Fu", "Greggs Headrow", "McDonald's Briggate", "Nando's Leeds", "KFC Merrion St"],
+      Medium: ["Laynes Espresso", "Sarto Pasta", "Whitelocks Ale House", "Costa Leeds", "Starbucks Vicar", "Subway Albion", "Pret Leeds", "Trinity Kitchen"],
+      Low: ["Zucco", "Prashad Leeds", "The Man Behind The Curtain", "Ox Club", "Wapentake Cafe", "The Reliance", "La Besi", "Tharavadu"]
+    }
+  }
+};
+
+const getRestaurantsForCityAndDemand = (cityKey: string, demandMode: 'Low' | 'Medium' | 'High') => {
+  const cityInfo = CITY_DATABASES[cityKey] || CITY_DATABASES["London"];
+  
+  // Choose core pool based on demand level
+  let mainPool = cityInfo.restaurants[demandMode] || cityInfo.restaurants['Medium'];
+  let secondaryPool: string[] = [];
+  if (demandMode === 'High') {
+    secondaryPool = cityInfo.restaurants['Medium'];
+  } else if (demandMode === 'Medium') {
+    secondaryPool = [...cityInfo.restaurants['Low'], ...cityInfo.restaurants['High']];
+  } else {
+    secondaryPool = cityInfo.restaurants['Medium'];
+  }
+
+  // Combine and shuffle, then pick 6 restaurants
+  const allNames = Array.from(new Set([...mainPool, ...secondaryPool]));
+  const shuffled = [...allNames].sort(() => 0.5 - Math.random());
+  const selectedNames = shuffled.slice(0, 6);
+
+  // Offset distribution coordinates around core center
+  const baseOffsets = [
+    { lat: 0.002, lng: 0.002 },
+    { lat: -0.003, lng: 0.004 },
+    { lat: 0.004, lng: -0.002 },
+    { lat: -0.002, lng: -0.003 },
+    { lat: 0.001, lng: -0.005 },
+    { lat: -0.005, lng: 0.003 },
+    { lat: 0.005, lng: 0.005 },
+    { lat: -0.004, lng: -0.005 }
+  ];
+
+  return selectedNames.map((name, idx) => {
+    const offset = baseOffsets[idx % baseOffsets.length];
+    
+    let busyness: 'High' | 'Medium' | 'Low' = 'Medium';
+    if (cityInfo.restaurants.High.includes(name)) busyness = 'High';
+    else if (cityInfo.restaurants.Low.includes(name)) busyness = 'Low';
+
+    return {
+      name,
+      offset: {
+        lat: offset.lat + (Math.random() - 0.5) * 0.0005,
+        lng: offset.lng + (Math.random() - 0.5) * 0.0005
+      },
+      busyness
+    };
+  });
+};
 
 // Helper components moved outside App to prevent flickering
 const UpdateScreen = ({ progress }: { progress: number }) => (
@@ -5817,7 +5925,71 @@ export default function App() {
     localStorage.setItem('hyper_driver_job_preference', jobTypePreference);
   }, [jobTypePreference]);
 
-  const [selectedRestaurant, setSelectedRestaurant] = useState<typeof MOCK_RESTAURANTS[0] | null>(null);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<{
+    name: string;
+    offset: { lat: number; lng: number };
+    busyness: 'High' | 'Medium' | 'Low';
+  } | null>(null);
+
+  const currentCity = useMemo(() => {
+    if (!location) return "London";
+    const lat = location.latitude;
+    const lng = location.longitude;
+    
+    // Proximity check for major UK cities
+    if (lat > 53.3 && lat < 53.6 && lng > -2.4 && lng < -2.1) return "Manchester";
+    if (lat > 52.3 && lat < 52.6 && lng > -2.0 && lng < -1.7) return "Birmingham";
+    if (lat > 55.8 && lat < 56.0 && lng > -4.4 && lng < -4.1) return "Glasgow";
+    if (lat > 53.7 && lat < 53.9 && lng > -1.7 && lng < -1.4) return "Leeds";
+    if (lat > 51.4 && lat < 51.6 && lng > -2.7 && lng < -2.4) return "Bristol";
+    if (lat > 51.3 && lat < 51.7 && lng > -0.5 && lng < 0.3) return "London";
+    
+    return "United Kingdom"; 
+  }, [location]);
+
+  const activeCityKey = useMemo(() => {
+    if (!currentCity || currentCity === "United Kingdom") return "London";
+    return currentCity;
+  }, [currentCity]);
+
+  const activeCityCenter = useMemo(() => {
+    const info = CITY_DATABASES[activeCityKey];
+    return info ? info.center : { latitude: 51.5074, longitude: -0.1278 };
+  }, [activeCityKey]);
+
+  const [activeRestaurants, setActiveRestaurants] = useState<{
+    name: string;
+    offset: { lat: number; lng: number };
+    busyness: 'High' | 'Medium' | 'Low';
+  }[]>([]);
+
+  // Update/Shuffle restaurants every 5 minutes OR when city/demand mode changes!
+  useEffect(() => {
+    const refreshRestaurants = () => {
+      const fresh = getRestaurantsForCityAndDemand(activeCityKey, busynessMode);
+      setActiveRestaurants(fresh);
+      if (typeof addDebugLog === 'function') {
+        addDebugLog('info', `Active map restaurants systematically updated for ${activeCityKey} under ${busynessMode} demand tiers.`);
+      }
+    };
+
+    refreshRestaurants();
+
+    const intervalId = setInterval(refreshRestaurants, 300000); // 5 minutes
+    return () => clearInterval(intervalId);
+  }, [activeCityKey, busynessMode]);
+
+  const handleSelectCity = (cityKey: string) => {
+    const info = CITY_DATABASES[cityKey];
+    if (info) {
+      setLocation({ latitude: info.center.latitude, longitude: info.center.longitude });
+      setMapOffset({ x: 0, y: 0 }); // Re-center map offsets so user sees the new city immediately!
+      if (typeof addDebugLog === 'function') {
+        addDebugLog('info', `Switched active region to ${cityKey}. Simulator coordinates updated.`);
+      }
+    }
+  };
+
   const [rewards, setRewards] = useState<{ completed: number, target: number, reward: string }[]>([
     { completed: 0, target: 5, reward: "£10 Bonus" },
     { completed: 0, target: 10, reward: "£25 Bonus" },
@@ -5953,21 +6125,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('hyper_driver_selected_services', JSON.stringify(selectedServices));
   }, [selectedServices]);
-  const currentCity = useMemo(() => {
-    if (!location) return "London";
-    const lat = location.latitude;
-    const lng = location.longitude;
-    
-    // Proximity check for major UK cities
-    if (lat > 53.3 && lat < 53.6 && lng > -2.4 && lng < -2.1) return "Manchester";
-    if (lat > 52.3 && lat < 52.6 && lng > -2.0 && lng < -1.7) return "Birmingham";
-    if (lat > 55.8 && lat < 56.0 && lng > -4.4 && lng < -4.1) return "Glasgow";
-    if (lat > 53.7 && lat < 53.9 && lng > -1.7 && lng < -1.4) return "Leeds";
-    if (lat > 51.4 && lat < 51.6 && lng > -2.7 && lng < -2.4) return "Bristol";
-    if (lat > 51.3 && lat < 51.7 && lng > -0.5 && lng < 0.3) return "London";
-    
-    return "United Kingdom"; 
-  }, [location]);
 
   const watchId = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -6296,7 +6453,7 @@ export default function App() {
     if (isSimulatingMovement || isNavigating) {
       const interval = setInterval(() => {
         setLocation(prev => {
-          if (!prev) return { latitude: 51.5074, longitude: -0.1278 };
+          if (!prev) return { latitude: activeCityCenter.latitude, longitude: activeCityCenter.longitude };
           
           if (isNavigating && activeOrders.length > 0) {
             const order = activeOrders[0];
@@ -6403,8 +6560,8 @@ export default function App() {
             angle += 0.05;
             const radius = 0.001;
             return {
-              latitude: 51.5074 + Math.sin(angle) * radius,
-              longitude: -0.1278 + Math.cos(angle) * radius,
+              latitude: activeCityCenter.latitude + Math.sin(angle) * radius,
+              longitude: activeCityCenter.longitude + Math.cos(angle) * radius,
             };
           }
 
@@ -6417,7 +6574,7 @@ export default function App() {
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [isSimulatingMovement, isNavigating, activeOrders]);
+  }, [isSimulatingMovement, isNavigating, activeOrders, activeCityCenter]);
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -6533,21 +6690,39 @@ export default function App() {
   const allDocsUploaded = uploadedDocs.length === 3;
 
   // Surge Pricing Configuration
-  const [activeSurgeAreas, setActiveSurgeAreas] = useState([
-    { id: '1', name: "Shoreditch", lat: 0.005, lng: 0.005, radius: 0.008, multiplier: 1.8, trend: 'stable' as const },
-    { id: '2', name: "Soho", lat: -0.005, lng: -0.008, radius: 0.006, multiplier: 1.5, trend: 'rising' as const },
-    { id: '3', name: "King's Cross", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.6, trend: 'falling' as const }
+  const [activeSurgeAreas, setActiveSurgeAreas] = useState<{
+    id: string;
+    name: string;
+    lat: number;
+    lng: number;
+    radius: number;
+    multiplier: number;
+    trend: 'stable' | 'rising' | 'falling';
+    demand: 'Low' | 'Medium' | 'High';
+  }[]>([
+    { id: '1', name: "Shoreditch", lat: 0.005, lng: 0.005, radius: 0.008, multiplier: 2.1, trend: 'stable', demand: 'High' },
+    { id: '2', name: "Soho", lat: -0.005, lng: -0.008, radius: 0.006, multiplier: 1.5, trend: 'rising', demand: 'Medium' },
+    { id: '3', name: "King's Cross", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.1, trend: 'falling', demand: 'Low' }
   ]);
   const [surgeMultiplier, setSurgeMultiplier] = useState(1.0);
 
   // Dynamic Surge and Busyness Control
   useEffect(() => {
     const updateSurge = () => {
-      const modeTarget = busynessMode === 'High' ? 2.5 : busynessMode === 'Medium' ? 1.5 : 1.0;
       setActiveSurgeAreas(prev => prev.map(area => {
-        // Drift multiplier towards modeTarget
-        const drift = (modeTarget - area.multiplier) * 0.2;
-        const randomNoise = (Math.random() - 0.5) * 0.4;
+        // Enforce specific targets so each demand tier maintains distinct multipliers
+        let specificTarget = 1.0;
+        if (area.demand === 'High') {
+          specificTarget = busynessMode === 'High' ? 2.8 : busynessMode === 'Medium' ? 2.0 : 1.6;
+        } else if (area.demand === 'Medium') {
+          specificTarget = busynessMode === 'High' ? 1.8 : busynessMode === 'Medium' ? 1.4 : 1.2;
+        } else { // Low
+          specificTarget = busynessMode === 'High' ? 1.3 : busynessMode === 'Medium' ? 1.1 : 1.0;
+        }
+
+        // Drift multiplier towards specificTarget
+        const drift = (specificTarget - area.multiplier) * 0.2;
+        const randomNoise = (Math.random() - 0.5) * 0.2;
         const newMultiplier = Math.max(1.0, Math.min(4.0, Number((area.multiplier + drift + randomNoise).toFixed(1))));
         const trend = newMultiplier > area.multiplier ? 'rising' : (newMultiplier < area.multiplier ? 'falling' : 'stable');
         const newLat = area.lat + (Math.random() - 0.5) * 0.001;
@@ -6661,9 +6836,14 @@ export default function App() {
     const candidates = Array.from({ length: 5 }).map(() => {
       const type = getJobType();
       const variant = type === 'ride' ? (Math.random() > 0.8 ? 'Premier' : Math.random() > 0.6 ? 'HyperXL' : 'HyperX') : 'Hyper Eats';
-      const customerName = MOCK_CUSTOMERS[Math.floor(Math.random() * MOCK_CUSTOMERS.length)];
       
-      const restOffset = MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)].offset;
+      const cityInfo = CITY_DATABASES[activeCityKey] || CITY_DATABASES["London"];
+      const customerName = cityInfo.customers[Math.floor(Math.random() * cityInfo.customers.length)];
+      
+      const restaurantsPool = activeRestaurants.length > 0 ? activeRestaurants : getRestaurantsForCityAndDemand(activeCityKey, busynessMode);
+      const chosenRestaurant = restaurantsPool[Math.floor(Math.random() * restaurantsPool.length)];
+      const restOffset = chosenRestaurant?.offset || { lat: 0.002, lng: 0.002 };
+      
       const pickupLat = location.latitude + restOffset.lat;
       const pickupLng = location.longitude + restOffset.lng;
       const custLat = pickupLat + (Math.random() - 0.5) * 0.02;
@@ -6676,7 +6856,7 @@ export default function App() {
       let activeSurge = Math.max(surgeMultiplier, globalSurge);
       
       activeSurgeAreas.forEach(area => {
-        const d = Math.sqrt(Math.pow(pickupLat - 51.5074 - area.lat, 2) + Math.pow(pickupLng - (-0.1278) - area.lng, 2));
+        const d = Math.sqrt(Math.pow(pickupLat - activeCityCenter.latitude - area.lat, 2) + Math.pow(pickupLng - activeCityCenter.longitude - area.lng, 2));
         if (d < area.radius) {
           activeSurge = Math.max(activeSurge, area.multiplier);
         }
@@ -6704,7 +6884,7 @@ export default function App() {
         id: Math.random().toString(36).substring(2, 11),
         type,
         customerName: isStacked ? `${customerName} (Max+1)` : customerName,
-        restaurantName: type === 'delivery' ? MOCK_RESTAURANTS[Math.floor(Math.random() * MOCK_RESTAURANTS.length)].name : variant,
+        restaurantName: type === 'delivery' ? (chosenRestaurant?.name || "Local Kitchen") : variant,
         restaurantLocation: { latitude: pickupLat, longitude: pickupLng },
         pickupLocation: { latitude: pickupLat, longitude: pickupLng },
         customerLocation: { latitude: custLat, longitude: custLng },
@@ -6755,8 +6935,8 @@ export default function App() {
       let randomRange = 2500;
 
       if (busynessMode === 'Low') {
-        baseWait = 15000;
-        randomRange = 30000; // 15s to 45s
+        baseWait = 45000;
+        randomRange = 75000; // 45s to 120s (2 minutes)
       } else if (busynessMode === 'Medium') {
         baseWait = 5000;
         randomRange = 10000; // 5s to 15s
@@ -6985,7 +7165,8 @@ export default function App() {
           isStacked: false,
           batchCount: 1
         };
-        const secondCustomer = MOCK_CUSTOMERS[Math.floor(Math.random() * MOCK_CUSTOMERS.length)];
+        const cityInfo = CITY_DATABASES[activeCityKey] || CITY_DATABASES["London"];
+        const secondCustomer = cityInfo.customers[Math.floor(Math.random() * cityInfo.customers.length)];
         const order2: Order = {
           ...pendingOrder,
           id: pendingOrder.id + "_2",
@@ -8615,6 +8796,24 @@ export default function App() {
                 {location && !isLowPerformance && activeSurgeAreas.map((area, i) => {
                   const x = area.lng * MAP_SCALE + mapOffset.x;
                   const y = -area.lat * MAP_SCALE + mapOffset.y;
+                  
+                  const isHigh = ('demand' in area && area.demand === 'High') || area.name === 'Shoreditch';
+                  const isMedium = ('demand' in area && area.demand === 'Medium') || area.name === 'Soho';
+                  
+                  let borderBgClass = 'border-red-500/40 bg-red-500/10';
+                  let badgeBgClass = 'bg-red-600/95 text-white';
+                  let labelName = 'High Demand';
+
+                  if (isMedium) {
+                    borderBgClass = 'border-yellow-500/40 bg-yellow-500/10';
+                    badgeBgClass = 'bg-yellow-500 text-slate-900 border border-yellow-300';
+                    labelName = 'Med Demand';
+                  } else if (!isHigh) {
+                    borderBgClass = 'border-[#a0522d]/40 bg-[#a0522d]/10';
+                    badgeBgClass = 'bg-[#8b4513] text-amber-100 border border-[#a0522d]';
+                    labelName = 'Low Demand';
+                  }
+
                   return (
                     <motion.div
                       key={`surge-zone-${i}`}
@@ -8624,7 +8823,7 @@ export default function App() {
                         scale: [1, 1.1, 1]
                       }}
                       transition={{ duration: 4, repeat: Infinity }}
-                      className="absolute rounded-full border-4 border-blue-500/30 bg-blue-500/10 pointer-events-none"
+                      className={`absolute rounded-full border-4 ${borderBgClass} pointer-events-none`}
                       style={{
                         width: area.radius * 2 * MAP_SCALE,
                         height: area.radius * 2 * MAP_SCALE,
@@ -8634,8 +8833,9 @@ export default function App() {
                         zIndex: 10
                       }}
                     >
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-600/80 backdrop-blur-md px-2 py-0.5 rounded text-[8px] font-black text-white whitespace-nowrap shadow-xl">
-                        {area.multiplier}x Surge
+                      <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${badgeBgClass} backdrop-blur-md px-2 py-0.5 rounded text-[8px] font-black whitespace-nowrap shadow-xl flex flex-col items-center leading-none gap-0.5`}>
+                        <span className="uppercase tracking-wider text-[6px] opacity-80">{labelName}</span>
+                        <span>{area.multiplier}x Surge</span>
                       </div>
                     </motion.div>
                   );
@@ -8666,14 +8866,14 @@ export default function App() {
                 })}
 
                 {/* Mock Restaurants (Busy Map) */}
-                {location && MOCK_RESTAURANTS.map((rest, i) => {
+                {location && activeRestaurants.map((rest, i) => {
                   const x = rest.offset.lng * MAP_SCALE + mapOffset.x;
                   const y = -rest.offset.lat * MAP_SCALE + mapOffset.y;
                   const isOrderActive = activeOrders.some(o => o.restaurantName === rest.name);
                   
                   return (
                     <motion.div 
-                      key={`rest-${rest.name}`}
+                      key={`rest-${rest.name}-${i}`}
                       whileTap={{ scale: 0.9 }}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -8727,25 +8927,34 @@ export default function App() {
 
                 {/* Simulated Street Labels */}
                 <div className="absolute inset-0 pointer-events-none opacity-20 overflow-hidden">
-                  {[
-                    { name: "High St", x: 100, y: 200 },
-                    { name: "London Rd", x: 400, y: 500 },
-                    { name: "Park Ave", x: 700, y: 100 },
-                    { name: "Station Way", x: 200, y: 800 },
-                    { name: "Broadway", x: 600, y: 400 },
-                  ].map((label, i) => (
-                    <div 
-                      key={i}
-                      className={`absolute text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${theme === 'dark' ? 'text-white/40' : 'text-black/40'}`}
-                      style={{ 
-                        left: label.x * zoom, 
-                        top: label.y * zoom,
-                        transform: location ? `translate(${(location.longitude * LABEL_SCALE + mapOffset.x) % (1000 * zoom)}px, ${(location.latitude * LABEL_SCALE + mapOffset.y) % (1000 * zoom)}px)` : 'none'
-                      }}
-                    >
-                      {label.name}
-                    </div>
-                  ))}
+                  {(() => {
+                    const streetNames = CITY_DATABASES[activeCityKey]?.streets || ["High St", "London Rd", "Park Ave", "Station Way", "Broadway"];
+                    const mapOffsets = [
+                      { x: 100, y: 200 },
+                      { x: 420, y: 480 },
+                      { x: 700, y: 150 },
+                      { x: 180, y: 780 },
+                      { x: 620, y: 380 },
+                      { x: 300, y: 280 },
+                      { x: 520, y: 680 }
+                    ];
+                    return streetNames.map((name, i) => {
+                      const offsetPoint = mapOffsets[i % mapOffsets.length];
+                      return (
+                        <div 
+                          key={`street-${name}-${i}`}
+                          className={`absolute text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${theme === 'dark' ? 'text-white/40' : 'text-black/40'}`}
+                          style={{ 
+                            left: offsetPoint.x * zoom, 
+                            top: offsetPoint.y * zoom,
+                            transform: location ? `translate(${(location.longitude * LABEL_SCALE + mapOffset.x) % (1000 * zoom)}px, ${(location.latitude * LABEL_SCALE + mapOffset.y) % (1000 * zoom)}px)` : 'none'
+                          }}
+                        >
+                          {name}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
 
                 {/* Region Outlines (Simulated) */}
@@ -9666,7 +9875,18 @@ export default function App() {
                                     <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest">{globalSurge.toFixed(1)}x Surge</span>
                                   </div>
                                 )}
-                                <p className="text-[10px] font-bold text-gray-400 mt-1">{currentCity}</p>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className="text-[10px] font-bold text-gray-400">Region:</span>
+                                  <select 
+                                    value={activeCityKey} 
+                                    onChange={(e) => handleSelectCity(e.target.value)}
+                                    className="text-[10px] bg-white/5 border border-white/10 hover:border-white/20 text-blue-400 font-extrabold px-1.5 py-0.5 rounded cursor-pointer outline-none transition-colors"
+                                  >
+                                    {Object.keys(CITY_DATABASES).map(cName => (
+                                      <option key={cName} value={cName} className="bg-slate-900 text-white font-bold">{cName}</option>
+                                    ))}
+                                  </select>
+                                </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -10577,7 +10797,7 @@ export default function App() {
                     ))}
                   </div>
                   <p className="text-[10px] text-gray-500 font-bold mt-4 leading-tight">
-                    {busynessMode === 'Low' && "Quiet period. Orders will be rare (15-45s wait)."}
+                    {busynessMode === 'Low' && "Quiet period. Orders will be rare (45-120s wait)."}
                     {busynessMode === 'Medium' && "Steady demand. Orders every 5-15s."}
                     {busynessMode === 'High' && "Peak time! Rapid-fire orders (1.5-4s wait)."}
                   </p>
@@ -11676,18 +11896,32 @@ export default function App() {
                 <div className="flex flex-col gap-4">
                   {/* Top Raw Code with selections and close button */}
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 bg-[#1a1a1a] text-white px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-sm">
-                      {pendingOrder.type === 'delivery' ? (
-                        <>
-                          <Utensils size={13} className="text-white" />
-                          <span>Hyper Eats</span>
-                        </>
-                      ) : (
-                        <>
-                          <CarIcon size={13} className="text-white" fill="currentColor" />
-                          <span>{pendingOrder.restaurantName || "HyperX"}</span>
-                        </>
-                      )}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-2 bg-[#1a1a1a] text-white px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-sm">
+                        {pendingOrder.type === 'delivery' ? (
+                          <>
+                            <Utensils size={13} className="text-white" />
+                            <span>Hyper Eats</span>
+                          </>
+                        ) : (
+                          <>
+                            <CarIcon size={13} className="text-white" fill="currentColor" />
+                            <span>{pendingOrder.restaurantName || "HyperX"}</span>
+                          </>
+                        )}
+                      </div>
+                      {(() => {
+                        const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
+                        return (
+                          <span className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider font-mono shadow-sm ${
+                            isDouble 
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                              : 'bg-blue-100 text-blue-800 border border-blue-200'
+                          }`}>
+                            {isDouble ? '✨ DOUBLE ORDER' : 'SINGLE ORDER'}
+                          </span>
+                        );
+                      })()}
                     </div>
                     
                     <button 
@@ -11715,41 +11949,103 @@ export default function App() {
                   <div className="h-px bg-gray-100 my-1" />
 
                   {/* Timeline with accurate metrics formatted */}
-                  <div className="relative pl-6 py-1 space-y-7">
-                    {/* Vertical Connecting Line */}
-                    <div className="absolute left-[7px] top-[14px] bottom-[14px] w-[2px] bg-black" />
+                  {(() => {
+                    const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
+                    if (isDouble) {
+                      return (
+                        <div className="relative pl-6 py-1 space-y-6">
+                          {/* Vertical Connecting Line */}
+                          <div className="absolute left-[7px] top-[14px] bottom-[14px] w-[2px] bg-black" />
 
-                    {/* Top pickup locator dot/circle */}
-                    <div className="absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full bg-black border-2 border-white ring-2 ring-black" />
+                          {/* Top pickup locator dot/circle */}
+                          <div className="absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full bg-black border-2 border-white ring-2 ring-black" />
 
-                    {/* Bottom dropoff square design */}
-                    <div className="absolute left-[3px] bottom-[15px] w-2.5 h-2.5 bg-black" />
+                          {/* Middle dropoff circle/dot */}
+                          <div className="absolute left-[3px] top-[100px] w-2.5 h-2.5 rounded-full bg-blue-600 border-2 border-white ring-1 ring-blue-600" />
 
-                    {/* Time & distance metadata headers matching screenshot perfectly */}
-                    <div>
-                      <p className="font-sans text-xs font-bold text-gray-500">
-                        3 min (0.5 mi)
-                      </p>
-                      <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
-                        {pendingOrder.restaurantName || "Pwllmelin Road, Cardiff, CF5 2NQ"}
-                      </p>
-                      <p className="font-sans text-[11px] text-gray-400 font-bold">
-                        {pendingOrder.type === 'delivery' ? "12 Kingsway, Holborn, London WC2B 6YB" : "Driver Pickup Point"}
-                      </p>
-                    </div>
+                          {/* Bottom dropoff square design */}
+                          <div className="absolute left-[3px] bottom-[15px] w-2.5 h-2.5 bg-indigo-600" />
 
-                    <div>
-                      <p className="font-sans text-xs font-bold text-gray-500">
-                        {pendingOrder.estimatedTime} mins ({pendingOrder.estimatedDistance.toFixed(1)} mi)
-                      </p>
-                      <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
-                        {pendingOrder.customerName || "45 The Hayes, Cardiff"}
-                      </p>
-                      <p className="font-sans text-[11px] text-gray-400 font-bold">
-                        {pendingOrder.type === 'delivery' ? "48 High Holborn, London WC1V 6RL" : "Final Destination Address"}
-                      </p>
-                    </div>
-                  </div>
+                          {/* Pickup Info */}
+                          <div>
+                            <p className="font-sans text-xs font-bold text-gray-500">
+                              3 min (0.5 mi)
+                            </p>
+                            <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
+                              {pendingOrder.restaurantName || "Pwllmelin Road, Cardiff, CF5 2NQ"}
+                            </p>
+                            <p className="font-sans text-[11px] text-gray-400 font-bold">
+                              {pendingOrder.type === 'delivery' ? "12 Kingsway, Holborn, London WC2B 6YB" : "Driver Pickup Point"}
+                            </p>
+                          </div>
+
+                          {/* Dropoff 1 Info */}
+                          <div>
+                            <p className="font-sans text-xs font-bold text-gray-500">
+                              {pendingOrder.estimatedTime} mins (approx) • Dropoff 1
+                            </p>
+                            <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
+                              {pendingOrder.customerName.replace(" + 1 more", "").replace(" (Max+1)", "").trim()}
+                            </p>
+                            <p className="font-sans text-[11px] text-gray-400 font-bold">
+                              48 High Holborn, London WC1V 6RL
+                            </p>
+                          </div>
+
+                          {/* Dropoff 2 Info */}
+                          <div>
+                            <p className="font-sans text-xs font-bold text-gray-500">
+                              +{Math.floor(pendingOrder.estimatedTime * 0.4)} mins • Dropoff 2 (Double)
+                            </p>
+                            <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
+                              Recipient (Part 2)
+                            </p>
+                            <p className="font-sans text-[11px] text-gray-400 font-bold">
+                              42 Southampton Row, London WC1B 4AR
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="relative pl-6 py-1 space-y-7">
+                          {/* Vertical Connecting Line */}
+                          <div className="absolute left-[7px] top-[14px] bottom-[14px] w-[2px] bg-black" />
+
+                          {/* Top pickup locator dot/circle */}
+                          <div className="absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full bg-black border-2 border-white ring-2 ring-black" />
+
+                          {/* Bottom dropoff square design */}
+                          <div className="absolute left-[3px] bottom-[15px] w-2.5 h-2.5 bg-black" />
+
+                          {/* Time & distance metadata headers matching screenshot perfectly */}
+                          <div>
+                            <p className="font-sans text-xs font-bold text-gray-500">
+                              3 min (0.5 mi)
+                            </p>
+                            <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
+                              {pendingOrder.restaurantName || "Pwllmelin Road, Cardiff, CF5 2NQ"}
+                            </p>
+                            <p className="font-sans text-[11px] text-gray-400 font-bold">
+                              {pendingOrder.type === 'delivery' ? "12 Kingsway, Holborn, London WC2B 6YB" : "Driver Pickup Point"}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="font-sans text-xs font-bold text-gray-500">
+                              {pendingOrder.estimatedTime} mins ({pendingOrder.estimatedDistance.toFixed(1)} mi)
+                            </p>
+                            <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
+                              {pendingOrder.customerName || "45 The Hayes, Cardiff"}
+                            </p>
+                            <p className="font-sans text-[11px] text-gray-400 font-bold">
+                              {pendingOrder.type === 'delivery' ? "48 High Holborn, London WC1V 6RL" : "Final Destination Address"}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+                  })()}
 
                   {/* Large Charcoal/Black Accept Match Button */}
                   <div className="pt-2 shrink-0">
@@ -12472,13 +12768,15 @@ const DebugMonitorView = ({
   };
 
   const triggerInjectBigOrder = () => {
+    const lat = location?.latitude ?? 51.5074;
+    const lng = location?.longitude ?? -0.1278;
     const highTierOrder = {
       id: 'mock_ord_' + Math.random().toString(36).substring(2, 9),
       type: 'delivery',
       restaurantName: "Alain Ducasse at The Dorchester (Michelin Star)",
-      restaurantLocation: { latitude: 51.5074 + 0.005, longitude: -0.1278 - 0.005 },
+      restaurantLocation: { latitude: lat + 0.005, longitude: lng - 0.005 },
       customerName: "VIP Client Royal Suite",
-      customerLocation: { latitude: 51.5074 + 0.015, longitude: -0.1278 + 0.015 },
+      customerLocation: { latitude: lat + 0.015, longitude: lng + 0.015 },
       items: [
         { name: "Sauté gourmand de homard", quantity: 2, price: 190.00 },
         { name: "Dom Pérignon Vintage Champagne", quantity: 1, price: 299.00 }
