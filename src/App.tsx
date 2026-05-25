@@ -11658,206 +11658,324 @@ export default function App() {
         )}
 
         {/* Global Trip Request Overlay - Visible on any screen */}
-        <AnimatePresence>
+         <AnimatePresence>
           {pendingOrder && (
             <motion.div 
-              initial={{ y: '100%' }} 
-              animate={{ y: 0 }} 
-              exit={{ y: '100%' }} 
+              initial={{ y: '100%', opacity: 0 }} 
+              animate={{ y: 0, opacity: 1 }} 
+              exit={{ y: '100%', opacity: 0 }} 
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="absolute inset-x-0 bottom-0 z-[5000] w-full max-w-md mx-auto bg-white text-black rounded-t-[36px] shadow-[0_-15px_45px_rgba(0,0,0,0.22)] flex flex-col overflow-hidden border-t border-gray-100 pb-2"
+              className={pendingOrder.isMatching 
+                ? "absolute inset-x-3 bottom-4 z-[5000] w-[calc(100%-24px)] max-w-md mx-auto bg-white text-black rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden border border-gray-100 p-6"
+                : "absolute inset-x-0 bottom-0 z-[5000] w-full max-w-md mx-auto bg-white text-black rounded-t-[36px] shadow-[0_-15px_45px_rgba(0,0,0,0.22)] flex flex-col overflow-hidden border-t border-gray-100 pb-2"
+              }
               id="uber-incoming-trip-sheet"
             >
-              {/* Top Handle bar */}
-              <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mt-3 shrink-0" />
-
-              {/* Header section with badge & close button */}
-              <div className="flex items-center justify-between px-6 pt-3 pb-2 shrink-0">
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 bg-[#00b050] text-white px-4 py-2 rounded-full font-black text-xs uppercase tracking-wider shadow-sm">
-                    <span className="text-base leading-none">🍴</span>
-                    <span className="align-middle">Add delivery</span>
+              {pendingOrder.isMatching ? (
+                /* MATCH JOB CUSTOM LAYOUT FROM SCREENSHOT */
+                <div className="flex flex-col gap-4">
+                  {/* Top Raw Code with selections and close button */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 bg-[#1a1a1a] text-white px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-sm">
+                      <User size={13} fill="currentColor" />
+                      <span>UberX</span>
+                    </div>
+                    
+                    <button 
+                      onClick={handleDeclineOrder}
+                      className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center transition-colors active:scale-90"
+                      aria-label="Decline"
+                    >
+                      <X size={16} className="text-gray-500" />
+                    </button>
                   </div>
-                  {(() => {
-                    const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
-                    return (
-                      <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider font-mono shadow-sm ${
-                        isDouble 
-                          ? 'bg-amber-100 text-amber-800 border border-amber-200' 
-                          : 'bg-blue-100 text-blue-800 border border-blue-200'
-                      }`}>
-                        {isDouble ? '✨ DOUBLE ORDER (2x PAY)' : 'SINGLE ORDER'}
-                      </span>
-                    );
-                  })()}
-                </div>
-                
-                <button 
-                  onClick={handleDeclineOrder}
-                  className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors active:scale-90"
-                  aria-label="Decline"
-                >
-                  <X size={20} className="text-gray-600" />
-                </button>
-              </div>
 
-              {/* Main payout and details */}
-              <div className="px-6 py-2 shrink-0">
-                <h2 className="font-sans text-[48px] font-black text-gray-900 tracking-tight leading-none">
-                  +£{pendingOrder.estimatedPay.toFixed(2)}
-                </h2>
-                
-                <div className="flex items-center gap-2 mt-2.5 text-gray-700 font-bold text-sm">
-                  <span className="text-base">⏱️</span>
-                  <span className="text-black font-black">+{ pendingOrder.estimatedDistance.toFixed(1) } mi</span>
-                  <span className="text-gray-300">•</span>
-                  <span>{pendingOrder.estimatedTime} min</span>
-                  <span className="text-gray-300">•</span>
-                  {(() => {
-                    const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
-                    return (
-                      <span className={`px-2.5 py-0.5 rounded-md font-mono text-[10px] uppercase font-black ${
-                        isDouble ? 'bg-amber-500/15 text-amber-700' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {isDouble ? '2 Deliveries' : '1 Delivery'}
-                      </span>
-                    );
-                  })()}
-                </div>
-              </div>
+                  {/* Premium display payout & rating */}
+                  <div className="flex flex-col gap-1">
+                    <h2 className="font-sans text-[48px] font-black text-gray-900 tracking-tight leading-none">
+                      £{pendingOrder.estimatedPay % 1 === 0 ? pendingOrder.estimatedPay.toFixed(0) : pendingOrder.estimatedPay.toFixed(2)}
+                    </h2>
+                    
+                    <div className="flex items-center gap-1 mt-1 bg-gray-100 border border-gray-200/50 w-fit px-2 py-0.5 rounded-md">
+                      <Star size={11} fill="#eab308" className="text-yellow-500" />
+                      <span className="font-sans font-black text-xs text-gray-700">4.94</span>
+                    </div>
+                  </div>
 
-              {/* Delivery Addresses Chain */}
-              <div className="px-6 py-4 flex-1 overflow-y-auto">
-                {(() => {
-                  const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
-                  if (isDouble) {
-                    return (
-                      <div className="relative pl-8 border-l-2 border-dashed border-gray-300 ml-3 py-1 space-y-6">
-                        {/* Pickup dot (black square with internal dot) */}
-                        <div className="absolute left-[-8px] top-[12px] w-4 h-4 bg-black rounded-sm flex items-center justify-center">
-                          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                        </div>
+                  {/* Horizontal Divider */}
+                  <div className="h-px bg-gray-100 my-1" />
 
-                        <div>
-                          <p className="font-sans text-lg font-black text-gray-900 leading-tight">
-                            {pendingOrder.restaurantName || "Pizza Express - Holborn"}
-                          </p>
-                          <p className="font-sans text-xs text-gray-500 font-bold mt-1">
-                            {pendingOrder.type === 'delivery' 
-                              ? "12 Kingsway, Holborn, London WC2B 6YB" 
-                              : "Driver Pickup Point"}
-                          </p>
-                        </div>
+                  {/* Timeline with accurate metrics formatted */}
+                  <div className="relative pl-6 py-1 space-y-7">
+                    {/* Vertical Connecting Line */}
+                    <div className="absolute left-[7px] top-[14px] bottom-[14px] w-[2px] bg-black" />
 
-                        {/* First dropoff dot */}
-                        <div className="relative pl-8 pb-1">
-                          <div className="absolute left-[-31px] top-[4px] w-3.5 h-3.5 rounded-full bg-blue-600 flex items-center justify-center border-2 border-white">
-                            <div className="w-1 h-1 bg-white rounded-full" />
-                          </div>
-                          <div>
-                            <p className="font-sans text-[15px] text-gray-600 font-black leading-tight">
-                              Dropoff 1: {pendingOrder.customerName.replace(" + 1 more", "").replace(" (Max+1)", "").trim()}
-                            </p>
-                            <p className="font-sans text-xs text-gray-400 font-bold mt-1">
-                              48 High Holborn, London WC1V 6RL
-                            </p>
-                          </div>
-                        </div>
+                    {/* Top pickup locator dot/circle */}
+                    <div className="absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full bg-black border-2 border-white ring-2 ring-black" />
 
-                        {/* Second dropoff dot */}
-                        <div className="relative pl-8">
-                          <div className="absolute left-[-31px] top-[4px] w-3.5 h-3.5 rounded-full bg-indigo-600 flex items-center justify-center border-2 border-white">
-                            <div className="w-1 h-1 bg-white rounded-full" />
-                          </div>
-                          <div>
-                            <p className="font-sans text-[15px] text-gray-600 font-black leading-tight">
-                              Dropoff 2: Recipient (Part 2)
-                            </p>
-                            <p className="font-sans text-xs text-gray-400 font-bold mt-1">
-                              42 Southampton Row, London WC1B 4AR
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  } else {
-                    return (
-                      <div className="relative pl-8 border-l-2 border-dashed border-gray-300 ml-3 py-1 space-y-5">
-                        {/* Pickup dot (black square with internal dot) */}
-                        <div className="absolute left-[-8px] top-[12px] w-4 h-4 bg-black rounded-sm flex items-center justify-center">
-                          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                        </div>
+                    {/* Bottom dropoff square design */}
+                    <div className="absolute left-[3px] bottom-[15px] w-2.5 h-2.5 bg-black" />
 
-                        <div>
-                          <p className="font-sans text-lg font-black text-gray-900 leading-tight">
-                            {pendingOrder.restaurantName || "Pizza Express - Holborn"}
-                          </p>
-                          <p className="font-sans text-xs text-gray-500 font-bold mt-1">
-                            {pendingOrder.type === 'delivery' 
-                              ? "12 Kingsway, Holborn, London WC2B 6YB" 
-                              : "Driver Pickup Point"}
-                          </p>
-                        </div>
+                    {/* Time & distance metadata headers matching screenshot perfectly */}
+                    <div>
+                      <p className="font-sans text-xs font-bold text-gray-500">
+                        3 min (0.5 mi)
+                      </p>
+                      <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
+                        {pendingOrder.restaurantName || "Pwllmelin Road, Cardiff, CF5 2NQ"}
+                      </p>
+                      <p className="font-sans text-[11px] text-gray-400 font-bold">
+                        {pendingOrder.type === 'delivery' ? "12 Kingsway, Holborn, London WC2B 6YB" : "Driver Pickup Point"}
+                      </p>
+                    </div>
 
-                        {/* Dropoff destination point icon (blue circular dot) */}
-                        <div className="absolute left-[-7px] bottom-[10px] w-3.5 h-3.5 rounded-full bg-blue-600 flex items-center justify-center">
-                          <div className="w-1 h-1 bg-white rounded-full" />
-                        </div>
+                    <div>
+                      <p className="font-sans text-xs font-bold text-gray-500">
+                        {pendingOrder.estimatedTime} mins ({pendingOrder.estimatedDistance.toFixed(1)} mi)
+                      </p>
+                      <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
+                        {pendingOrder.customerName || "45 The Hayes, Cardiff"}
+                      </p>
+                      <p className="font-sans text-[11px] text-gray-400 font-bold">
+                        {pendingOrder.type === 'delivery' ? "48 High Holborn, London WC1V 6RL" : "Final Destination Address"}
+                      </p>
+                    </div>
+                  </div>
 
-                        <div className="pt-2">
-                          <p className="font-sans text-[15px] text-gray-600 font-black leading-tight">
-                            {pendingOrder.type === 'delivery' ? `Customer: ${pendingOrder.customerName}` : "Passenger Dropoff"}
-                          </p>
-                          <p className="font-sans text-xs text-gray-400 font-bold mt-1">
-                            {pendingOrder.type === 'delivery' 
-                              ? "48 High Holborn, London WC1V 6RL"
-                              : "Final Destination Address"}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  }
-                })()}
-              </div>
-
-              {/* Accept Trigger Button section */}
-              <div className="p-6 pt-2 shrink-0">
-                <button 
-                  onClick={handleAcceptOrder}
-                  disabled={isMatchingLoading || isMatchFailed}
-                  className="relative w-full py-5 bg-[#00b050] hover:bg-[#009e48] active:scale-[0.98] transition-all text-white rounded-2xl font-black text-xl shadow-[0_12px_36px_rgba(0,176,80,0.32)] overflow-hidden flex items-center justify-center min-h-[64px]"
-                >
-                  {/* Action progress countdown line */}
-                  {!isMatchingLoading && !isMatchFailed && (
-                    <motion.div 
-                      key={`uber-timer-${pendingOrder.id}`}
-                      initial={{ width: '100%' }}
-                      animate={{ width: '0%' }}
-                      transition={{ duration: 18, ease: 'linear' }}
-                      className="absolute bottom-0 left-0 h-1.5 bg-white/35 z-20"
-                    />
-                  )}
-
-                  <span className="relative z-10 flex items-center gap-3">
-                    {isMatchingLoading ? (
-                      <>
+                  {/* Large Charcoal/Black Accept Match Button */}
+                  <div className="pt-2 shrink-0">
+                    <button 
+                      onClick={handleAcceptOrder}
+                      disabled={isMatchingLoading || isMatchFailed}
+                      className="relative w-full py-4 bg-[#1a1a1a] hover:bg-black active:scale-[0.98] transition-all text-white rounded-2xl font-black text-lg shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden flex items-center justify-center min-h-[58px]"
+                    >
+                      {/* Action progress countdown line */}
+                      {!isMatchingLoading && !isMatchFailed && (
                         <motion.div 
-                          animate={{ rotate: 360 }}
-                          transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                          className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full"
+                          key={`uber-timer-match-${pendingOrder.id}`}
+                          initial={{ width: '100%' }}
+                          animate={{ width: '0%' }}
+                          transition={{ duration: 18, ease: 'linear' }}
+                          className="absolute bottom-0 left-0 h-1 bg-amber-500 z-20"
                         />
-                        <span>Matching...</span>
-                      </>
-                    ) : isMatchFailed ? (
-                      <span>Another driver accepted</span>
-                    ) : (
-                      <span className="tracking-wide uppercase font-sans font-black">
-                        Accept • {orderExpiryTimer}s
+                      )}
+
+                      <span className="relative z-10 flex items-center gap-3">
+                        {isMatchingLoading ? (
+                          <>
+                            <motion.div 
+                              animate={{ rotate: 360 }}
+                              transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                              className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full"
+                            />
+                            <span>Matching...</span>
+                          </>
+                        ) : isMatchFailed ? (
+                          <span>Another driver accepted</span>
+                        ) : (
+                          <span className="tracking-wide font-sans font-black text-base">
+                            Match
+                          </span>
+                        )}
                       </span>
-                    )}
-                  </span>
-                </button>
-              </div>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* ORIGINAL NORMAL JOB STYLE */
+                <>
+                  {/* Top Handle bar */}
+                  <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mt-3 shrink-0" />
+
+                  {/* Header section with badge & close button */}
+                  <div className="flex items-center justify-between px-6 pt-3 pb-2 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 bg-[#00b050] text-white px-4 py-2 rounded-full font-black text-xs uppercase tracking-wider shadow-sm">
+                        <span className="text-base leading-none">🍴</span>
+                        <span className="align-middle">Add delivery</span>
+                      </div>
+                      {(() => {
+                        const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
+                        return (
+                          <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider font-mono shadow-sm ${
+                            isDouble 
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                              : 'bg-blue-100 text-blue-800 border border-blue-200'
+                          }`}>
+                            {isDouble ? '✨ DOUBLE ORDER (2x PAY)' : 'SINGLE ORDER'}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    
+                    <button 
+                      onClick={handleDeclineOrder}
+                      className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors active:scale-90"
+                      aria-label="Decline"
+                    >
+                      <X size={20} className="text-gray-600" />
+                    </button>
+                  </div>
+
+                  {/* Main payout and details */}
+                  <div className="px-6 py-2 shrink-0">
+                    <h2 className="font-sans text-[48px] font-black text-gray-900 tracking-tight leading-none">
+                      +£{pendingOrder.estimatedPay.toFixed(2)}
+                    </h2>
+                    
+                    <div className="flex items-center gap-2 mt-2.5 text-gray-700 font-bold text-sm">
+                      <span className="text-base">⏱️</span>
+                      <span className="text-black font-black">+{ pendingOrder.estimatedDistance.toFixed(1) } mi</span>
+                      <span className="text-gray-300">•</span>
+                      <span>{pendingOrder.estimatedTime} min</span>
+                      <span className="text-gray-300">•</span>
+                      {(() => {
+                        const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
+                        return (
+                          <span className={`px-2.5 py-0.5 rounded-md font-mono text-[10px] uppercase font-black ${
+                            isDouble ? 'bg-amber-500/15 text-amber-700' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {isDouble ? '2 Deliveries' : '1 Delivery'}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Delivery Addresses Chain */}
+                  <div className="px-6 py-4 flex-1 overflow-y-auto">
+                    {(() => {
+                      const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
+                      if (isDouble) {
+                        return (
+                          <div className="relative pl-8 border-l-2 border-dashed border-gray-300 ml-3 py-1 space-y-6">
+                            {/* Pickup dot (black square with internal dot) */}
+                            <div className="absolute left-[-8px] top-[12px] w-4 h-4 bg-black rounded-sm flex items-center justify-center">
+                              <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                            </div>
+
+                            <div>
+                              <p className="font-sans text-lg font-black text-gray-900 leading-tight">
+                                {pendingOrder.restaurantName || "Pizza Express - Holborn"}
+                              </p>
+                              <p className="font-sans text-xs text-gray-500 font-bold mt-1">
+                                {pendingOrder.type === 'delivery' 
+                                  ? "12 Kingsway, Holborn, London WC2B 6YB" 
+                                  : "Driver Pickup Point"}
+                              </p>
+                            </div>
+
+                            {/* First dropoff dot */}
+                            <div className="relative pl-8 pb-1">
+                              <div className="absolute left-[-31px] top-[4px] w-3.5 h-3.5 rounded-full bg-blue-600 flex items-center justify-center border-2 border-white">
+                                <div className="w-1 h-1 bg-white rounded-full" />
+                              </div>
+                              <div>
+                                <p className="font-sans text-[15px] text-gray-600 font-black leading-tight">
+                                  Dropoff 1: {pendingOrder.customerName.replace(" + 1 more", "").replace(" (Max+1)", "").trim()}
+                                </p>
+                                <p className="font-sans text-xs text-gray-400 font-bold mt-1">
+                                  48 High Holborn, London WC1V 6RL
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Second dropoff dot */}
+                            <div className="relative pl-8">
+                              <div className="absolute left-[-31px] top-[4px] w-3.5 h-3.5 rounded-full bg-indigo-600 flex items-center justify-center border-2 border-white">
+                                <div className="w-1 h-1 bg-white rounded-full" />
+                              </div>
+                              <div>
+                                <p className="font-sans text-[15px] text-gray-600 font-black leading-tight">
+                                  Dropoff 2: Recipient (Part 2)
+                                </p>
+                                <p className="font-sans text-xs text-gray-400 font-bold mt-1">
+                                  42 Southampton Row, London WC1B 4AR
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="relative pl-8 border-l-2 border-dashed border-gray-300 ml-3 py-1 space-y-5">
+                            {/* Pickup dot (black square with internal dot) */}
+                            <div className="absolute left-[-8px] top-[12px] w-4 h-4 bg-black rounded-sm flex items-center justify-center">
+                              <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                            </div>
+
+                            <div>
+                              <p className="font-sans text-lg font-black text-gray-900 leading-tight">
+                                {pendingOrder.restaurantName || "Pizza Express - Holborn"}
+                              </p>
+                              <p className="font-sans text-xs text-gray-500 font-bold mt-1">
+                                {pendingOrder.type === 'delivery' 
+                                  ? "12 Kingsway, Holborn, London WC2B 6YB" 
+                                  : "Driver Pickup Point"}
+                              </p>
+                            </div>
+
+                            {/* Dropoff destination point icon (blue circular dot) */}
+                            <div className="absolute left-[-7px] bottom-[10px] w-3.5 h-3.5 rounded-full bg-blue-600 flex items-center justify-center">
+                              <div className="w-1 h-1 bg-white rounded-full" />
+                            </div>
+
+                            <div className="pt-2">
+                              <p className="font-sans text-[15px] text-gray-600 font-black leading-tight">
+                                {pendingOrder.type === 'delivery' ? `Customer: ${pendingOrder.customerName}` : "Passenger Dropoff"}
+                              </p>
+                              <p className="font-sans text-xs text-gray-400 font-bold mt-1">
+                                {pendingOrder.type === 'delivery' 
+                                  ? "48 High Holborn, London WC1V 6RL"
+                                  : "Final Destination Address"}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+
+                  {/* Accept Trigger Button section */}
+                  <div className="p-6 pt-2 shrink-0">
+                    <button 
+                      onClick={handleAcceptOrder}
+                      disabled={isMatchingLoading || isMatchFailed}
+                      className="relative w-full py-5 bg-[#00b050] hover:bg-[#009e48] active:scale-[0.98] transition-all text-white rounded-2xl font-black text-xl shadow-[0_12px_36px_rgba(0,176,80,0.32)] overflow-hidden flex items-center justify-center min-h-[64px]"
+                    >
+                      {/* Action progress countdown line */}
+                      {!isMatchingLoading && !isMatchFailed && (
+                        <motion.div 
+                          key={`uber-timer-${pendingOrder.id}`}
+                          initial={{ width: '100%' }}
+                          animate={{ width: '0%' }}
+                          transition={{ duration: 18, ease: 'linear' }}
+                          className="absolute bottom-0 left-0 h-1.5 bg-white/35 z-20"
+                        />
+                      )}
+
+                      <span className="relative z-10 flex items-center gap-3">
+                        {isMatchingLoading ? (
+                          <>
+                            <motion.div 
+                              animate={{ rotate: 360 }}
+                              transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                              className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full"
+                            />
+                            <span>Matching...</span>
+                          </>
+                        ) : isMatchFailed ? (
+                          <span>Another driver accepted</span>
+                        ) : (
+                          <span className="tracking-wide uppercase font-sans font-black">
+                            Accept • {orderExpiryTimer}s
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </div>
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
