@@ -4517,6 +4517,7 @@ export default function App() {
   });
   const engineNodeRef = useRef<{ osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode; filter: BiquadFilterNode; ctx: AudioContext } | null>(null);
   const workerRef = useRef<Worker | null>(null);
+  const currentOrderAudioRef = useRef<HTMLAudioElement | null>(null);
   const [backgroundTicks, setBackgroundTicks] = useState(0);
 
   const startEngineKeepAlive = React.useCallback(() => {
@@ -5009,6 +5010,20 @@ export default function App() {
       if (type === 'order') {
         const now = audioCtx.currentTime;
         
+        // If there's already an active audio and it is currently playing, don't start a new one to prevent overlapping/cacophony!
+        if (currentOrderAudioRef.current && !currentOrderAudioRef.current.paused && !currentOrderAudioRef.current.ended) {
+          return;
+        }
+
+        // Otherwise, ensure we cleanly stop and reset any old reference
+        if (currentOrderAudioRef.current) {
+          try {
+            currentOrderAudioRef.current.pause();
+            currentOrderAudioRef.current.currentTime = 0;
+          } catch (err) {}
+          currentOrderAudioRef.current = null;
+        }
+
         let customFilePlayed = false;
         
         // 1. YouTube Audio Alert Playback
@@ -5045,6 +5060,7 @@ export default function App() {
           try {
             const audio = new Audio(customSoundUrl);
             audio.volume = 0.7;
+            currentOrderAudioRef.current = audio;
             audio.play().then(() => {
               customFilePlayed = true;
             }).catch(err => {
@@ -5060,21 +5076,31 @@ export default function App() {
 
         function playPublicFilesAndFallback() {
           // 3. Try playing /order.mp3 from public folder
-          const audioMp3 = new Audio('/order.mp3');
-          audioMp3.volume = 0.6;
-          audioMp3.play()
-            .then(() => { customFilePlayed = true; })
-            .catch(() => {
-              // 4. Try playing /order.wav from public folder
-              const audioWav = new Audio('/order.wav');
-              audioWav.volume = 0.6;
-              audioWav.play()
-                .then(() => { customFilePlayed = true; })
-                .catch(() => {
-                  // 5. Synthesizer replica of the crisp, high-pitch rhythmic alarm chime
+          try {
+            const audioMp3 = new Audio('/order.mp3');
+            audioMp3.volume = 0.6;
+            currentOrderAudioRef.current = audioMp3;
+            audioMp3.play()
+              .then(() => { customFilePlayed = true; })
+              .catch(() => {
+                // 4. Try playing /order.wav from public folder
+                try {
+                  const audioWav = new Audio('/order.wav');
+                  audioWav.volume = 0.6;
+                  currentOrderAudioRef.current = audioWav;
+                  audioWav.play()
+                    .then(() => { customFilePlayed = true; })
+                    .catch(() => {
+                      // 5. Synthesizer replica of the crisp, high-pitch rhythmic alarm chime
+                      playSynthesizedIncomingRadar(audioCtx, now);
+                    });
+                } catch (e) {
                   playSynthesizedIncomingRadar(audioCtx, now);
-                });
-            });
+                }
+              });
+          } catch (e) {
+            playSynthesizedIncomingRadar(audioCtx, now);
+          }
         }
 
         function playSynthesizedIncomingRadar(ctx: AudioContext, startTime: number) {
@@ -5144,6 +5170,13 @@ export default function App() {
   // Loop high-fidelity order sound while pending order is open
   useEffect(() => {
     if (!pendingOrder) {
+      if (currentOrderAudioRef.current) {
+        try {
+          currentOrderAudioRef.current.pause();
+          currentOrderAudioRef.current.currentTime = 0;
+        } catch (e) {}
+        currentOrderAudioRef.current = null;
+      }
       if (soundPreference === 'youtube') {
         const iframe = document.getElementById('youtube-alert-player') as HTMLIFrameElement;
         if (iframe && iframe.contentWindow) {
@@ -5171,6 +5204,13 @@ export default function App() {
     
     return () => {
       clearInterval(interval);
+      if (currentOrderAudioRef.current) {
+        try {
+          currentOrderAudioRef.current.pause();
+          currentOrderAudioRef.current.currentTime = 0;
+        } catch (e) {}
+        currentOrderAudioRef.current = null;
+      }
       if (soundPreference === 'youtube') {
         const iframe = document.getElementById('youtube-alert-player') as HTMLIFrameElement;
         if (iframe && iframe.contentWindow) {
@@ -6789,7 +6829,6 @@ export default function App() {
               const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
               const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
               sendNotification(prefix + (shouldPickScheduled ? "Scheduled" : "High Priority") + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "HyperX"}`);
-              playHyperSound('order');
             } else {
               // Auto-skipped/declined!
               sendNotification("Auto-Skip Filter", `Skipped £${newOrder.estimatedPay.toFixed(2)} trip - below £${targetPrice.toFixed(2)} target price.`);
@@ -6834,7 +6873,6 @@ export default function App() {
           prefix + "Real Background Match!" + surgeText, 
           `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "HyperX"}`
         );
-        playHyperSound('order');
         addDebugLog('success', `Real Background thread generated trip matches: £${newOrder.estimatedPay.toFixed(2)} via Web Worker loop.`);
       }
     }
@@ -11062,6 +11100,108 @@ export default function App() {
                     <ArrowRight size={20} className="text-gray-300" />
                   </button>
                 ))}
+
+                {/* Background Activity Labs Section */}
+                <div className={`p-6 rounded-3xl mt-6 border-2 ${theme === 'dark' ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-100'}`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-black text-lg flex items-center gap-2">
+                      <Zap size={20} className={isKeepAliveActive && user.isOnline ? "text-amber-500 animate-pulse" : "text-amber-500"} />
+                      Background Activity Labs
+                    </h3>
+                    <span className="p-1 px-2.5 bg-yellow-500/10 border border-yellow-500/30 text-yellow-600 dark:text-yellow-500 rounded text-[9px] font-black uppercase tracking-wider font-mono">LABS</span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-bold mb-4">
+                    Mobile/desktop operating systems automatically freeze browser timers when you minimize tabs. Activate this <strong>Keep-Alive system</strong> to receive instant dispatch orders and system audio rings even when your screen is locked.
+                  </p>
+                  
+                  <div className="space-y-4">
+                    {/* Status 1: System Notification check */}
+                    <div className={`flex items-center justify-between p-3.5 rounded-2xl ${theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-white border border-gray-100 shadow-sm'}`}>
+                      <div>
+                        <p className="font-bold text-xs">Device Locked Screen Banners</p>
+                        <p className="text-[10px] text-gray-400 font-bold">
+                          {"Notification" in window ? (
+                            Notification.permission === 'granted' ? (
+                              <span className="text-emerald-500 font-black">● Granted & Active</span>
+                            ) : Notification.permission === 'denied' ? (
+                              <span className="text-rose-500 font-black">● Blocked by Browser</span>
+                            ) : (
+                              <span className="text-amber-500 font-black">● Pending Authorization</span>
+                            )
+                          ) : (
+                            <span className="text-slate-400">Not Supported</span>
+                          )}
+                        </p>
+                      </div>
+                      {"Notification" in window && Notification.permission !== 'granted' && (
+                        <button 
+                          onClick={() => {
+                            Notification.requestPermission().then(perm => {
+                              addToast("Permissions updated", `Notification access set to: ${perm}`, "info");
+                              addDebugLog('info', `Notification permission updated to: ${perm}`);
+                            });
+                          }}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                        >
+                          Allow Banners
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Status 2: Audio Keep-Alive Switch */}
+                    <div className={`flex items-center justify-between p-3.5 rounded-2xl ${theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-white border border-gray-100 shadow-sm'}`}>
+                      <div>
+                        <p className="font-bold text-xs">Stay-Alive Low Audio Wave</p>
+                        <p className="text-[10px] text-slate-400 font-bold">Locks sound channel to prevent sleep processes</p>
+                      </div>
+                      <div 
+                        onClick={() => {
+                          const updated = !isKeepAliveActive;
+                          setIsKeepAliveActive(updated);
+                          localStorage.setItem('hyper_driver_keep_alive_engine', updated ? 'true' : 'false');
+                          addToast(updated ? "Keep-Alive Enabled" : "Keep-Alive Disabled", updated ? "Stay-alive low frequency wave loop playing." : "Stay-alive sound module suspended.", "info");
+                        }}
+                        className={`w-12 h-6 rounded-full relative p-1 transition-colors cursor-pointer ${isKeepAliveActive ? 'bg-amber-500' : 'bg-gray-300'}`}
+                      >
+                        <motion.div 
+                          animate={{ x: isKeepAliveActive ? 24 : 0 }}
+                          className="w-4 h-4 bg-white rounded-full shadow-sm" 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Status 3: Web Worker Thread Status */}
+                    <div className={`flex items-center justify-between p-3.5 rounded-2xl ${theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-white border border-gray-100 shadow-sm'}`}>
+                      <div>
+                        <p className="font-bold text-xs">Independent Worker Ticks</p>
+                        <p className="text-[10px] text-gray-400 font-bold">Counts background CPU cycles triggered</p>
+                      </div>
+                      <div className="font-mono text-xs font-black px-2.5 py-1 bg-slate-900 border border-slate-800 rounded-lg text-amber-500">
+                        {backgroundTicks} TICKS
+                      </div>
+                    </div>
+
+                    {/* Action 4: Real system push badge test action */}
+                    <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex flex-col gap-2 mt-2">
+                      <p className="text-[11px] text-slate-500 dark:text-gray-300 font-bold">
+                        <strong>Test it:</strong> Tap the button below, then immediately lock your phone screen or go to your phone Home screen. You will receive a simulated real dispatch order with ringing audio in 5 seconds!
+                      </p>
+                      <button 
+                        onClick={triggerFiveSecondBackgroundTest}
+                        className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white rounded-xl text-[10px] font-black uppercase tracking-wider font-mono shadow-md text-center cursor-pointer active:scale-95 transition-transform"
+                      >
+                        ⚡ START LOCK-SCREEN BANNER TEST
+                      </button>
+                    </div>
+
+                    {/* Phone PWA instructions */}
+                    <div className="text-[10px] text-gray-400 leading-normal pl-2 border-l-2 border-amber-300 space-y-1">
+                      <p className="font-bold text-gray-600 dark:text-gray-300">📱 Mobile Setup:</p>
+                      <p>• iOS (iPhone): Tap Safari <strong className="text-blue-500">"Share"</strong> icon → select <strong className="text-blue-500">"Add to Home Screen"</strong>. Launch app from your device Home screen as a standalone PWA for full background support.</p>
+                      <p>• Android (Chrome): Tap the <strong className="text-blue-500">"Add to Home screen"</strong> option to enable lock-screen system alerts cleanly.</p>
+                    </div>
+                  </div>
+                </div>
                 
                 <div className={`p-4 rounded-2xl mt-4 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
                   <div className="flex items-center justify-between">
