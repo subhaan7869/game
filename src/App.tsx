@@ -11677,8 +11677,17 @@ export default function App() {
                   {/* Top Raw Code with selections and close button */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 bg-[#1a1a1a] text-white px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-sm">
-                      <User size={13} fill="currentColor" />
-                      <span>UberX</span>
+                      {pendingOrder.type === 'delivery' ? (
+                        <>
+                          <Utensils size={13} className="text-white" />
+                          <span>Hyper Eats</span>
+                        </>
+                      ) : (
+                        <>
+                          <CarIcon size={13} className="text-white" fill="currentColor" />
+                          <span>{pendingOrder.restaurantName || "HyperX"}</span>
+                        </>
+                      )}
                     </div>
                     
                     <button 
