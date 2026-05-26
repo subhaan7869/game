@@ -38,7 +38,7 @@ export interface Order {
 export interface NavSimulation {
   active: boolean;
   orderId: string;
-  type: 'pickup' | 'dropoff';
+  type: 'pickup' | 'dropoff' | 'busy_area';
   startPos: { lat: number, lng: number };
   endPos: { lat: number, lng: number };
   currentPos: { lat: number, lng: number };

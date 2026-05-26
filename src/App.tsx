@@ -123,6 +123,17 @@ interface CityData {
   };
 }
 
+const NOTTINGHAM_LANDMARKS: Record<string, Location> = {
+  "Old Market Square": { latitude: 52.9540, longitude: -1.1500 },
+  "Nottingham Castle": { latitude: 52.9492, longitude: -1.1541 },
+  "Wollaton Hall": { latitude: 52.9479, longitude: -1.2093 },
+  "Lace Market": { latitude: 52.9515, longitude: -1.1444 },
+  "Motorpoint Arena": { latitude: 52.9512, longitude: -1.1394 },
+  "City Ground Forest Stadium": { latitude: 52.9400, longitude: -1.1328 },
+  "University of Nottingham": { latitude: 52.9374, longitude: -1.1969 },
+  "Ye Olde Trip to Jerusalem": { latitude: 52.9493, longitude: -1.1528 }
+};
+
 const CITY_DATABASES: Record<string, CityData> = {
   "London": {
     center: { latitude: 51.5074, longitude: -0.1278 },
@@ -192,6 +203,16 @@ const CITY_DATABASES: Record<string, CityData> = {
       High: ["Bundobust Leeds", "Red's True BBQ Briggate", "House of Fu", "Greggs Headrow", "McDonald's Briggate", "Nando's Leeds", "KFC Merrion St"],
       Medium: ["Laynes Espresso", "Sarto Pasta", "Whitelocks Ale House", "Costa Leeds", "Starbucks Vicar", "Subway Albion", "Pret Leeds", "Trinity Kitchen"],
       Low: ["Zucco", "Prashad Leeds", "The Man Behind The Curtain", "Ox Club", "Wapentake Cafe", "The Reliance", "La Besi", "Tharavadu"]
+    }
+  },
+  "Nottingham": {
+    center: { latitude: 52.9548, longitude: -1.1581 },
+    streets: ["Wollaton St", "Derby Rd", "Milton St", "Clumber St", "Bridlesmith Gate", "Carlton St", "Fletcher Gate", "Lace Market", "Angel Row", "Mansfield Rd", "Lower Parliament St", "Hockley", "Cheapside"],
+    customers: ["Robin", "Marian", "Guy", "Scarlett", "Kieran", "Harriet", "Callum", "Niamh", "Alistair", "Imogen"],
+    restaurants: {
+      High: ["Greggs Clumber St", "McDonald's Exchange", "Nando's Market Sq", "Five Guys Nottingham", "Mowgli Hockley", "Taco Bell Nottingham"],
+      Medium: ["Costa Coffee Hockley", "Starbucks Wollaton", "200 Degrees Coffee", "Subway Hockley", "Pizza Express Lace Market", "Itsu Nottingham", "Pret Clumber St"],
+      Low: ["Pistachio", "The Hockley Arts Club", "Yarn", "Sat Bains Restaurant", "Alchemilla", "Zara's Restaurant", "Annie's Burger Shack"]
     }
   }
 };
@@ -456,42 +477,90 @@ const ShiftSummaryModal = ({ stats, onClose }: { stats: any, onClose: () => void
   );
 };
 
-const Heatmap = ({ busynessMode, isLowPerformance }: { busynessMode: 'Low' | 'Medium' | 'High', isLowPerformance?: boolean }) => {
+const Heatmap = ({ 
+  busynessMode, 
+  isLowPerformance,
+  activeSurgeAreas = [],
+  MAP_SCALE = 50000,
+  mapOffset = { x: 0, y: 0 },
+  zoom = 1,
+  centerX = window.innerWidth / 2,
+  centerY = window.innerHeight / 2
+}: { 
+  busynessMode: 'Low' | 'Medium' | 'High', 
+  isLowPerformance?: boolean,
+  activeSurgeAreas?: any[],
+  MAP_SCALE?: number,
+  mapOffset?: { x: number, y: number },
+  zoom?: number,
+  centerX?: number,
+  centerY?: number
+}) => {
   const intensity = busynessMode === 'High' ? 1 : busynessMode === 'Medium' ? 0.6 : 0.3;
   
-  // Disable heatmap on low-perf devices or if intensity is too low
-  if (intensity < 0.4 || isLowPerformance) return null; 
+  if (isLowPerformance) return null; 
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-[5]">
-      {/* Cluster 1 */}
-      <div className="absolute left-[30%] top-[40%] -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[400px] sm:h-[400px]">
-        <motion.div 
-          animate={{ 
-            scale: [1, 1.05, 1],
-            opacity: [0.1 * intensity, 0.2 * intensity, 0.1 * intensity]
-          }}
-          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-0 rounded-full bg-orange-600 blur-[40px] sm:blur-[60px]"
-        />
-      </div>
+      {activeSurgeAreas.length > 0 ? (
+        activeSurgeAreas.map((area, idx) => {
+          const x = area.lng * MAP_SCALE + mapOffset.x;
+          const y = -area.lat * MAP_SCALE + mapOffset.y;
+          const isHigh = ('demand' in area && area.demand === 'High') || area.name === 'Shoreditch';
+          const isMedium = ('demand' in area && area.demand === 'Medium') || area.name === 'Soho';
+          
+          // Let size dynamically scale with zoom. Bigger areas should have larger glow
+          const size = area.radius * 3.8 * MAP_SCALE;
 
-      {/* Cluster 2 */}
-      <div className="absolute left-[70%] top-[60%] -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px] sm:w-[350px] sm:h-[350px]">
-        <motion.div 
-          animate={{ 
-            scale: [1, 1.1, 1],
-            opacity: [0.1 * intensity, 0.2 * intensity, 0.1 * intensity]
-          }}
-          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-0 rounded-full bg-yellow-600 blur-[30px] sm:blur-[50px]"
-        />
-      </div>
-
-      {/* Center Surge Glow */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px]">
-        <div className={`absolute inset-0 rounded-full blur-[60px] sm:blur-[80px] transition-opacity duration-1000 ${busynessMode === 'High' ? 'bg-orange-500 opacity-10' : 'bg-transparent opacity-0'}`} />
-      </div>
+          return (
+            <div 
+              key={`heatmap-glow-${idx}`}
+              className="absolute pointer-events-none"
+              style={{
+                width: size,
+                height: size,
+                left: centerX,
+                top: centerY,
+                transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`
+              }}
+            >
+              <motion.div 
+                animate={{ 
+                  scale: [1, 1.05, 1],
+                  opacity: [0.35 * intensity, 0.55 * intensity, 0.35 * intensity]
+                }}
+                transition={{ duration: 6 + (idx % 3) * 2, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-0 rounded-full blur-[45px] sm:blur-[60px]"
+                style={{
+                  background: isHigh 
+                    ? 'radial-gradient(circle, rgba(239, 68, 68, 0.45) 0%, rgba(249, 115, 22, 0.15) 50%, rgba(239, 68, 68, 0) 100%)' 
+                    : isMedium 
+                      ? 'radial-gradient(circle, rgba(234, 179, 8, 0.4) 0%, rgba(245, 158, 11, 0.15) 50%, rgba(234, 179, 8, 0) 100%)'
+                      : 'radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, rgba(45, 212, 191, 0.1) 50%, rgba(16, 185, 129, 0) 100%)',
+                }}
+              />
+            </div>
+          );
+        })
+      ) : (
+        // Fallback static clusters if no surge areas yet
+        <>
+          <div className="absolute left-[30%] top-[40%] -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px]">
+            <motion.div 
+              animate={{ scale: [1, 1.05, 1], opacity: [0.12 * intensity, 0.22 * intensity, 0.12 * intensity] }}
+              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+              className="absolute inset-0 rounded-full blur-[40px] bg-red-600"
+            />
+          </div>
+          <div className="absolute left-[70%] top-[60%] -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px]">
+            <motion.div 
+              animate={{ scale: [1, 1.1, 1], opacity: [0.12 * intensity, 0.22 * intensity, 0.12 * intensity] }}
+              transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+              className="absolute inset-0 rounded-full blur-[30px] bg-orange-500"
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -502,6 +571,7 @@ const OrderDetailsModal = ({
   onClose, 
   onNextStep, 
   getArrivalTime,
+  isActionAllowed,
   onOpenChat,
   onCancel
 }: { 
@@ -510,6 +580,7 @@ const OrderDetailsModal = ({
   onClose: () => void, 
   onNextStep: (id: string) => void,
   getArrivalTime: (mins: number) => string,
+  isActionAllowed: (id: string) => boolean,
   onOpenChat: (id: string) => void,
   onCancel: (id: string) => void
 }) => {
@@ -588,12 +659,21 @@ const OrderDetailsModal = ({
         >
           <MessageSquare size={24} />
         </button>
-        <button 
-          onClick={() => onNextStep(order.id)}
-          className="flex-1 py-5 bg-black text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform"
-        >
-          {order.status === 'accepted' ? (order.type === 'ride' ? 'START TRIP' : 'START PICKUP') : 'COMPLETE DELIVERY'}
-        </button>
+        {isActionAllowed(order.id) ? (
+          <button 
+            onClick={() => onNextStep(order.id)}
+            className="flex-1 py-5 bg-black text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-transform"
+          >
+            {order.status === 'accepted' ? (order.type === 'ride' ? 'START TRIP' : 'START PICKUP') : 'COMPLETE DELIVERY'}
+          </button>
+        ) : (
+          <button 
+            disabled
+            className="flex-1 py-5 bg-gray-500/10 text-gray-500/50 rounded-2xl font-black text-xl cursor-not-allowed border border-white/5"
+          >
+            {order.status === 'accepted' ? 'PICKUP LOCKED' : 'DELIVERY LOCKED'}
+          </button>
+        )}
       </div>
     </motion.div>
   );
@@ -4861,6 +4941,39 @@ export default function App() {
   const [location, setLocation] = useState<Location | null>({ latitude: 51.5074, longitude: -0.1278 }); // Default to London
   const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+
+  // Touch Pinch-to-Zoom references
+  const isPinchingRef = useRef(false);
+  const initialTouchDistanceRef = useRef<number | null>(null);
+  const initialZoomRef = useRef<number>(1);
+
+  // Restaurant Order Preparation timers state
+  const [preparingOrders, setPreparingOrders] = useState<Record<string, number>>({});
+  const [triggeredPrepOrders, setTriggeredPrepOrders] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const keys = Object.keys(preparingOrders);
+    if (keys.length === 0) return;
+    
+    const interval = setInterval(() => {
+      setPreparingOrders(prev => {
+        const next = { ...prev };
+        let changed = false;
+        for (const key of Object.keys(next)) {
+          if (next[key] > 0) {
+            next[key] = next[key] - 1;
+            changed = true;
+          } else {
+            delete next[key];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [preparingOrders]);
   const [vehicleType, setVehicleType] = useState<'Car' | 'Bike' | 'Scooter'>(() => {
     try {
       const saved = localStorage.getItem('hyper_driver_vehicle_type');
@@ -5091,6 +5204,21 @@ export default function App() {
 
   const playHyperSound = React.useCallback((type: 'order' | 'accept' | 'message' | 'complete' | 'radar') => {
     try {
+      // Trigger actual physical vibrations on the user's phone
+      if ("vibrate" in navigator) {
+        if (type === 'order') {
+          navigator.vibrate([400, 150, 400, 150, 400]); // Intense dispatch vibration
+        } else if (type === 'radar') {
+          navigator.vibrate([200, 100, 200]); // Pulsing radar vibration
+        } else if (type === 'accept') {
+          navigator.vibrate([80]); // Crispy tactile click
+        } else if (type === 'message') {
+          navigator.vibrate([150, 80, 150]); // standard SMS vibration pattern
+        } else if (type === 'complete') {
+          navigator.vibrate([100, 50, 100, 50, 250]); // Success pattern
+        }
+      }
+
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioContextClass) return;
 
@@ -5558,6 +5686,31 @@ export default function App() {
     return stops;
   }, [activeOrders]);
 
+  const [busyAreaTarget, setBusyAreaTarget] = useState<{ id: string, name: string, location: Location } | null>(null);
+
+  const isActionAllowed = (orderId: string) => {
+    if (activeOrders.length === 0) return false;
+    const currentStop = currentStops[0];
+    if (!currentStop) return false;
+    
+    // Rule 1: It is the active stop
+    if (orderId === currentStop.orderId) return true;
+    
+    // Rule 2: If both are pickups and from the same restaurant, let them be active!
+    const activeOrder = activeOrders.find(o => o.id === currentStop.orderId);
+    const targetOrder = activeOrders.find(o => o.id === orderId);
+    
+    if (activeOrder && targetOrder && currentStop.type === 'pickup' && targetOrder.status === 'accepted') {
+      const activeRest = activeOrder.restaurantName;
+      const targetRest = targetOrder.restaurantName;
+      if (activeRest && targetRest && activeRest === targetRest) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
   const [isNavigating, setIsNavigating] = useState(false);
   const [userSpeed, setUserSpeed] = useState(0);
   const [currentSpeedLimit, setCurrentSpeedLimit] = useState(30);
@@ -5942,6 +6095,7 @@ export default function App() {
     if (lat > 55.8 && lat < 56.0 && lng > -4.4 && lng < -4.1) return "Glasgow";
     if (lat > 53.7 && lat < 53.9 && lng > -1.7 && lng < -1.4) return "Leeds";
     if (lat > 51.4 && lat < 51.6 && lng > -2.7 && lng < -2.4) return "Bristol";
+    if (lat > 52.8 && lat < 53.1 && lng > -1.3 && lng < -1.0) return "Nottingham";
     if (lat > 51.3 && lat < 51.7 && lng > -0.5 && lng < 0.3) return "London";
     
     return "United Kingdom"; 
@@ -6150,13 +6304,21 @@ export default function App() {
   const locationRef = useRef(location);
   const currentStopRef = useRef(currentStop);
   
+  const busyAreaTargetRef = useRef(busyAreaTarget);
+  useEffect(() => { busyAreaTargetRef.current = busyAreaTarget; }, [busyAreaTarget]);
+
   useEffect(() => { locationRef.current = location; }, [location]);
   useEffect(() => { currentStopRef.current = currentStop; }, [currentStop]);
 
   // Simulated Map Movement
   useEffect(() => {
-    if (!isNavigating || !user.isOnline || activeOrders.length === 0 || !location || !currentStop) {
-      if (isNavigating && activeOrders.length === 0) setIsNavigating(false);
+    const hasJob = activeOrders.length > 0;
+    const isNavBusy = !hasJob && !!busyAreaTarget;
+    
+    if (!isNavigating || !user.isOnline || (!hasJob && !isNavBusy) || !location) {
+      if (isNavigating && !hasJob && !isNavBusy) {
+        setIsNavigating(false);
+      }
       return;
     }
 
@@ -6164,19 +6326,38 @@ export default function App() {
       // Use refs to avoid interval re-triggering on every location update
       const loc = locationRef.current;
       const targetStop = currentStopRef.current;
-      if (!targetStop || !loc) return;
+      const busyTarget = busyAreaTargetRef.current;
+      if (!loc) return;
+
+      let target: Location;
+      let label: string;
+      const onJob = activeOrders.length > 0;
+
+      if (onJob && targetStop) {
+        target = targetStop.location;
+        label = targetStop.label;
+      } else if (!onJob && busyTarget) {
+        target = busyTarget.location;
+        label = `Surge Area: ${busyTarget.name}`;
+      } else {
+        return; // Nothing to navigate to
+      }
       
-      const target = targetStop.location;
       const dLat = target.latitude - loc.latitude;
       const dLng = target.longitude - loc.longitude;
       const distance = Math.sqrt(dLat * dLat + dLng * dLng);
       
-      const speed = 0.00015; 
+      const speed = 0.00045; // Snappy movement (3x speed) for high quality testing flow
 
       if (distance < speed * 1.5) {
         setLocation(target);
         setIsNavigating(false);
-        sendNotification("Arrived", `You have arrived at ${targetStop.label}`, "success");
+        if (!onJob) {
+          setBusyAreaTarget(null);
+          sendNotification("Arrived", `Arrived at busy region: ${label}`, "success");
+        } else {
+          sendNotification("Arrived", `You have arrived at ${label}`, "success");
+        }
         return;
       }
 
@@ -6197,7 +6378,59 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(moveInterval);
-  }, [isNavigating, user.isOnline, activeOrders.length > 0, location === null]);
+  }, [isNavigating, user.isOnline, activeOrders.length > 0, !!busyAreaTarget, location === null]);
+
+  // Synchronize Nav Simulation with current active stop or busyAreaTarget
+  useEffect(() => {
+    if (!user.isOnline) return;
+    
+    if (activeOrders.length > 0) {
+      const targetStop = currentStops[0];
+      if (targetStop) {
+        if (!navSimulation.active || navSimulation.orderId !== targetStop.orderId || navSimulation.type !== targetStop.type) {
+          const startLoc = location || { latitude: activeCityCenter.latitude, longitude: activeCityCenter.longitude };
+          const pPos = { lat: targetStop.location.latitude, lng: targetStop.location.longitude };
+          
+          setIsNavigating(true);
+          setNavSimulation({
+            active: true,
+            orderId: targetStop.orderId,
+            type: targetStop.type,
+            startPos: { lat: startLoc.latitude, lng: startLoc.longitude },
+            endPos: pPos,
+            currentPos: { lat: startLoc.latitude, lng: startLoc.longitude },
+            progress: 0,
+            distanceRemaining: 1.5,
+            eta: 5,
+            speed: 15 + Math.random() * 10
+          });
+        }
+      }
+    } else if (busyAreaTarget) {
+      if (!navSimulation.active || navSimulation.orderId !== busyAreaTarget.id || navSimulation.type !== 'busy_area') {
+        const startLoc = location || { latitude: activeCityCenter.latitude, longitude: activeCityCenter.longitude };
+        const pPos = { lat: busyAreaTarget.location.latitude, lng: busyAreaTarget.location.longitude };
+        
+        setIsNavigating(true);
+        setNavSimulation({
+          active: true,
+          orderId: busyAreaTarget.id,
+          type: 'busy_area' as any,
+          startPos: { lat: startLoc.latitude, lng: startLoc.longitude },
+          endPos: pPos,
+          currentPos: { lat: startLoc.latitude, lng: startLoc.longitude },
+          progress: 0,
+          distanceRemaining: 1.2,
+          eta: 4,
+          speed: 15 + Math.random() * 10
+        });
+      }
+    } else {
+      if (navSimulation.active) {
+        setNavSimulation(prev => ({ ...prev, active: false }));
+      }
+    }
+  }, [currentStops, busyAreaTarget, user.isOnline]);
 
   // GPS Drift Effect (Subtle jitter when online but stationary)
   useEffect(() => {
@@ -6784,30 +7017,59 @@ export default function App() {
   const centerY = screenSize.height / 2;
 
   // Map Background Component for depth and to prevent "black screen" feel
-  const MapGrid = () => (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-      {/* Background base */}
-      <div className="absolute inset-0 bg-[#0c0c0d]" />
-      
-      {/* Major Roads Grid */}
-      <div className="absolute inset-0 opacity-[0.15]" style={{ 
-        backgroundImage: `linear-gradient(90deg, #3b82f6 1px, transparent 1px), linear-gradient(#3b82f6 1px, transparent 1px)`,
-        backgroundSize: '150px 150px'
-      }} />
-      
-      {/* Minor Roads Grid */}
-      <div className="absolute inset-0 opacity-[0.05]" style={{ 
-        backgroundImage: `linear-gradient(90deg, #ffffff 1px, transparent 1px), linear-gradient(#ffffff 1px, transparent 1px)`,
-        backgroundSize: '30px 30px'
-      }} />
+  const MapGrid = () => {
+    // Dynamic styling based on Busyness (Uber-like color shifts)
+    let baseBg = 'bg-[#0c0c0d]';
+    let roadColor = '#3b82f6'; // Light blue
+    let radialGlowColor = 'rgba(59,130,246,0.06)';
+    let vignetteColor = 'rgba(0,0,0,0.4)';
 
-      {/* City Glows */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.05)_0%,transparent_70%)]" />
-      
-      {/* Dark Vignette */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]" />
-    </div>
-  );
+    if (busynessMode === 'High') {
+      baseBg = 'bg-[#150606]'; // Dark Crimson Tint
+      roadColor = '#ff3b30'; // Neon Crimson
+      radialGlowColor = 'rgba(239, 68, 68, 0.09)';
+      vignetteColor = 'rgba(25, 5, 5, 0.65)';
+    } else if (busynessMode === 'Medium') {
+      baseBg = 'bg-[#120a03]'; // Dark Amber/Gold Tint
+      roadColor = '#f59e0b'; // Gold
+      radialGlowColor = 'rgba(245, 158, 11, 0.07)';
+      vignetteColor = 'rgba(18, 10, 3, 0.55)';
+    } else {
+      baseBg = 'bg-[#05090e]'; // Deep Blue-Green Teal Tint
+      roadColor = '#06b6d4'; // Cool Cyan/Teal
+      radialGlowColor = 'rgba(6, 182, 212, 0.06)';
+      vignetteColor = 'rgba(3, 8, 15, 0.45)';
+    }
+
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 transition-colors duration-1000">
+        {/* Background base */}
+        <div className={`absolute inset-0 ${baseBg} transition-all duration-1000`} />
+        
+        {/* Major Roads Grid */}
+        <div className="absolute inset-0 opacity-[0.15] transition-all duration-1000" style={{ 
+          backgroundImage: `linear-gradient(90deg, ${roadColor} 1px, transparent 1px), linear-gradient(${roadColor} 1px, transparent 1px)`,
+          backgroundSize: '150px 150px'
+        }} />
+        
+        {/* Minor Roads Grid */}
+        <div className="absolute inset-0 opacity-[0.04]" style={{ 
+          backgroundImage: `linear-gradient(90deg, #ffffff 1px, transparent 1px), linear-gradient(#ffffff 1px, transparent 1px)`,
+          backgroundSize: '30px 30px'
+        }} />
+
+        {/* City Glows */}
+        <div className="absolute inset-0 transition-all duration-1000" style={{
+          backgroundImage: `radial-gradient(circle at 50% 50%, ${radialGlowColor} 0%, transparent 70%)`
+        }} />
+        
+        {/* Dark Vignette */}
+        <div className="absolute inset-0 transition-all duration-1000" style={{
+          backgroundImage: `radial-gradient(circle at center, transparent 0%, ${vignetteColor} 100%)`
+        }} />
+      </div>
+    );
+  };
 
   // Improved Order Matching Algorithm with Surge
   const generateSmartOrder = () => {
@@ -7545,9 +7807,68 @@ export default function App() {
     return () => clearInterval(interval);
   }, [user.isOnline, activeOrders, isCustomerTyping, activeChatOrderId]);
 
+  // Touch handlers for multi-touch pinch to zoom gesture on map
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      isPinchingRef.current = true;
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.sqrt(
+        Math.pow(touch1.clientX - touch2.clientX, 2) +
+        Math.pow(touch1.clientY - touch2.clientY, 2)
+      );
+      initialTouchDistanceRef.current = distance;
+      initialZoomRef.current = zoom;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && isPinchingRef.current && initialTouchDistanceRef.current !== null) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.sqrt(
+        Math.pow(touch1.clientX - touch2.clientX, 2) +
+        Math.pow(touch1.clientY - touch2.clientY, 2)
+      );
+      if (initialTouchDistanceRef.current > 0) {
+        const scale = distance / initialTouchDistanceRef.current;
+        const targetZoom = Math.max(0.4, Math.min(3.0, initialZoomRef.current * scale));
+        setZoom(targetZoom);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    isPinchingRef.current = false;
+    initialTouchDistanceRef.current = null;
+  };
+
   const handleNextStep = (orderId: string) => {
     const order = activeOrders.find(o => o.id === orderId);
     if (!order) return;
+
+    // Check if it's a delivery pickup, and we need to roll the preparing timer
+    if (order.status === 'accepted' && order.type === 'delivery') {
+      if (!triggeredPrepOrders[orderId]) {
+        // 45% chance of being delayed (restaurant still preparing)
+        if (Math.random() < 0.45) {
+          const randomTime = Math.floor(Math.random() * 21) + 15; // 15 to 35 seconds
+          setPreparingOrders(prev => ({ ...prev, [orderId]: randomTime }));
+          setTriggeredPrepOrders(prev => ({ ...prev, [orderId]: true }));
+          sendNotification("Preparing Order", `Restaurant is still preparing the order. Wait: ${randomTime}s`, "info");
+          addToast("Still Preparing", `Greggs is cooking. Estimated wait: ${randomTime}s`, "info");
+          playHyperSound('radar');
+          return; // Block pickup progression!
+        } else {
+          // Immediately marked as triggered with no wait duration
+          setTriggeredPrepOrders(prev => ({ ...prev, [orderId]: true }));
+        }
+      } else if (preparingOrders[orderId] && preparingOrders[orderId] > 0) {
+        // Still preparing, block confirm pickup click!
+        addToast("Store Preparing", `Please wait for Greggs to complete order preparation (${preparingOrders[orderId]}s remaining).`, "info");
+        return;
+      }
+    }
 
     if (order.status === 'accepted') {
       if (order.type === 'delivery' && order.receiptRequired && !order.receiptVerified) {
@@ -8280,7 +8601,18 @@ export default function App() {
               </div>
               
                   {/* Heatmap Simulation */}
-                  {user.isOnline && !isNavigating && mapCoreMode === 'cyber' && <Heatmap busynessMode={busynessMode} isLowPerformance={isLowPerformance} />}
+                  {user.isOnline && !isNavigating && mapCoreMode === 'cyber' && (
+                    <Heatmap 
+                      busynessMode={busynessMode} 
+                      isLowPerformance={isLowPerformance} 
+                      activeSurgeAreas={activeSurgeAreas}
+                      MAP_SCALE={MAP_SCALE}
+                      mapOffset={mapOffset}
+                      zoom={zoom}
+                      centerX={centerX}
+                      centerY={centerY}
+                    />
+                  )}
                   
                   {/* Navigation Simulation Overlay */}
                   {mapCoreMode === 'cyber' && <MapSimulationView sim={navSimulation} />}
@@ -8619,11 +8951,20 @@ export default function App() {
                   setSelectedRestaurant(null);
                 }}
                 onPan={(e, info) => {
+                  if (isPinchingRef.current) return;
                   if (isNaN(info.delta.x) || isNaN(info.delta.y)) return;
                   setMapOffset(prev => ({
                     x: (prev.x || 0) + info.delta.x,
                     y: (prev.y || 0) + info.delta.y
                   }));
+                }}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onWheel={(e) => {
+                  const delta = e.deltaY;
+                  // Scroll zoom: changes zoom slightly per notch
+                  setZoom(prev => Math.max(0.4, Math.min(3.0, prev - delta * 0.0012)));
                 }}
                 className={`absolute inset-0 overflow-hidden cursor-grab active:cursor-grabbing ${isNightMode || theme === 'dark' ? 'bg-[#0e1014]' : 'bg-[#e5e3df]'} ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'blur-md grayscale opacity-50 pointer-events-none' : ''}`}
               >
@@ -8976,32 +9317,47 @@ export default function App() {
 
                 {mapCoreMode === 'cyber' && (
                   <>
-                    {/* Driver Marker */}
+                    {/* Driver Marker (Uber Classic style pulsing blue dot with heading representation) */}
                     <motion.div 
                       className="absolute z-[220]"
                       animate={{ 
                         left: (centerX || window.innerWidth/2) + (mapOffset.x || 0),
-                        top: (centerY || window.innerHeight/2) + (mapOffset.y || 0),
-                        rotate: heading || 0
+                        top: (centerY || window.innerHeight/2) + (mapOffset.y || 0)
                       }}
-                    transition={{ type: "spring", stiffness: 60, damping: 20 }}
-                  >
-                    <div className="relative group -translate-x-1/2 -translate-y-1/2">
-                      <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity rounded-full scale-150" />
-                      <div className="w-12 h-12 bg-[#0a0a0a] rounded-2xl border-2 border-blue-500 shadow-[0_0_25px_0_rgba(59,130,246,0.6)] flex items-center justify-center p-2 relative overflow-hidden transition-transform hover:scale-110">
-                        <CarIcon className="text-blue-500 w-full h-full fill-blue-500/10" strokeWidth={2.5} />
-                        <div className="absolute inset-0 bg-gradient-to-t from-blue-500/10 to-transparent" />
-                      </div>
-                      {/* Animated Heading Arrow */}
-                      <div className="absolute -top-5 left-1/2 -translate-x-1/2">
+                      transition={{ type: "spring", stiffness: 60, damping: 20 }}
+                    >
+                      <div className="relative -translate-x-1/2 -translate-y-1/2">
+                        {/* Expandable ripple waves propagating outwards */}
                         <motion.div 
-                          animate={{ y: [0, -4, 0] }}
-                          transition={{ duration: 1.5, repeat: Infinity }}
-                          className="w-3 h-3 bg-blue-500 rotate-45 shadow-[0_0_10px_rgba(59,130,246,0.5)] border border-white/20"
+                          animate={{ scale: [1, 3.2], opacity: [0.65, 0] }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+                          className="absolute w-12 h-12 bg-blue-500/25 rounded-full border border-blue-500/30 -translate-x-1/2 -translate-y-1/2"
+                          style={{ left: '50%', top: '50%' }}
                         />
+                        <motion.div 
+                          animate={{ scale: [1, 2.0], opacity: [0.45, 0] }}
+                          transition={{ duration: 2, delay: 0.6, repeat: Infinity, ease: "easeOut" }}
+                          className="absolute w-12 h-12 bg-blue-400/15 rounded-full border border-blue-400/20 -translate-x-1/2 -translate-y-1/2"
+                          style={{ left: '50%', top: '50%' }}
+                        />
+
+                        {/* Solid bright sapphire blue tracking core with white ring layout */}
+                        <motion.div 
+                          animate={{ rotate: heading || 0 }}
+                          transition={{ type: "spring", stiffness: 65, damping: 15 }}
+                          className="w-7 h-7 bg-[#276EF1] rounded-full border-[3px] border-white shadow-[0_0_15px_rgba(39,110,241,0.9)] relative flex items-center justify-center cursor-pointer"
+                        >
+                          {/* Uber direction indicator pointer on heading front */}
+                          <div 
+                            className="absolute -top-[7px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[8px] border-b-[#276EF1]"
+                            style={{ filter: "drop-shadow(0px -1px 2px rgba(39,110,241,0.5))" }}
+                          />
+                          
+                          {/* Inner pulsing micro light */}
+                          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse shadow-[0_0_4px_white]" />
+                        </motion.div>
                       </div>
-                    </div>
-                  </motion.div>
+                    </motion.div>
 
                   {/* Active and Pending Trip Paths */}
                   {location && (isNavigating || pendingOrder) && (
@@ -9657,20 +10013,30 @@ export default function App() {
                       
                       <div className="flex flex-col items-center flex-1">
                         {currentStop && distanceToStop(currentStop) <= 0.1 ? (
-                          <motion.button
-                            whileTap={{ scale: 0.95 }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleNextStep(currentStop.orderId);
-                            }}
-                            className={`px-8 py-3 rounded-full font-display font-black text-lg uppercase tracking-tighter shadow-lg transition-all ${
-                              currentStop.type === 'pickup' 
-                                ? 'bg-blue-600 text-white shadow-blue-500/20' 
-                                : 'bg-green-600 text-white shadow-green-500/20'
-                            }`}
-                          >
-                            {currentStop.type === 'pickup' ? (activeOrders.find(o => o.id === currentStop.orderId)?.type === 'delivery' ? 'Confirm Pickup' : 'Confirm Arrival') : 'Confirm Dropoff'}
-                          </motion.button>
+                          preparingOrders[currentStop.orderId] && preparingOrders[currentStop.orderId] > 0 ? (
+                            <motion.button
+                              disabled
+                              className="px-8 py-3 bg-orange-600 border border-orange-500 text-white rounded-full font-display font-black text-lg uppercase tracking-tighter shadow-lg animate-pulse select-none flex items-center gap-2"
+                            >
+                              <span className="animate-spin text-sm">⏳</span>
+                              <span>Greggs Prep: {preparingOrders[currentStop.orderId]}s</span>
+                            </motion.button>
+                          ) : (
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleNextStep(currentStop.orderId);
+                              }}
+                              className={`px-8 py-3 rounded-full font-display font-black text-lg uppercase tracking-tighter shadow-lg transition-all ${
+                                currentStop.type === 'pickup' 
+                                  ? 'bg-blue-600 text-white shadow-blue-500/20' 
+                                  : 'bg-green-600 text-white shadow-green-500/20'
+                              }`}
+                            >
+                              {currentStop.type === 'pickup' ? (activeOrders.find(o => o.id === currentStop.orderId)?.type === 'delivery' ? 'Confirm Pickup' : 'Confirm Arrival') : 'Confirm Dropoff'}
+                            </motion.button>
+                          )
                         ) : (
                           <div className="flex flex-col items-center">
                             <div className="h-8 overflow-hidden flex items-center justify-center relative w-64">
@@ -9875,17 +10241,68 @@ export default function App() {
                                     <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest">{globalSurge.toFixed(1)}x Surge</span>
                                   </div>
                                 )}
-                                <div className="flex items-center gap-1.5 mt-1">
-                                  <span className="text-[10px] font-bold text-gray-400">Region:</span>
-                                  <select 
-                                    value={activeCityKey} 
-                                    onChange={(e) => handleSelectCity(e.target.value)}
-                                    className="text-[10px] bg-white/5 border border-white/10 hover:border-white/20 text-blue-400 font-extrabold px-1.5 py-0.5 rounded cursor-pointer outline-none transition-colors"
+                                <div className="flex flex-col gap-1.5 mt-1.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] font-bold text-gray-400">Region:</span>
+                                    <select 
+                                      value={activeCityKey} 
+                                      onChange={(e) => handleSelectCity(e.target.value)}
+                                      className="text-[10px] bg-white/5 border border-white/10 hover:border-white/20 text-blue-400 font-extrabold px-1.5 py-0.5 rounded cursor-pointer outline-none transition-colors"
+                                    >
+                                      {Object.keys(CITY_DATABASES).map(cName => (
+                                        <option key={cName} value={cName} className="bg-slate-900 text-white font-bold">{cName}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  {activeCityKey === "Nottingham" && (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] font-bold text-gray-400">Location:</span>
+                                      <select 
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          if (val) {
+                                            const pos = NOTTINGHAM_LANDMARKS[val];
+                                            if (pos) {
+                                              setLocation(pos);
+                                              setMapOffset({ x: 0, y: 0 }); // Center map on driver
+                                            }
+                                          }
+                                        }}
+                                        className="text-[10px] bg-white/5 border border-white/10 hover:border-white/20 text-green-400 font-extrabold px-1.5 py-0.5 rounded cursor-pointer outline-none transition-colors"
+                                        defaultValue=""
+                                      >
+                                        <option value="" disabled className="bg-slate-900 text-gray-405">Jump to POI...</option>
+                                        {Object.keys(NOTTINGHAM_LANDMARKS).map(name => (
+                                          <option key={name} value={name} className="bg-slate-900 text-white font-bold">{name}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Direct Push Connection trigger for authentic phone notification dispatches */}
+                                  <button 
+                                    onClick={() => {
+                                      if (!("Notification" in window)) {
+                                        addToast("Unsupported Browser", "Device does not support standard Web Notifications.", "alert");
+                                        return;
+                                      }
+                                      Notification.requestPermission().then(permission => {
+                                        if (permission === 'granted') {
+                                          addToast("Pocket Alerts Active", "Phone haptics and background dispatches successfully connected!", "success");
+                                          sendNotification("GPS Dispatches Ready", "You will now receive job alerts even when your phone is in your pocket!", "success");
+                                          if ("vibrate" in navigator) {
+                                            navigator.vibrate([200, 100, 200]);
+                                          }
+                                        } else {
+                                          addToast("Permission Denied", "Enable notification permissions in browser settings for alert dispatches.", "alert");
+                                        }
+                                      });
+                                    }}
+                                    className="text-[8px] self-start px-2 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 font-black rounded uppercase tracking-widest active:scale-95 transition-all mt-1"
+                                    title="Connect true phone alerts"
                                   >
-                                    {Object.keys(CITY_DATABASES).map(cName => (
-                                      <option key={cName} value={cName} className="bg-slate-900 text-white font-bold">{cName}</option>
-                                    ))}
-                                  </select>
+                                    🔔 Connect Pocket Alerts
+                                  </button>
                                 </div>
                             </div>
                           </div>
@@ -10096,12 +10513,29 @@ export default function App() {
                               <button onClick={() => { setActiveChatOrderId(order.id); setCurrentScreen('chat'); }} className={`w-10 h-10 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-white/5 text-white' : 'bg-gray-100 text-black'}`}>
                                 <MessageSquare size={20} />
                               </button>
-                              <button 
-                                onClick={() => handleNextStep(order.id)} 
-                                className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}
-                              >
-                                {order.status === 'accepted' ? 'Confirm Pickup' : 'Complete Delivery'}
-                              </button>
+                              {preparingOrders[order.id] && preparingOrders[order.id] > 0 ? (
+                                <button 
+                                  disabled
+                                  className="px-4 py-2 bg-orange-600 border border-orange-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest animate-pulse flex items-center gap-1 select-none"
+                                >
+                                  <span>⏳</span>
+                                  <span>Prep: {preparingOrders[order.id]}s</span>
+                                </button>
+                              ) : isActionAllowed(order.id) ? (
+                                <button 
+                                  onClick={() => handleNextStep(order.id)} 
+                                  className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}
+                                >
+                                  {order.status === 'accepted' ? 'Confirm Pickup' : 'Complete Delivery'}
+                                </button>
+                              ) : (
+                                <button 
+                                  disabled
+                                  className="px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest bg-gray-500/10 text-gray-500/50 cursor-not-allowed border border-white/5"
+                                >
+                                  {order.status === 'accepted' ? 'Pickup Locked' : 'Delivery Locked'}
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
@@ -10121,6 +10555,7 @@ export default function App() {
                     onClose={() => setViewingOrderDetailsId(null)}
                     onNextStep={handleNextStep}
                     getArrivalTime={getArrivalTime}
+                    isActionAllowed={isActionAllowed}
                     onOpenChat={(id) => {
                       setActiveChatOrderId(id);
                       setViewingOrderDetailsId(null);
@@ -10814,7 +11249,29 @@ export default function App() {
                       {area.trend === 'falling' && <div className="flex items-center gap-1 text-red-500 text-[10px] font-black uppercase tracking-widest"><ArrowDown size={10} /> Falling</div>}
                     </div>
                     <p className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-blue-900'}`}>{area.name} is busy.</p>
-                    <p className="text-sm text-gray-500 font-bold mt-1">Head towards {area.name} for higher earnings potential.</p>
+                    <p className="text-sm text-gray-500 font-bold mt-1 mb-2">Head towards {area.name} for higher earnings potential.</p>
+                    {activeOrders.length === 0 && (
+                      <button
+                        onClick={() => {
+                          const surgeAreaLocation = {
+                            latitude: activeCityCenter.latitude + area.lat,
+                            longitude: activeCityCenter.longitude + area.lng
+                          };
+                          setBusyAreaTarget({
+                            id: area.id,
+                            name: area.name,
+                            location: surgeAreaLocation
+                          });
+                          setIsNavigating(true);
+                          setMapOffset({ x: 0, y: 0 }); // Center on map
+                          setIsBottomMenuOpen(false); // Close panel to let them see navigation on map
+                        }}
+                        className="mt-3 w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <Navigation size={14} className="rotate-45" />
+                        {busyAreaTarget?.id === area.id ? "🎯 Navigating Here..." : "🚗 Navigate to Area"}
+                      </button>
+                    )}
                   </div>
                 ))}
 
