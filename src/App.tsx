@@ -111,6 +111,9 @@ import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmai
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 
+// Global cache for decoded audio buffers to prevent background music interruption
+const webAudioBufferCache = new Map<string, AudioBuffer>();
+
 // Mock data for UK cities and their local setups
 interface CityData {
   center: { latitude: number; longitude: number };
@@ -4706,6 +4709,7 @@ export default function App() {
   const engineNodeRef = useRef<{ osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode; filter: BiquadFilterNode; ctx: AudioContext } | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const currentOrderAudioRef = useRef<HTMLAudioElement | null>(null);
+  const currentWebAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const [backgroundTicks, setBackgroundTicks] = useState(0);
 
   const startEngineKeepAlive = React.useCallback(() => {
@@ -5246,12 +5250,15 @@ export default function App() {
       if (type === 'order') {
         const now = audioCtx.currentTime;
         
-        // If there's already an active audio and it is currently playing, don't start a new one to prevent overlapping/cacophony!
-        if (currentOrderAudioRef.current && !currentOrderAudioRef.current.paused && !currentOrderAudioRef.current.ended) {
-          return;
+        // Cleanly stop any currently active Web Audio source node to avoid overlap/cacophony
+        if (currentWebAudioSourceRef.current) {
+          try {
+            currentWebAudioSourceRef.current.stop();
+          } catch (err) {}
+          currentWebAudioSourceRef.current = null;
         }
 
-        // Otherwise, ensure we cleanly stop and reset any old reference
+        // Cleanly stop and reset any standard HTMLAudioElement reference as a fallback
         if (currentOrderAudioRef.current) {
           try {
             currentOrderAudioRef.current.pause();
@@ -5260,7 +5267,46 @@ export default function App() {
           currentOrderAudioRef.current = null;
         }
 
-        let customFilePlayed = false;
+        const playUrlViaWebAudio = async (url: string, volume: number = 0.7): Promise<boolean> => {
+          try {
+            let audioBuffer = webAudioBufferCache.get(url);
+            if (!audioBuffer) {
+              const response = await fetch(url);
+              if (!response.ok) throw new Error(`HTTP status ${response.status}`);
+              const arrayBuffer = await response.arrayBuffer();
+              audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+              webAudioBufferCache.set(url, audioBuffer);
+            }
+
+            // Prevent state overlap
+            if (currentWebAudioSourceRef.current) {
+              try { currentWebAudioSourceRef.current.stop(); } catch (e) {}
+              currentWebAudioSourceRef.current = null;
+            }
+
+            const source = audioCtx.createBufferSource();
+            source.buffer = audioBuffer;
+
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+
+            source.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            currentWebAudioSourceRef.current = source;
+            source.start(0);
+
+            source.onended = () => {
+              if (currentWebAudioSourceRef.current === source) {
+                currentWebAudioSourceRef.current = null;
+              }
+            };
+            return true;
+          } catch (err) {
+            console.warn(`Web Audio API playback for ${url} failed`, err);
+            return false;
+          }
+        };
         
         // 1. YouTube Audio Alert Playback
         if (soundPreference === 'youtube') {
@@ -5291,53 +5337,26 @@ export default function App() {
           return;
         }
         
-        // 2. Custom Uploaded Audio File Alert Playback
-        if (soundPreference === 'custom_file' && customSoundUrl) {
-          try {
-            const audio = new Audio(customSoundUrl);
-            audio.volume = 0.7;
-            currentOrderAudioRef.current = audio;
-            audio.play().then(() => {
-              customFilePlayed = true;
-            }).catch(err => {
-              console.warn("Custom sound playback failed, trying preloaded file", err);
-              playPublicFilesAndFallback();
-            });
-          } catch(e) {
-            playPublicFilesAndFallback();
+        const executeWebAudioPlayback = async () => {
+          // 2. Custom Uploaded Audio File Alert Playback (decoded via Web Audio to prevent pausing user music)
+          if (soundPreference === 'custom_file' && customSoundUrl) {
+            const playedCustom = await playUrlViaWebAudio(customSoundUrl, 0.7);
+            if (playedCustom) return;
           }
-        } else {
-          playPublicFilesAndFallback();
-        }
 
-        function playPublicFilesAndFallback() {
-          // 3. Try playing /order.mp3 from public folder
-          try {
-            const audioMp3 = new Audio('/order.mp3');
-            audioMp3.volume = 0.6;
-            currentOrderAudioRef.current = audioMp3;
-            audioMp3.play()
-              .then(() => { customFilePlayed = true; })
-              .catch(() => {
-                // 4. Try playing /order.wav from public folder
-                try {
-                  const audioWav = new Audio('/order.wav');
-                  audioWav.volume = 0.6;
-                  currentOrderAudioRef.current = audioWav;
-                  audioWav.play()
-                    .then(() => { customFilePlayed = true; })
-                    .catch(() => {
-                      // 5. Synthesizer replica of the crisp, high-pitch rhythmic alarm chime
-                      playSynthesizedIncomingRadar(audioCtx, now);
-                    });
-                } catch (e) {
-                  playSynthesizedIncomingRadar(audioCtx, now);
-                }
-              });
-          } catch (e) {
-            playSynthesizedIncomingRadar(audioCtx, now);
-          }
-        }
+          // 3. Try playing /order.mp3 from public folder via Web Audio
+          const playedMp3 = await playUrlViaWebAudio('/order.mp3', 0.6);
+          if (playedMp3) return;
+
+          // 4. Try playing /order.wav from public folder via Web Audio
+          const playedWav = await playUrlViaWebAudio('/order.wav', 0.6);
+          if (playedWav) return;
+
+          // 5. Synthesizer replica of the crisp, high-pitch rhythmic alarm chime as final fallback
+          playSynthesizedIncomingRadar(audioCtx, now);
+        };
+
+        executeWebAudioPlayback();
 
         function playSynthesizedIncomingRadar(ctx: AudioContext, startTime: number) {
           const playPingNode = (freq: number, triggerTime: number, duration: number, vol = 0.18) => {
@@ -5379,7 +5398,6 @@ export default function App() {
           playPingNode(1046.50, startTime, 0.45, 0.22); // C6 Note
           playPingNode(1046.50, startTime + 0.35, 0.45, 0.22); // C6 secondary bounce
         }
-
       } else if (type === 'radar') {
         const now = audioCtx.currentTime;
         playTone(1000, now, 0.15, 'sine', 0.12);
@@ -5412,6 +5430,12 @@ export default function App() {
           currentOrderAudioRef.current.currentTime = 0;
         } catch (e) {}
         currentOrderAudioRef.current = null;
+      }
+      if (currentWebAudioSourceRef.current) {
+        try {
+          currentWebAudioSourceRef.current.stop();
+        } catch (e) {}
+        currentWebAudioSourceRef.current = null;
       }
       if (soundPreference === 'youtube') {
         const iframe = document.getElementById('youtube-alert-player') as HTMLIFrameElement;
@@ -5446,6 +5470,12 @@ export default function App() {
           currentOrderAudioRef.current.currentTime = 0;
         } catch (e) {}
         currentOrderAudioRef.current = null;
+      }
+      if (currentWebAudioSourceRef.current) {
+        try {
+          currentWebAudioSourceRef.current.stop();
+        } catch (e) {}
+        currentWebAudioSourceRef.current = null;
       }
       if (soundPreference === 'youtube') {
         const iframe = document.getElementById('youtube-alert-player') as HTMLIFrameElement;
