@@ -6039,7 +6039,7 @@ export default function App() {
   const [busynessMode, setBusynessMode] = useState<'Low' | 'Medium' | 'High'>('Medium');
   const [globalSurge, setGlobalSurge] = useState(1.0);
 
-  // Realistic Demand Simulation (every 5 mins)
+  // Realistic Demand Simulation (every 5 mins) - manages global surges but does not override locator
   useEffect(() => {
     const simulateDemand = () => {
       const hour = new Date().getHours();
@@ -6047,7 +6047,6 @@ export default function App() {
       
       const modes: ('Low' | 'Medium' | 'High')[] = isPeak ? ['Medium', 'High', 'High'] : ['Low', 'Low', 'Medium'];
       const newMode = modes[Math.floor(Math.random() * modes.length)];
-      setBusynessMode(newMode);
       
       let newSurge = 1.0;
       if (newMode === 'High') {
@@ -6968,6 +6967,46 @@ export default function App() {
     { id: '3', name: "King's Cross", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.1, trend: 'falling', demand: 'Low' }
   ]);
   const [surgeMultiplier, setSurgeMultiplier] = useState(1.0);
+  const [lastDetectedAreaName, setLastDetectedAreaName] = useState<string>('Shoreditch');
+
+  // Dynamic dispatch demand determined completely by maps current area coordinates
+  useEffect(() => {
+    if (!location) return;
+    const localLat = location.latitude - 51.5074;
+    const localLng = location.longitude - (-0.1278);
+
+    let detectedDemand: 'Low' | 'Medium' | 'High' = 'Low'; // Default/baseline for outside any hotspots
+    let detectedAreaName = 'Outside Hotspots';
+
+    // Track active surge areas
+    for (const area of activeSurgeAreas) {
+      const d = Math.sqrt(Math.pow(localLat - area.lat, 2) + Math.pow(localLng - area.lng, 2));
+      if (d < area.radius) {
+        detectedDemand = area.demand;
+        detectedAreaName = area.name;
+        break;
+      }
+    }
+
+    setBusynessMode(detectedDemand);
+
+    if (detectedAreaName !== lastDetectedAreaName) {
+      setLastDetectedAreaName(detectedAreaName);
+      let announceTitle = "Dynamic dispatch shift";
+      let announceMsg = "";
+      if (detectedAreaName === 'Outside Hotspots') {
+        announceTitle = "Left Hotspot Zone";
+        announceMsg = "You are now in a low demand zone. Orders are less frequent outside hotspots.";
+        addToast("Low Demand Zone", "Entering suburbs/fringe area. Orders will be rare.", "info");
+      } else {
+        announceTitle = `Entered ${detectedAreaName}`;
+        announceMsg = `${detectedAreaName} has ${detectedDemand} demand! Keep-alive dispatch rate optimized.`;
+        addToast(`${detectedAreaName} Hotspot`, `Active demand: ${detectedDemand}. Rates are boosted!`, "success");
+      }
+      sendNotification(announceTitle, announceMsg, "info");
+      addDebugLog('info', `Dynamic Dispatcher changed location band to ${detectedAreaName} (${detectedDemand} demand tier)`);
+    }
+  }, [location, activeSurgeAreas, lastDetectedAreaName]);
 
   // Dynamic Surge and Busyness Control
   useEffect(() => {
@@ -11297,28 +11336,34 @@ export default function App() {
                 <h1 className="text-3xl font-black">Opportunities</h1>
               </div>
               <div className="space-y-4">
-                <div className={`p-6 rounded-3xl ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'} mb-8`}>
-                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Area Demand (Timer Control)</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    {['Low', 'Medium', 'High'].map((mode) => (
-                      <button 
-                        key={mode}
-                        onClick={() => setBusynessMode(mode as any)}
-                        className={`py-4 rounded-2xl font-black text-sm transition-all border-2 ${
-                          busynessMode === mode 
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
-                            : theme === 'dark' ? 'bg-white/5 border-transparent text-gray-400' : 'bg-white border-gray-100 text-black'
-                        }`}
-                      >
-                        {mode}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-gray-500 font-bold mt-4 leading-tight">
-                    {busynessMode === 'Low' && "Quiet period. Orders will be rare (45-120s wait)."}
-                    {busynessMode === 'Medium' && "Steady demand. Orders every 5-15s."}
-                    {busynessMode === 'High' && "Peak time! Rapid-fire orders (1.5-4s wait)."}
+                <div className={`p-6 rounded-3xl ${theme === 'dark' ? 'bg-[#151515] border border-white/5' : 'bg-blue-50/50 border border-blue-100'} mb-8`}>
+                  <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest mb-3 flex items-center gap-1.5 font-mono">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                    Dynamic Area Dispatch (Auto)
                   </p>
+                  <h3 className="font-display text-xl font-black mb-1 text-black dark:text-white">Location-based automatic demand</h3>
+                  <p className="text-xs text-gray-500 font-medium mb-6 leading-relaxed">
+                    Demand status and ping timer now adjust automatically in real-time depending on your exact coordinates on the map. Move towards busy hotspots to instantly maximize your order frequency.
+                  </p>
+                  
+                  <div className={`flex flex-col gap-3 p-4 rounded-2xl ${theme === 'dark' ? 'bg-white/5' : 'bg-white'}`}>
+                    <div className="flex justify-between items-center pb-2.5 border-b border-gray-100 dark:border-white/5">
+                      <span className="text-xs text-gray-400 font-bold uppercase tracking-wider font-mono">Current Zone</span>
+                      <span className="text-sm font-black text-black dark:text-white">{lastDetectedAreaName}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-0.5">
+                      <span className="text-xs text-gray-400 font-bold uppercase tracking-wider font-mono">Live Demand Tier</span>
+                      <span className={`px-2.5 py-1 text-[11px] font-black uppercase rounded-lg tracking-wide ${
+                        busynessMode === 'High' 
+                          ? 'bg-rose-500/15 text-rose-500' 
+                          : busynessMode === 'Medium' 
+                          ? 'bg-amber-500/15 text-amber-500' 
+                          : 'bg-emerald-500/15 text-emerald-500'
+                      }`}>
+                        {busynessMode} ({busynessMode === 'High' ? '1.5-4s' : busynessMode === 'Medium' ? '5-15s' : '45-120s'})
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 {activeSurgeAreas.map((area) => (
