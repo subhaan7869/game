@@ -10488,18 +10488,32 @@ export default function App() {
                   <AnimatePresence>
                     {(() => {
                       const baseList = activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter);
-                      const pickupList = baseList.filter(o => o.status === 'accepted');
                       
-                      // If there is a double/multiple pickup order before getting to the restaurant, show both so the user can see both pickups!
-                      if (pickupList.length > 1) {
-                        return pickupList;
+                      // If there is an active currentOrder
+                      if (currentOrder) {
+                        const isPickup = currentOrder.status === 'accepted' || 
+                                         currentOrder.status === 'en_route_to_pickup' || 
+                                         currentOrder.status === 'arrived' || 
+                                         currentOrder.status === 'arriving' || 
+                                         currentOrder.status === 'scanning_receipt';
+                        
+                        if (isPickup) {
+                          // Find other accepted order(s) for the SAME restaurant to show the double/multiple orders together
+                          const sameRestaurantPickups = baseList.filter(o => 
+                            (o.status === 'accepted' || o.status === 'en_route_to_pickup' || o.status === 'arrived' || o.status === 'arriving' || o.status === 'scanning_receipt') &&
+                            o.restaurantName === currentOrder.restaurantName
+                          );
+                          if (sameRestaurantPickups.length > 0) {
+                            return sameRestaurantPickups;
+                          }
+                        }
+                        
+                        // Otherwise (or if not a double order), show only the active currentOrder (one by one)
+                        const singleList = baseList.filter(o => o.id === currentOrder.id);
+                        if (singleList.length > 0) return singleList;
                       }
                       
-                      // Otherwise, show them one-by-one.
-                      if (currentOrder && baseList.some(o => o.id === currentOrder.id)) {
-                        return baseList.filter(o => o.id === currentOrder.id);
-                      }
-                      
+                      // Fallback: show only the very first order if currentOrder isn't set or found
                       if (baseList.length > 0) {
                         return [baseList[0]];
                       }
