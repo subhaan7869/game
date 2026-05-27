@@ -10486,7 +10486,26 @@ export default function App() {
               {!isBottomMenuOpen && !pendingOrder && !activeChatOrderId && (
                 <div className="absolute bottom-24 left-0 right-0 p-4 space-y-2 pointer-events-none z-[140]">
                   <AnimatePresence>
-                    {activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, idx) => (
+                    {(() => {
+                      const baseList = activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter);
+                      const pickupList = baseList.filter(o => o.status === 'accepted');
+                      
+                      // If there is a double/multiple pickup order before getting to the restaurant, show both so the user can see both pickups!
+                      if (pickupList.length > 1) {
+                        return pickupList;
+                      }
+                      
+                      // Otherwise, show them one-by-one.
+                      if (currentOrder && baseList.some(o => o.id === currentOrder.id)) {
+                        return baseList.filter(o => o.id === currentOrder.id);
+                      }
+                      
+                      if (baseList.length > 0) {
+                        return [baseList[0]];
+                      }
+                      
+                      return [];
+                    })().map((order, idx) => (
                     <motion.div 
                       key={order.id} 
                       initial={{ y: 100 }} 
@@ -10552,12 +10571,32 @@ export default function App() {
                                   <span>Prep: {preparingOrders[order.id]}s</span>
                                 </button>
                               ) : isActionAllowed(order.id) ? (
-                                <button 
-                                  onClick={() => handleNextStep(order.id)} 
-                                  className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}
-                                >
-                                  {order.status === 'accepted' ? 'Confirm Pickup' : 'Complete Delivery'}
-                                </button>
+                                (() => {
+                                  const distVal = parseFloat(distanceToTarget(order));
+                                  // threshold of 0.15 miles so actual testing is highly responsive and smooth
+                                  const isNearby = distVal <= 0.15;
+                                  
+                                  if (!isNearby) {
+                                    return (
+                                      <button 
+                                        disabled
+                                        className="px-3 py-2 rounded-xl font-black text-[9px] uppercase tracking-tight bg-orange-500/10 border border-orange-500/20 text-orange-500 cursor-not-allowed select-none opacity-90 max-w-[140px] truncate"
+                                        title={`You must arrive at the destination to complete this. Current distance: ${distVal.toFixed(2)} mi`}
+                                      >
+                                        Locked ({distVal.toFixed(1)}mi)
+                                      </button>
+                                    );
+                                  }
+                                  
+                                  return (
+                                    <button 
+                                      onClick={() => handleNextStep(order.id)} 
+                                      className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}
+                                    >
+                                      {order.status === 'accepted' ? 'Confirm Pickup' : 'Complete Delivery'}
+                                    </button>
+                                  );
+                                })()
                               ) : (
                                 <button 
                                   disabled
