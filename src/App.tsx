@@ -86,7 +86,11 @@ import {
   Trash2,
   Lock,
   Bike as BikeIcon,
-  Car as CarIcon
+  Car as CarIcon,
+  Wrench,
+  Sparkles,
+  Gauge,
+  CloudRain
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -2506,15 +2510,28 @@ const VehicleDetailsScreen = ({
   setUser, 
   setVehicleType,
   onClose,
-  theme
+  theme,
+  purchasedUpgrades = [],
+  setPurchasedUpgrades,
+  fuel = 100,
+  setFuel,
+  vehicleHealth = 100,
+  setVehicleHealth
 }: { 
   user: UserProfile, 
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
   setVehicleType?: React.Dispatch<React.SetStateAction<'Car' | 'Bike' | 'Scooter'>>,
   onClose: () => void,
-  theme: string
+  theme: string,
+  purchasedUpgrades: string[],
+  setPurchasedUpgrades: React.Dispatch<React.SetStateAction<string[]>>,
+  fuel: number,
+  setFuel: React.Dispatch<React.SetStateAction<number>>,
+  vehicleHealth: number,
+  setVehicleHealth: React.Dispatch<React.SetStateAction<number>>
 }) => {
   // Initialize vehicles from user.vehiclesList or fallback to user.vehicleInfo
+  const [activeTab, setActiveTab] = useState<'vehicles' | 'upgrades'>('vehicles');
   const [vehiclesList, setVehiclesList] = useState<any[]>(() => {
     if (user.vehiclesList && user.vehiclesList.length > 0) {
       return user.vehiclesList;
@@ -2668,6 +2685,36 @@ const VehicleDetailsScreen = ({
     onClose();
   };
 
+  const payAndInstall = (id: string, price: number, name: string) => {
+    if (purchasedUpgrades.includes(id)) return;
+    if (user.walletBalance < price) {
+      alert(`Insufficient funds! This upgrade costs £${price.toFixed(2)}. Complete more orders first.`);
+      return;
+    }
+    setUser(u => ({ ...u, walletBalance: Number((u.walletBalance - price).toFixed(2)) }));
+    setPurchasedUpgrades(up => [...up, id]);
+  };
+
+  const handleRefuel = () => {
+    const cost = 15;
+    if (user.walletBalance < cost) {
+      alert("Insufficient funds! Refueling requires £15.00.");
+      return;
+    }
+    setUser(u => ({ ...u, walletBalance: Number((u.walletBalance - cost).toFixed(2)) }));
+    setFuel(100);
+  };
+
+  const handleRepair = () => {
+    const cost = 25;
+    if (user.walletBalance < cost) {
+      alert("Insufficient funds! Standard repair service requires £25.00.");
+      return;
+    }
+    setUser(u => ({ ...u, walletBalance: Number((u.walletBalance - cost).toFixed(2)) }));
+    setVehicleHealth(100);
+  };
+
   return (
     <motion.div 
       initial={{ x: '100%' }} 
@@ -2692,6 +2739,32 @@ const VehicleDetailsScreen = ({
           </button>
         )}
       </div>
+
+      {/* Immersive Tabs selector */}
+      {!isFormOpen && (
+        <div className={`p-1 rounded-2xl flex max-w-sm gap-1 mb-8 ${theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-gray-100 border border-gray-100'}`}>
+          <button 
+            onClick={() => setActiveTab('vehicles')}
+            className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 ${
+              activeTab === 'vehicles' 
+                ? (theme === 'dark' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-black text-white shadow-lg')
+                : 'text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            🚗 Registered Fleet
+          </button>
+          <button 
+            onClick={() => setActiveTab('upgrades')}
+            className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 flex items-center justify-center gap-2 ${
+              activeTab === 'upgrades' 
+                ? (theme === 'dark' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-black text-white shadow-lg')
+                : 'text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            🔧 Performance Tuning Shop
+          </button>
+        </div>
+      )}
 
       {isFormOpen ? (
         <motion.div 
@@ -2841,93 +2914,238 @@ const VehicleDetailsScreen = ({
         </motion.div>
       ) : null}
 
-      <div className="space-y-4">
-        <h2 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Registered Fleet</h2>
-        <div className="grid md:grid-cols-2 gap-4">
-          {vehiclesList.map((item, idx) => {
-            const isActive = activePlate.toUpperCase() === item.plate.toUpperCase();
-            const uniqueKey = item.id || `veh-${item.plate}-${idx}`;
-            return (
-              <div 
-                key={uniqueKey}
-                onClick={() => setActivePlate(item.plate)}
-                className={`p-5 rounded-[28px] border-2 cursor-pointer transition-all flex items-center justify-between relative group ${
-                  isActive 
-                    ? (theme === 'dark' ? 'border-blue-500 bg-blue-950/20 shadow-xl shadow-blue-500/5' : 'border-blue-600 bg-blue-50/50 shadow-xl shadow-blue-500/5') 
-                    : (theme === 'dark' ? 'border-white/5 bg-white/5 hover:border-white/10' : 'border-gray-100 bg-gray-50/30 hover:border-gray-200')
-                }`}
-              >
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <div className={`w-14 h-14 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-150'} border border-black/5`}>
-                    {item.photo ? (
-                      <img src={item.photo} alt="Vehicle thumbnail" className="w-full h-full object-cover" />
-                    ) : item.type === 'Bike' ? (
-                      <BikeIcon size={24} className="text-gray-400 animate-pulse" />
-                    ) : (
-                      <CarIcon size={24} className="text-gray-400" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-black text-base truncate">{item.make} {item.model}</h3>
-                      <span className={`text-[9px] uppercase tracking-widest px-2 py-0.5 rounded font-black ${
-                        item.type === 'Bike' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'
-                      }`}>
-                        {item.type}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap text-xs font-bold text-gray-400">
-                      <span>{item.year}</span>
-                      <span>•</span>
-                      <span className="text-[10px] font-mono tracking-wider text-blue-600 font-bold uppercase">{item.plate}</span>
-                    </div>
-                    {item.insuranceExpiry && (
-                      <p className="text-[9px] text-gray-400 italic mt-1 uppercase tracking-wider">
-                        Insurance Exp: <span className="font-mono">{item.insuranceExpiry}</span>
-                      </p>
-                    )}
-                  </div>
-                </div>
+      {!isFormOpen && activeTab === 'upgrades' ? (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-8"
+        >
+          {/* Active stats */}
+          <div className="flex items-center gap-4 p-5 bg-black/10 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-2xl">
+            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
+              <DollarSign size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Tuning Balance</p>
+              <p className="text-xl font-black font-mono text-green-500">£{user.walletBalance.toFixed(2)}</p>
+            </div>
+          </div>
 
-                <div className="flex items-center gap-3 ml-4">
-                  {isActive ? (
-                    <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-green-500 mr-2">
-                      <span className="w-2 h-2 rounded-full bg-green-500 animate-ping"></span> ACTIVE
-                    </span>
-                  ) : (
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">Swap to drive</span>
-                  )}
-                  
-                  <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startEdit(item);
-                      }}
-                      className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-white hover:bg-gray-100 border border-gray-150 text-gray-600'} transition-all`}
-                    >
-                      <Edit2 size={13} />
-                    </button>
-                    <button 
-                      onClick={(e) => handleDeleteVehicle(item.id, e)}
-                      className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400' : 'bg-white hover:bg-red-50 border border-gray-150 text-red-500'} transition-all`}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
+          {/* Vitals Maintenance Stations */}
+          <div className="grid md:grid-cols-2 gap-6 bg-blue-600/5 border border-blue-600/20 p-6 rounded-[32px]">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                  ⛽ Fuel Tank Status
+                </span>
+                <span className="text-sm font-black font-mono text-amber-500">{fuel.toFixed(0)}%</span>
               </div>
-            );
-          })}
-        </div>
-      </div>
+              <div className="w-full bg-gray-200 dark:bg-white/10 h-2 rounded-full mb-4 overflow-hidden">
+                <div 
+                  className="bg-amber-500 h-full transition-all duration-300"
+                  style={{ width: `${fuel}%` }}
+                />
+              </div>
+              <button
+                onClick={handleRefuel}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black uppercase tracking-widest active:scale-95 transition-transform"
+              >
+                Refuel Fully (-£15.00)
+              </button>
+            </div>
 
-      <button 
-        onClick={handleAllChangesSave}
-        className="w-full py-5 bg-black text-white hover:bg-gray-900 rounded-[28px] font-black text-xl shadow-xl active:scale-95 transition-transform mt-12 block"
-      >
-        SAVE FLEET STATUS
-      </button>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                  🛠️ Body & Motor Integrity
+                </span>
+                <span className="text-sm font-black font-mono text-red-500">{vehicleHealth.toFixed(0)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-white/10 h-2 rounded-full mb-4 overflow-hidden">
+                <div 
+                  className="bg-red-500 h-full transition-all duration-300"
+                  style={{ width: `${vehicleHealth}%` }}
+                />
+              </div>
+              <button
+                onClick={handleRepair}
+                className="w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl text-xs font-black uppercase tracking-widest active:scale-95 transition-transform"
+              >
+                Repair Chassis (-£25.00)
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-4">Available Performance Tunings</h2>
+            <div className="grid md:grid-cols-2 gap-4">
+              {[
+                {
+                  id: 'engine_remap',
+                  name: 'Stage 1 Nitrous Engine Remap',
+                  desc: 'Overclocks the combustion chambers for a massive speed multiplier on all standard simulation runs.',
+                  benefit: '⚡ +50% simulation movement speed boost',
+                  price: 300,
+                  icon: <Zap size={22} className="text-yellow-500" />
+                },
+                {
+                  id: 'hybrid_eco',
+                  name: 'Eco-Regen Hybrid System',
+                  desc: 'Recycles kinetic braking energies back into standard auxiliary storage generators.',
+                  benefit: '🍃 Saves ~55% fuel expenditure per trip',
+                  price: 250,
+                  icon: <Gauge size={22} className="text-emerald-500" />
+                },
+                {
+                  id: 'alloy_suspension',
+                  name: 'Double-Armour Alloy Suspensions',
+                  desc: 'Heavy alloy dampers protecting raw core components from rugged potholes and street hazards.',
+                  benefit: '🛡️ Prevents potholes & drivewear by ~60%',
+                  price: 200,
+                  icon: <Wrench size={22} className="text-blue-500" />
+                },
+                {
+                  id: 'radar_jammer',
+                  name: 'Metropoline Radar Jammer',
+                  desc: 'Disrupts speed traps and patrol road checks automatically using customized software waves.',
+                  benefit: '👮 Scrambles radar frequency speed checks completely',
+                  price: 450,
+                  icon: <ShieldCheck size={22} className="text-purple-500" />
+                }
+              ].map(tuning => {
+                const isBought = purchasedUpgrades.includes(tuning.id);
+                return (
+                  <div 
+                    key={tuning.id} 
+                    className={`p-6 rounded-[28px] border-2 flex flex-col justify-between ${
+                      isBought 
+                        ? (theme === 'dark' ? 'bg-blue-600/10 border-blue-600/30' : 'bg-blue-50/50 border-blue-400')
+                        : (theme === 'dark' ? 'bg-neutral-900 border-white/5' : 'bg-gray-50 border-gray-150')
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-white/5' : 'bg-white shadow-sm'}`}>
+                          {tuning.icon}
+                        </div>
+                        <h3 className="font-black text-sm tracking-tight">{tuning.name}</h3>
+                      </div>
+                      <p className="text-xs text-gray-400 leading-relaxed mb-4">{tuning.desc}</p>
+                      <div className="p-3 bg-black/5 dark:bg-white/5 rounded-2xl mb-4">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-blue-500 block mb-1">Active Effect:</span>
+                        <p className="text-[11px] font-bold text-gray-500">{tuning.benefit}</p>
+                      </div>
+                    </div>
+
+                    {isBought ? (
+                      <div className="w-full py-3 bg-green-500/10 border border-green-500/20 rounded-xl text-center text-[10px] font-black uppercase tracking-widest text-green-500 flex items-center justify-center gap-1.5">
+                        <Check size={12} /> Tuning Active & Installed
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => payAndInstall(tuning.id, tuning.price, tuning.name)}
+                        className={`w-full py-3.5 rounded-xl text-[10px] uppercase font-black tracking-widest active:scale-95 transition-all text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/10 flex items-center justify-center gap-1`}
+                      >
+                        Buy & Install Tuning for £{tuning.price.toFixed(2)}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </motion.div>
+      ) : activeTab === 'vehicles' ? (
+        <>
+          <div className="space-y-4">
+            <h2 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Registered Fleet</h2>
+            <div className="grid md:grid-cols-2 gap-4">
+              {vehiclesList.map((item, idx) => {
+                const isActive = activePlate.toUpperCase() === item.plate.toUpperCase();
+                const uniqueKey = item.id || `veh-${item.plate}-${idx}`;
+                return (
+                  <div 
+                    key={uniqueKey}
+                    onClick={() => setActivePlate(item.plate)}
+                    className={`p-5 rounded-[28px] border-2 cursor-pointer transition-all flex items-center justify-between relative group ${
+                      isActive 
+                        ? (theme === 'dark' ? 'border-blue-500 bg-blue-950/20 shadow-xl shadow-blue-500/5' : 'border-blue-600 bg-blue-50/50 shadow-xl shadow-blue-500/5') 
+                        : (theme === 'dark' ? 'border-white/5 bg-white/5 hover:border-white/10' : 'border-gray-100 bg-gray-50/30 hover:border-gray-200')
+                    }`}
+                  >
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className={`w-14 h-14 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-150'} border border-black/5`}>
+                        {item.photo ? (
+                          <img src={item.photo} alt="Vehicle thumbnail" className="w-full h-full object-cover" />
+                        ) : item.type === 'Bike' ? (
+                          <BikeIcon size={24} className="text-gray-400 animate-pulse" />
+                        ) : (
+                          <CarIcon size={24} className="text-gray-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-black text-base truncate">{item.make} {item.model}</h3>
+                          <span className={`text-[9px] uppercase tracking-widest px-2 py-0.5 rounded font-black ${
+                            item.type === 'Bike' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'
+                          }`}>
+                            {item.type}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap text-xs font-bold text-gray-400">
+                          <span>{item.year}</span>
+                          <span>•</span>
+                          <span className="text-[10px] font-mono tracking-wider text-blue-600 font-bold uppercase">{item.plate}</span>
+                        </div>
+                        {item.insuranceExpiry && (
+                          <p className="text-[9px] text-gray-400 italic mt-1 uppercase tracking-wider">
+                            Insurance Exp: <span className="font-mono">{item.insuranceExpiry}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 ml-4">
+                      {isActive ? (
+                        <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-green-500 mr-2">
+                          <span className="w-2 h-2 rounded-full bg-green-500 animate-ping"></span> ACTIVE
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">Swap to drive</span>
+                      )}
+                      
+                      <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEdit(item);
+                          }}
+                          className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-white hover:bg-gray-100 border border-gray-150 text-gray-600'} transition-all`}
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        <button 
+                          onClick={(e) => handleDeleteVehicle(item.id, e)}
+                          className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-red-500/10 hover:bg-red-500 hover:text-white text-red-400' : 'bg-white hover:bg-red-50 border border-gray-150 text-red-500'} transition-all`}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <button 
+            onClick={handleAllChangesSave}
+            className="w-full py-5 bg-black text-white hover:bg-gray-900 rounded-[28px] font-black text-xl shadow-xl active:scale-95 transition-transform mt-12 block"
+          >
+            SAVE FLEET STATUS
+          </button>
+        </>
+      ) : null}
     </motion.div>
   );
 };
@@ -6204,6 +6422,75 @@ export default function App() {
     type: "Hyper Eats"
   });
 
+  const [fuel, setFuel] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('hd_fuel');
+      return saved ? parseFloat(saved) : 100;
+    } catch { return 100; }
+  });
+  const [vehicleHealth, setVehicleHealth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('hd_health');
+      return saved ? parseFloat(saved) : 100;
+    } catch { return 100; }
+  });
+  const [purchasedUpgrades, setPurchasedUpgrades] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('hd_upgrades');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [weatherState, setWeatherState] = useState<'clear' | 'rainy' | 'sunset' | 'night'>(() => {
+    try {
+      const saved = localStorage.getItem('hd_weather');
+      return (saved as any) || 'clear';
+    } catch { return 'clear'; }
+  });
+  const [deliveryStreak, setDeliveryStreak] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('hd_streak');
+      return saved ? parseInt(saved) : 0;
+    } catch { return 0; }
+  });
+  
+  // Random dynamic event popups
+  const [activeMemeEvent, setActiveMemeEvent] = useState<{
+    id: string;
+    title: string;
+    description: string;
+    options: { text: string; action: () => void; style?: string }[];
+  } | null>(null);
+
+  // Synchronize dynamic values
+  useEffect(() => {
+    try { localStorage.setItem('hd_fuel', fuel.toString()); } catch(e){}
+  }, [fuel]);
+  useEffect(() => {
+    try { localStorage.setItem('hd_health', vehicleHealth.toString()); } catch(e){}
+  }, [vehicleHealth]);
+  useEffect(() => {
+    try { localStorage.setItem('hd_upgrades', JSON.stringify(purchasedUpgrades)); } catch(e){}
+  }, [purchasedUpgrades]);
+  useEffect(() => {
+    try { localStorage.setItem('hd_weather', weatherState); } catch(e){}
+  }, [weatherState]);
+  useEffect(() => {
+    try { localStorage.setItem('hd_streak', deliveryStreak.toString()); } catch(e){}
+  }, [deliveryStreak]);
+
+  // Web Speech vocal assistant guide
+  const speakNav = React.useCallback((text: string) => {
+    try {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.05;
+        utterance.pitch = 1.02;
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (e) {}
+  }, []);
+
   // CarPlay Remote Sync
   useEffect(() => {
     if (!firebaseUser || !db) return;
@@ -6804,7 +7091,44 @@ export default function App() {
               return prev;
             }
             
-            const step = 0.0003; // Speed
+            // Speed remapping
+            const speedRemapped = purchasedUpgrades.includes('engine_remap'); 
+            let step = speedRemapped ? 0.00045 : 0.0003; // Remap gives +50% speed boost!
+            
+            // Freeze movement if out of fuel or broken down
+            if (fuel <= 0 || vehicleHealth <= 0) {
+              step = 0.00000;
+              return prev;
+            }
+
+            // Decrement fuel & vehicle damage:
+            const isHybrid = purchasedUpgrades.includes('hybrid_eco');
+            // Night weather costs slightly more fuel due to heaters/lights
+            const weatherMultiplier = weatherState === 'night' ? 1.35 : weatherState === 'rainy' ? 1.15 : 1.0;
+            const fuelDecline = (isHybrid ? 0.07 : 0.16) * weatherMultiplier;
+            
+            const isSuspension = purchasedUpgrades.includes('alloy_suspension');
+            // Rainy day pothole wear increases wear!
+            const rainWearMultiplier = weatherState === 'rainy' ? 1.45 : 1.0;
+            const healthDecline = (isSuspension ? 0.05 : 0.13) * rainWearMultiplier;
+            
+            setTimeout(() => {
+              setFuel(f => {
+                const nextFuel = Math.max(0, f - fuelDecline);
+                if (nextFuel <= 10 && f > 10) {
+                  addToast("Low Fuel Alarm", "Your vehicle is running out of fuel! Tap 'Refuel Fully' or go to My Vehicles.", "alert");
+                }
+                return nextFuel;
+              });
+              setVehicleHealth(h => {
+                const nextHealth = Math.max(0, h - healthDecline);
+                if (nextHealth <= 10 && h > 10) {
+                  addToast("Critical Wear and Tear", "Your vehicle is about to break down! Tap 'Repair' or go to My Vehicles.", "alert");
+                }
+                return nextHealth;
+              });
+            }, 0);
+
             return {
               latitude: prev.latitude + (dLat / dist) * step,
               longitude: prev.longitude + (dLng / dist) * step,
@@ -6833,10 +7157,133 @@ export default function App() {
             longitude: prev.longitude + (Math.random() - 0.5) * 0.0001,
           };
         });
+
+        // Random occurrences when actively navigating
+        if (isNavigating && activeOrders.length > 0 && !activeMemeEvent) {
+          const roll = Math.random();
+          if (roll < 0.012) { // 1.2% chance per second of a street obstacle!
+            const eventTypeRoll = Math.random();
+            if (eventTypeRoll < 0.25) {
+              setActiveMemeEvent({
+                id: 'evt_doorbell',
+                title: '🎬 Ring Doorbell Dance!',
+                description: 'The buyer left a sticky note: "My kids are watching the camera. If you do a silly dance I will instantly tip you £15.00!" Do you dance?',
+                options: [
+                  {
+                    text: '🕺 Do the TikTok dance! (+£15.00 tip)',
+                    action: () => {
+                      setEarnings(e => e + 15.00);
+                      setTodayEarningsTotal(e => e + 15.00);
+                      addToast("Generous Tip!", "You danced like a champion! Added +£15.00 tip.", "success");
+                      addDebugLog('info', 'Completed Ring Doorbell Dance on shift.');
+                      setActiveMemeEvent(null);
+                    }
+                  },
+                  {
+                    text: '🤐 Keep it professional',
+                    action: () => {
+                      addToast("Normal Payout", "Dropped food at door and walked away.", "info");
+                      setActiveMemeEvent(null);
+                    }
+                  }
+                ]
+              });
+            } else if (eventTypeRoll < 0.5) {
+              setActiveMemeEvent({
+                id: 'evt_pothole',
+                title: '🕳️ Massive London Pothole!',
+                description: 'Watch out! A craggy pothole appears in the lane ahead. Reaction speed check!',
+                options: [
+                  {
+                    text: '🚴 Swerve quickly (Damages body slightly)',
+                    action: () => {
+                      setVehicleHealth(h => Math.max(0, h - 8));
+                      addToast("Tire Slipped", "Smooth dodge, but tires sustained minor wear (-8% health).", "alert");
+                      setActiveMemeEvent(null);
+                    }
+                  },
+                  {
+                    text: '🚀 Jump over it! (75% Reflex Roll)',
+                    action: () => {
+                      if (Math.random() < 0.75) {
+                        setEarnings(e => e + 5.00);
+                        setTodayEarningsTotal(e => e + 5.00);
+                        addToast("STUNT DOUBLE!", "Epic vault! Crowds cheer, added +£5.00 bonus!", "success");
+                      } else {
+                        setVehicleHealth(h => Math.max(0, h - 25));
+                        addToast("CRASHED!", "Ouch! You slammed straight into the brick. Wrecked suspension (-25% health).", "alert");
+                      }
+                      setActiveMemeEvent(null);
+                    }
+                  }
+                ]
+              });
+            } else if (eventTypeRoll < 0.75) {
+              const hasRadar = purchasedUpgrades.includes('radar_jammer');
+              setActiveMemeEvent({
+                id: 'evt_police',
+                title: '🚨 Metropolitan Police Speed Trap!',
+                description: 'The traffic police are scanning vehicle speeds today! They are waving you over.',
+                options: [
+                  {
+                    text: '👮 Stop nicely and show papers',
+                    action: () => {
+                      addToast("Passed Check", "Papers verified. Drive safe, officer says.", "success");
+                      setActiveMemeEvent(null);
+                    }
+                  },
+                  {
+                    text: hasRadar 
+                      ? '⚡ Activate Radar Stealth Jammer! (Escapes Check)' 
+                      : '💨 Sprint past them! (Risk £40 fine!)',
+                    action: () => {
+                      if (hasRadar) {
+                        addToast("Stealth Escape", "Jammer scrambles speed gun. Waved right past! No penalty.", "success");
+                        setDeliveryStreak(s => s + 1);
+                      } else {
+                        if (Math.random() < 0.4) {
+                          addToast("Lucky Escape!", "Accelerated out of sight! Close call.", "success");
+                        } else {
+                          setEarnings(e => Math.max(0, e - 40));
+                          setTodayEarningsTotal(e => Math.max(0, e - 40));
+                          addToast("FINED £40", "Speeding fine issued. Retracted -£40 from shift total.", "alert");
+                        }
+                      }
+                      setActiveMemeEvent(null);
+                    }
+                  }
+                ]
+              });
+            } else {
+              setActiveMemeEvent({
+                id: 'evt_cat',
+                title: '🐱 Stray Kitten in Road!',
+                description: 'An adorable kitten is sitting frozen in the middle of the road. Delivery timer is ticking!',
+                options: [
+                  {
+                    text: '❤️ Stop to carry kitten to safety (+0.15 Rider Rating!)',
+                    action: () => {
+                      setUser(u => ({ ...u, rating: Math.min(5.00, u.rating + 0.15) }));
+                      addToast("Karma Boost!", "Kitten is safe! Your courier review score gets boosted.", "success");
+                      setActiveMemeEvent(null);
+                    }
+                  },
+                  {
+                    text: '🚴 Swerve around (Slight delay)',
+                    action: () => {
+                      addToast("Evaded safely", "Passed the kitten carefully. Pushing on.", "info");
+                      setActiveMemeEvent(null);
+                    }
+                  }
+                ]
+              });
+            }
+          }
+        }
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [isSimulatingMovement, isNavigating, activeOrders, activeCityCenter]);
+  }, [isSimulatingMovement, isNavigating, activeOrders, activeCityCenter, purchasedUpgrades, fuel, vehicleHealth, weatherState, activeMemeEvent, speakNav]);
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -7541,6 +7988,8 @@ export default function App() {
 
       setMapOffset({ x: 0, y: 0 }); // Snap map back to driver on acceptance
       playHyperSound('accept');
+      const targetPoint = pendingOrder.type === 'delivery' ? (pendingOrder.restaurantName || "Store Pick-up") : "Rider Pickup Point";
+      speakNav(`Dispatch received. Initiating route to ${targetPoint}. Keep safe pace.`);
 
       // Simulated Customer Greeting after 5 seconds
       const orderIds = orderCountToAdd === 2 
@@ -7966,6 +8415,7 @@ export default function App() {
         const msg = order.type === 'ride' ? `Rider ${order.customerName} picked up` : `Order from ${order.restaurantName} picked up`;
         sendNotification(order.type === 'ride' ? "Trip Started" : "Order Picked Up", msg);
         playHyperSound('accept');
+        speakNav(order.type === 'ride' ? `Passenger on board. Routing path to dropoff destination for ${order.customerName}.` : `Goods secured. Routing path to delivery address of ${order.customerName}.`);
       }
     } else if (order.status === 'scanning_receipt') {
         setIsScanningReceipt(orderId);
@@ -8103,6 +8553,9 @@ export default function App() {
       if (remaining.length === 0) setIsNavigating(false);
       return remaining;
     });
+
+    setDeliveryStreak(s => s + 1);
+    speakNav(`Job complete. Payout of £${earnedPay.toFixed(2)} dispatched. Continuous deliveries increase your combo streak!`);
 
     // Remote Cleanup
     if (user.uid && firebaseUser && db) {
@@ -11578,6 +12031,12 @@ export default function App() {
               setVehicleType={setVehicleType}
               onClose={() => setCurrentScreen('account')} 
               theme={theme} 
+              purchasedUpgrades={purchasedUpgrades}
+              setPurchasedUpgrades={setPurchasedUpgrades}
+              fuel={fuel}
+              setFuel={setFuel}
+              vehicleHealth={vehicleHealth}
+              setVehicleHealth={setVehicleHealth}
             />
           )}
 
