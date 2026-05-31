@@ -1163,6 +1163,9 @@ const TripPreferencesModal = ({
   setVehicleType, 
   selectedServices, 
   setSelectedServices, 
+  enabledServices,
+  setEnabledServices,
+  addToast,
   onClose,
   theme,
   isInsuranceExpired,
@@ -1186,6 +1189,9 @@ const TripPreferencesModal = ({
   setVehicleType: (val: 'Car' | 'Bike' | 'Scooter') => void,
   selectedServices: JobType[],
   setSelectedServices: (val: JobType[]) => void,
+  enabledServices: string[],
+  setEnabledServices: React.Dispatch<React.SetStateAction<string[]>>,
+  addToast: (title: string, body: string, type: 'success' | 'alert' | 'info') => void,
   onClose: () => void,
   theme: string,
   isInsuranceExpired: boolean,
@@ -1308,6 +1314,122 @@ const TripPreferencesModal = ({
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Marketplace Service Toggles */}
+          <div>
+            <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest text-left mb-4">Marketplace Services</p>
+            <div className="space-y-3">
+              {[
+                {
+                  id: 'rideshare',
+                  name: 'HyperX Rideshare',
+                  desc: 'Standard passenger requests',
+                  metric: '1.0x Base',
+                  badge: 'Standard',
+                  badgeColor: 'bg-blue-600/10 text-blue-500 border border-blue-600/20',
+                  icon: <User size={16} className="text-blue-500" />
+                },
+                {
+                  id: 'intercity',
+                  name: 'Hyper Intercity 🛣️',
+                  desc: 'Long-distance cross-county premium routes',
+                  metric: 'Juicy 1.8x Pay',
+                  badge: 'Premium',
+                  badgeColor: 'bg-fuchsia-600/10 text-fuchsia-500 border border-fuchsia-600/20',
+                  icon: <Navigation size={16} className="text-fuchsia-500 rotate-45" />
+                },
+                {
+                  id: 'hyper_pet',
+                  name: 'Hyper Pet 🐾',
+                  desc: 'Riders with friendly domestic animals',
+                  metric: '+25% Tip Boost',
+                  badge: 'Pet Friendly',
+                  badgeColor: 'bg-amber-600/10 text-amber-500 border border-amber-600/20',
+                  icon: <Heart size={16} className="text-amber-500" />
+                },
+                {
+                  id: 'hyperxl',
+                  name: 'HyperXL Premium 🚙',
+                  desc: 'High-capacity vehicle matchings (5-6 riders)',
+                  metric: 'Enhanced base',
+                  badge: 'XL Size',
+                  badgeColor: 'bg-purple-600/10 text-purple-500 border border-purple-600/20',
+                  icon: <Users size={16} className="text-purple-500" />
+                },
+                {
+                  id: 'green',
+                  name: 'Eco Green 🔋',
+                  desc: 'EV/Hybrid target EV matching requests',
+                  metric: '+£2.00 Green Bonus',
+                  badge: 'Eco',
+                  badgeColor: 'bg-emerald-600/10 text-emerald-500 border border-emerald-600/20',
+                  icon: <Sparkles size={16} className="text-emerald-500" />
+                },
+                {
+                  id: 'packages',
+                  name: 'Package Connect 📦',
+                  desc: 'Contactless courier package shipping',
+                  metric: 'No Passenger',
+                  badge: 'Courier',
+                  badgeColor: 'bg-zinc-600/15 text-zinc-400 border border-zinc-600/20',
+                  icon: <Truck size={16} className="text-zinc-500" />
+                },
+                {
+                  id: 'assist',
+                  name: 'Assist Access ♿',
+                  desc: 'Assistance routes for senior/disabled riders',
+                  metric: '+15% Rating',
+                  badge: 'Community',
+                  badgeColor: 'bg-red-600/10 text-red-500 border border-red-600/20',
+                  icon: <ShieldCheck size={16} className="text-red-500" />
+                }
+              ].map(srv => {
+                const isEnabled = enabledServices.includes(srv.id);
+                return (
+                  <div 
+                    key={srv.id}
+                    className={`p-4 rounded-[24px] border transition-all flex items-center justify-between gap-3 ${
+                      isEnabled 
+                        ? theme === 'dark' ? 'bg-blue-600/10 border-blue-600/30' : 'bg-blue-50/50 border-blue-100'
+                        : theme === 'dark' ? 'bg-[#1e1e1e] border-transparent opacity-60' : 'bg-gray-50 border-transparent opacity-60'
+                    }`}
+                  >
+                    <div className="flex gap-3 text-left items-center min-w-0">
+                      <div className={`p-2 rounded-xl shrink-0 ${theme === 'dark' ? 'bg-white/5' : 'bg-white'}`}>
+                        {srv.icon}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-black text-xs truncate">{srv.name}</span>
+                          <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full ${srv.badgeColor}`}>
+                            {srv.badge}
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-bold text-gray-400 truncate leading-tight mt-0.5">{srv.desc}</p>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => {
+                        if (isEnabled) {
+                          if (enabledServices.length > 1) {
+                            setEnabledServices(prev => prev.filter(x => x !== srv.id));
+                          } else {
+                            addToast("Active Service Required", "You must keep at least one service enabled to receive ride/delivery requests!", "alert");
+                          }
+                        } else {
+                          setEnabledServices(prev => [...prev, srv.id]);
+                        }
+                      }}
+                      className={`w-9 h-5 rounded-full shrink-0 p-0.5 transition-colors duration-200 ${isEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-white/10'}`}
+                    >
+                      <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ${isEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -6254,6 +6376,21 @@ export default function App() {
     }
   }, [targetPrice]);
 
+  const [enabledServices, setEnabledServices] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('hd_enabled_services');
+      return saved ? JSON.parse(saved) : ['rideshare', 'intercity', 'hyper_pet', 'hyperxl', 'green', 'packages', 'assist'];
+    } catch {
+      return ['rideshare', 'intercity', 'hyper_pet', 'hyperxl', 'green', 'packages', 'assist'];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('hd_enabled_services', JSON.stringify(enabledServices));
+    } catch (e) {}
+  }, [enabledServices]);
+
   const [busynessMode, setBusynessMode] = useState<'Low' | 'Medium' | 'High'>('Medium');
   const [globalSurge, setGlobalSurge] = useState(1.0);
 
@@ -7095,6 +7232,12 @@ export default function App() {
             const speedRemapped = purchasedUpgrades.includes('engine_remap'); 
             let step = speedRemapped ? 0.00045 : 0.0003; // Remap gives +50% speed boost!
             
+            // Intercity routes cover huge distances, so we cross them 4x faster!
+            const isIntercity = order && (order.restaurantName === 'Intercity Route' || order.restaurantName?.includes('Intercity'));
+            if (isIntercity) {
+              step = step * 4;
+            }
+            
             // Freeze movement if out of fuel or broken down
             if (fuel <= 0 || vehicleHealth <= 0) {
               step = 0.00000;
@@ -7601,19 +7744,50 @@ export default function App() {
 
     if (availableServices.length === 0) return null;
 
-      const getJobType = () => {
-        // Absolute priority for HyperX (ride) if user has a Car and ride service is enabled
-        if (vehicleType === 'Car' && availableServices.includes('ride')) {
-          const isRideSelected = selectedServices.length === 0 || selectedServices.includes('ride');
-          if (isRideSelected) return 'ride';
+    const getJobType = () => {
+      const pool: JobType[] = [];
+      if (availableServices.includes('delivery')) {
+        pool.push('delivery');
+      }
+      if (availableServices.includes('ride') && vehicleType === 'Car') {
+        // Check if any passenger services are enabled in preferences
+        const hasPassengerService = enabledServices.some(s => ['rideshare', 'intercity', 'hyper_pet', 'hyperxl', 'green', 'assist'].includes(s));
+        if (hasPassengerService) {
+          pool.push('ride');
         }
+      }
+      if (pool.length === 0) {
         return availableServices[Math.floor(Math.random() * availableServices.length)];
-      };
+      }
+      return pool[Math.floor(Math.random() * pool.length)];
+    };
 
     // 1. Generate 5 candidate orders
     const candidates = Array.from({ length: 5 }).map(() => {
       const type = getJobType();
-      const variant = type === 'ride' ? (Math.random() > 0.8 ? 'Premier' : Math.random() > 0.6 ? 'HyperXL' : 'HyperX') : 'Hyper Eats';
+      
+      let variant = 'Hyper Eats';
+      if (type === 'ride') {
+        const ridePool: string[] = [];
+        if (enabledServices.includes('rideshare')) ridePool.push('HyperX');
+        if (enabledServices.includes('intercity')) ridePool.push('Intercity Route');
+        if (enabledServices.includes('hyper_pet')) ridePool.push('Hyper Pet 🐾');
+        if (enabledServices.includes('hyperxl')) ridePool.push('HyperXL 🚙');
+        if (enabledServices.includes('green')) ridePool.push('Eco Green 🔋');
+        if (enabledServices.includes('assist')) ridePool.push('Assist Access ♿');
+        
+        if (ridePool.length > 0) {
+          variant = ridePool[Math.floor(Math.random() * ridePool.length)];
+        } else {
+          variant = 'HyperX';
+        }
+      } else {
+        const delivPool: string[] = ['Hyper Eats 🍔'];
+        if (enabledServices.includes('packages')) {
+          delivPool.push('Package Connect 📦');
+        }
+        variant = delivPool[Math.floor(Math.random() * delivPool.length)];
+      }
       
       const cityInfo = CITY_DATABASES[activeCityKey] || CITY_DATABASES["London"];
       const customerName = cityInfo.customers[Math.floor(Math.random() * cityInfo.customers.length)];
@@ -7624,8 +7798,19 @@ export default function App() {
       
       const pickupLat = location.latitude + restOffset.lat;
       const pickupLng = location.longitude + restOffset.lng;
-      const custLat = pickupLat + (Math.random() - 0.5) * 0.02;
-      const custLng = pickupLng + (Math.random() - 0.5) * 0.02;
+      
+      let customEstDist = 0;
+      let pickupOffsetLat = (Math.random() - 0.5) * 0.02;
+      let pickupOffsetLng = (Math.random() - 0.5) * 0.02;
+
+      if (variant === 'Intercity Route') {
+        // Significantly longer distance for Intercity routes
+        pickupOffsetLat = (Math.random() - 0.5) * 0.15;
+        pickupOffsetLng = (Math.random() - 0.5) * 0.15;
+      }
+
+      const custLat = pickupLat + pickupOffsetLat;
+      const custLng = pickupLng + pickupOffsetLng;
 
       const distToPickup = Math.sqrt(Math.pow(pickupLat - location.latitude, 2) + Math.pow(pickupLng - location.longitude, 2)) * MILES_PER_DEGREE;
       const tripDist = Math.sqrt(Math.pow(custLat - pickupLat, 2) + Math.pow(custLng - pickupLng, 2)) * MILES_PER_DEGREE;
@@ -7640,29 +7825,77 @@ export default function App() {
         }
       });
 
-      const baseFee = variant === 'Premier' ? 5.00 : variant === 'HyperXL' ? 3.50 : type === 'ride' ? 2.50 : 1.50;
-      const mileRate = variant === 'Premier' ? 2.80 : variant === 'HyperXL' ? 2.10 : type === 'ride' ? 1.45 : 1.10;
-      const minuteRate = variant === 'Premier' ? 0.35 : 0.15;
-      const estTime = Math.floor((tripDist + distToPickup) * 4 + 3);
+      let baseFee = 2.50;
+      let mileRate = 1.45;
+      let minuteRate = 0.15;
+      let minPay = 5.00;
+      customEstDist = tripDist + distToPickup;
+
+      if (variant === 'HyperX') {
+        baseFee = 2.50;
+        mileRate = 1.45;
+        minuteRate = 0.15;
+        minPay = 5.00;
+      } else if (variant === 'Intercity Route') {
+        baseFee = 32.00;
+        mileRate = 2.65;
+        minuteRate = 0.25;
+        minPay = 45.00;
+        if (customEstDist < 15.0) {
+          customEstDist += 15.5; // Ensure it feels long distance
+        }
+      } else if (variant === 'Hyper Pet 🐾') {
+        baseFee = 4.50;
+        mileRate = 1.80;
+        minuteRate = 0.20;
+        minPay = 9.00;
+      } else if (variant === 'HyperXL 🚙') {
+        baseFee = 5.50;
+        mileRate = 2.10;
+        minuteRate = 0.20;
+        minPay = 11.50;
+      } else if (variant === 'Eco Green 🔋') {
+        baseFee = 3.00;
+        mileRate = 1.60;
+        minuteRate = 0.18;
+        minPay = 6.50;
+      } else if (variant === 'Assist Access ♿') {
+        baseFee = 4.00;
+        mileRate = 1.50;
+        minuteRate = 0.30;
+        minPay = 8.00;
+      } else if (variant === 'Package Connect 📦') {
+        baseFee = 3.50;
+        mileRate = 1.30;
+        minuteRate = 0.12;
+        minPay = 5.50;
+      } else {
+        // Hyper Eats or default delivery
+        baseFee = 1.50;
+        mileRate = 1.10;
+        minuteRate = 0.15;
+        minPay = 4.00;
+      }
+
+      const estTime = Math.floor((customEstDist) * 4 + 3);
+      const calculatedPay = baseFee + (customEstDist * mileRate) + (estTime * minuteRate);
       
-      const calculatedPay = baseFee + ((tripDist + distToPickup) * mileRate) + (estTime * minuteRate);
-      const minPay = variant === 'Premier' ? 12.00 : variant === 'HyperXL' ? 8.00 : type === 'ride' ? 5.00 : 4.00;
-      const finalBasePay = Math.max(calculatedPay, minPay);
+      const finalBasePay = Math.max(calculatedPay, minPay) + (variant === 'Eco Green 🔋' ? 2.00 : 0);
       
-      // Force single order type if already has 2 or more active orders (makes it exactly 3 trips max)
-      const isStacked = type === 'delivery' && activeOrders.length < 2 && Math.random() < 0.3; // 30% chance for double orders
+      const isStacked = type === 'delivery' && activeOrders.length < 2 && Math.random() < 0.3;
       let batchCount = isStacked ? 2 : 1;
       
-      const pay = (finalBasePay + (Math.random() * 2)) * activeSurge * (isStacked ? 1.7 : 1);
+      const petTipBoost = variant === 'Hyper Pet 🐾' ? (1.25) : 1;
+      const pay = (finalBasePay + (Math.random() * 2)) * activeSurge * (isStacked ? 1.7 : 1) * petTipBoost;
 
       const verificationMethod = (['pin', 'photo', 'none'] as const)[Math.floor(Math.random() * 3)];
-      const receiptRequired = type === 'delivery' && Math.random() < 0.7; // 70% chance for receipt scan
+      const receiptRequired = type === 'delivery' && Math.random() < 0.7;
 
       return {
         id: Math.random().toString(36).substring(2, 11),
         type,
-        customerName: isStacked ? `${customerName} (Max+1)` : customerName,
-        restaurantName: type === 'delivery' ? (chosenRestaurant?.name || "Local Kitchen") : variant,
+        customerName: isStacked ? `${customerName} (Max+1)` : (variant === 'HyperXL 🚙' ? `${customerName} (5 Passengers)` : customerName),
+        restaurantName: type === 'delivery' ? (variant === 'Package Connect 📦' ? "Parcel Center" : (chosenRestaurant?.name || "Local Kitchen")) : variant,
         restaurantLocation: { latitude: pickupLat, longitude: pickupLng },
         pickupLocation: { latitude: pickupLat, longitude: pickupLng },
         customerLocation: { latitude: custLat, longitude: custLng },
@@ -7673,10 +7906,10 @@ export default function App() {
         mileageRate: mileRate,
         timeRate: minuteRate,
         surgeMultiplier: activeSurge,
-        estimatedDistance: Number(((tripDist + distToPickup) * (isStacked ? 1.4 : 1)).toFixed(1)),
-        estimatedTime: Math.floor(((tripDist + distToPickup) * 5 + 4) * (isStacked ? 1.5 : 1)),
+        estimatedDistance: Number(((customEstDist) * (isStacked ? 1.4 : 1)).toFixed(1)),
+        estimatedTime: Math.floor(((customEstDist) * 5 + 4) * (isStacked ? 1.5 : 1)),
         status: 'pending' as const,
-        items: type === 'delivery' ? ["Meal Deal", "Hyper Eats Order"] : undefined,
+        items: type === 'delivery' ? (variant === 'Package Connect 📦' ? ["Secure Parcel Delivery"] : ["Meal Deal", "Hyper Eats Order"]) : undefined,
         pin: Math.floor(1000 + Math.random() * 9000).toString(),
         isMatching: activeOrders.length > 0 || Math.random() < 0.25,
         surge: activeSurge > 1.0 ? activeSurge : undefined,
@@ -11502,6 +11735,129 @@ export default function App() {
                 </div>
 
                 <div className={`p-6 rounded-[32px] border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}>
+                  <h3 className="font-black text-xl mb-1 flex items-center gap-2">
+                    <SlidersHorizontal size={20} className="text-blue-500" />
+                    Marketplace Service Toggles
+                  </h3>
+                  <p className="text-xs text-gray-400 font-bold mb-6">Opt-in to distinct on-demand dispatch networks like Uber has. Customize your incoming route types.</p>
+                  
+                  <div className="space-y-4">
+                    {[
+                      {
+                        id: 'rideshare',
+                        name: 'HyperX Rideshare',
+                        desc: 'Standard passenger ride requests',
+                        metric: '1.0x Base Fare',
+                        badge: 'Standard',
+                        badgeColor: 'bg-blue-600/10 text-blue-500 border border-blue-600/20',
+                        icon: <User size={18} className="text-blue-500" />
+                      },
+                      {
+                        id: 'intercity',
+                        name: 'Hyper Intercity 🛣️',
+                        desc: 'Long-distance high mileage premium routes across counties',
+                        metric: 'Juicy 1.8x Payouts',
+                        badge: 'Premium Rate',
+                        badgeColor: 'bg-fuchsia-600/10 text-fuchsia-500 border border-fuchsia-600/20',
+                        icon: <Navigation size={18} className="text-fuchsia-500 rotate-45" />
+                      },
+                      {
+                        id: 'hyper_pet',
+                        name: 'Hyper Pet 🐾',
+                        desc: 'Riders traveling with friendly domestic animals and carriers',
+                        metric: '+25% Tip Multiply Boost',
+                        badge: 'Pet Friendly',
+                        badgeColor: 'bg-amber-600/10 text-amber-500 border border-amber-600/20',
+                        icon: <Heart size={18} className="text-amber-500" />
+                      },
+                      {
+                        id: 'hyperxl',
+                        name: 'HyperXL Premium 🚙',
+                        desc: 'Group bookings (5-6 passengers) with enhanced base mileage rates',
+                        metric: 'Enhanced Base Rate',
+                        badge: 'Extra Large',
+                        badgeColor: 'bg-purple-600/10 text-purple-500 border border-purple-600/20',
+                        icon: <Users size={18} className="text-purple-500" />
+                      },
+                      {
+                        id: 'green',
+                        name: 'Eco Green 🔋',
+                        desc: 'EV/Hybrid matching with environment-conscious groups',
+                        metric: '+£2.00 Green Bonus',
+                        badge: 'Eco Friendly',
+                        badgeColor: 'bg-emerald-600/10 text-emerald-500 border border-emerald-600/20',
+                        icon: <Sparkles size={18} className="text-emerald-500" />
+                      },
+                      {
+                        id: 'packages',
+                        name: 'Package Connect 📦',
+                        desc: 'Contactless high-patience parcel, document, or logistics courier',
+                        metric: 'No Passenger hassle',
+                        badge: 'Contactless Courier',
+                        badgeColor: 'bg-zinc-600/15 text-zinc-400 border border-zinc-600/20',
+                        icon: <Truck size={18} className="text-zinc-500" />
+                      },
+                      {
+                        id: 'assist',
+                        name: 'Assist Access ♿',
+                        desc: 'Assistance certified routes helping senior or disabled riders',
+                        metric: '+15% Rating Loyalty Boost',
+                        badge: 'Community Plus',
+                        badgeColor: 'bg-red-600/10 text-red-500 border border-red-600/20',
+                        icon: <ShieldCheck size={18} className="text-red-500" />
+                      }
+                    ].map(srv => {
+                      const isEnabled = enabledServices.includes(srv.id);
+                      return (
+                        <div 
+                          key={srv.id}
+                          className={`p-4 rounded-2xl border transition-all flex items-start justify-between gap-3 ${
+                            isEnabled 
+                              ? theme === 'dark' ? 'bg-blue-600/10 border-blue-600/40 text-white' : 'bg-blue-50/50 border-blue-100 text-blue-900'
+                              : theme === 'dark' ? 'bg-[#151515] border-transparent text-gray-500 opacity-60' : 'bg-white border-transparent text-gray-400 opacity-60'
+                          }`}
+                        >
+                          <div className="flex gap-3 text-left">
+                            <div className={`p-2.5 rounded-xl shrink-0 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}>
+                              {srv.icon}
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="font-black text-sm">{srv.name}</span>
+                                <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${srv.badgeColor}`}>
+                                  {srv.badge}
+                                </span>
+                              </div>
+                              <p className="text-[11px] font-bold text-gray-400 leading-tight">{srv.desc}</p>
+                              <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{srv.metric}</p>
+                            </div>
+                          </div>
+                          
+                          <button 
+                            onClick={() => {
+                              if (isEnabled) {
+                                if (enabledServices.length > 1) {
+                                  setEnabledServices(prev => prev.filter(x => x !== srv.id));
+                                  sendNotification("Preference Updated", `Disabled matching for ${srv.name}`);
+                                } else {
+                                  addToast("Active Service Required", "You must keep at least one service enabled to receive ride/delivery requests!", "alert");
+                                }
+                              } else {
+                                setEnabledServices(prev => [...prev, srv.id]);
+                                sendNotification("Preference Updated", `Enabled matching for ${srv.name}`);
+                              }
+                            }}
+                            className={`w-12 h-6 rounded-full shrink-0 p-0.5 transition-colors ${isEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-white/10'}`}
+                          >
+                            <div className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-200 ${isEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className={`p-6 rounded-[32px] border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}>
                   <h3 className="font-black text-xl mb-2">Delivery Limit</h3>
                   <p className="text-sm text-gray-400 font-bold mb-4">Maximum active deliveries at one time.</p>
                   <div className={`flex items-center justify-between p-4 rounded-2xl shadow-sm ${theme === 'dark' ? 'bg-black/20 border border-white/5 text-white' : 'bg-white text-blue-900'}`}>
@@ -12886,6 +13242,9 @@ export default function App() {
               setVehicleType={setVehicleType}
               selectedServices={selectedServices}
               setSelectedServices={setSelectedServices}
+              enabledServices={enabledServices}
+              setEnabledServices={setEnabledServices}
+              addToast={addToast}
               onClose={() => setIsVehicleSettingsOpen(false)}
               theme={theme}
               isInsuranceExpired={isInsuranceExpired}
