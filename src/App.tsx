@@ -4513,9 +4513,9 @@ const TripHistoryScreen = ({
       ) : (
         <div className="space-y-4">
           <h3 className="font-black text-sm uppercase tracking-widest text-gray-400 px-2">Recent Activities</h3>
-          {completedTrips.slice().reverse().map((trip) => (
+          {completedTrips.slice().reverse().map((trip, idx) => (
             <motion.div 
-              key={trip.id}
+              key={`completed-trip-list-${trip.id || idx}-${idx}`}
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               className={`p-5 rounded-[32px] border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 shadow-xl shadow-black/20' : 'bg-white border-gray-100 shadow-sm border-b-4'}`}
@@ -9668,9 +9668,9 @@ export default function App() {
               )}
 
               {/* Radar Orders Map Overlay (Interactive Icons) */}
-              {user.isOnline && !isNavigating && radarOrders.map(order => (
+              {user.isOnline && !isNavigating && radarOrders.map((order, idx) => (
                 <motion.div
-                  key={`radar-icon-${order.id}`}
+                  key={`radar-icon-${order.id}-${idx}`}
                   initial={{ scale: 0, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0, opacity: 0 }}
@@ -9891,9 +9891,9 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x">
-                          {radarOrders.map(order => (
+                          {radarOrders.map((order, idx) => (
                             <motion.div 
-                              key={`radar-list-item-${order.id}`}
+                              key={`radar-list-item-${order.id}-${idx}`}
                               initial={{ scale: 0.9, opacity: 0 }}
                               animate={{ scale: 1, opacity: 1 }}
                               className="min-w-[325px] max-w-[325px] snap-center bg-white/5 hover:bg-white/10 rounded-[24px] p-5 border border-white/5 transition-all text-left relative"
@@ -10464,7 +10464,7 @@ export default function App() {
 
                     return (
                       <motion.div 
-                        key={`stop-pin-${stop.orderId}-${stop.type}`}
+                        key={`stop-pin-${stop.orderId}-${stop.type}-${i}`}
                         initial={{ scale: 0 }}
                         animate={{ scale: isCurrentTarget ? 1.2 : 1 }}
                         className="absolute z-[210] flex flex-col items-center"
@@ -10559,7 +10559,7 @@ export default function App() {
                       )}
 
                       {/* Restaurant and Customer markers */}
-                      {location && activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map(order => {
+                      {location && activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, idx) => {
                         const isPickup = order.status === 'accepted';
                         const target = isPickup 
                           ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
@@ -10573,7 +10573,7 @@ export default function App() {
                         
                         return (
                           <div 
-                            key={order.id} 
+                            key={`restaurant-customer-marker-${order.id}-${idx}`} 
                             className="absolute transition-transform duration-1000 pointer-events-auto cursor-pointer" 
                             style={{ transform: `translate(${x}px, ${y}px)`, zIndex: isSelected ? 100 : 10 }}
                             onClick={(e) => {
@@ -11353,7 +11353,7 @@ export default function App() {
                                 <AnimatePresence mode="popLayout">
                                   {activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, idx) => (
                                     <motion.div 
-                                      key={order.id} 
+                                      key={`active-order-list-${order.id}-${idx}`} 
                                       initial={{ y: 20, opacity: 0 }} 
                                       animate={{ y: 0, opacity: 1 }} 
                                       exit={{ x: -100, opacity: 0 }}
