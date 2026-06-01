@@ -18,7 +18,14 @@
         "documentsUploaded": { "type": "boolean", "description": "Whether documents are uploaded" },
         "faceVerified": { "type": "boolean", "description": "Whether face is verified" },
         "documentExpiries": { "type": "object", "description": "Map of document names to expiry dates" },
-        "fcmToken": { "type": "string", "description": "Firebase Cloud Messaging push token" }
+        "fcmToken": { "type": "string", "description": "Firebase Cloud Messaging push token" },
+        "latitude": { "type": "number", "description": "Last updated GPS latitude of the driver" },
+        "longitude": { "type": "number", "description": "Last updated GPS longitude of the driver" },
+        "heading": { "type": "number", "description": "Driver direction heading in degrees" },
+        "isOnline": { "type": "boolean", "description": "Whether driver is actively online on shift" },
+        "onTimeRate": { "type": "number", "description": "Driver on-time rating percentage" },
+        "todayEarnings": { "type": "number", "description": "Driver today's cash earnings" },
+        "todayDeliveries": { "type": "number", "description": "Driver today's completed deliveries" }
       },
       "required": ["uid", "name", "faceSignature"]
     },

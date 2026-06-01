@@ -61,7 +61,13 @@ service cloud.firestore {
              (!('vehicleInfo' in data) || (data.vehicleInfo is map)) &&
              (!('vehiclesList' in data) || (data.vehiclesList is list)) &&
              (!('fcmToken' in data) || (data.fcmToken is string && data.fcmToken.size() < 500)) &&
-             (!('documentExpiries' in data) || (data.documentExpiries is map && data.documentExpiries.keys().size() < 20));
+             (!('documentExpiries' in data) || (data.documentExpiries is map && data.documentExpiries.keys().size() < 20)) &&
+             (!('latitude' in data) || (data.latitude is number)) &&
+             (!('longitude' in data) || (data.longitude is number)) &&
+             (!('heading' in data) || (data.heading is number)) &&
+             (!('onTimeRate' in data) || (data.onTimeRate is number)) &&
+             (!('todayEarnings' in data) || (data.todayEarnings is number)) &&
+             (!('todayDeliveries' in data) || (data.todayDeliveries is number));
     }
 
     function isValidStatusTransition(oldStatus, newStatus) {

@@ -14,6 +14,19 @@ interface ActiveStop {
   orderId: string;
 }
 
+export interface OtherDriver {
+  uid: string;
+  name: string;
+  rating: number;
+  tier: string;
+  isOnline: boolean;
+  latitude?: number;
+  longitude?: number;
+  heading?: number;
+  todayEarnings?: number;
+  todayDeliveries?: number;
+}
+
 export interface InteractiveMapProps {
   location: Location | null;
   heading?: number;
@@ -22,6 +35,7 @@ export interface InteractiveMapProps {
   currentStops: ActiveStop[];
   pendingOrder: any;
   theme?: 'light' | 'dark';
+  otherDrivers?: OtherDriver[];
 }
 
 // Check for Google Maps Platform API key in environments
@@ -304,7 +318,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   isNavigating,
   currentStops,
   pendingOrder,
-  theme = 'dark'
+  theme = 'dark',
+  otherDrivers = []
 }) => {
   const [mapType, setMapType] = useState<'hybrid' | 'roadmap'>('roadmap');
   const [viewAngle, setViewAngle] = useState<'top' | 'tilt'>('top');
@@ -453,6 +468,36 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 </div>
               </AdvancedMarker>
             )}
+
+            {/* Markers for other Online Drivers */}
+            {otherDrivers && (() => {
+              const seenIds = new Set<string>();
+              return otherDrivers.filter(dr => {
+                if (!dr || !dr.uid || seenIds.has(dr.uid)) return false;
+                seenIds.add(dr.uid);
+                return true;
+              });
+            })().map(dr => {
+              if (!dr.latitude || !dr.longitude) return null;
+              return (
+                <AdvancedMarker 
+                  key={`other-driver-${dr.uid}`}
+                  position={{ lat: dr.latitude, lng: dr.longitude }}
+                >
+                  <div className="relative flex flex-col items-center select-none pointer-events-none">
+                    {/* Tiny name tooltip of rival rider */}
+                    <div className="px-2 py-0.5 bg-black/90 backdrop-blur-md border border-white/10 rounded-lg text-white font-extrabold text-[8px] uppercase tracking-wide shadow-lg whitespace-nowrap mb-1">
+                      {dr.name.split(' ')[0]} ⭐{dr.rating.toFixed(1)}
+                    </div>
+                    
+                    {/* Competitive gold/orange vehicle node */}
+                    <div className="w-7 h-7 bg-amber-500 rounded-full border-2 border-[#121214] shadow-2xl flex items-center justify-center animate-pulse">
+                      <Navigation size={10} className="text-white fill-white translate-y-[-0.5px] translate-x-[-0.5px]" style={{ transform: `rotate(${(dr.heading || 0) - 45}deg)` }} />
+                    </div>
+                  </div>
+                </AdvancedMarker>
+              );
+            })}
 
             {/* Marker 2: Active Navigation Stops Pinpoints */}
             {location && isNavigating && currentStops.map((stop, i) => (

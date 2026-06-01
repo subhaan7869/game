@@ -111,6 +111,7 @@ import { InteractiveMap } from './components/InteractiveMap';
 import { EarningsDetail } from './components/EarningsDetail';
 import { WebAnalyticsDashboard } from './components/WebAnalyticsDashboard';
 import SimulatedHomeScreen from './components/SimulatedHomeScreen';
+import { MultiplayerHub, OtherDriver } from './components/MultiplayerHub';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
@@ -6177,6 +6178,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isNavigating, user.isOnline, roadEvent]);
   const [radarOrders, setRadarOrders] = useState<Order[]>([]);
+  const [otherOnlineDrivers, setOtherOnlineDrivers] = useState<OtherDriver[]>([]);
   const [selectedRadarOrder, setSelectedRadarOrder] = useState<Order | null>(null);
   const [radarDisplayMode, setRadarDisplayMode] = useState<'couple' | 'none'>('couple');
   const [isRadarDropdownOpen, setIsRadarDropdownOpen] = useState(false);
@@ -6720,6 +6722,71 @@ export default function App() {
       return () => clearInterval(interval);
     }
   }, [location === null]);
+
+  // MULTIPLAYER LIVE GPS COORDINATES & PRESENCE SYNCHRONIZATION EFFECT
+  useEffect(() => {
+    if (!db || !firebaseUser || !user.isOnline || !location) return;
+
+    let updateTimeout: NodeJS.Timeout;
+
+    const performSync = async () => {
+      try {
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        await updateDoc(userRef, {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          heading: heading || 0,
+          isOnline: user.isOnline,
+          todayEarnings: user.earningsStats?.daily || 0,
+          todayDeliveries: user.deliveriesToday || 0,
+          onTimeRate: user.onTimeRate || 97
+        });
+      } catch (error) {
+        console.error("Presence Sync Error:", error);
+      }
+    };
+
+    // Debounce updates slightly to avoid hammering Firestore writes too frequently
+    updateTimeout = setTimeout(performSync, 1500);
+
+    return () => clearTimeout(updateTimeout);
+  }, [location?.latitude, location?.longitude, heading, user.isOnline, user.earningsStats?.daily, user.deliveriesToday, firebaseUser?.uid, db]);
+
+  // MULTIPLAYER FEED LISTENING EFFECT (SNAPSHOTS OF OTHER ONLINE DRIVERS)
+  useEffect(() => {
+    if (!db || !firebaseUser || !user.isOnline) {
+      if (otherOnlineDrivers.length > 0) setOtherOnlineDrivers([]);
+      return;
+    }
+
+    const q = query(collection(db, 'users'), where('isOnline', '==', true));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const activeList: OtherDriver[] = [];
+      snapshot.forEach((docSnap) => {
+        if (docSnap.id !== firebaseUser.uid) {
+          const data = docSnap.data();
+          activeList.push({
+            uid: docSnap.id,
+            name: data.name || 'Courier Rival',
+            rating: data.rating || 5.0,
+            tier: data.tier || 'Blue',
+            isOnline: data.isOnline || false,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            heading: data.heading || 0,
+            todayEarnings: data.todayEarnings || 0,
+            todayDeliveries: data.todayDeliveries || 0,
+            onTimeRate: data.onTimeRate || 97
+          });
+        }
+      });
+      setOtherOnlineDrivers(activeList);
+    }, (error) => {
+      console.error("Leaderboard Live Error:", error);
+    });
+
+    return () => unsubscribe();
+  }, [firebaseUser?.uid, user.isOnline, db]);
   
   const [selectedServices, setSelectedServices] = useState<JobType[]>(() => {
     try {
@@ -6742,6 +6809,21 @@ export default function App() {
   useEffect(() => {
     if (pendingOrder && orderExpiryTimer > 0) {
       expiryInterval.current = setInterval(() => {
+        // Safe check for competitive snatch simulation
+        // If there are less than 6 seconds left, there's a 15% random chance each tick a bot rider snatches it
+        if (orderExpiryTimer <= 6 && Math.random() < 0.15) {
+          const names = ["Liam Hughes", "Sarah Kenner", "Dave Ridley", "Priyah Patel", "Chloe Vance"];
+          const botRider = names[Math.floor(Math.random() * names.length)];
+          addToast(
+            "Order Snatched!",
+            `Competitive courier ${botRider} claimed the ${pendingOrder.restaurantName || "Offer"} contract first!`,
+            "alert"
+          );
+          addDebugLog("warn", `Rival dispatcher snatched pending contract: ${pendingOrder.restaurantName}.`);
+          handleDeclineOrder();
+          return;
+        }
+
         setOrderExpiryTimer(prev => prev - 1);
       }, 1000);
     } else if (orderExpiryTimer === 0) {
@@ -8331,6 +8413,12 @@ export default function App() {
         console.log(`Order Accepted: ${pendingOrder.id}, PIN: ${pendingOrder.pin}`);
       }
 
+      // Increase acceptance rate
+      setUser(prev => {
+        const nextAcc = Math.min(100, prev.acceptanceRate + 1);
+        return { ...prev, acceptanceRate: nextAcc };
+      });
+
       setPendingOrder(null);
       setOrderExpiryTimer(10);
       setIsNavigating(true);
@@ -8533,6 +8621,12 @@ export default function App() {
     setPendingOrder(null);
     setOrderExpiryTimer(10);
     playHyperSound('accept');
+
+    // Decrement Acceptance Rate
+    setUser(prev => {
+      const nextAcc = Math.max(60, prev.acceptanceRate - 2);
+      return { ...prev, acceptanceRate: nextAcc };
+    });
   };
 
   const handleCancelOrder = (orderId: string, reason: string) => {
@@ -8552,6 +8646,12 @@ export default function App() {
     setSelectedCancelReason(null);
     sendNotification("Trip Cancelled", `Trip cancelled: ${reason}`);
     playHyperSound('accept');
+
+    // Increase cancellation rate (penalizing Completion score)
+    setUser(prev => {
+      const nextCancel = Math.min(40, prev.cancellationRate + 3);
+      return { ...prev, cancellationRate: nextCancel };
+    });
   };
 
   const handleSendMessage = (text: string) => {
@@ -9415,6 +9515,7 @@ export default function App() {
                       currentStops={currentStops}
                       pendingOrder={pendingOrder}
                       theme={theme}
+                      otherDrivers={otherOnlineDrivers}
                     />
                   ) : (
                     <MapGrid />
@@ -9449,11 +9550,25 @@ export default function App() {
                   {/* Target Price Float indicator */}
                   <div 
                     onClick={() => setCurrentScreen('trip_preferences')}
-                    className="absolute top-28 right-4 z-50 flex items-center gap-2 bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2 shadow-2xl pointer-events-auto cursor-pointer active:scale-95 hover:border-white/20 transition-all"
+                    className="absolute top-28 right-4 z-50 flex items-center gap-2 bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2 shadow-2xl pointer-events-auto cursor-pointer active:scale-95 hover:border-white/20 transition-all font-sans"
                   >
                     <Target size={12} className="text-blue-500" />
                     <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Target Pay:</span>
                     <span className="text-xs font-black text-green-400">≥£{targetPrice.toFixed(2)}</span>
+                  </div>
+
+                  {/* Floating Competitive Lobby Node */}
+                  <div 
+                    onClick={() => setCurrentScreen('multiplayer_hub')}
+                    className="absolute top-40 right-4 z-50 flex items-center gap-2.5 bg-gradient-to-r from-neutral-900 to-[#121215] backdrop-blur-md border border-amber-500/15 hover:border-amber-500/35 rounded-2xl px-4 py-2 shadow-2xl pointer-events-auto cursor-pointer active:scale-95 hover:brightness-110 transition-all text-left font-sans"
+                  >
+                    <Users size={12} className="text-amber-500 animate-pulse shrink-0" />
+                    <div>
+                      <span className="text-[8px] font-black uppercase tracking-widest text-gray-500 block leading-tight">Rival Pool</span>
+                      <span className="text-[10px] font-black text-amber-500 flex items-center gap-1 mt-0.5 leading-none">
+                        Active League • Rank #{otherOnlineDrivers.length + 1}
+                      </span>
+                    </div>
                   </div>
                   
                   {!location && (
@@ -11322,6 +11437,19 @@ export default function App() {
                             </div>
                           </div>
                           <div 
+                            onClick={() => { setCurrentScreen('multiplayer_hub'); setIsBottomMenuOpen(false); }}
+                            className={`p-4 rounded-2xl flex items-center gap-4 border cursor-pointer active:scale-95 transition-transform ${theme === 'dark' ? 'bg-[#1b1c20] border-amber-500/10 hover:border-amber-500/20' : 'bg-amber-50/50 border-amber-100'}`}
+                          >
+                            <div className="p-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg animate-pulse"><Users size={20} /></div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-sm font-black">Competitive Lobby</p>
+                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping shrink-0" />
+                              </div>
+                              <p className={`text-[10px] font-bold ${theme === 'dark' ? 'text-amber-400/80' : 'text-amber-700'}`}>Check rankings, active reputation & surges</p>
+                            </div>
+                          </div>
+                          <div 
                             onClick={() => { setIsInboxOpen(true); setIsBottomMenuOpen(false); setCurrentScreen('inbox'); }}
                             className={`p-4 rounded-2xl flex items-center gap-4 cursor-pointer active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}
                           >
@@ -11619,6 +11747,28 @@ export default function App() {
               </AnimatePresence>
             </motion.div>
           )}
+
+          <AnimatePresence>
+            {currentScreen === 'multiplayer_hub' && (
+              <MultiplayerHub
+                user={user}
+                setUser={setUser}
+                otherDrivers={otherOnlineDrivers}
+                activeSurgeAreas={activeSurgeAreas}
+                setBusyAreaTarget={setBusyAreaTarget}
+                setCurrentScreen={setCurrentScreen}
+                theme={theme}
+                onAcceptRadarOffer={(offer) => {
+                  setPendingOrder(offer);
+                  setOrderExpiryTimer(18);
+                }}
+                radarOrders={radarOrders}
+                setRadarOrders={setRadarOrders}
+                addToast={(title, msg, type) => addToast(title, msg, type)}
+                addDebugLog={addDebugLog}
+              />
+            )}
+          </AnimatePresence>
 
           <AnimatePresence>
             {currentScreen === 'personal_details' && (
