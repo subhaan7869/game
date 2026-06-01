@@ -98,6 +98,18 @@ export interface Mission {
   type: 'delivery_count' | 'earnings_goal' | 'rating_streak';
 }
 
+export interface Quest {
+  id: string;
+  title: string;
+  description: string;
+  progress: number;
+  target: number;
+  rewardType: 'xp' | 'cash' | 'fuel';
+  rewardValue: number;
+  completed: boolean;
+  type: 'daily' | 'weekly';
+}
+
 export interface UserProfile {
   uid?: string;
   email?: string;

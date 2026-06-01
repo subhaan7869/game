@@ -104,7 +104,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, HyperProTier, ScheduledOrder, CompletedTrip, NavSimulation } from './types';
+import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, HyperProTier, ScheduledOrder, CompletedTrip, NavSimulation, Quest } from './types';
 import { HyperDriverLogo } from './components/HyperDriverLogo';
 import { MediaControls } from './components/MediaControls';
 import { InteractiveMap } from './components/InteractiveMap';
@@ -5285,6 +5285,7 @@ export default function App() {
   // Location & Orders
   const [location, setLocation] = useState<Location | null>({ latitude: 51.5074, longitude: -0.1278 }); // Default to London
   const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
+  const [useRealGPS, setUseRealGPS] = useState(false);
   const [zoom, setZoom] = useState(1);
 
   // Touch Pinch-to-Zoom references
@@ -6537,6 +6538,29 @@ export default function App() {
     { completed: 0, target: 10, reward: "£25 Bonus" },
     { completed: 0, target: 20, reward: "£60 Bonus" },
   ]);
+
+  const [quests, setQuests] = useState<Quest[]>(() => {
+    const cached = localStorage.getItem('hyper_quests_db');
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (e) {
+        console.error("Error parsing cached quests", e);
+      }
+    }
+    return [
+      { id: 'q_daily_1', title: 'Lunch Hour Hustle', description: 'Deliver 3 orders during shift', progress: 0, target: 3, rewardType: 'cash', rewardValue: 15, completed: false, type: 'daily' },
+      { id: 'q_daily_2', title: 'Perfect Service Run', description: 'Deliver and maintain superb customer rating', progress: 0, target: 1, rewardType: 'cash', rewardValue: 10, completed: false, type: 'daily' },
+      { id: 'q_daily_3', title: 'Eco-Pilot Marathon', description: 'Complete a delivery with fuel above 50%', progress: 0, target: 1, rewardType: 'fuel', rewardValue: 100, completed: false, type: 'daily' },
+      { id: 'q_weekly_1', title: 'Weekend Hustle Warrior', description: 'Complete 10 total deliveries', progress: 0, target: 10, rewardType: 'cash', rewardValue: 50, completed: false, type: 'weekly' },
+      { id: 'q_weekly_2', title: 'Region Commander', description: 'Deliver in multiple different regions', progress: 0, target: 2, rewardType: 'cash', rewardValue: 35, completed: false, type: 'weekly' },
+      { id: 'q_weekly_3', title: 'High-Roller Earnings', description: 'Earn premium payouts of £100 total', progress: 0, target: 100, rewardType: 'cash', rewardValue: 60, completed: false, type: 'weekly' }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('hyper_quests_db', JSON.stringify(quests));
+  }, [quests]);
   const wakeLockRef = useRef<any>(null);
   const [activeTopTab, setActiveTopTab] = useState<'status' | 'browse' | 'earnings'>('status');
   const [showLastTripCard, setShowLastTripCard] = useState(false);
@@ -7514,6 +7538,13 @@ export default function App() {
   }, [isSimulatingMovement, isNavigating, activeOrders, activeCityCenter, purchasedUpgrades, fuel, vehicleHealth, weatherState, activeMemeEvent, speakNav]);
 
   useEffect(() => {
+    if (!useRealGPS) {
+      if (watchId.current !== null) {
+        navigator.geolocation.clearWatch(watchId.current);
+        watchId.current = null;
+      }
+      return;
+    }
     if ("geolocation" in navigator) {
       watchId.current = navigator.geolocation.watchPosition(
         (position) => {
@@ -7529,9 +7560,10 @@ export default function App() {
     return () => {
       if (watchId.current !== null) {
         navigator.geolocation.clearWatch(watchId.current);
+        watchId.current = null;
       }
     };
-  }, []);
+  }, [useRealGPS]);
 
   // Notification API setup
   useEffect(() => {
@@ -9043,6 +9075,63 @@ export default function App() {
       });
       return updated;
     });
+
+    // Update Quests
+    setQuests(prevQuests => {
+      return prevQuests.map(q => {
+        if (q.completed) return q;
+
+        let newProgress = q.progress;
+        
+        if (q.id === 'q_daily_1') {
+          newProgress = Math.min(q.target, q.progress + 1);
+        } else if (q.id === 'q_daily_2') {
+          newProgress = Math.min(q.target, q.progress + 1);
+        } else if (q.id === 'q_daily_3') {
+          if (fuel > 50) {
+            newProgress = q.target;
+          }
+        } else if (q.id === 'q_weekly_1') {
+          newProgress = Math.min(q.target, q.progress + 1);
+        } else if (q.id === 'q_weekly_2') {
+          newProgress = Math.min(q.target, q.progress + 1);
+        } else if (q.id === 'q_weekly_3') {
+          newProgress = Math.min(q.target, q.progress + Math.floor(order.estimatedPay));
+        }
+
+        const isNowCompleted = newProgress >= q.target;
+        if (isNowCompleted && !q.completed) {
+          setTimeout(() => {
+            sendNotification("Quest Completed! 🏆", `You completed the "${q.title}" Quest!`);
+            
+            if (q.rewardType === 'cash') {
+              setUser(u => {
+                const currentBalance = u?.walletBalance || 0;
+                return {
+                  ...u,
+                  walletBalance: currentBalance + q.rewardValue,
+                  earningsStats: {
+                    ...u?.earningsStats,
+                    daily: (u?.earningsStats?.daily || 0) + q.rewardValue,
+                    weekly: (u?.earningsStats?.weekly || 0) + q.rewardValue
+                  }
+                } as any;
+              });
+              addToast("Quest Bonus", `+£${q.rewardValue.toFixed(2)} added to your Wallet balance!`, "success");
+            } else if (q.rewardType === 'fuel') {
+              setFuel(100);
+              addToast("Quest Fuel Bonus", "Engine Remapped: Fuel cell recharged to 100%!", "success");
+            }
+          }, 600);
+        }
+
+        return {
+          ...q,
+          progress: newProgress,
+          completed: isNowCompleted
+        };
+      });
+    });
     
     sendNotification(order.type === 'ride' ? "Trip Complete" : "Delivery Complete", `You earned £${order.estimatedPay.toFixed(2)}`);
     setLastTrip({
@@ -10138,8 +10227,8 @@ export default function App() {
 
                 {/* Surge Zones Visualization */}
                 {location && !isLowPerformance && activeSurgeAreas.map((area, i) => {
-                  const x = area.lng * MAP_SCALE + mapOffset.x;
-                  const y = -area.lat * MAP_SCALE + mapOffset.y;
+                  const x = (area.lng - location.longitude) * MAP_SCALE + mapOffset.x;
+                  const y = (location.latitude - area.lat) * MAP_SCALE + mapOffset.y;
                   
                   const isHigh = ('demand' in area && area.demand === 'High') || area.name === 'Shoreditch';
                   const isMedium = ('demand' in area && area.demand === 'Medium') || area.name === 'Soho';
@@ -10211,8 +10300,12 @@ export default function App() {
 
                 {/* Mock Restaurants (Busy Map) */}
                 {location && activeRestaurants.map((rest, i) => {
-                  const x = rest.offset.lng * MAP_SCALE + mapOffset.x;
-                  const y = -rest.offset.lat * MAP_SCALE + mapOffset.y;
+                  const cityInfo = CITY_DATABASES[activeCityKey] || CITY_DATABASES["London"];
+                  const restLat = cityInfo.center.latitude + rest.offset.lat;
+                  const restLng = cityInfo.center.longitude + rest.offset.lng;
+                  
+                  const x = (restLng - location.longitude) * MAP_SCALE + mapOffset.x;
+                  const y = (location.latitude - restLat) * MAP_SCALE + mapOffset.y;
                   const isOrderActive = activeOrders.some(o => o.restaurantName === rest.name);
                   
                   return (
@@ -12724,47 +12817,157 @@ export default function App() {
           )}
 
           {(currentScreen === 'planner' || currentScreen === 'rewards') && (
-            <motion.div key="planner" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
+            <motion.div key="planner" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-[#0c0c0d] text-white p-6 overflow-y-auto pb-32 font-sans">
               <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
-                <h1 className="text-3xl font-black">Rewards</h1>
+                <button onClick={() => setCurrentScreen('home')} className="p-2.5 bg-neutral-900 border border-white/10 hover:border-white/20 hover:bg-neutral-800 rounded-full transition-all active:scale-90 text-white cursor-pointer"><X size={20} /></button>
+                <h1 className="text-3xl font-black tracking-tight text-white uppercase font-display">Hyper Quests</h1>
               </div>
-              <div className="space-y-6">
-                <div className="p-8 bg-black text-white rounded-[40px] relative overflow-hidden">
-                  <div className="relative z-10">
-                    <h2 className="text-4xl font-black mb-2">Quest</h2>
-                    <p className="text-gray-400 font-bold mb-6">Complete orders to earn bonuses</p>
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-blue-600 rounded-2xl"><Target size={32} /></div>
+
+              {/* Top Banner (Total Quest Orders Today) */}
+              <div className="p-8 bg-gradient-to-br from-neutral-900 to-[#121215] border border-white/10 text-white rounded-[32px] relative overflow-hidden mb-8 shadow-2xl">
+                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                  <div>
+                    <h2 className="text-2xl font-black mb-1 flex items-center gap-2">
+                       <Trophy className="text-amber-500" size={24} />
+                      Career Milestones
+                    </h2>
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-wider">Complete orders to claim major cash bonuses</p>
+                    <div className="flex items-center gap-4 mt-6">
+                      <div className="p-3 bg-blue-600/25 border border-blue-500/30 rounded-2xl text-blue-400"><Target size={30} /></div>
                       <div>
-                        <span className="block text-2xl font-black">{rewards[0].completed} / {rewards[2].target}</span>
-                        <span className="text-sm text-gray-400 font-bold">Total Orders Today</span>
+                        <span className="block text-3xl font-black tracking-tight text-white">{rewards[0].completed} / {rewards[2].target}</span>
+                        <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-widest">Total Deliveries Met</span>
                       </div>
                     </div>
                   </div>
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/20 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
+
+                  {/* Reset indicators */}
+                  <div className="flex flex-col gap-1.5 self-start sm:self-center bg-black/40 border border-white/5 p-4 rounded-2xl">
+                    <span className="text-[9px] font-black tracking-wider text-gray-500 uppercase">Quest Systems</span>
+                    <span className="text-[10px] font-black text-green-400 flex items-center gap-1">● DAILY DISPATCH • ONLINE</span>
+                    <span className="text-[10px] font-black text-blue-400 flex items-center gap-1">● WEEKLY GRAND • ACTIVE</span>
+                  </div>
+                </div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
+              </div>
+
+              <div className="space-y-8">
+                {/* 1. Daily Quests Section */}
+                <div>
+                  <div className="flex items-center justify-between mb-4 px-1">
+                    <h3 className="text-lg font-black uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                      <Zap className="text-yellow-500 shrink-0" size={16} />
+                      Daily Challenges
+                    </h3>
+                    <span className="text-[9px] bg-yellow-500/15 border border-yellow-500/20 text-yellow-500 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">Reset Daily</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {quests.filter(q => q.type === 'daily').map((quest) => {
+                      const progress = Math.min(100, (quest.progress / quest.target) * 100);
+                      return (
+                        <div key={quest.id} className={`p-6 rounded-[24px] border transition-all ${quest.completed ? 'bg-emerald-950/25 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.05)]' : 'bg-neutral-900/50 border-white/5 hover:border-white/10'}`}>
+                          <div className="flex justify-between items-start gap-4 mb-3">
+                            <div>
+                              <h4 className={`font-black text-lg ${quest.completed ? 'text-emerald-400 line-through' : 'text-white'}`}>{quest.title}</h4>
+                              <p className="text-xs text-gray-400 font-medium mt-0.5">{quest.description}</p>
+                            </div>
+                            <span className={`text-xs font-black px-2.5 py-1 rounded-xl shrink-0 ${
+                              quest.completed 
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                : quest.rewardType === 'fuel' 
+                                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
+                                  : 'bg-green-500/10 text-green-400 border border-green-500/20'
+                            }`}>
+                              {quest.completed ? 'CLAIMED' : quest.rewardType === 'fuel' ? 'RECHARGE' : `+£${quest.rewardValue}`}
+                            </span>
+                          </div>
+                          
+                          <div className="w-full h-2 bg-neutral-800 rounded-full overflow-hidden mb-2 relative">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${progress}%` }}
+                              className={`h-full ${quest.completed ? 'bg-emerald-500' : quest.rewardType === 'fuel' ? 'bg-blue-500' : 'bg-gradient-to-r from-blue-600 to-indigo-500'}`}
+                            />
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] text-gray-500 font-extrabold uppercase tracking-wider">
+                            <span>Progress</span>
+                            <span>{quest.progress} / {quest.target} {quest.rewardType === 'fuel' ? 'Gal' : ''}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="space-y-4">
-                  {rewards.map((reward, i) => {
-                    const progress = Math.min(100, (reward.completed / reward.target) * 100);
-                    return (
-                      <div key={i} className="p-6 bg-gray-50 rounded-[30px] border border-gray-100">
-                        <div className="flex justify-between items-center mb-4">
-                          <h3 className="text-xl font-black">{reward.reward}</h3>
-                          <span className="font-black text-blue-600">{reward.completed}/{reward.target}</span>
+                {/* 2. Weekly Quests Section */}
+                <div>
+                  <div className="flex items-center justify-between mb-4 px-1">
+                    <h3 className="text-lg font-black uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                      <Trophy className="text-blue-400 shrink-0" size={16} />
+                      Weekly Milestones
+                    </h3>
+                    <span className="text-[9px] bg-blue-500/15 border border-blue-500/20 text-blue-400 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">Resets Monday</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {quests.filter(q => q.type === 'weekly').map((quest) => {
+                      const progress = Math.min(100, (quest.progress / quest.target) * 100);
+                      return (
+                        <div key={quest.id} className={`p-6 rounded-[24px] border transition-all ${quest.completed ? 'bg-emerald-950/25 border-emerald-500/30' : 'bg-neutral-900/50 border-white/5 hover:border-white/10'}`}>
+                          <div className="flex justify-between items-start gap-4 mb-3">
+                            <div>
+                              <h4 className={`font-black text-lg ${quest.completed ? 'text-emerald-400 line-through' : 'text-white'}`}>{quest.title}</h4>
+                              <p className="text-xs text-gray-400 font-medium mt-0.5">{quest.description}</p>
+                            </div>
+                            <span className={`text-xs font-black px-2.5 py-1 rounded-xl shrink-0 ${
+                              quest.completed 
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                : 'bg-green-500/10 text-green-400 border border-green-500/20'
+                            }`}>
+                              {quest.completed ? 'CLAIMED' : `+£${quest.rewardValue}`}
+                            </span>
+                          </div>
+                          
+                          <div className="w-full h-2 bg-neutral-800 rounded-full overflow-hidden mb-2 relative">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${progress}%` }}
+                              className={`h-full ${quest.completed ? 'bg-emerald-500' : 'bg-gradient-to-r from-indigo-600 to-purple-500'}`}
+                            />
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] text-gray-500 font-extrabold uppercase tracking-wider">
+                            <span>Earned</span>
+                            <span>{quest.progress} / {quest.target}</span>
+                          </div>
                         </div>
-                        <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden mb-2">
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${progress}%` }}
-                            className="h-full bg-blue-600"
-                          />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. Base Milestone unlocks */}
+                <div className="p-6 bg-neutral-900/20 border border-white/5 rounded-[32px] mt-6">
+                  <h3 className="text-sm font-black text-gray-500 uppercase tracking-widest mb-4">Milestone Unlocks</h3>
+                  <div className="space-y-3">
+                    {rewards.map((reward, i) => {
+                      const progress = Math.min(100, (reward.completed / reward.target) * 100);
+                      return (
+                        <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-neutral-900/40 border border-white/5 hover:border-white/10 rounded-2xl transition-all">
+                          <div>
+                            <span className="text-sm font-black text-white">{reward.reward}</span>
+                            <span className="text-xs text-gray-400 block font-medium">Earned upon hitting {reward.target} total career orders.</span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="w-32 h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-blue-500" style={{ width: `${progress}%` }} />
+                            </div>
+                            <span className="text-xs font-black text-gray-400">{reward.completed}/{reward.target}</span>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-400 font-bold">Complete {reward.target} orders to unlock</p>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </motion.div>
