@@ -5373,6 +5373,7 @@ export default function App() {
     speed: 15 + Math.random() * 15
   });
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
+  const [fcmToken, setFcmToken] = useState<string | null>(null);
   const [earnings, setEarnings] = useState(() => {
     try {
       const saved = localStorage.getItem('hyper_driver_earnings');
@@ -6963,6 +6964,7 @@ export default function App() {
             setIsNewUserFormOpen(true);
           }
           setIsProfileLoaded(true);
+          initializeFCMToken(fUser.uid);
         }).catch(error => {
           console.error("Profile load failed:", error);
         });
@@ -7523,6 +7525,136 @@ export default function App() {
     addToast(title, body, type);
     setNotifications(prev => [body, ...prev.slice(0, 49)]);
   };
+
+  const initializeFCMToken = async (userId: string) => {
+    try {
+      if (!("Notification" in window)) return;
+      
+      console.log("Checking and registering standard Android PWA FCM Token for driver:", userId);
+      
+      // If permission is already granted, let's auto sync token
+      if (Notification.permission === "granted") {
+        fetchAndSaveFCMToken(userId);
+      } else if (Notification.permission === "default") {
+        // Safe check to prompt on user profile load/registration or game starts
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          fetchAndSaveFCMToken(userId);
+          addDebugLog('success', 'Real notification permissions granted by PWA user.');
+        } else {
+          addDebugLog('warn', 'Browser notification permission rejected or dismissed.');
+        }
+      }
+    } catch (err) {
+      console.error("FCM initializing failed safely:", err);
+    }
+  };
+
+  const fetchAndSaveFCMToken = async (userId: string) => {
+    try {
+      const { getFCMToken } = await import('./firebase');
+      // Pass standard Public VAPID Key configured from environment if available
+      const customVapid = (import.meta as any).env?.VITE_FIREBASE_VAPID_KEY || 'BOMz3_M8X9-4-g9zF2fJq6G_Gzsh7Z7p7t5K5G7H5R_G-M3G7c_r5B_C3_Y_h_K_f_X_W_q_w';
+      const token = await getFCMToken(customVapid);
+      if (token) {
+        setFcmToken(token);
+        console.log("Successfully generated client FCM Token:", token);
+        addDebugLog('success', `Active Android FCM Token: ${token.substring(0, 15)}...`);
+        
+        // Save dynamically to user profile in firebase so backend/Vercel can dispatch pushes
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const userRef = doc(db, 'users', userId);
+        await updateDoc(userRef, { fcmToken: token }).catch((firestoreErr) => {
+          console.warn("Local sandbox status info: user doc doesn't fully support update or not created yet", firestoreErr.message);
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching FCM token:", err);
+    }
+  };
+
+  // Listen to deep-links and postMessages from tapped service worker notifications
+  useEffect(() => {
+    const searchParams = new window.URLSearchParams(window.location.search);
+    const actionParam = searchParams.get('action');
+    const orderIdParam = searchParams.get('orderId');
+
+    if (actionParam) {
+      addDebugLog('success', `Deep linked action received: ${actionParam} to order: ${orderIdParam}`);
+      
+      // Construct a realistic McBurger delivery order
+      const pushGeneratedOrder: Order = {
+        id: orderIdParam || "fcm_" + Math.random().toString(36).substring(2, 11),
+        restaurantName: 'McBurger',
+        customerName: 'Alex Mercer (FCM Deep Link)',
+        status: 'pending' as const,
+        estimatedPay: 8.50,
+        estimatedDistance: 2.3,
+        estimatedTime: 8,
+        items: ["Big McBurger Meal", "Hyper Fry Extra"],
+        pin: '8823',
+        isMatching: false,
+        pickupLocation: { latitude: location?.latitude || 51.524, longitude: location?.longitude || -0.078 },
+        customerLocation: { latitude: (location?.latitude || 51.524) + 0.012, longitude: (location?.longitude || -0.078) + 0.012 },
+        type: 'delivery' as const,
+        isStacked: false,
+        batchCount: 1,
+        restaurantLocation: { latitude: location?.latitude || 51.524, longitude: location?.longitude || -0.078 },
+        pickupPos: { lat: location?.latitude || 51.524, lng: location?.longitude || -0.078 }
+      };
+
+      if (actionParam === 'accept') {
+        setPendingOrder(pushGeneratedOrder);
+        setTimeout(() => {
+          // Programmatically simulate acceptance
+          setActiveOrders(prev => {
+            const exists = prev.some(o => o.id === pushGeneratedOrder.id);
+            if (exists) return prev;
+            return [...prev, { ...pushGeneratedOrder, status: 'accepted' as const }];
+          });
+          setIsNavigating(true);
+          setPendingOrder(null);
+          addToast("Order Accepted!", "Direct push-notification 'Accept' action button was triggered successfully.", "success");
+          
+          setNavSimulation({
+            active: true,
+            orderId: pushGeneratedOrder.id,
+            type: 'pickup',
+            startPos: { lat: location?.latitude || 51.524, lng: location?.longitude || -0.078 },
+            endPos: { lat: pushGeneratedOrder.pickupLocation?.latitude || 51.524, lng: pushGeneratedOrder.pickupLocation?.longitude || -0.078 },
+            currentPos: { lat: location?.latitude || 51.524, lng: location?.longitude || -0.078 },
+            progress: 0,
+            distanceRemaining: pushGeneratedOrder.estimatedDistance / 2,
+            eta: pushGeneratedOrder.estimatedTime / 2,
+            speed: 20
+          });
+        }, 800);
+      } else if (actionParam === 'view' || actionParam === 'open') {
+        // Pop the order sheet onto their dashboard
+        setPendingOrder(pushGeneratedOrder);
+        setOrderExpiryTimer(35); // longer timer for view deep link
+        addToast("FCM Order Dispatched", "Pending order sheet active.", "success");
+      } else if (actionParam === 'decline') {
+        setPendingOrder(null);
+        addToast("FCM Order Bypassed", "Request dismissed.", "info");
+      }
+
+      // Cleanup query params to prevent repeating execution on next reload
+      const nextUrl = window.location.pathname;
+      window.history.replaceState({}, '', nextUrl);
+    }
+
+    // Set up standard message listener for foreground / service worker messages
+    const handleMessageEvent = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'NOTIFICATION_CALLBACK') {
+        const { action, orderId } = event.data;
+        addDebugLog('success', `Live SW Event: ${action} trigger for dispatch ID ${orderId}`);
+      }
+    };
+
+    window.addEventListener('message', handleMessageEvent);
+    return () => window.removeEventListener('message', handleMessageEvent);
+  }, [window.location.search, user?.uid, location]);
 
   const [uploadedDocs, setUploadedDocs] = useState<string[]>([]);
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
@@ -14083,6 +14215,8 @@ app.post('/api/cashout', async (req, res) => {
               setIsKeepAliveActive={setIsKeepAliveActive}
               backgroundTicks={backgroundTicks}
               triggerFiveSecondBackgroundTest={triggerFiveSecondBackgroundTest}
+              fcmToken={fcmToken}
+              fetchAndSaveFCMToken={fetchAndSaveFCMToken}
             />
           </motion.div>
         )}
@@ -14133,7 +14267,9 @@ const DebugMonitorView = ({
   isKeepAliveActive,
   setIsKeepAliveActive,
   backgroundTicks,
-  triggerFiveSecondBackgroundTest
+  triggerFiveSecondBackgroundTest,
+  fcmToken,
+  fetchAndSaveFCMToken
 }: any) => {
   const [activeTab, setActiveTab] = React.useState<'logs' | 'telemetry' | 'background' | 'glitchbox' | 'rescue'>('logs');
   const [logFilter, setLogFilter] = React.useState<'all' | 'info' | 'warn' | 'error' | 'success'>('all');
@@ -14645,6 +14781,133 @@ const DebugMonitorView = ({
                   </div>
                 </div>
 
+              </div>
+
+              {/* Firebase Cloud Messaging (FCM) Active Token Indicators */}
+              <div className="p-5 bg-gradient-to-tr from-slate-950 to-slate-900 border border-white/5 rounded-3xl mt-4">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                      <h4 className="font-extrabold text-white text-sm uppercase tracking-wide flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse" />
+                        Firebase Cloud Messaging (FCM) Active Driver Node
+                      </h4>
+                      <p className="text-[11px] text-slate-400 leading-normal mt-1">
+                        Acquire and save FCM push tokens to allow server-directed real-time notifications on Android.
+                      </p>
+                    </div>
+                    {fcmToken ? (
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(fcmToken);
+                          addToast("Token Copied!", "FCM Push registration token copied to clipboard.", "success");
+                        }}
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/5 rounded-xl text-xs font-mono font-bold uppercase transition-all cursor-pointer shadow-sm hover:scale-[1.02]"
+                      >
+                        Copy Token
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => {
+                          if (user && user.uid) {
+                            fetchAndSaveFCMToken(user.uid);
+                          } else {
+                            addToast("Authentication Required", "Please sign in or complete onboarding before requesting FCM tokens.", "alert");
+                          }
+                        }}
+                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md hover:scale-[1.02]"
+                      >
+                        Generate Token
+                      </button>
+                    )}
+                  </div>
+
+                  {fcmToken && (
+                    <div className="p-3 bg-slate-900/60 border border-white/4 rounded-xl">
+                      <span className="text-[9px] font-mono font-black text-slate-500 block uppercase tracking-widest mb-1">Your Device Token (Auto-Saved to Firestore)</span>
+                      <p className="text-[10px] font-mono text-amber-400 font-bold break-all select-all leading-normal">
+                        {fcmToken}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Push dispatch adapters */}
+                  <div className="border-t border-white/5 pt-4">
+                    <h5 className="text-[11px] font-bold text-slate-200 uppercase tracking-wider mb-2">Simulate Cloud-Edge Push Trigger</h5>
+                    <p className="text-[10px] text-slate-400 leading-normal mb-3">
+                      This triggers a delivery alert by transmitting an API POST request to `/api/send-push` targeting your specific device token, simulating standard Uber dispatch behavior.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={async () => {
+                          if (!fcmToken) {
+                            addToast("FCM Token Required", "Click 'Generate Token' before triggering a test push.", "alert");
+                            return;
+                          }
+                          addToast("Dispatching FCM Request", "Transmitting POST request to /api/send-push...", "info");
+                          try {
+                            const res = await fetch('/api/send-push', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                token: fcmToken,
+                                title: "New Delivery Available 🍔",
+                                body: "McBurger • £8.50 • 2.3 miles away",
+                                orderId: "fcm_test_order_123"
+                              })
+                            });
+                            const data = await res.json();
+                            if (res.ok) {
+                              addToast("FCM Dispatch Success", "Real push transmitted successfully via Vercel endpoint!", "success");
+                              addDebugLog('success', `Real FCM Push delivered. MessageId: ${data.messageId}`);
+                            } else {
+                              // Fall back to localized service-worker action parameters if endpoint is unconfigured
+                              addToast("Local Fallback Active", "Credentials unconfigured; triggering Local PWA push message.", "info");
+                              addDebugLog('warn', `API Response warning: ${data.error}`);
+                              
+                              if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                                navigator.serviceWorker.ready.then(reg => {
+                                  reg.showNotification("New Delivery Available 🍔", {
+                                    body: "McBurger • £8.50 • 2.3 miles away",
+                                    icon: '/icon.png',
+                                    badge: '/icon.png',
+                                    vibrate: [200, 100, 200, 100, 200],
+                                    data: { url: '/', orderId: 'fallback_sim_order' },
+                                    actions: [
+                                      { action: 'accept', title: 'Accept ✅' },
+                                      { action: 'decline', title: 'Decline ❌' }
+                                    ]
+                                  } as any);
+                                });
+                              }
+                            }
+                          } catch (err: any) {
+                            addToast("Vercel Server Connector bypassed", "Service worker notification fallback activated.", "info");
+                            
+                            if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                              navigator.serviceWorker.ready.then(reg => {
+                                reg.showNotification("New Delivery Available 🍔", {
+                                  body: "McBurger • £8.50 • 2.3 miles away",
+                                  icon: '/icon.png',
+                                  badge: '/icon.png',
+                                  vibrate: [200, 100, 200, 100, 200],
+                                  data: { url: '/', orderId: 'local_sw_order' },
+                                  actions: [
+                                    { action: 'accept', title: 'Accept ✅' },
+                                    { action: 'decline', title: 'Decline ❌' }
+                                  ]
+                                } as any);
+                              });
+                            }
+                          }
+                        }}
+                        className="px-5 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-sans font-black tracking-wider rounded-xl text-xs uppercase cursor-pointer transition-all hover:scale-[1.02]"
+                      >
+                        Fire Real FCM Push
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Core testing suite actions */}

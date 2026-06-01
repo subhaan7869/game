@@ -17,7 +17,8 @@
         "profilePic": { "type": "string", "description": "URL to profile picture" },
         "documentsUploaded": { "type": "boolean", "description": "Whether documents are uploaded" },
         "faceVerified": { "type": "boolean", "description": "Whether face is verified" },
-        "documentExpiries": { "type": "object", "description": "Map of document names to expiry dates" }
+        "documentExpiries": { "type": "object", "description": "Map of document names to expiry dates" },
+        "fcmToken": { "type": "string", "description": "Firebase Cloud Messaging push token" }
       },
       "required": ["uid", "name", "faceSignature"]
     },

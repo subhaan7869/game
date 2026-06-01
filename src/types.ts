@@ -161,4 +161,5 @@ export interface UserProfile {
     sortCode?: string;
     isReal?: boolean;
   }[];
+  fcmToken?: string;
 }

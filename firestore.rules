@@ -60,6 +60,7 @@ service cloud.firestore {
              (!('walletBalance' in data) || (data.walletBalance is number && data.walletBalance >= 0)) &&
              (!('vehicleInfo' in data) || (data.vehicleInfo is map)) &&
              (!('vehiclesList' in data) || (data.vehiclesList is list)) &&
+             (!('fcmToken' in data) || (data.fcmToken is string && data.fcmToken.size() < 500)) &&
              (!('documentExpiries' in data) || (data.documentExpiries is map && data.documentExpiries.keys().size() < 20));
     }
 
