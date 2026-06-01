@@ -6483,6 +6483,7 @@ export default function App() {
     if (lat > 53.7 && lat < 53.9 && lng > -1.7 && lng < -1.4) return "Leeds";
     if (lat > 51.4 && lat < 51.6 && lng > -2.7 && lng < -2.4) return "Bristol";
     if (lat > 52.8 && lat < 53.1 && lng > -1.3 && lng < -1.0) return "Nottingham";
+    if (lat > 51.3 && lat < 51.6 && lng > -3.3 && lng < -3.0) return "Cardiff";
     if (lat > 51.3 && lat < 51.7 && lng > -0.5 && lng < 0.3) return "London";
     
     return "United Kingdom"; 
@@ -10319,6 +10320,36 @@ export default function App() {
 
                 {mapCoreMode === 'cyber' && (
                   <>
+                    {/* Markers for other Online Drivers */}
+                    {location && otherOnlineDrivers && otherOnlineDrivers.map((dr) => {
+                      if (!dr.latitude || !dr.longitude) return null;
+                      const x = (dr.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
+                      const y = (location.latitude - dr.latitude) * MAP_SCALE + (mapOffset.y || 0);
+                      return (
+                        <motion.div 
+                          key={`cyber-rival-${dr.uid}`}
+                          className="absolute z-[215]"
+                          animate={{ 
+                            left: (centerX || window.innerWidth/2) + x,
+                            top: (centerY || window.innerHeight/2) + y
+                          }}
+                          transition={{ type: "spring", stiffness: 60, damping: 20 }}
+                        >
+                          <div className="relative -translate-x-1/2 -translate-y-1/2 flex flex-col items-center select-none pointer-events-none">
+                            {/* Tiny name tooltip of rival rider */}
+                            <div className="px-1.5 py-0.5 bg-black/90 backdrop-blur-md border border-white/10 rounded-md text-white font-extrabold text-[7px] uppercase tracking-wide shadow-lg whitespace-nowrap mb-0.5">
+                              {dr.name.split(' ')[0]} • ⭐{dr.rating.toFixed(1)}
+                            </div>
+                            
+                            {/* Competitive gold/orange vehicle node */}
+                            <div className="w-5 h-5 bg-amber-500 rounded-full border-2 border-white shadow-md flex items-center justify-center animate-pulse">
+                              <Navigation size={8} className="text-white fill-white" style={{ transform: `rotate(${(dr.heading || 0) - 45}deg)` }} />
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+
                     {/* Driver Marker (Uber Classic style pulsing blue dot with heading representation) */}
                     <motion.div 
                       className="absolute z-[220]"
@@ -10505,27 +10536,29 @@ export default function App() {
                   {location && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       {/* Pulsing blue dot for driver */}
-                      <div className="relative z-10" style={{ transform: `translate(${mapOffset.x}px, ${mapOffset.y}px)` }}>
-                        {user.isOnline ? (
-                          <div className="w-10 h-10 bg-white rounded-full shadow-xl flex items-center justify-center border-2 border-blue-500">
-                            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                              <Navigation size={18} className="text-white fill-white" style={{ transform: 'rotate(45deg)' }} />
+                      {mapCoreMode !== 'cyber' && (
+                        <div className="relative z-10" style={{ transform: `translate(${mapOffset.x}px, ${mapOffset.y}px)` }}>
+                          {user.isOnline ? (
+                            <div className="w-10 h-10 bg-white rounded-full shadow-xl flex items-center justify-center border-2 border-blue-500">
+                              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                                <Navigation size={18} className="text-white fill-white" style={{ transform: 'rotate(45deg)' }} />
+                              </div>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="w-8 h-8 bg-blue-500 rounded-full border-4 border-white shadow-[0_0_20px_rgba(59,130,246,0.8)] flex items-center justify-center">
-                            <Navigation size={16} className="text-white fill-white" style={{ transform: 'rotate(45deg)' }} />
-                          </div>
-                        )}
-                        <div className="absolute -inset-6 bg-blue-500/30 rounded-full animate-ping" />
-                        {pendingOrder && (
-                          <motion.div 
-                            animate={{ scale: [1, 4], opacity: [0.5, 0] }}
-                            transition={{ duration: 2, repeat: Infinity }}
-                            className="absolute inset-0 bg-blue-400 rounded-full"
-                          />
-                        )}
-                      </div>
+                          ) : (
+                            <div className="w-8 h-8 bg-blue-500 rounded-full border-4 border-white shadow-[0_0_20px_rgba(59,130,246,0.8)] flex items-center justify-center">
+                              <Navigation size={16} className="text-white fill-white" style={{ transform: 'rotate(45deg)' }} />
+                            </div>
+                          )}
+                          <div className="absolute -inset-6 bg-blue-500/30 rounded-full animate-ping" />
+                          {pendingOrder && (
+                            <motion.div 
+                              animate={{ scale: [1, 4], opacity: [0.5, 0] }}
+                              transition={{ duration: 2, repeat: Infinity }}
+                              className="absolute inset-0 bg-blue-400 rounded-full"
+                            />
+                          )}
+                        </div>
+                      )}
 
                       {/* Surge Badges and More Buttons */}
                       {user.isOnline && !isNavigating && (
@@ -10559,7 +10592,7 @@ export default function App() {
                       )}
 
                       {/* Restaurant and Customer markers */}
-                      {location && activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, idx) => {
+                      {location && mapCoreMode !== 'cyber' && activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, idx) => {
                         const isPickup = order.status === 'accepted';
                         const target = isPickup 
                           ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
@@ -10617,7 +10650,7 @@ export default function App() {
                       })}
 
                       {/* Pending Order Marker (Matching) */}
-                      {location && pendingOrder && (
+                      {location && mapCoreMode !== 'cyber' && pendingOrder && (
                         <>
                           {[(pendingOrder.type === 'delivery' ? pendingOrder.restaurantLocation : pendingOrder.pickupLocation), pendingOrder.customerLocation].map((target, i) => {
                             if (!target) return null;
