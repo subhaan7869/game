@@ -694,7 +694,9 @@ const NewDashboard = ({
   setCurrentScreen,
   busynessMode,
   globalSurge,
-  vigilanteAdActive
+  vigilanteAdActive,
+  joinedAirportId,
+  userQueuePosition
 }: { 
   user: UserProfile, 
   earnings: number, 
@@ -702,7 +704,9 @@ const NewDashboard = ({
   setCurrentScreen: (s: AppScreen) => void,
   busynessMode: string,
   globalSurge: number,
-  vigilanteAdActive: boolean
+  vigilanteAdActive: boolean,
+  joinedAirportId: string | null,
+  userQueuePosition: number
 }) => {
   const greeting = () => {
     const hour = new Date().getHours();
@@ -819,14 +823,19 @@ const NewDashboard = ({
               </div>
 
               {/* Airport Tag */}
-              <div className="absolute bottom-10 right-8 scale-90">
-                <div className="bg-white p-3 rounded-2xl shadow-xl flex items-center gap-3 border border-gray-100">
+              <div 
+                onClick={() => setCurrentScreen('airport_queues')}
+                className="absolute bottom-10 right-8 scale-90 cursor-pointer hover:scale-105 active:scale-95 transition-all"
+              >
+                <div className="bg-white p-3 rounded-2xl shadow-xl flex items-center gap-3 border border-gray-100 text-black">
                   <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">
-                    <MapPin size={24} />
+                    <Plane size={20} />
                   </div>
                   <div>
                     <h4 className="font-black text-xs">Airport Queue</h4>
-                    <p className="text-[9px] font-bold text-gray-400">15 Drivers Ahead</p>
+                    <p className="text-[9px] font-bold text-gray-400">
+                      {joinedAirportId ? `Joined: #${userQueuePosition}` : 'Tap to View Queues'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -4641,6 +4650,380 @@ const TripHistoryScreen = ({
   );
 };
 
+export interface Airport {
+  id: string;
+  name: string;
+  code: string;
+  latOffset: number;
+  lngOffset: number;
+  paxDemand: 'Low' | 'Medium' | 'High';
+  driversAheadDefault: number;
+  baseWaitMins: number;
+  flights: Array<{
+    flightNo: string;
+    origin: string;
+    etaMins: number;
+    passengers: number;
+    status: string;
+  }>;
+}
+
+const getAirportQueuesList = (cityCenter: { latitude: number; longitude: number }): Airport[] => [
+  {
+    id: 'lhr',
+    name: "London Heathrow Airport",
+    code: "LHR",
+    latOffset: 0.024,
+    lngOffset: -0.048,
+    paxDemand: 'High',
+    driversAheadDefault: 32,
+    baseWaitMins: 35,
+    flights: [
+      { flightNo: "BA224", origin: "New York (JFK)", etaMins: 1, passengers: 280, status: "Landing" },
+      { flightNo: "VS104", origin: "Atlanta (ATL)", etaMins: 4, passengers: 210, status: "En Route" },
+      { flightNo: "LH248", origin: "Frankfurt (FRA)", etaMins: 9, passengers: 140, status: "En Route" }
+    ]
+  },
+  {
+    id: 'lgw',
+    name: "London Gatwick Airport",
+    code: "LGW",
+    latOffset: -0.042,
+    lngOffset: -0.015,
+    paxDemand: 'Medium',
+    driversAheadDefault: 14,
+    baseWaitMins: 20,
+    flights: [
+      { flightNo: "EZY812", origin: "Nice (NCE)", etaMins: 2, passengers: 160, status: "Landing" },
+      { flightNo: "BA2612", origin: "Tenerife (TFS)", etaMins: 7, passengers: 190, status: "En Route" }
+    ]
+  },
+  {
+    id: 'stn',
+    name: "London Stansted Airport",
+    code: "STN",
+    latOffset: 0.046,
+    lngOffset: 0.032,
+    paxDemand: 'High',
+    driversAheadDefault: 24,
+    baseWaitMins: 25,
+    flights: [
+      { flightNo: "FR102", origin: "Dublin (DUB)", etaMins: 4, passengers: 189, status: "En Route" },
+      { flightNo: "FR8342", origin: "Rome (CIA)", etaMins: 11, passengers: 180, status: "En Route" }
+    ]
+  },
+  {
+    id: 'lcy',
+    name: "London City Airport",
+    code: "LCY",
+    latOffset: 0.006,
+    lngOffset: 0.038,
+    paxDemand: 'Low',
+    driversAheadDefault: 6,
+    baseWaitMins: 12,
+    flights: [
+      { flightNo: "LX452", origin: "Zurich (ZHR)", etaMins: 5, passengers: 85, status: "En Route" }
+    ]
+  }
+];
+
+const AirportQueuesScreen = ({
+  onClose,
+  theme,
+  location,
+  setLocation,
+  isOnline,
+  activeCityKey,
+  activeCityCenter,
+  activeOrders,
+  joinedAirportId,
+  setJoinedAirportId,
+  userQueuePosition,
+  setUserQueuePosition,
+  setBusyAreaTarget,
+  setIsNavigating,
+  sendNotification,
+  addToast,
+  addDebugLog
+}: {
+  onClose: () => void;
+  theme: string;
+  location: { latitude: number; longitude: number } | null;
+  setLocation: React.Dispatch<React.SetStateAction<{ latitude: number; longitude: number } | null>>;
+  isOnline: boolean;
+  activeCityKey: string;
+  activeCityCenter: { latitude: number; longitude: number };
+  activeOrders: any[];
+  joinedAirportId: string | null;
+  setJoinedAirportId: React.Dispatch<React.SetStateAction<string | null>>;
+  userQueuePosition: number;
+  setUserQueuePosition: React.Dispatch<React.SetStateAction<number>>;
+  setBusyAreaTarget: React.Dispatch<React.SetStateAction<{ id: string; name: string; location: { latitude: number; longitude: number } } | null>>;
+  setIsNavigating: React.Dispatch<React.SetStateAction<boolean>>;
+  sendNotification: (title: string, body: string, iconType?: string) => void;
+  addToast: (title: string, text: string, type?: 'success' | 'alert' | 'info') => void;
+  addDebugLog: (type: 'info' | 'warn' | 'error' | 'success', msg: string) => void;
+}) => {
+  const [selectedAirportId, setSelectedAirportId] = useState<string>('lhr');
+  const airports = getAirportQueuesList(activeCityCenter);
+  const selectedAirport = airports.find(a => a.id === selectedAirportId) || airports[0];
+
+  const targetCoords = {
+    latitude: activeCityCenter.latitude + selectedAirport.latOffset,
+    longitude: activeCityCenter.longitude + selectedAirport.lngOffset
+  };
+
+  const distanceInMiles = location 
+    ? Math.sqrt(Math.pow(location.latitude - targetCoords.latitude, 2) + Math.pow(location.longitude - targetCoords.longitude, 2)) * 69 
+    : 999;
+
+  const isInsideGeofence = distanceInMiles <= 0.008 * 69; // ~0.55 miles geofence limit
+
+  const hasAnyActiveQueueJoined = joinedAirportId !== null;
+  const isJoinedSelected = joinedAirportId === selectedAirport.id;
+
+  return (
+    <motion.div 
+      initial={{ x: '100%' }} 
+      animate={{ x: 0 }} 
+      exit={{ x: '100%' }} 
+      className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
+    >
+      <div className="flex items-center gap-4 mb-6">
+        <button onClick={onClose} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={24} /></button>
+        <div>
+          <h1 className="font-display text-3xl font-black tracking-tight flex items-center gap-2">
+            <Plane size={28} className="translate-y-[-2px] text-blue-600 dark:text-blue-400" />
+            Airport Zones
+          </h1>
+          <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider font-mono">Live LHR & LGW FIFO Wait System</p>
+        </div>
+      </div>
+
+      {/* Global Queue Joined Indicator */}
+      {hasAnyActiveQueueJoined && (
+        <div className="mb-6 p-4 rounded-3xl bg-blue-600 text-white shadow-xl flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center animate-pulse">
+              <Plane size={20} />
+            </div>
+            <div>
+              <p className="text-[9px] font-black opacity-80 uppercase tracking-widest leading-none">In Hold Queue</p>
+              <h4 className="font-extrabold text-sm">{joinedAirportId === 'lhr' ? 'Heathrow LHR' : joinedAirportId === 'lgw' ? 'Gatwick LGW' : joinedAirportId === 'stn' ? 'Stansted STN' : 'London City LCY'}</h4>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] font-black uppercase bg-white/20 px-3 py-1.5 rounded-xl font-mono">Position #{userQueuePosition}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Airport Chips row */}
+      <div className="flex gap-2 mb-6 overflow-x-auto py-1 scrollbar-none">
+        {airports.map((airport) => {
+          const isActive = selectedAirportId === airport.id;
+          const isUserInThis = joinedAirportId === airport.id;
+          return (
+            <button
+              key={airport.id}
+              onClick={() => setSelectedAirportId(airport.id)}
+              className={`px-4 py-3 rounded-2xl flex items-center gap-2 font-black text-xs uppercase tracking-widest whitespace-nowrap transition-all border shrink-0 ${
+                isActive 
+                  ? (theme === 'dark' ? 'bg-white text-black border-white' : 'bg-black text-white border-black')
+                  : (theme === 'dark' ? 'bg-white/5 border-white/5 text-gray-400' : 'bg-gray-50 border-gray-100 text-gray-500')
+              }`}
+            >
+              <span>{airport.code}</span>
+              {isUserInThis && <div className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Main Airport Info Card */}
+      <div className={`p-6 rounded-[32px] border-2 transition-all mb-6 ${theme === 'dark' ? 'bg-[#151518] border-white/5' : 'bg-gray-50/50 border-gray-100'}`}>
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h2 className="text-xl font-black">{selectedAirport.name}</h2>
+            <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
+              selectedAirport.paxDemand === 'High' ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'
+            }`}>
+              {selectedAirport.paxDemand} Demand
+            </span>
+          </div>
+          <p className="text-2xl font-black text-blue-500">{selectedAirport.code}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 my-6">
+          <div className={`p-4 rounded-2xl ${theme === 'dark' ? 'bg-white/5' : 'bg-white border border-gray-100'}`}>
+            <div className="flex items-center gap-2 text-gray-400 mb-1">
+              <Clock size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Est. Wait Time</span>
+            </div>
+            <p className="font-extrabold text-base">{selectedAirport.baseWaitMins} - {selectedAirport.baseWaitMins + 15} mins</p>
+          </div>
+          <div className={`p-4 rounded-2xl ${theme === 'dark' ? 'bg-white/5' : 'bg-white border border-gray-100'}`}>
+            <div className="flex items-center gap-2 text-gray-400 mb-1">
+              <Users size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Hold Area Cars</span>
+            </div>
+            <p className="font-extrabold text-base">{selectedAirport.driversAheadDefault} Cars</p>
+          </div>
+        </div>
+
+        {/* Geofencing Status Area */}
+        <div className={`p-5 rounded-2xl border ${
+          isInsideGeofence
+            ? 'bg-green-500/10 border-green-500/20 text-green-500'
+            : (theme === 'dark' ? 'bg-white/5 border-white/5 text-gray-400' : 'bg-white border-gray-100 text-gray-500')
+        }`}>
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-3 h-3 rounded-full ${isInsideGeofence ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+            <h4 className="font-black text-xs uppercase tracking-widest">
+              {isInsideGeofence ? 'Inside FIFO Geofence Lot' : 'Outside Geofence Lot'}
+            </h4>
+          </div>
+
+          <p className="text-xs font-bold leading-normal mt-1 mb-4 text-gray-500 dark:text-gray-400">
+            {isInsideGeofence 
+              ? 'You are currently inside the holding lot boundaries. You are eligible to join the first-in first-out airport dispatches queue.'
+              : `To enter the queue, you must be within LHR/LGW virtual lot coordinates. Currently ${distanceInMiles.toFixed(1)} miles away.`}
+          </p>
+
+          {!isInsideGeofence ? (
+            <div className="flex flex-col sm:flex-row gap-2 w-full">
+              <button
+                onClick={() => {
+                  if (!isOnline) {
+                    addToast("Go Online First", "You must go online to activate driving simulation.", "alert");
+                    return;
+                  }
+                  if (activeOrders.length > 0) {
+                    addToast("Active Trip", "Complete your current trip structure before navigating.", "alert");
+                    return;
+                  }
+                  setBusyAreaTarget({
+                    id: selectedAirport.id,
+                    name: `${selectedAirport.code} Wait Lot`,
+                    location: targetCoords
+                  });
+                  setIsNavigating(true);
+                  addToast("Navigation Active", `Vehicle path mapped to ${selectedAirport.code} holding lot. Heading there now!`, "success");
+                  addDebugLog("info", `Initiated simulated GPS path towards ${selectedAirport.name}.`);
+                  onClose();
+                }}
+                className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Navigation size={13} className="rotate-45" />
+                SIMULATE DRIVE
+              </button>
+
+              <button
+                onClick={() => {
+                  setLocation(targetCoords);
+                  addToast("Teleported", `Instantly arrived at ${selectedAirport.code} coordinate geofence.`, "success");
+                  addDebugLog("success", `GPS Teleported to ${selectedAirport.code} geofence slot.`);
+                }}
+                className="flex-1 py-3.5 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Zap size={13} />
+                DEV TELEPORT
+              </button>
+            </div>
+          ) : (
+            <div>
+              {isJoinedSelected ? (
+                <div className="space-y-4">
+                  <div className={`p-4 rounded-xl text-center flex flex-col justify-center items-center ${theme === 'dark' ? 'bg-white/5' : 'bg-white'}`}>
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 font-mono">Your Current Queue Position</span>
+                    <span className="text-4xl font-black text-blue-600 dark:text-blue-400 font-mono">#{userQueuePosition}</span>
+                    <span className="text-[9px] text-gray-400 font-bold mt-1.5 uppercase tracking-widest">Est. Hold dispatch: {Math.max(1, Math.round(userQueuePosition * 1.2))} mins</span>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setJoinedAirportId(null);
+                      setUserQueuePosition(0);
+                      addToast("Left Queue", "You removed yourself from the airport queue.", "alert");
+                      addDebugLog("warn", "Left airport FIFO queue.");
+                    }}
+                    className="w-full py-4 aspect-auto bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all active:scale-95 flex justify-center items-center gap-2 cursor-pointer"
+                  >
+                    <X size={14} />
+                    LEAVE WAITING QUEUE
+                  </button>
+                </div>
+              ) : (
+                <button
+                  disabled={hasAnyActiveQueueJoined}
+                  onClick={() => {
+                    if (!isOnline) {
+                      addToast("Go Online First", "You must go online to register on the holding lot records.", "alert");
+                      return;
+                    }
+                    setJoinedAirportId(selectedAirport.id);
+                    setUserQueuePosition(selectedAirport.driversAheadDefault);
+                    sendNotification(`${selectedAirport.code} Queue Joined`, `Checked-in to FIFO waiting stack. Starting at position #${selectedAirport.driversAheadDefault}.`);
+                    addToast("Queue Joined", `You are checked-in to ${selectedAirport.code} holding lot. Position #${selectedAirport.driversAheadDefault}.`, "success");
+                    addDebugLog("success", `Registered in ${selectedAirport.code} FIFO records at Position #${selectedAirport.driversAheadDefault}.`);
+                  }}
+                  className={`w-full py-4 font-black text-xs uppercase tracking-widest rounded-xl transition-all active:scale-95 flex justify-center items-center gap-2 cursor-pointer ${
+                    hasAnyActiveQueueJoined
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-500'
+                      : 'bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20'
+                  }`}
+                >
+                  <CheckCircle2 size={14} />
+                  {hasAnyActiveQueueJoined ? 'Already queued in another airport' : 'JOIN WAITING QUEUE'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Flight Schedules Dynamic section */}
+      <div className="mb-4">
+        <h3 className="text-sm font-black uppercase tracking-widest mb-3 flex items-center gap-2">
+          <Plane size={16} className="text-blue-500" />
+          Arriving Flights Schedules
+        </h3>
+        <div className="space-y-3">
+          {selectedAirport.flights.map((flight, idx) => (
+            <div key={`${flight.flightNo}-${idx}`} className={`p-4 rounded-2xl border flex justify-between items-center ${
+              theme === 'dark' ? 'bg-white/5 border-white/5' : 'bg-white border-gray-100 shadow-sm'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center">
+                  <Plane size={18} className="rotate-90 shrink-0" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-extrabold text-sm">{flight.flightNo}</p>
+                    <span className="text-[7px] bg-blue-500/10 text-blue-500 px-1 py-0.5 rounded uppercase tracking-wider font-mono font-black">{flight.status}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-bold leading-normal">From {flight.origin}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs font-black text-blue-600 dark:text-blue-400 font-mono">
+                  {flight.etaMins === 1 ? 'Landing soon' : `in ${flight.etaMins} mins`}
+                </p>
+                <p className="text-[9px] text-gray-400 font-bold mt-0.5">{flight.passengers} passengers</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={`mt-6 p-4 rounded-2xl border flex items-start gap-3 border-orange-500/20 bg-orange-500/5 text-orange-500 text-xs font-bold leading-normal`}>
+        <AlertCircle size={16} className="shrink-0 mt-0.5" />
+        <p>Keep your app active while in the geofeed lot. Discharging your GPS or shutting off online modes will revoke your queue ticket instantly.</p>
+      </div>
+    </motion.div>
+  );
+};
+
 const DeliveryVerificationModal = ({ 
   order, 
   enteredPin, 
@@ -5464,6 +5847,40 @@ export default function App() {
     speed: 15 + Math.random() * 15
   });
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
+  const [joinedAirportId, setJoinedAirportId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem('hyper_driver_joined_airport_id');
+      return saved || null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [userQueuePosition, setUserQueuePosition] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('hyper_driver_user_queue_pos');
+      return saved ? parseInt(saved, 10) : 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (joinedAirportId) {
+        localStorage.setItem('hyper_driver_joined_airport_id', joinedAirportId);
+      } else {
+        localStorage.removeItem('hyper_driver_joined_airport_id');
+      }
+    } catch (e) {}
+  }, [joinedAirportId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('hyper_driver_user_queue_pos', String(userQueuePosition));
+    } catch (e) {}
+  }, [userQueuePosition]);
+
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const [earnings, setEarnings] = useState(() => {
     try {
@@ -8432,7 +8849,7 @@ export default function App() {
 
   // REAL BACKGROUND THREAD ENGINE: Web Worker & Audio Keep-Alive Link
   const triggerBackgroundOrderGeneration = React.useCallback(() => {
-    if (!user.isOnline || isOnBreak || pendingOrder || activeOrders.length >= 3) return;
+    if (!user.isOnline || isOnBreak || pendingOrder || activeOrders.length >= 3 || joinedAirportId !== null) return;
     
     let pctChance = 0.35; // Medium busyness default
     if (busynessMode === 'Low') {
@@ -8459,7 +8876,159 @@ export default function App() {
         addDebugLog('success', `Real Background thread generated trip matches: £${newOrder.estimatedPay.toFixed(2)} via Web Worker loop.`);
       }
     }
-  }, [user.isOnline, isOnBreak, pendingOrder === null, activeOrders.length, busynessMode, jobTypePreference, targetPrice, generateSmartOrder, sendNotification, playHyperSound, addDebugLog]);
+  }, [user.isOnline, isOnBreak, pendingOrder === null, activeOrders.length, busynessMode, jobTypePreference, targetPrice, generateSmartOrder, sendNotification, playHyperSound, addDebugLog, joinedAirportId]);
+
+  const generateAirportOrder = React.useCallback(() => {
+    if (!location || !joinedAirportId) return null;
+    
+    const airports = getAirportQueuesList(activeCityCenter);
+    const joined = airports.find(a => a.id === joinedAirportId) || airports[0];
+    
+    // Target coordinate typically piccadilly or city center
+    const destOffsetLat = (Math.random() - 0.5) * 0.012;
+    const destOffsetLng = (Math.random() - 0.5) * 0.012;
+    const customerLocation = {
+      latitude: activeCityCenter.latitude + destOffsetLat,
+      longitude: activeCityCenter.longitude + destOffsetLng
+    };
+    
+    const pickupLocation = {
+      latitude: activeCityCenter.latitude + joined.latOffset,
+      longitude: activeCityCenter.longitude + joined.lngOffset
+    };
+    
+    const tripDist = Math.sqrt(
+      Math.pow(customerLocation.latitude - pickupLocation.latitude, 2) + 
+      Math.pow(customerLocation.longitude - pickupLocation.longitude, 2)
+    ) * 69;
+    
+    const basePay = 18.50; // Premium base fee for airport
+    const mileageRate = 2.50;
+    const timeRate = 0.35;
+    const estTime = tripDist * 1.5;
+    const estPay = basePay + (tripDist * mileageRate) + (estTime * timeRate);
+    
+    const names = ["James Albright", "Clara Montgomery", "Sir Richard Davies", "Ambassador Novak", "Elena Romanov", "Marcus Sterling"];
+    const customerName = names[Math.floor(Math.random() * names.length)];
+    
+    const airportOrder: Order = {
+      id: `airport_order_${Date.now()}`,
+      type: 'ride',
+      customerName,
+      restaurantName: `${joined.code} Terminal ${Math.random() < 0.5 ? '2' : '5'} Dispatch`, // Serve passenger as "restaurant" for routing
+      pickupLocation, 
+      customerLocation,
+      estimatedPay: Math.round(estPay * 100) / 100,
+      estimatedDistance: Math.round((tripDist) * 10) / 10,
+      estimatedTime: Math.round(estTime),
+      status: 'pending',
+      items: ["Large Luggage Case x2", "Priority Business Bags", "Airport Parking Entry Paid"],
+      surge: 1.6 + Math.random() * 0.4,
+      isMatching: true
+    };
+    
+    return airportOrder;
+  }, [location, joinedAirportId, activeCityCenter]);
+
+  // Airport FIFO Queue Simulator Thread
+  const [outOfAirportGeofenceGraceTicks, setOutOfAirportGeofenceGraceTicks] = useState(0);
+
+  useEffect(() => {
+    if (!user.isOnline || !joinedAirportId) {
+      setOutOfAirportGeofenceGraceTicks(0);
+      return;
+    }
+
+    const airports = getAirportQueuesList(activeCityCenter);
+    const joined = airports.find(a => a.id === joinedAirportId);
+    if (!joined) return;
+
+    const airportCoords = {
+      latitude: activeCityCenter.latitude + joined.latOffset,
+      longitude: activeCityCenter.longitude + joined.lngOffset
+    };
+
+    const interval = setInterval(() => {
+      if (!location) return;
+
+      const dLat = location.latitude - airportCoords.latitude;
+      const dLng = location.longitude - airportCoords.longitude;
+      const dist = Math.sqrt(dLat * dLat + dLng * dLng) * 69;
+
+      const isInside = dist <= 0.008 * 69; // ~0.55 miles geofence limit
+
+      if (!isInside) {
+        setOutOfAirportGeofenceGraceTicks(prev => {
+          const next = prev + 1;
+          if (next >= 2) {
+            // Cancel queue position
+            setJoinedAirportId(null);
+            setUserQueuePosition(0);
+            addToast("Queue Revoked ⚠️", `You left the ${joined.code} holding area geofence. Position ticket revoked!`, "alert");
+            addDebugLog("error", `FIFO queue ticket revoked: left LHR/LGW wait area boundaries.`);
+            return 0;
+          } else {
+            addToast("Departure Warning ⚠️", `Return to LHR/LGW geofence holding lot immediately. 5 seconds until ticket is cancelled!`, "alert");
+            addDebugLog("warn", "Drifted outside airport waiting lot geofence coordinates.");
+            return next;
+          }
+        });
+        return;
+      }
+
+      // Inside geofence - reset grace period
+      setOutOfAirportGeofenceGraceTicks(0);
+
+      // Decrement queue position over time mock FIFO logic
+      setUserQueuePosition(prev => {
+        if (prev <= 1) {
+          // At front of high-priority dispatch!
+          if (!pendingOrder && activeOrders.length === 0) {
+            const airportOrder = generateAirportOrder();
+            if (airportOrder) {
+              setPendingOrder(airportOrder);
+              setOrderExpiryTimer(20);
+              sendNotification("✈️ Premium Airport Match", `VIP airport dispatch: £${airportOrder.estimatedPay.toFixed(2)} heading out of ${joined.code}!`);
+              addToast("Premium Dispatch", "You are dispatched to the terminal terminal! Accept premium ride now.", "success");
+              addDebugLog("success", `Matched high-paying airport customer from ${joined.code} holding lot.`);
+              speakNav(`Airport match available. High payout detected.`);
+              playHyperSound('order');
+            }
+          }
+          return 1;
+        }
+
+        // Progression rate
+        let spotsToAdvance = 1;
+        
+        // Random flight landing spike!
+        if (Math.random() < 0.15) {
+          const flightPrefixes = ["BA", "VS", "EZY", "LH", "UA"];
+          const flightPrefix = flightPrefixes[Math.floor(Math.random() * flightPrefixes.length)];
+          const flightNum = Math.floor(Math.random() * 800) + 100;
+          const randomSpots = Math.floor(Math.random() * 3) + 2; // progress 2 to 4 spots extra
+          
+          spotsToAdvance += randomSpots;
+          
+          addToast("Flight Landed ✈️", `Flight ${flightPrefix}${flightNum} arrived at ${joined.code}! Hold area processing is moving rapidly.`, "info");
+          addDebugLog("info", `Flight ${flightPrefix}${flightNum} arrived at ${joined.code}. Advanced extra ${randomSpots} in queue loop.`);
+        }
+
+        const nextPos = Math.max(1, prev - spotsToAdvance);
+        if (nextPos === 1) {
+          addToast("First in Queue 🥇", `You are next in line for airport dispatch at ${joined.code}. Keep parked!`, "success");
+        } else if (nextPos === 5 || nextPos === 3) {
+          addToast("Queue Alert", `Your queue position at ${joined.code} is #${nextPos}. Prepare for terminal departure.`, "info");
+        }
+        
+        addDebugLog("info", `Airport hold FIFO ticking: progressed queue to #${nextPos} in ${joined.code} lot.`);
+        return nextPos;
+      });
+
+    }, 6000);
+
+    return () => clearInterval(interval);
+  }, [user.isOnline, location, joinedAirportId, activeOrders.length, pendingOrder === null, activeCityCenter, generateAirportOrder]);
 
   const triggerFiveSecondBackgroundTest = React.useCallback(() => {
     addToast("Testing Real Alerts", "Close this browser tab or minimize your screen NOW. You will receive a real system push alert in 5 seconds!", "info");
@@ -8596,6 +9165,12 @@ export default function App() {
         const nextAcc = Math.min(100, prev.acceptanceRate + 1);
         return { ...prev, acceptanceRate: nextAcc };
       });
+
+      if (joinedAirportId) {
+        setJoinedAirportId(null);
+        setUserQueuePosition(0);
+        addToast("Airport Navigating ✈️", "Depart holding area. Proceeding to terminal pickup points.", "success");
+      }
 
       setPendingOrder(null);
       setOrderExpiryTimer(10);
@@ -11376,6 +11951,8 @@ export default function App() {
                 busynessMode={busynessMode}
                 globalSurge={globalSurge}
                 vigilanteAdActive={vigilanteAdActive}
+                joinedAirportId={joinedAirportId}
+                userQueuePosition={userQueuePosition}
               />
             )}
 
@@ -12922,7 +13499,7 @@ export default function App() {
                   </div>
                   <h4 className="font-black">Airport Queue</h4>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">LHR: 45-60 Cars • LGW: 10-15 Cars</p>
-                  <button className="mt-4 px-6 py-2 bg-black dark:bg-white dark:text-black text-white rounded-full text-xs font-black">VIEW QUEUE</button>
+                  <button onClick={() => setCurrentScreen('airport_queues')} className="mt-4 px-6 py-2 bg-black dark:bg-white dark:text-black text-white rounded-full text-xs font-black cursor-pointer hover:scale-105 transition-all">VIEW QUEUE</button>
                 </div>
               </div>
             </motion.div>
@@ -13730,6 +14307,28 @@ export default function App() {
               onClose={() => setCurrentScreen('account')}
               theme={theme}
               sendNotification={sendNotification}
+            />
+          )}
+
+          {currentScreen === 'airport_queues' && (
+            <AirportQueuesScreen 
+              onClose={() => setCurrentScreen('home')}
+              theme={theme}
+              location={location}
+              setLocation={setLocation}
+              isOnline={user.isOnline}
+              activeCityKey={activeCityKey}
+              activeCityCenter={activeCityCenter}
+              activeOrders={activeOrders}
+              joinedAirportId={joinedAirportId}
+              setJoinedAirportId={setJoinedAirportId}
+              userQueuePosition={userQueuePosition}
+              setUserQueuePosition={setUserQueuePosition}
+              setBusyAreaTarget={setBusyAreaTarget}
+              setIsNavigating={setIsNavigating}
+              sendNotification={sendNotification}
+              addToast={addToast}
+              addDebugLog={addDebugLog}
             />
           )}
 

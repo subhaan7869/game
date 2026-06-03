@@ -65,7 +65,7 @@ export interface ScheduledOrder {
   estimatedPay: number;
 }
 
-export type AppScreen = 'onboarding' | 'documents' | 'face_verification' | 'home' | 'earnings' | 'inbox' | 'account' | 'chat' | 'hyper_driver_pro' | 'wallet' | 'opportunities' | 'safety' | 'earnings_detail' | 'banking' | 'scheduled_orders' | 'rewards' | 'carplay_dashboard' | 'trip_history' | 'work_hub' | 'ratings' | 'planner' | 'hyper_driver_services' | 'vehicle_details' | 'payment_methods' | 'trip_preferences' | 'personal_details' | 'insurance' | 'audio_settings' | 'multiplayer_hub';
+export type AppScreen = 'onboarding' | 'documents' | 'face_verification' | 'home' | 'earnings' | 'inbox' | 'account' | 'chat' | 'hyper_driver_pro' | 'wallet' | 'opportunities' | 'safety' | 'earnings_detail' | 'banking' | 'scheduled_orders' | 'rewards' | 'carplay_dashboard' | 'trip_history' | 'work_hub' | 'ratings' | 'planner' | 'hyper_driver_services' | 'vehicle_details' | 'payment_methods' | 'trip_preferences' | 'personal_details' | 'insurance' | 'audio_settings' | 'multiplayer_hub' | 'airport_queues';
 
 export interface CompletedTrip {
   id: string;
