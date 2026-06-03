@@ -158,6 +158,8 @@ export interface UserProfile {
     plate: string;
     type: string;
     photo?: string;
+    taxiPlate?: string;
+    taxiPhone?: string;
   };
   vehiclesList?: {
     id: string;
@@ -168,6 +170,8 @@ export interface UserProfile {
     plate: string;
     type: string;
     photo?: string;
+    taxiPlate?: string;
+    taxiPhone?: string;
   }[];
   paymentMethods?: {
     id: string;

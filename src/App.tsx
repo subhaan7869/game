@@ -2639,7 +2639,9 @@ const VehicleDetailsScreen = ({
   fuel = 100,
   setFuel,
   vehicleHealth = 100,
-  setVehicleHealth
+  setVehicleHealth,
+  hyperXAutoQueue = false,
+  setHyperXAutoQueue
 }: { 
   user: UserProfile, 
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>,
@@ -2651,7 +2653,9 @@ const VehicleDetailsScreen = ({
   fuel: number,
   setFuel: React.Dispatch<React.SetStateAction<number>>,
   vehicleHealth: number,
-  setVehicleHealth: React.Dispatch<React.SetStateAction<number>>
+  setVehicleHealth: React.Dispatch<React.SetStateAction<number>>,
+  hyperXAutoQueue?: boolean,
+  setHyperXAutoQueue?: React.Dispatch<React.SetStateAction<boolean>>
 }) => {
   // Initialize vehicles from user.vehiclesList or fallback to user.vehicleInfo
   const [activeTab, setActiveTab] = useState<'vehicles' | 'upgrades'>('vehicles');
@@ -2668,7 +2672,9 @@ const VehicleDetailsScreen = ({
         plate: user.vehicleInfo.plate || '',
         type: user.vehicleInfo.type || 'Car',
         photo: user.vehicleInfo.photo || '',
-        insuranceExpiry: user.documentExpiries?.["Vehicle Insurance"] || ''
+        insuranceExpiry: user.documentExpiries?.["Vehicle Insurance"] || '',
+        taxiPlate: user.vehicleInfo.taxiPlate || '',
+        taxiPhone: user.vehicleInfo.taxiPhone || ''
       }];
     }
     return [];
@@ -2688,6 +2694,8 @@ const VehicleDetailsScreen = ({
   const [formType, setFormType] = useState('Car');
   const [formPhoto, setFormPhoto] = useState('');
   const [formInsurance, setFormInsurance] = useState('');
+  const [formTaxiPlate, setFormTaxiPlate] = useState('');
+  const [formTaxiPhone, setFormTaxiPhone] = useState('');
 
   // Pre-fill form when editing
   const startEdit = (veh: any) => {
@@ -2699,6 +2707,8 @@ const VehicleDetailsScreen = ({
     setFormType(veh.type);
     setFormPhoto(veh.photo || '');
     setFormInsurance(veh.insuranceExpiry || '');
+    setFormTaxiPlate(veh.taxiPlate || '');
+    setFormTaxiPhone(veh.taxiPhone || '');
     setIsFormOpen(true);
   };
 
@@ -2711,6 +2721,8 @@ const VehicleDetailsScreen = ({
     setFormType('Car');
     setFormPhoto('');
     setFormInsurance('');
+    setFormTaxiPlate('');
+    setFormTaxiPhone('');
     setIsFormOpen(true);
   };
 
@@ -2732,7 +2744,9 @@ const VehicleDetailsScreen = ({
             plate: formPlate.toUpperCase(),
             type: formType,
             photo: formPhoto,
-            insuranceExpiry: formInsurance
+            insuranceExpiry: formInsurance,
+            taxiPlate: formTaxiPlate,
+            taxiPhone: formTaxiPhone
           };
         }
         return v;
@@ -2747,7 +2761,9 @@ const VehicleDetailsScreen = ({
         plate: formPlate.toUpperCase(),
         type: formType,
         photo: formPhoto,
-        insuranceExpiry: formInsurance
+        insuranceExpiry: formInsurance,
+        taxiPlate: formTaxiPlate,
+        taxiPhone: formTaxiPhone
       };
       setVehiclesList(prev => [...prev, newVeh]);
       if (!activePlate) {
@@ -2793,7 +2809,9 @@ const VehicleDetailsScreen = ({
           year: selectedVeh.year,
           plate: selectedVeh.plate,
           type: selectedVeh.type,
-          photo: selectedVeh.photo || ''
+          photo: selectedVeh.photo || '',
+          taxiPlate: selectedVeh.taxiPlate || '',
+          taxiPhone: selectedVeh.taxiPhone || ''
         },
         vehiclesList: vehiclesList,
         documentExpiries: updatedExpiries
@@ -2963,6 +2981,29 @@ const VehicleDetailsScreen = ({
                     type="date" 
                     value={formInsurance}
                     onChange={e => setFormInsurance(e.target.value)}
+                    className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/5 focus:border-blue-500 text-white' : 'bg-white border-gray-100 focus:border-blue-500'}`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Taxi Plate ID / License No.</label>
+                  <input 
+                    type="text" 
+                    value={formTaxiPlate}
+                    onChange={e => setFormTaxiPlate(e.target.value)}
+                    placeholder="e.g. TX-PLATE-9921"
+                    className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-white/10 border-white/5 focus:border-blue-500 text-white' : 'bg-white border-gray-100 focus:border-blue-500'}`}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Taxi Plate Owner Phone</label>
+                  <input 
+                    type="tel" 
+                    value={formTaxiPhone}
+                    onChange={e => setFormTaxiPhone(e.target.value)}
+                    placeholder="e.g. +44 7911 123456"
                     className={`w-full p-4 rounded-2xl font-bold outline-none border-2 transition-all ${theme === 'dark' ? 'bg-[#1a1a1a] border-white/5 focus:border-blue-500 text-white' : 'bg-white border-gray-100 focus:border-blue-500'}`}
                   />
                 </div>
@@ -3225,6 +3266,14 @@ const VehicleDetailsScreen = ({
                             Insurance Exp: <span className="font-mono">{item.insuranceExpiry}</span>
                           </p>
                         )}
+                        {item.taxiPlate && (
+                          <p className="text-[9px] text-gray-400 mt-1 uppercase tracking-wider flex flex-wrap items-center gap-1">
+                            <span>🚕 Plate: <span className="font-mono text-amber-500 font-black">{item.taxiPlate}</span></span>
+                            {item.taxiPhone && (
+                              <span className="text-gray-500 font-medium">/ Phone: <span className="text-blue-400 font-mono font-bold">{item.taxiPhone}</span></span>
+                            )}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -3259,6 +3308,31 @@ const VehicleDetailsScreen = ({
                 );
               })}
             </div>
+          </div>
+
+          <div className={`p-6 rounded-[28px] border-2 border-dashed ${theme === 'dark' ? 'bg-[#18181c]/60 border-amber-500/20' : 'bg-amber-50/50 border-amber-200'} mt-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4`}>
+            <div className="flex-1 text-left">
+              <h4 className="font-extrabold text-lg text-black dark:text-white flex items-center gap-2">
+                <Zap size={20} className="text-amber-500 animate-pulse shrink-0" />
+                Hyper-X Back-to-Back Queue
+              </h4>
+              <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest mt-0.5 mb-1.5 font-mono">Continuous Queue Mode</p>
+              <p className="text-xs text-gray-500 font-bold leading-normal">
+                Pre-accept incoming matching jobs when approaching your existing drop-off location. Sequential route guidance ensures you deliver to existing passengers/packages first before navigating to new pickups.
+              </p>
+            </div>
+            {setHyperXAutoQueue && (
+              <button 
+                onClick={() => {
+                  setHyperXAutoQueue(prev => !prev);
+                }}
+                className={`w-14 h-8 shrink-0 rounded-full p-1 transition-all duration-300 cursor-pointer ${hyperXAutoQueue ? 'bg-amber-500' : 'bg-gray-300 dark:bg-zinc-800'}`}
+              >
+                <div className={`w-6 h-6 rounded-full bg-white shadow transform transition-transform duration-300 flex items-center justify-center ${hyperXAutoQueue ? 'translate-x-6' : 'translate-x-0'}`}>
+                  {hyperXAutoQueue && <Check size={12} className="text-amber-600 font-black" />}
+                </div>
+              </button>
+            )}
           </div>
 
           <button 
@@ -5361,6 +5435,21 @@ export default function App() {
   const BUILDING_SCALE = 6000 * zoom;
   const PARK_SCALE = 2000 * zoom;
 
+  const [hyperXAutoQueue, setHyperXAutoQueue] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('hyper_x_auto_queue');
+      return saved === 'true'; // default to false
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('hyper_x_auto_queue', String(hyperXAutoQueue));
+    } catch (e) {}
+  }, [hyperXAutoQueue]);
+
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [navSimulation, setNavSimulation] = useState<NavSimulation>({
     active: false,
@@ -6034,8 +6123,17 @@ export default function App() {
 
     const ordersReadyForDropoff = activeOrders.filter(o => o.status === 'picked_up');
 
-    // If there ARE pickups to do, we ONLY show pickups in the stop list to enforce "Pick up all before dropping off"
-    if (ordersNeedingPickup.length > 0) {
+    // If Hyper-X back-to-back queueing is enabled, we complete the active drop-off FIRST
+    // before routing towards the new pickup!
+    if (hyperXAutoQueue && ordersReadyForDropoff.length > 0 && ordersNeedingPickup.length > 0) {
+      ordersReadyForDropoff.forEach(order => {
+        stops.push({
+          orderId: order.id,
+          type: 'dropoff',
+          location: order.customerLocation,
+          label: order.type === 'ride' ? `Dropoff: Passenger` : `Deliver to: ${order.customerName}`
+        });
+      });
       ordersNeedingPickup.forEach(order => {
         stops.push({
           orderId: order.id,
@@ -6045,19 +6143,31 @@ export default function App() {
         });
       });
     } else {
-      // Only show dropoffs if all pickups are complete
-      ordersReadyForDropoff.forEach(order => {
-        stops.push({
-          orderId: order.id,
-          type: 'dropoff',
-          location: order.customerLocation,
-          label: order.type === 'ride' ? `Dropoff: Passenger` : `Deliver to: ${order.customerName}`
+      // If there ARE pickups to do, we ONLY show pickups in the stop list to enforce "Pick up all before dropping off"
+      if (ordersNeedingPickup.length > 0) {
+        ordersNeedingPickup.forEach(order => {
+          stops.push({
+            orderId: order.id,
+            type: 'pickup',
+            location: order.restaurantLocation || order.pickupLocation!,
+            label: order.type === 'ride' ? `Pickup: ${order.customerName}` : `Pickup: ${order.restaurantName || "Restaurant"}`
+          });
         });
-      });
+      } else {
+        // Only show dropoffs if all pickups are complete
+        ordersReadyForDropoff.forEach(order => {
+          stops.push({
+            orderId: order.id,
+            type: 'dropoff',
+            location: order.customerLocation,
+            label: order.type === 'ride' ? `Dropoff: Passenger` : `Deliver to: ${order.customerName}`
+          });
+        });
+      }
     }
 
     return stops;
-  }, [activeOrders]);
+  }, [activeOrders, hyperXAutoQueue]);
 
   const [busyAreaTarget, setBusyAreaTarget] = useState<{ id: string, name: string, location: Location } | null>(null);
 
@@ -7801,7 +7911,8 @@ export default function App() {
   }[]>([
     { id: '1', name: "Shoreditch", lat: 0.005, lng: 0.005, radius: 0.008, multiplier: 2.1, trend: 'stable', demand: 'High' },
     { id: '2', name: "Soho", lat: -0.005, lng: -0.008, radius: 0.006, multiplier: 1.5, trend: 'rising', demand: 'Medium' },
-    { id: '3', name: "King's Cross", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.1, trend: 'falling', demand: 'Low' }
+    { id: '3', name: "King's Cross", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.1, trend: 'falling', demand: 'Low' },
+    { id: 'fake_busy_area', name: "Piccadilly Hub (Fake Hotspot)", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising', demand: 'High' }
   ]);
   const [surgeMultiplier, setSurgeMultiplier] = useState(1.0);
   const [lastDetectedAreaName, setLastDetectedAreaName] = useState<string>('Shoreditch');
@@ -8284,6 +8395,40 @@ export default function App() {
     scheduleNextOrder();
     return () => clearTimeout(timer);
   }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference, targetPrice, busynessMode, isOnBreak, radarOrders.length]);
+
+  // Hyper-X Back-to-Back Queueing Simulator:
+  // Decides to offer a queued, back-to-back request when a driver is delivering and nearing their drop-off point.
+  useEffect(() => {
+    if (!user.isOnline || isOnBreak || pendingOrder) return;
+    if (!hyperXAutoQueue) return;
+
+    // Check if there is an active order being delivered
+    const activeDropoffOrder = activeOrders.find(o => o.status === 'picked_up');
+    if (!activeDropoffOrder) return;
+
+    // Determine if we are nearing the drop-off coordinate (either by simulation remaining distance or progress)
+    const isNearingDropoff = navSimulation.active && 
+      navSimulation.type === 'dropoff' && 
+      navSimulation.orderId === activeDropoffOrder.id &&
+      (navSimulation.distanceRemaining < 0.6 || navSimulation.progress > 0.6);
+
+    if (isNearingDropoff) {
+      const dispatchKey = `hxb2b_${activeDropoffOrder.id}`;
+      if (!sessionStorage.getItem(dispatchKey)) {
+        sessionStorage.setItem(dispatchKey, 'true');
+
+        setTimeout(() => {
+          const matchedOrder = generateSmartOrder();
+          if (matchedOrder) {
+            setPendingOrder(matchedOrder);
+            setOrderExpiryTimer(18);
+            sendNotification("Hyper-X Back-to-Back Match", `Queued match available: £${matchedOrder.estimatedPay.toFixed(2)} • ${matchedOrder.restaurantName || 'HyperX'}`);
+            addToast("Back-to-Back Offer", "You received a queued offer near your drop-off!", "success");
+          }
+        }, 1500);
+      }
+    }
+  }, [user.isOnline, isOnBreak, activeOrders, pendingOrder, navSimulation.active, navSimulation.distanceRemaining, navSimulation.progress, hyperXAutoQueue]);
 
   // REAL BACKGROUND THREAD ENGINE: Web Worker & Audio Keep-Alive Link
   const triggerBackgroundOrderGeneration = React.useCallback(() => {
@@ -12143,6 +12288,37 @@ export default function App() {
                 </div>
 
                 <div className={`p-6 rounded-[32px] border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 text-left">
+                      <h3 className="font-black text-xl mb-1 flex items-center gap-2 text-black dark:text-white">
+                        <Zap size={20} className="text-amber-500 animate-pulse shrink-0" />
+                        Hyper-X Back-to-Back
+                      </h3>
+                      <p className="text-xs font-black uppercase text-amber-500 tracking-widest mb-2 font-mono">Continuous Queue Mode</p>
+                      <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                        When nearing a drop-off, accept your next job early. Navigation remains restricted of the new job to the pickup, which only unlocks after your current drops off successfully.
+                      </p>
+                    </div>
+                    
+                    <button 
+                      onClick={() => {
+                        setHyperXAutoQueue(prev => {
+                          const val = !prev;
+                          sendNotification("Queue Status Updated", val ? "Hyper-X Back-to-Back queue active" : "Hyper-X Back-to-Back queue disabled");
+                          addToast("Hyper-X Preferences", val ? "Back-to-back queue active! Accept rides near dropoffs." : "Back-to-back queue inactive.", "success");
+                          return val;
+                        });
+                      }}
+                      className={`w-14 h-8 shrink-0 rounded-full p-1 transition-all duration-300 cursor-pointer ${hyperXAutoQueue ? 'bg-amber-500' : 'bg-gray-300 dark:bg-zinc-800'}`}
+                    >
+                      <div className={`w-6 h-6 rounded-full bg-white shadow transform transition-transform duration-300 flex items-center justify-center ${hyperXAutoQueue ? 'translate-x-6' : 'translate-x-0'}`}>
+                        {hyperXAutoQueue && <Check size={12} className="text-amber-600 font-black" />}
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div className={`p-6 rounded-[32px] border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-100'}`}>
                   <h3 className="font-black text-xl mb-1 flex items-center gap-2">
                     <SlidersHorizontal size={20} className="text-blue-500" />
                     Marketplace Service Toggles
@@ -12583,6 +12759,48 @@ export default function App() {
                   </div>
                 </div>
 
+                <div className={`p-6 rounded-[28px] border-2 border-dashed ${theme === 'dark' ? 'bg-[#18181c] border-amber-500/20' : 'bg-amber-50/50 border-amber-200'} mb-4 flex flex-col justify-between items-start gap-3`}>
+                  <div>
+                    <div className="flex items-center gap-2 text-amber-500 mb-1">
+                      <Zap size={18} className="animate-bounce shrink-0" />
+                      <span className="font-extrabold uppercase text-xs tracking-wider">Simulated Hotspot Testing Center</span>
+                    </div>
+                    <p className={`font-black text-lg ${theme === 'dark' ? 'text-white' : 'text-gray-950'}`}>Piccadilly Hub (Fake Hotspot)</p>
+                    <p className="text-xs text-gray-500 font-bold leading-normal mt-1">
+                      Instantly configure GPS simulation path towards the London Piccadilly core. High quality simulation triggers massive 3.5x surge rates and rapid trip rates upon arrival.
+                    </p>
+                  </div>
+                  {activeOrders.length > 0 ? (
+                    <span className="text-[11px] font-black text-red-500 uppercase tracking-widest mt-2 bg-red-500/10 px-3 py-1.5 rounded-xl">
+                      ⚠️ Complete active orders first to navigate busy region
+                    </span>
+                  ) : (
+                    <button 
+                      onClick={() => {
+                        const busyAreaLocation = {
+                          latitude: activeCityCenter.latitude + 0.015,
+                          longitude: activeCityCenter.longitude + 0.012
+                        };
+                        setBusyAreaTarget({
+                          id: 'fake_busy_area',
+                          name: "Piccadilly Hub (Fake Hotspot)",
+                          location: busyAreaLocation
+                        });
+                        setIsNavigating(true);
+                        setMapOffset({ x: 0, y: 0 }); // reset
+                        setIsBottomMenuOpen(false); // close panel
+                        setCurrentScreen('home'); // redirect to home map
+                        addToast("Simulation Directed", "Simulated vehicle path redirected to Piccadilly Fake Busy Region.", "success");
+                        sendNotification("Driving to Piccadilly", "Target coordinate shifted to 3.5x surge epicenter.");
+                      }}
+                      className="w-full mt-2 py-3.5 px-5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Navigation size={13} className="rotate-45 shrink-0" />
+                      🚀 NAVIGATE TO FAKE BUSY AREA
+                    </button>
+                  )}
+                </div>
+
                 {activeSurgeAreas.map((area) => (
                   <div key={area.id} className={`p-6 rounded-3xl border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-blue-50 border-blue-100'}`}>
                     <div className="flex items-center justify-between mb-2">
@@ -12801,6 +13019,8 @@ export default function App() {
               setFuel={setFuel}
               vehicleHealth={vehicleHealth}
               setVehicleHealth={setVehicleHealth}
+              hyperXAutoQueue={hyperXAutoQueue}
+              setHyperXAutoQueue={setHyperXAutoQueue}
             />
           )}
 
