@@ -111,6 +111,7 @@ import { InteractiveMap } from './components/InteractiveMap';
 import { EarningsDetail } from './components/EarningsDetail';
 import { WebAnalyticsDashboard } from './components/WebAnalyticsDashboard';
 import SimulatedHomeScreen from './components/SimulatedHomeScreen';
+import { CompanionChat } from './components/CompanionChat';
 import { MultiplayerHub, OtherDriver } from './components/MultiplayerHub';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -708,186 +709,180 @@ const NewDashboard = ({
   joinedAirportId: string | null,
   userQueuePosition: number
 }) => {
-  const greeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  };
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const stats = user.earningsStats || { daily: 0, weekly: 0, monthly: 0, ytd: 0 };
 
   return (
-    <div className="h-full w-full bg-gray-50 flex flex-col font-sans overflow-y-auto no-scrollbar pb-32">
-      {/* Header */}
-      <div className="px-6 pt-12 pb-6 flex items-center justify-between">
-        <div className="bg-black/95 py-2 px-4 rounded-2xl flex items-center shadow-lg shadow-black/10 select-none hover:scale-[1.01] transition-transform">
-          <HyperDriverLogo size="sm" />
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="w-10 h-10 bg-white shadow-sm border border-gray-100 rounded-full flex items-center justify-center text-gray-700 active:scale-90 transition-transform">
-            <Camera size={20} />
+    <div className="h-full w-full bg-[#0a0a0c] flex flex-col font-sans overflow-hidden relative select-none">
+      
+      {/* 3D-Look Navigation Coordinate Map Backdrop */}
+      <div className="absolute inset-0 z-0">
+        <svg className="w-full h-full opacity-45 transform scale-105" xmlns="http://www.w3.org/2000/svg">
+          {/* Grid Background Lines */}
+          <defs>
+            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)" />
+
+          {/* Glowing City Roads */}
+          {/* Main Expressway */}
+          <path d="M-50,220 C200,300 400,380 850,460" stroke="#1e1e24" strokeWidth="14" fill="none" strokeLinecap="round" />
+          <path d="M-50,220 C200,300 400,380 850,460" stroke="#121215" strokeWidth="8" strokeDasharray="16 12" fill="none" strokeLinecap="round" />
+          
+          {/* Inner highways */}
+          <path d="M120,-20 L150,900" stroke="#18181c" strokeWidth="6" fill="none" />
+          <path d="M350,-50 L280,850" stroke="#16161a" strokeWidth="5" fill="none" />
+          <path d="M-10,550 L750,380" stroke="#1e1e24" strokeWidth="7" fill="none" />
+          <path d="M220,100 C340,320 180,620 420,950" stroke="#18181c" strokeWidth="6" fill="none" strokeLinecap="round" />
+          
+          {/* Dynamic Map Navigation Cursor (Electric Blue Triangle with Pulsing Radiance) */}
+          <circle cx="280" cy="390" r="34" fill="rgba(34,197,94,0.06)" className="animate-pulse" />
+          <circle cx="280" cy="390" r="16" fill="rgba(34,197,94,0.12)" />
+          <polygon points="280,378 271,398 280,393 289,398" fill="#22c55e" className="shadow-lg" />
+          
+          {/* HOT ZONE Neon Amber/Crimson Pulsing Glyphs */}
+          <g className="cursor-pointer" onClick={() => setCurrentScreen('opportunities')}>
+            <circle cx="160" cy="180" r="48" fill="rgba(239,68,68,0.05)" className="animate-pulse" />
+            <circle cx="160" cy="180" r="34" fill="none" stroke="rgba(239,68,68,0.15)" strokeWidth="1.5" strokeDasharray="5 3" />
+            <circle cx="160" cy="180" r="4" fill="#ef4444" />
+            <rect x="110" y="145" width="100" height="24" rx="12" fill="rgba(239,68,68,0.95)" className="shadow-lg" />
+            <text x="160" y="161" fill="#ffffff" fontSize="10" fontWeight="900" textAnchor="middle" className="font-display tracking-wider">HOT ZONE</text>
+            <text x="160" y="212" fill="#ffffff" fontSize="14" fontWeight="900" textAnchor="middle" className="font-display tracking-wide glow-text">+£3.00</text>
+          </g>
+          
+          <g className="cursor-pointer" onClick={() => setCurrentScreen('opportunities')}>
+            <circle cx="520" cy="510" r="64" fill="rgba(249,115,22,0.04)" />
+            <circle cx="520" cy="510" r="42" fill="none" stroke="rgba(249,115,22,0.1)" strokeWidth="1.5" strokeDasharray="4 4" />
+            <circle cx="520" cy="510" r="4" fill="#f97316" />
+            <rect x="470" y="475" width="100" height="24" rx="12" fill="rgba(249,115,22,0.95)" className="shadow-lg" />
+            <text x="520" y="491" fill="#ffffff" fontSize="10" fontWeight="900" textAnchor="middle" className="font-display tracking-wider">HOT ZONE</text>
+            <text x="520" y="542" fill="#ffffff" fontSize="14" fontWeight="900" textAnchor="middle" className="font-display tracking-wide">+£2.00</text>
+          </g>
+        </svg>
+      </div>
+
+      {/* Top Vignette and Scanline Overlays */}
+      <div className="absolute inset-0 bg-transparent pointer-events-none z-10">
+        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-black/90" />
+      </div>
+
+      {/* Premium Screen Content */}
+      <div className="relative z-20 flex-1 flex flex-col justify-between h-full">
+        
+        {/* Header Block */}
+        <div className="px-6 pt-12 pb-4 flex items-center justify-between">
+          {/* Side Drawer Toggle button */}
+          <button 
+            onClick={() => setCurrentScreen('account')} 
+            className="w-11 h-11 bg-[#18181b]/90 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/5 active:scale-90 transition-transform shadow-xl shrink-0"
+          >
+            <Menu size={22} />
           </button>
-          <button onClick={() => setCurrentScreen('opportunities')} className="w-10 h-10 bg-white shadow-sm border border-gray-100 rounded-full flex items-center justify-center text-gray-700 active:scale-90 transition-transform">
-            <MapPin size={20} />
+
+          {/* Central Branded Header */}
+          <div className="flex items-center gap-1.5 select-none font-display">
+            <span className="text-xl font-bold tracking-tight text-white uppercase">HYPER</span>
+            <span className="text-xl font-extrabold tracking-tight text-[#22c55e] uppercase">DRIVER</span>
+          </div>
+
+          {/* Right Notifications Bell button */}
+          <button 
+            onClick={() => {
+              setShowNotifications(!showNotifications);
+              setCurrentScreen('inbox');
+            }} 
+            className="w-11 h-11 bg-[#18181b]/90 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/5 active:scale-95 transition-transform shadow-xl relative shrink-0"
+          >
+            <Bell size={20} />
+            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full animate-ping" />
+            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full" />
           </button>
-          <button onClick={() => setCurrentScreen('account')} className="w-10 h-10 bg-white shadow-sm border border-gray-100 rounded-full flex items-center justify-center text-gray-700 active:scale-90 transition-transform">
-            <Settings size={20} />
-          </button>
         </div>
-      </div>
 
-      {/* Greeting */}
-      <div className="px-6 mb-8">
-        <h2 className="text-2xl font-black text-gray-800">{greeting()}, {user.name.split(' ')[0]}</h2>
-        <p className="text-gray-500 font-bold">Ready to hit the road?</p>
-      </div>
-
-      {/* Vigilante Sponsor Banner */}
-      {vigilanteAdActive && (
-        <motion.div 
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          className="px-6 mb-8"
-        >
-          <div className="bg-gradient-to-r from-blue-900 via-blue-950 to-black p-5 rounded-[28px] border border-blue-500/30 flex items-center justify-between shadow-xl relative overflow-hidden group">
-             <div className="absolute inset-0 bg-blue-600/5 backdrop-blur-sm opacity-50" />
-             <div className="flex items-center gap-4 relative z-10">
-                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]">
-                   <ShieldCheck size={28} />
-                </div>
-                <div>
-                   <h4 className="text-white font-black text-xs uppercase tracking-[0.2em] mb-1">Vigilante Sponsor</h4>
-                   <p className="text-blue-400 text-[10px] font-bold">Ad detected: +£5.00 sponsorship bonus</p>
-                </div>
-             </div>
-             <motion.div 
-               animate={{ scale: [1, 1.1, 1] }} 
-               transition={{ repeat: Infinity, duration: 2 }} 
-               className="px-4 py-2 bg-blue-600 text-white rounded-2xl font-black text-xs relative z-10 shadow-lg"
-             >
-                £5 BONUS
-             </motion.div>
+        {/* Offline Status Dropdown Selection Overlay */}
+        <div className="flex justify-center mt-3">
+          <div className="bg-[#121214]/90 backdrop-blur-md border border-white/5 rounded-full px-5 py-2 flex items-center gap-2.5 shadow-xl">
+            <span className="w-2.5 h-2.5 rounded-full bg-neutral-500 shadow-[0_0_8px_rgba(115,115,115,0.7)]" />
+            <span className="text-white font-black text-xs uppercase tracking-[0.1em]">You're offline</span>
+            <ChevronDown size={14} className="text-gray-400" />
           </div>
-        </motion.div>
-      )}
+        </div>
 
-      {/* GO Button */}
-      <div className="px-6 mb-10">
-        <button 
-          onClick={startShift}
-          className="w-full py-8 bg-blue-600 text-white rounded-3xl shadow-[0_20px_50px_rgba(37,99,235,0.3)] flex flex-col items-center justify-center active:scale-95 transition-all group"
-        >
-          <span className="text-4xl font-black tracking-tight mb-1">GO</span>
-          <span className="text-[10px] font-black uppercase tracking-widest opacity-60">GO ONLINE</span>
-        </button>
-      </div>
+        {/* Dynamic Helpful Quick Hub Information */}
+        <div className="flex-1 flex flex-col justify-center px-6 text-center transform -translate-y-4">
+          <p className="text-gray-400 font-display text-sm font-black uppercase tracking-[0.2em] mb-1">Status Overview</p>
+          <h2 className="text-3xl font-black text-white leading-none tracking-tight mb-2 uppercase">Go online to receive orders</h2>
+          <p className="text-gray-500 font-bold text-xs max-w-xs mx-auto">High priority request matching is active in your area with additional surge multipliers.</p>
+        </div>
 
-      {/* Quick Stats Grid */}
-      <div className="px-6 mb-8 grid grid-cols-3 gap-3">
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-          <p className="text-lg font-black tracking-tight text-gray-800">£24-32/hr 🔥</p>
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-tight mt-1">High Demand Now</p>
-        </div>
-        <div onClick={() => setCurrentScreen('rewards')} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm cursor-pointer active:scale-95 transition-transform">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Next Quest</p>
-          <p className="text-xs font-black text-gray-800 leading-tight">Complete 4 Trips, Earn <span className="text-blue-600">£40</span></p>
-        </div>
-        <div onClick={() => setCurrentScreen('earnings_detail')} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm cursor-pointer active:scale-95 transition-transform">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">This Week</p>
-          <p className="text-lg font-black text-gray-800">£{stats.weekly.toFixed(2)}</p>
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{user.deliveries} TRIPS</p>
-        </div>
-      </div>
+        {/* Bottom Panel Overlay Drawer Sheet */}
+        <div className="w-full bg-[#121214] border-t border-white/5 rounded-t-[40px] px-6 pt-5 pb-8 shadow-[0_-15px_40px_rgba(0,0,0,0.6)] shrink-0 flex flex-col gap-5">
+          <div className="w-12 h-1 rounded-full bg-white/10 mx-auto mb-1" />
 
-      {/* Opportunity Card */}
-      <div className="px-6 mb-8">
-        <div className="flex items-center justify-between mb-3 px-2">
-          <h3 className="text-sm font-black uppercase tracking-widest text-gray-800">Nearby Opportunities</h3>
-          <ChevronRight size={18} className="text-gray-400" />
-        </div>
-        <div className="bg-white rounded-[32px] overflow-hidden border border-gray-100 shadow-sm p-2">
-           <div className="h-40 bg-gray-100 rounded-[28px] relative overflow-hidden">
-              <div className="absolute inset-0 bg-[#f0ece1]" style={{ backgroundImage: 'radial-gradient(circle, #e4e1d5 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
-                {/* Simplified surge map look */}
-                <div className="absolute top-4 left-10 w-32 h-32 bg-orange-500/20 rounded-full blur-2xl animate-pulse" />
-                <div className="absolute bottom-4 right-10 w-24 h-24 bg-blue-500/20 rounded-full blur-xl" />
+          {/* Today's Earning Summary info row - Premium Layout */}
+          <div className="flex justify-between items-center bg-[#1c1c1e] p-5 rounded-[28px] border border-white/5 shadow-inner">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white/5 text-[#22c55e] rounded-2xl flex items-center justify-center shrink-0">
+                <TrendingUp size={22} className="animate-pulse" />
               </div>
-              
-              {/* Surge Tag */}
-              <div className="absolute top-10 left-10 scale-90">
-                <div className="bg-orange-500 text-white px-4 py-3 rounded-2xl font-black text-sm shadow-xl flex flex-col items-center">
-                  <span>Surge +£2.50</span>
-                  <span className="text-[8px] uppercase tracking-widest opacity-80">Extra</span>
+              <div className="text-left">
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none mb-1.5">Today's Earnings</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-black text-white leading-none">£{earnings.toFixed(2)}</span>
+                  <span className="text-[10px] font-bold text-gray-400">0 Deliveries</span>
                 </div>
               </div>
+            </div>
+            
+            <button 
+              onClick={() => setCurrentScreen('earnings_detail')} 
+              className="w-10 h-10 bg-white/5 text-gray-300 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
 
-              {/* Airport Tag */}
-              <div 
-                onClick={() => setCurrentScreen('airport_queues')}
-                className="absolute bottom-10 right-8 scale-90 cursor-pointer hover:scale-105 active:scale-95 transition-all"
-              >
-                <div className="bg-white p-3 rounded-2xl shadow-xl flex items-center gap-3 border border-gray-100 text-black">
-                  <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white">
-                    <Plane size={20} />
-                  </div>
-                  <div>
-                    <h4 className="font-black text-xs">Airport Queue</h4>
-                    <p className="text-[9px] font-bold text-gray-400">
-                      {joinedAirportId ? `Joined: #${userQueuePosition}` : 'Tap to View Queues'}
-                    </p>
-                  </div>
-                </div>
+          {/* Quick Informative Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <div 
+              onClick={() => setCurrentScreen('opportunities')}
+              className="bg-[#1c1c1e] p-4 rounded-2xl border border-white/5 text-left active:scale-95 transition-transform cursor-pointer"
+            >
+              <div className="flex justify-between items-center mb-1">
+                <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest leading-none">Next Quest</p>
+                <ChevronRight size={12} className="text-gray-500" />
               </div>
-           </div>
-           <button onClick={() => setCurrentScreen('rewards')} className="w-full py-4 text-center text-blue-600 font-black text-xs uppercase tracking-widest border-t border-gray-50 flex items-center justify-center gap-2 mt-1">
-             VIEW QUESTS & PROMOS
-             <ChevronRight size={14} />
-           </button>
-        </div>
-      </div>
+              <p className="text-xs font-black text-white">4 Trips for <span className="text-[#22c55e]">£40</span></p>
+            </div>
 
-      {/* Quick Action Tiles */}
-      <div className="px-6 mb-8 grid grid-cols-2 gap-4">
-        <button onClick={() => setCurrentScreen('trip_preferences')} className="bg-white p-6 rounded-[28px] border border-gray-100 shadow-sm flex flex-col items-start active:scale-95 transition-all text-left group">
-          <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-800 mb-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-            <Target size={24} />
-          </div>
-          <h4 className="font-black text-sm mb-1">Set a Destination</h4>
-          <p className="text-[10px] font-bold text-gray-400">Get trips towards a location</p>
-        </button>
-        <button onClick={() => setCurrentScreen('rewards')} className="bg-white p-6 rounded-[28px] border border-gray-100 shadow-sm flex flex-col items-start active:scale-95 transition-all text-left group">
-          <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-800 mb-4 group-hover:bg-green-600 group-hover:text-white transition-colors">
-            <FileText size={24} />
-          </div>
-          <h4 className="font-black text-sm mb-1">Quests & Challenges</h4>
-          <p className="text-[10px] font-bold text-gray-400">Complete trips, earn bonuses</p>
-        </button>
-      </div>
-
-      {/* Bottom Earnings Row */}
-      <div className="px-6 mb-12">
-        <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Today's Earnings</p>
-            <div className="flex items-end gap-2">
-              <span className="text-2xl font-black text-gray-800">£{earnings.toFixed(2)}</span>
-              <button onClick={() => setCurrentScreen('earnings_detail')} className="text-blue-600 text-[10px] font-black uppercase tracking-widest border-b border-blue-600 mb-1">SEE DETAILS</button>
+            <div 
+              onClick={() => setCurrentScreen('airport_queues')}
+              className="bg-[#1c1c1e] p-4 rounded-2xl border border-white/5 text-left active:scale-95 transition-transform cursor-pointer"
+            >
+              <div className="flex justify-between items-center mb-1">
+                <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest leading-none">Airport Queue</p>
+                <Plane size={11} className="text-[#22c55e]" />
+              </div>
+              <p className="text-xs font-black text-white">
+                {joinedAirportId ? `No. ${userQueuePosition}` : 'Tap to View'}
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button onClick={() => setCurrentScreen('ratings')} className="flex items-center gap-1 bg-gray-50 border border-gray-100 px-3 py-2 rounded-full active:scale-90 transition-transform">
-              <User size={16} className="text-gray-400" />
-              <span className="text-xs font-black text-gray-500">Ratings</span>
-              <span className="text-xs font-black text-gray-800 ml-1">{user.rating.toFixed(1)}</span>
-            </button>
-            <button onClick={() => setCurrentScreen('account')} className="flex items-center gap-1 bg-gray-50 border border-gray-100 px-3 py-2 rounded-full active:scale-90 transition-transform">
-              <SlidersHorizontal size={16} className="text-gray-400" />
-              <span className="text-xs font-black text-gray-500">Account</span>
-            </button>
-          </div>
+          {/* Large Neon Green Go Online Button */}
+          <button 
+            onClick={startShift}
+            className="w-full py-5 bg-[#22c55e] hover:bg-[#1fbd52] text-black rounded-2xl font-black text-base uppercase tracking-widest flex items-center justify-center gap-3 shadow-[0_12px_28px_rgba(34,197,94,0.3)] hover:shadow-[0_16px_36px_rgba(34,197,94,0.45)] transition-all active:scale-95 duration-300 group"
+          >
+            <Navigation size={18} fill="currentColor" className="transform rotate-45 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            GO ONLINE
+          </button>
+          
         </div>
+
       </div>
     </div>
   );
@@ -906,7 +901,8 @@ const SideMenu = ({
   earnings,
   earningsGoal,
   setEarningsGoal,
-  busynessMode
+  busynessMode,
+  endShift
 }: { 
   user: UserProfile, 
   setIsSideMenuOpen: (val: boolean) => void,
@@ -920,129 +916,161 @@ const SideMenu = ({
   earnings: number,
   earningsGoal: number,
   setEarningsGoal: (val: number) => void,
-  busynessMode: 'Low' | 'Medium' | 'High'
-}) => (
-  <motion.div 
-    initial={{ x: '-100%' }}
-    animate={{ x: 0 }}
-    exit={{ x: '-100%' }}
-    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-    className="fixed left-0 top-0 bottom-0 w-[85%] max-w-[320px] z-[2000] bg-black text-white flex flex-col shadow-[20px_0_60px_rgba(0,0,0,0.5)] border-r border-white/10"
-    onClick={(e) => e.stopPropagation()}
-  >
-    <div className="p-8 pt-12 flex-1 overflow-y-auto custom-scrollbar">
-      {/* User Card */}
-      <div className="bg-white/5 rounded-[40px] p-6 mb-8 border border-white/5">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="w-16 h-16 rounded-full border-2 border-blue-500 p-0.5 shadow-lg shadow-blue-500/20">
-            <img src={user.profilePic || "https://picsum.photos/seed/driver/100/100"} alt="Profile" className="w-full h-full object-cover rounded-full" />
-          </div>
-          <div>
-            <h3 className="font-display text-2xl font-black tracking-tight">{user.name}</h3>
-            <div className="flex items-center gap-1 text-xs font-black text-blue-500 uppercase tracking-widest mt-1">
-              <Star size={12} fill="currentColor" />
-              <span>{user.rating}</span>
-              <span className="mx-1 opacity-30 text-white">•</span>
-              <span>{user.tier}</span>
+  busynessMode: 'Low' | 'Medium' | 'High',
+  endShift: () => void
+}) => {
+  return (
+    <motion.div 
+      initial={{ x: '-100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '-100%' }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      className="fixed left-0 top-0 bottom-0 w-[85%] max-w-[320px] z-[2000] bg-[#0c0d10] text-white flex flex-col shadow-[20px_0_60px_rgba(0,0,0,0.6)] border-r border-white/5"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="p-6 pt-10 flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+        {/* User Card - Clickable Header to Account details */}
+        <div 
+          onClick={() => {
+            setCurrentScreen('account');
+            setIsSideMenuOpen(false);
+          }}
+          className="flex items-center justify-between p-4 bg-white/[0.03] border border-white/5 rounded-3xl mb-8 cursor-pointer hover:bg-white/[0.06] active:scale-[0.98] transition-all"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full border border-white/10 p-0.5 relative shrink-0">
+              <img 
+                src={user.profilePic || "https://picsum.photos/seed/driver/100/100"} 
+                alt="Profile" 
+                className="w-full h-full object-cover rounded-full" 
+              />
+              <div className="absolute -bottom-1 -right-1 bg-yellow-500 border border-black rounded-full p-1 leading-none shadow-md">
+                <Star size={8} fill="currentColor" className="text-black" />
+              </div>
+            </div>
+            <div className="text-left">
+              <h3 className="font-display text-lg font-black text-white leading-tight tracking-tight uppercase">
+                {user.name}
+              </h3>
+              <div className="flex items-center gap-1.5 mt-1 text-[11px] font-black tracking-wide uppercase">
+                <span className="text-yellow-500">{user.tier || "Gold"} Driver</span>
+                <span className="text-white/20">•</span>
+                <span className="text-gray-300 font-bold">{user.rating.toFixed(2)} ★</span>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="grid grid-cols-3 gap-2">
-          <div className="p-3 bg-white/5 rounded-2xl text-center">
-            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Today</p>
-            <p className="text-lg font-black">{user.deliveriesToday || 0}</p>
-          </div>
-          <div className="p-3 bg-white/5 rounded-2xl text-center">
-            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Lifetime</p>
-            <p className="text-lg font-black">{user.lifetimeTrips || user.deliveries || 0}</p>
-          </div>
-          <div className="p-3 bg-white/5 rounded-2xl text-center">
-            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">XP</p>
-            <p className="text-lg font-black">{Math.floor(user.experience || 0)}</p>
-          </div>
+          <ChevronRight size={18} className="text-gray-500" />
         </div>
 
-        {user.badges && user.badges.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {user.badges.map((badge, i) => (
-              <div key={`profile-badge-${i}`} className="px-2 py-1 bg-blue-600/20 border border-blue-500/20 rounded-lg text-[8px] font-black uppercase text-blue-500 tracking-widest">
-                {badge}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-4 p-3 bg-white/5 rounded-2xl flex items-center justify-between border border-white/5">
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full animate-pulse ${busynessMode === 'High' ? 'bg-orange-500' : 'bg-blue-500'}`} />
-            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Demand</span>
-          </div>
-          <span className={`text-[10px] font-black uppercase tracking-widest ${busynessMode === 'High' ? 'text-orange-500' : busynessMode === 'Medium' ? 'text-blue-400' : 'text-gray-500'}`}>
-            {busynessMode}
-          </span>
+        {/* Menu Navigation Items matching screen 06. HOME MENU in Image 3 */}
+        <div className="space-y-1 mb-8">
+          {[
+            { 
+              icon: <Mail size={20} />, 
+              label: "Inbox", 
+              action: () => { setCurrentScreen('inbox'); setIsSideMenuOpen(false); },
+              badge: <div className="ml-auto w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.8)] animate-pulse" />
+            },
+            { 
+              icon: <TrendingUp size={20} />, 
+              label: "Earnings", 
+              action: () => { setCurrentScreen('earnings_detail'); setIsSideMenuOpen(false); } 
+            },
+            { 
+              icon: <History size={20} />, 
+              label: "Trips", 
+              action: () => { setCurrentScreen('trip_history'); setIsSideMenuOpen(false); } 
+            },
+            { 
+              icon: <Gift size={20} />, 
+              label: "Promotions", 
+              action: () => { setCurrentScreen('opportunities'); setIsSideMenuOpen(false); } 
+            },
+            { 
+              icon: <CreditCard size={20} />, 
+              label: "Wallet", 
+              action: () => { setCurrentScreen('wallet'); setIsSideMenuOpen(false); },
+              badge: <span className="ml-auto text-xs font-mono font-black text-gray-400">£{(user.walletBalance || 45.20).toFixed(2)}</span>
+            },
+          ].map((item, i) => (
+            <button 
+              key={`side-menu-item-new-${i}`}
+              onClick={item.action}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl transition-all hover:bg-white/[0.04] text-gray-300 hover:text-white group active:scale-98 text-left"
+            >
+              <div className="text-[#22c55e] opacity-85 group-hover:opacity-100 transition-opacity">{item.icon}</div>
+              <span className="font-bold text-sm tracking-tight text-white/90 group-hover:text-white transition-colors">{item.label}</span>
+              {item.badge}
+            </button>
+          ))}
         </div>
-      </div>
 
-      {/* Quick Stats Grid */}
-      <div className="grid grid-cols-2 gap-3 mb-10">
-        <button onClick={() => { setCurrentScreen('earnings'); setIsSideMenuOpen(false); }} className="flex flex-col items-center justify-center gap-2 p-5 bg-white/5 rounded-3xl active:scale-95 transition-all border border-white/5 hover:bg-white/10 text-center">
-          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-600/20">
-            <TrendingUp size={20} />
-          </div>
-          <span className="text-[10px] font-black uppercase tracking-widest">Earnings</span>
-        </button>
-        <button onClick={() => { setCurrentScreen('account'); setIsSideMenuOpen(false); }} className="flex flex-col items-center justify-center gap-2 p-5 bg-white/5 rounded-3xl active:scale-95 transition-all border border-white/5 hover:bg-white/10 text-center">
-          <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center shadow-lg shadow-purple-600/20">
-            <User size={20} />
-          </div>
-          <span className="text-[10px] font-black uppercase tracking-widest">Account</span>
-        </button>
-      </div>
+        {/* Divider line */}
+        <div className="h-[1px] bg-white/5 w-full mb-6" />
 
-      {/* Menu Items */}
-      <div className="space-y-1 mb-10">
-        {[
-          { icon: <Zap size={20} />, label: "Work Hub", screen: 'hyper_driver_services' },
-          { icon: <Mail size={20} />, label: "Inbox", screen: 'inbox' },
-          { icon: <Clock size={20} />, label: "Scheduled", screen: 'scheduled_orders' },
-          { icon: <History size={20} />, label: "Trip History", screen: 'trip_history' },
-          { icon: <Target size={20} />, label: "Rewards", screen: 'hyper_driver_pro' },
-          { icon: <Gift size={20} />, label: "Promotions", screen: 'opportunities' },
-          { icon: <Shield size={20} />, label: "Safety", screen: 'safety' },
-          { icon: <Smartphone size={20} />, label: isCarPlaySynced ? "CarPlay Active" : "Sync CarPlay", action: () => setIsCarPlaySynced(!isCarPlaySynced), active: isCarPlaySynced },
-        ].map((item, i) => (
+        {/* Secondary lists */}
+        <div className="space-y-1">
+          {[
+            { 
+              icon: <User size={20} />, 
+              label: "Account", 
+              action: () => { setCurrentScreen('account'); setIsSideMenuOpen(false); } 
+            },
+            { 
+              icon: <Shield size={20} />, 
+              label: "Help", 
+              action: () => { setCurrentScreen('safety'); setIsSideMenuOpen(false); } 
+            },
+            { 
+              icon: <Settings size={20} />, 
+              label: "Settings", 
+              action: () => { setCurrentScreen('trip_preferences'); setIsSideMenuOpen(false); } 
+            },
+          ].map((item, i) => (
+            <button 
+              key={`side-menu-item-sec-${i}`}
+              onClick={item.action}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl transition-all hover:bg-white/[0.04] text-gray-400 hover:text-white group active:scale-98 text-left"
+            >
+              <div className="text-gray-500 group-hover:text-gray-350 transition-colors">{item.icon}</div>
+              <span className="font-bold text-sm tracking-tight text-white/75 group-hover:text-white transition-colors">{item.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* GO OFFLINE Action Button - dynamically displayed if currently Online */}
+        {user.isOnline && (
           <button 
-            key={`side-menu-item-${i}`}
             onClick={() => {
-              if (item.action) {
-                item.action();
-              } else if (item.screen) {
-                setCurrentScreen(item.screen as AppScreen);
-                setIsSideMenuOpen(false);
-              }
+              endShift();
+              setIsSideMenuOpen(false);
             }}
-            className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all active:scale-98 ${item.active ? 'bg-blue-600 text-white' : 'hover:bg-white/5 text-gray-300 hover:text-white'}`}
+            className="w-full mt-auto mb-4 py-4 bg-red-600/10 border border-red-500/20 hover:bg-red-600 hover:text-white text-red-400 rounded-2xl font-black text-xs uppercase tracking-widest text-center transition-all active:scale-[0.98]"
           >
-            <div className={`${item.active ? 'text-white' : 'text-blue-500'}`}>{item.icon}</div>
-            <span className="font-bold text-sm">{item.label}</span>
-            {item.label === "Inbox" && <div className="ml-auto w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center text-[10px] font-black">2</div>}
+            Go Offline
           </button>
-        ))}
+        )}
       </div>
-    </div>
 
-    <div className="p-8 border-t border-white/5 flex items-center justify-between gap-4">
-      <button onClick={logout} className="flex items-center gap-3 text-red-500 font-black tracking-tighter hover:opacity-80 transition-opacity">
-        <LogOut size={20} />
-        <span>SIGN OUT</span>
-      </button>
-      <button onClick={() => setIsSideMenuOpen(false)} className="p-3 bg-white/10 rounded-full active:scale-90 transition-transform">
-        <X size={20} />
-      </button>
-    </div>
-  </motion.div>
-);
+      {/* Footer controls: Sign Out / Close Side Drawer */}
+      <div className={`p-6 border-t border-white/5 flex items-center justify-between gap-4 bg-black/40 ${!user.isOnline ? 'mt-auto' : ''}`}>
+        <button 
+          onClick={logout} 
+          className="flex items-center gap-2 text-red-500 font-extrabold text-xs uppercase tracking-wider hover:opacity-85 transition-opacity"
+        >
+          <LogOut size={16} />
+          <span>SIGN OUT</span>
+        </button>
+        <button 
+          onClick={() => setIsSideMenuOpen(false)} 
+          className="p-2.5 bg-white/5 border border-white/5 hover:border-white/10 hover:bg-white/10 text-white rounded-full active:scale-90 transition-transform"
+        >
+          <X size={18} />
+        </button>
+      </div>
+    </motion.div>
+  );
+};
 
 const ScheduledOrdersScreen = ({ 
   scheduledOrders, 
@@ -2499,17 +2527,17 @@ const OnboardingFlow = ({
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }} 
       exit={{ opacity: 0 }} 
-      className={`h-full w-full flex flex-col p-8 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
+      className="h-full w-full flex flex-col p-8 overflow-y-auto pb-32 bg-[#0a0a0c] text-white"
     >
       <AnimatePresence mode="wait">
         {step === 0 && (
           <motion.div key="step0" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} className="flex-1 flex flex-col justify-center items-center text-center">
-            <div className="mb-8 p-6 bg-black rounded-[40px] shadow-2xl border border-white/5">
+            <div className="mb-8 p-6 bg-[#121214] rounded-[40px] shadow-2xl border border-white/5">
               <HyperDriverLogo size="lg" />
             </div>
             <h1 className="text-4xl font-black leading-none tracking-tighter mb-4 uppercase italic">WELCOME TO THE TEAM</h1>
             <p className="text-gray-400 font-bold text-base max-w-sm mb-12">Let's get you set up to start earning. We'll need a few details to activate your high-priority request queue.</p>
-            <button onClick={nextStep} className="w-full max-w-sm py-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white rounded-3xl font-black text-xl tracking-wide shadow-xl shadow-blue-600/20 active:scale-95 transition-all">
+            <button onClick={nextStep} className="w-full max-w-sm py-5 bg-[#22c55e] hover:bg-[#1fbd52] text-black rounded-2xl font-black text-lg tracking-wider shadow-lg shadow-[#22c55e]/20 active:scale-95 transition-all uppercase">
               ACTIVATE PROFILE
             </button>
           </motion.div>
@@ -2517,7 +2545,7 @@ const OnboardingFlow = ({
 
         {step === 1 && (
           <motion.div key="step1" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}>
-            <h2 className="text-3xl font-black mb-2">Personal Info</h2>
+            <h2 className="text-3xl font-black mb-2 text-white">Personal Info</h2>
             <p className="text-gray-400 font-bold mb-8">Confirm your identification details.</p>
             <div className="space-y-4">
               <input 
@@ -2525,36 +2553,36 @@ const OnboardingFlow = ({
                 placeholder="Full Name"
                 value={localUser.name}
                 onChange={e => setLocalUser({...localUser, name: e.target.value})}
-                className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all text-black"
+                className="w-full p-5 bg-[#121214] border border-white/5 rounded-2xl font-bold outline-none focus:border-[#22c55e] transition-all text-white placeholder-gray-600 animate-none"
               />
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-4">Date of Birth</label>
+                  <label className="text-[10px] font-black uppercase text-gray-500 ml-4">Date of Birth</label>
                   <input 
                     type="date" 
                     value={localUser.dob || ''}
                     onChange={e => setLocalUser({...localUser, dob: e.target.value})}
-                    className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all text-black"
+                    className="w-full p-5 bg-[#121214] border border-white/5 rounded-2xl font-bold outline-none focus:border-[#22c55e] transition-all text-white placeholder-gray-600 animate-none"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 ml-4">Nationality</label>
+                  <label className="text-[10px] font-black uppercase text-gray-500 ml-4">Nationality</label>
                   <input 
                     type="text" 
                     placeholder="UK"
                     value={localUser.nationality || ''}
                     onChange={e => setLocalUser({...localUser, nationality: e.target.value})}
-                    className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all text-black"
+                    className="w-full p-5 bg-[#121214] border border-white/5 rounded-2xl font-bold outline-none focus:border-[#22c55e] transition-all text-white placeholder-gray-600 animate-none"
                   />
                 </div>
               </div>
             </div>
             <div className="mt-8 flex items-center justify-between">
-              <button onClick={prevStep} className="text-sm font-black text-gray-400 hover:text-black transition-colors uppercase tracking-widest">Back</button>
+              <button onClick={prevStep} className="text-sm font-black text-gray-500 hover:text-white transition-colors uppercase tracking-widest">Back</button>
               <button 
                 onClick={nextStep}
                 disabled={!localUser.name || !localUser.dob || !localUser.nationality}
-                className="py-5 px-12 bg-black text-white rounded-2xl font-black text-lg shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                className="py-4 px-12 bg-[#22c55e] disabled:bg-neutral-800 disabled:text-neutral-500 text-black rounded-2xl font-black text-base shadow-xl disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider transition-all"
               >
                 NEXT
               </button>
@@ -2564,7 +2592,7 @@ const OnboardingFlow = ({
 
         {step === 2 && (
           <motion.div key="step2" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}>
-            <h2 className="text-3xl font-black mb-2">Service Type</h2>
+            <h2 className="text-3xl font-black mb-2 text-white">Service Type</h2>
             <p className="text-gray-400 font-bold mb-8">How do you want to earn?</p>
             <div className="grid gap-4">
                   {[
@@ -2577,25 +2605,25 @@ const OnboardingFlow = ({
                         setVehicle({...vehicle, type: item.id});
                         nextStep();
                       }}
-                      className={`p-6 border-4 rounded-[40px] text-left transition-all flex items-center gap-6 ${vehicle.type === item.id ? 'border-blue-600 bg-blue-50' : 'border-gray-100 hover:border-gray-200'}`}
+                      className={`p-6 border rounded-[30px] text-left transition-all flex items-center gap-6 ${vehicle.type === item.id ? 'border-[#22c55e] bg-emerald-500/5' : 'border-white/5 bg-[#121214] hover:border-white/10'}`}
                     >
-                      <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${vehicle.type === item.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-400'}`}>
+                      <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${vehicle.type === item.id ? 'bg-[#22c55e] text-black shadow-lg shadow-[#22c55e]/25' : 'bg-white/5 text-gray-400'}`}>
                         {item.icon}
                       </div>
                       <div>
-                        <h3 className={`text-xl font-black ${vehicle.type === item.id ? 'text-black' : 'text-gray-600'}`}>{item.label}</h3>
+                        <h3 className={`text-xl font-black ${vehicle.type === item.id ? 'text-[#22c55e]' : 'text-white'}`}>{item.label}</h3>
                         <p className="text-sm font-bold text-gray-400">{item.desc}</p>
                       </div>
                     </button>
                   ))}
             </div>
-            <button onClick={prevStep} className="mt-8 text-sm font-black text-gray-400 hover:text-black transition-colors uppercase tracking-widest text-black">Back</button>
+            <button onClick={prevStep} className="mt-8 text-sm font-black text-gray-500 hover:text-white transition-colors uppercase tracking-widest">Back</button>
           </motion.div>
         )}
 
         {step === 3 && (
           <motion.div key="step3" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}>
-            <h2 className="text-3xl font-black mb-2">Vehicle Info</h2>
+            <h2 className="text-3xl font-black mb-2 text-white">Vehicle Info</h2>
             <p className="text-gray-400 font-bold mb-8">Details of your {vehicle.type} vehicle.</p>
             <div className="space-y-4">
               <input 
@@ -2603,29 +2631,29 @@ const OnboardingFlow = ({
                 placeholder="Vehicle Make (e.g. Toyota)"
                 value={vehicle.make}
                 onChange={e => setVehicle({...vehicle, make: e.target.value})}
-                className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all text-black"
+                className="w-full p-5 bg-[#121214] border border-white/5 rounded-2xl font-bold outline-none focus:border-[#22c55e] transition-all text-white placeholder-gray-600 animate-none"
               />
               <input 
                 type="text" 
                 placeholder="Vehicle Model (e.g. Prius)"
                 value={vehicle.model}
                 onChange={e => setVehicle({...vehicle, model: e.target.value})}
-                className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all text-black"
+                className="w-full p-5 bg-[#121214] border border-white/5 rounded-2xl font-bold outline-none focus:border-[#22c55e] transition-all text-white placeholder-gray-600 animate-none"
               />
               <input 
                 type="text" 
                 placeholder="License Plate"
                 value={vehicle.plate}
                 onChange={e => setVehicle({...vehicle, plate: e.target.value.toUpperCase()})}
-                className="w-full p-6 bg-gray-100 rounded-3xl font-bold outline-none border-4 border-transparent focus:bg-white focus:border-blue-600 transition-all text-black"
+                className="w-full p-5 bg-[#121214] border border-white/5 rounded-2xl font-bold outline-none focus:border-[#22c55e] transition-all text-white placeholder-gray-600 animate-none"
               />
             </div>
-            <div className="mt-8 flex items-center justify-between text-black">
-              <button onClick={prevStep} className="text-sm font-black text-gray-400 hover:text-black transition-colors uppercase tracking-widest ">Back</button>
+            <div className="mt-8 flex items-center justify-between">
+              <button onClick={prevStep} className="text-sm font-black text-gray-500 hover:text-white transition-colors uppercase tracking-widest">Back</button>
               <button 
                 onClick={handleFinish}
                 disabled={!vehicle.make || !vehicle.model || !vehicle.plate}
-                className="py-5 px-12 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
+                className="py-4 px-12 bg-[#22c55e] text-black rounded-2xl font-black text-base shadow-xl disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider transition-all"
               >
                 COMPLETE SETUP
               </button>
@@ -5598,9 +5626,9 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     try {
       const saved = localStorage.getItem('hyper_driver_theme');
-      return (saved as 'light' | 'dark') || 'light';
+      return (saved as 'light' | 'dark') || 'dark';
     } catch (e) {
-      return 'light';
+      return 'dark';
     }
   });
   const [earningsTab, setEarningsTab] = useState<'today' | 'weekly' | 'recent'>('today');
@@ -6187,6 +6215,12 @@ export default function App() {
         }
         
         const executeWebAudioPlayback = async () => {
+          // If the preference is explicitly set to 'synthesized', play the synthesized chime immediately!
+          if (soundPreference === 'synthesized') {
+            playSynthesizedIncomingRadar(audioCtx, now);
+            return;
+          }
+
           // 2. Custom Uploaded Audio File Alert Playback (decoded via Web Audio to prevent pausing user music)
           if (soundPreference === 'custom_file' && customSoundUrl) {
             const playedCustom = await playUrlViaWebAudio(customSoundUrl, 0.7);
@@ -10117,6 +10151,7 @@ export default function App() {
                 earningsGoal={earningsGoal}
                 setEarningsGoal={setEarningsGoal}
                 busynessMode={busynessMode}
+                endShift={endShift}
               />
             </>
           )}
@@ -10150,12 +10185,12 @@ export default function App() {
             )}
 
             {currentScreen === 'documents' && (
-            <motion.div key="documents" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="h-full w-full bg-white text-black p-6 flex flex-col pb-24">
+            <motion.div key="documents" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="h-full w-full bg-[#0a0a0c] text-white p-6 flex flex-col pb-24">
               <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => setCurrentScreen(user.isOnline ? 'account' : 'onboarding')} className="p-2 bg-gray-100 rounded-full"><ArrowRight className="rotate-180" size={24} /></button>
+                <button onClick={() => setCurrentScreen(user.isOnline ? 'account' : 'onboarding')} className="w-10 h-10 bg-[#121214] border border-white/5 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"><ArrowRight className="rotate-180" size={20} /></button>
                 <h1 className="text-3xl font-black">Documents</h1>
               </div>
-              <p className="text-gray-400 font-bold mb-8">Tap each item to upload your documents.</p>
+              <p className="text-gray-405 font-bold mb-8 text-sm">Tap each item to upload your documents securely.</p>
               
               <div className="space-y-4 flex-1">
                 {[
@@ -10170,13 +10205,13 @@ export default function App() {
                       key={`doc-upload-${i}`} 
                       onClick={() => !isUploading && toggleDoc(doc.label)}
                       disabled={isUploading}
-                      className={`w-full p-6 border-2 rounded-3xl flex items-center justify-between transition-all ${isUploaded ? 'border-green-500 bg-green-50' : isUploading ? 'border-blue-500 bg-blue-50' : 'border-gray-100 active:scale-95'}`}
+                      className={`w-full p-5 border rounded-2xl flex items-center justify-between transition-all ${isUploaded ? 'border-[#22c55e] bg-emerald-500/5' : isUploading ? 'border-amber-500 bg-amber-500/5' : 'border-[#121214] bg-[#121214]/65 active:scale-95 hover:border-white/5'}`}
                     >
                       <div className="flex items-center gap-4">
-                        <div className={isUploaded ? 'text-green-500' : isUploading ? 'text-blue-500' : 'text-gray-400'}>{doc.icon}</div>
-                        <span className="font-bold">{isUploading ? 'Uploading...' : doc.label}</span>
+                        <div className={isUploaded ? 'text-[#22c55e]' : isUploading ? 'text-amber-500' : 'text-gray-400'}>{doc.icon}</div>
+                        <span className="font-bold text-sm text-white">{isUploading ? 'Uploading...' : doc.label}</span>
                       </div>
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isUploaded ? 'bg-green-500 text-white' : isUploading ? 'bg-blue-500 text-white animate-pulse' : 'bg-gray-100 text-gray-400'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isUploaded ? 'bg-[#22c55e] text-black shadow-lg shadow-[#22c55e]/20' : isUploading ? 'bg-amber-500 text-black animate-pulse' : 'bg-white/5 text-gray-400'}`}>
                         {isUploaded ? <Check size={20} /> : isUploading ? <Clock size={20} /> : <ChevronRight size={20} />}
                       </div>
                     </button>
@@ -10194,7 +10229,7 @@ export default function App() {
                     setCurrentScreen('face_verification');
                   }} 
                   disabled={!allDocsUploaded}
-                  className={`w-full py-5 rounded-2xl font-black text-xl transition-all ${allDocsUploaded ? 'bg-black text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                  className={`w-full py-5 rounded-2xl font-black text-lg uppercase tracking-wider transition-all ${allDocsUploaded ? 'bg-[#22c55e] border-none text-black shadow-[0_12px_28px_rgba(34,197,94,0.3)] hover:bg-[#1fbd52]' : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'}`}
                 >
                   NEXT
                 </button>
@@ -10222,10 +10257,10 @@ export default function App() {
                 </button>
               </div>
 
-              <h1 className="text-2xl font-black mt-12 mb-4">Face Verification</h1>
-              <p className="text-center text-gray-400 mb-12">Position your face in the circle to verify your identity.</p>
+              <h1 className="text-2xl font-black mt-12 mb-4 text-white uppercase tracking-tight">Face Verification</h1>
+              <p className="text-center text-gray-400 text-xs mb-12 max-w-xs">Position your face in the circle to verify your identity securely with facial coordinates mapping.</p>
               
-              <div className="w-72 h-72 rounded-full border-4 border-blue-500 overflow-hidden relative mb-12 shadow-[0_0_30px_rgba(59,130,246,0.5)] bg-gray-900 border-dashed">
+              <div className="w-72 h-72 rounded-full border-2 border-[#22c55e] overflow-hidden relative mb-12 shadow-[0_0_30px_rgba(34,197,94,0.3)] bg-gray-950 border-dashed">
                 {lockoutUntil && Date.now() < lockoutUntil ? (
                   <div className="absolute inset-0 bg-red-950/80 flex flex-col items-center justify-center p-8 text-center">
                     <ShieldAlert size={48} className="text-red-500 mb-4" />
@@ -10242,8 +10277,8 @@ export default function App() {
                     />
                     
                     {!videoRef.current?.srcObject && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-black/60">
-                        <Camera size={48} className="text-blue-500 mb-4 animate-pulse" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-black/80">
+                        <Camera size={40} className="text-[#22c55e] mb-4 animate-pulse" />
                         <button 
                           onClick={() => {
                             if (!firebaseUser) {
@@ -10252,12 +10287,12 @@ export default function App() {
                               startCamera();
                             }
                           }}
-                          className="px-6 py-2 bg-blue-600 text-white rounded-full font-black text-sm shadow-xl active:scale-95 transition-transform"
+                          className="px-6 py-3 bg-[#22c55e] hover:bg-[#1fbd52] text-black rounded-xl font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-transform"
                         >
                           {firebaseUser ? "START CAMERA" : "SIGN IN & START"}
                         </button>
-                        <p className="text-[10px] text-gray-500 mt-4 leading-tight">
-                          We need camera access for face verification. Please click to allow.
+                        <p className="text-[9px] text-gray-500 mt-4 leading-tight max-w-[180px]">
+                          We require camera access for instant verification.
                         </p>
                       </div>
                     )}
@@ -10266,7 +10301,7 @@ export default function App() {
                     <motion.div 
                       animate={{ y: [0, 288, 0] }}
                       transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                      className="absolute inset-x-0 h-1 bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,1)] z-10"
+                      className="absolute inset-x-0 h-1 bg-[#22c55e] shadow-[0_0_15px_rgba(34,197,94,1)] z-10"
                     />
                   </>
                 )}
@@ -10279,12 +10314,12 @@ export default function App() {
                     <motion.div 
                       initial={{ opacity: 0, scale: 0.5 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="absolute inset-0 bg-green-500/80 flex flex-col items-center justify-center z-20"
+                      className="absolute inset-0 bg-emerald-500/90 flex flex-col items-center justify-center z-20"
                     >
-                      <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-4">
-                        <Check size={48} className="text-green-500" strokeWidth={4} />
+                      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-3 text-black">
+                        <Check size={36} className="text-[#22c55e]" strokeWidth={4} />
                       </div>
-                      <span className="font-black text-xl">VERIFIED</span>
+                      <span className="font-black text-lg text-black uppercase tracking-wider">VERIFIED</span>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -10294,7 +10329,7 @@ export default function App() {
                 onClick={handleVerify}
                 id="verify-btn"
                 disabled={user.faceVerified || isVerifying || (lockoutUntil ? Date.now() < lockoutUntil : false)}
-                className={`w-full py-5 rounded-2xl font-black text-xl transition-all ${user.faceVerified ? 'bg-green-500 text-white' : (lockoutUntil && Date.now() < lockoutUntil) ? 'bg-gray-800 text-gray-500' : 'bg-white text-black active:scale-95'}`}
+                className={`w-full py-5 rounded-2xl font-black text-base uppercase tracking-wider transition-all ${user.faceVerified ? 'bg-[#22c55e] text-black shadow-[0_12px_28px_rgba(34,197,94,0.25)]' : (lockoutUntil && Date.now() < lockoutUntil) ? 'bg-gray-800 text-gray-500' : 'bg-white hover:bg-gray-100 text-black active:scale-95'}`}
               >
                 {user.faceVerified ? 'SUCCESS' : isVerifying ? 'VERIFYING...' : (lockoutUntil && Date.now() < lockoutUntil) ? 'LOCKED' : 'VERIFY'}
               </button>
@@ -10313,23 +10348,28 @@ export default function App() {
           )}
 
           {currentScreen === 'home' && (
-            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden">
+            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
+              {/* Main Map Backdrop (Online vs. Styled/dimmed Offline) */}
+              <div className={`h-full w-full absolute inset-0 z-0 transition-all duration-500 ${!user.isOnline ? 'grayscale brightness-[0.45] contrast-[1.1]' : ''}`}>
+                {mapCoreMode === 'google' ? (
+                  <InteractiveMap
+                    location={location}
+                    heading={heading}
+                    isOnline={user.isOnline}
+                    isNavigating={isNavigating}
+                    currentStops={currentStops}
+                    pendingOrder={pendingOrder}
+                    theme={theme}
+                    otherDrivers={otherOnlineDrivers}
+                  />
+                ) : (
+                  <MapGrid />
+                )}
+              </div>
+              
+              {/* Check for online status starts here */}
               {user.isOnline ? (
-                <div className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
-                  {mapCoreMode === 'google' ? (
-                    <InteractiveMap
-                      location={location}
-                      heading={heading}
-                      isOnline={user.isOnline}
-                      isNavigating={isNavigating}
-                      currentStops={currentStops}
-                      pendingOrder={pendingOrder}
-                      theme={theme}
-                      otherDrivers={otherOnlineDrivers}
-                    />
-                  ) : (
-                    <MapGrid />
-                  )}
+                <div className="h-full w-full relative overflow-hidden bg-transparent">
 
                   {/* Map Mode Controller Selector Pill */}
                   <div className="absolute top-28 left-4 z-50 flex items-center bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl p-1 shadow-2xl pointer-events-auto">
@@ -10564,6 +10604,15 @@ export default function App() {
                     <ShieldCheck size={24} />
                   </button>
                 </div>
+              )}
+
+              {/* Gemini AI Chat Companion */}
+              {user.isOnline && (
+                <CompanionChat 
+                  theme={theme} 
+                  user={user} 
+                  currentEarnings={todayEarningsTotal} 
+                />
               )}
 
               {/* Trip Radar Floating Little Toggle Button */}
@@ -11754,45 +11803,43 @@ export default function App() {
                 <div className="p-4 flex justify-between items-center pointer-events-auto">
                   <button 
                     onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
-                    className="w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-black active:scale-95 transition-transform"
+                    className="w-11 h-11 bg-neutral-900/90 backdrop-blur-md border border-white/10 rounded-full shadow-2xl flex items-center justify-center text-white active:scale-95 transition-transform shrink-0"
                   >
-                    <Menu size={24} />
+                    <Menu size={20} />
                   </button>
                   
-                  {user.isOnline && (
-                    <motion.div 
-                      initial={{ y: -50, scale: 0.9 }}
-                      animate={{ y: 0, scale: 1 }}
-                      className="bg-black text-white px-5 py-2 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 border border-white/10 cursor-pointer select-none min-w-[170px] max-w-[210px] min-h-[44px] transition-all relative"
-                      onClick={() => {
-                        setTopBarMode(prev => {
-                          if (prev === 'today') return 'last_trip';
-                          if (prev === 'last_trip') return 'hyper_driver_pro';
-                          return 'today';
-                        });
-                      }}
-                    >
-                      <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none">
-                        {topBarMode === 'today' && "Today's Earnings"}
-                        {topBarMode === 'last_trip' && "Last Trip Payout"}
-                        {topBarMode === 'hyper_driver_pro' && `Hyper Pro - ${user.tier || 'Diamond'}`}
+                  <motion.div 
+                    initial={{ y: -50, scale: 0.9 }}
+                    animate={{ y: 0, scale: 1 }}
+                    className="bg-[#0c0d10] text-[#22c55e] px-5 py-1.5 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 border border-white/10 cursor-pointer select-none min-w-[150px] max-w-[210px] min-h-[44px] transition-all relative"
+                    onClick={() => {
+                      setTopBarMode(prev => {
+                        if (prev === 'today') return 'last_trip';
+                        if (prev === 'last_trip') return 'hyper_driver_pro';
+                        return 'today';
+                      });
+                    }}
+                  >
+                    <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none">
+                      {topBarMode === 'today' && "Today's Earnings"}
+                      {topBarMode === 'last_trip' && "Last Trip Payout"}
+                      {topBarMode === 'hyper_driver_pro' && `Hyper Pro - ${user.tier || 'Diamond'}`}
+                    </span>
+
+                    <div className="flex items-center gap-1.5 justify-center leading-none">
+                      <span className="font-display text-base font-black tracking-tight select-none text-white">
+                        {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
+                        {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
+                        {topBarMode === 'hyper_driver_pro' && `${user.points || 350} XP`}
                       </span>
+                    </div>
 
-                      <div className="flex items-center gap-1.5 justify-center leading-none">
-                        <span className="font-display text-lg font-black tracking-tight select-none">
-                          {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
-                          {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
-                          {topBarMode === 'hyper_driver_pro' && `${user.points || 350} XP`}
-                        </span>
-                      </div>
-
-                      <div className="flex gap-1 mt-1 justify-center select-none">
-                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? 'bg-blue-500 w-2.5' : 'bg-white/30'}`} />
-                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? 'bg-blue-500 w-2.5' : 'bg-white/30'}`} />
-                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? 'bg-blue-500 w-2.5' : 'bg-white/30'}`} />
-                      </div>
-                    </motion.div>
-                  )}
+                    <div className="flex gap-1 mt-1 justify-center select-none">
+                      <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? 'bg-[#22c55e] w-2.5' : 'bg-white/30'}`} />
+                      <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? 'bg-[#22c55e] w-2.5' : 'bg-white/30'}`} />
+                      <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? 'bg-[#22c55e] w-2.5' : 'bg-white/30'}`} />
+                    </div>
+                  </motion.div>
 
                   <div className="flex items-center gap-2">
                     {user.isOnline && (
@@ -11801,26 +11848,18 @@ export default function App() {
                           setIsOffAppSimulated(true);
                           addToast("Off-App Mode", "Simulating background execution. Tap the floating dot/notification overlay to restore.", "info");
                         }}
-                        className="w-12 h-12 bg-slate-950 border border-white/10 hover:border-white/20 rounded-full shadow-xl flex items-center justify-center text-blue-400 hover:text-white active:scale-95 transition-all text-sm uppercase font-black shrink-0"
+                        className="w-11 h-11 bg-slate-950 border border-white/10 hover:border-white/20 rounded-full shadow-2xl flex items-center justify-center text-blue-400 hover:text-white active:scale-95 transition-all text-sm uppercase font-black shrink-0"
                         title="Simulate Minimize (Go Off-App)"
                       >
-                        <Smartphone size={22} className="text-blue-400 animate-pulse" />
+                        <Smartphone size={20} className="text-blue-400 animate-pulse" />
                       </button>
                     )}
                     <button 
                       onClick={() => setIsSearchOpen(true)}
-                      className="w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center text-black active:scale-95 transition-transform"
+                      className="w-11 h-11 bg-neutral-900/90 backdrop-blur-md border border-white/10 rounded-full shadow-2xl flex items-center justify-center text-white active:scale-95 transition-transform shrink-0"
                     >
-                      <Search size={24} />
+                      <Search size={20} />
                     </button>
-                    {!user.isOnline && (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
-                        className="w-12 h-12 rounded-full shadow-xl active:scale-95 transition-transform overflow-hidden border-2 border-white"
-                      >
-                        <img src={user.profilePic || "https://picsum.photos/seed/driver/100/100"} alt="Profile" className="w-full h-full object-cover" />
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
@@ -11832,11 +11871,11 @@ export default function App() {
                     key="online-bar"
                     initial={{ y: 100 }}
                     animate={{ y: 0 }}
-                    className="w-full bg-white shadow-[0_-15px_40px_rgba(0,0,0,0.2)] flex flex-col rounded-t-[32px] overflow-hidden"
+                    className="w-full bg-[#0c0d10] border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.8)] flex flex-col rounded-t-[40px] overflow-hidden text-white pb-6"
                   >
                     {/* Uber-style scanning progress bar */}
                     {user.isOnline && !isOnBreak && activeOrders.length === 0 && (
-                      <div className="w-full h-[4px] bg-blue-500/10 relative overflow-hidden shrink-0">
+                      <div className="w-full h-[4px] bg-emerald-500/10 relative overflow-hidden shrink-0">
                         <motion.div 
                           animate={{ 
                             left: ['-50%', '110%'] 
@@ -11846,20 +11885,24 @@ export default function App() {
                             repeat: Infinity, 
                             ease: "easeInOut" 
                           }}
-                          className="absolute top-0 bottom-0 w-[40%] bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]"
+                          className="absolute top-0 bottom-0 w-[40%] bg-[#22c55e] rounded-full shadow-[0_0_12px_rgba(34,197,94,0.8)]"
                         />
                       </div>
                     )}
 
                     <div 
                       onClick={() => setIsBottomMenuOpen(true)}
-                      className="flex items-center justify-between px-8 py-5 cursor-pointer active:bg-gray-50 transition-colors"
+                      className="flex items-center justify-between px-8 py-5 cursor-pointer hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors"
                     >
-                      <button className="text-black" onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}>
-                        <Menu size={28} />
-                      </button>
+                      <div className="flex items-center">
+                        <div className="relative flex items-center justify-center mr-4">
+                          <span className={`${isOnBreak ? 'bg-orange-500/20' : 'bg-[#22c55e]/20'} absolute inline-flex h-10 w-10 rounded-full animate-ping`} />
+                          <span className={`${isOnBreak ? 'bg-orange-500/35' : 'bg-[#22c55e]/35'} absolute inline-flex h-7 w-7 rounded-full animate-pulse`} />
+                          <span className={`relative inline-flex rounded-full h-4 w-4 ${isOnBreak ? 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.8)]' : 'bg-[#22c55e] shadow-[0_0_15px_rgba(34,197,94,0.8)]'} border-2 border-black`} />
+                        </div>
+                      </div>
                       
-                      <div className="flex flex-col items-center flex-1">
+                      <div className="flex flex-col items-start flex-1 select-none text-left">
                         {currentStop && distanceToStop(currentStop) <= 0.1 ? (
                           preparingOrders[currentStop.orderId] && preparingOrders[currentStop.orderId] > 0 ? (
                             <motion.button
@@ -11886,17 +11929,17 @@ export default function App() {
                             </motion.button>
                           )
                         ) : (
-                          <div className="flex flex-col items-center">
-                            <div className="h-8 overflow-hidden flex items-center justify-center relative w-64">
+                          <div className="flex flex-col text-left">
+                            <div className="h-7 overflow-hidden flex items-center relative w-64">
                               <AnimatePresence mode="wait">
                                 {activeOrders.length > 0 ? (
                                   <motion.span
                                     key="active-trips"
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    className="absolute font-display text-2xl font-black text-black tracking-tight leading-none text-center"
+                                    className="absolute font-display text-xl font-black text-white tracking-tight leading-none"
                                   >
-                                    {activeOrders.length === 1 ? '1 Trip' : `${activeOrders.length} Trips`} • £{activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}
+                                    {activeOrders.length === 1 ? '1 Active Trip' : `${activeOrders.length} Active Trips`}
                                   </motion.span>
                                 ) : (
                                   <motion.span
@@ -11905,36 +11948,51 @@ export default function App() {
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
                                     transition={{ duration: 0.3 }}
-                                    className="absolute font-display text-2xl font-black text-black tracking-tight leading-none text-center"
+                                    className="absolute font-display text-xl font-black text-white tracking-tight leading-none"
                                   >
-                                    {onlineStatusLoopText === 'finding_trips' ? 'Finding trips' : "You're online"}
+                                    {isOnBreak ? "On Break" : "You're online"}
                                   </motion.span>
                                 )}
                               </AnimatePresence>
                             </div>
-                            <div className="flex items-center gap-3 mt-1.5">
-                              <div className="flex items-center gap-1">
-                                <motion.div 
-                                  animate={{ opacity: [1, 0, 1] }}
-                                  transition={{ duration: 1.5, repeat: Infinity }}
-                                  className="w-1.5 h-1.5 rounded-full bg-blue-500"
-                                />
-                                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
-                                  {currentStop ? `${currentStop.label} • ${distanceToStop(currentStop).toFixed(1)} mi` : user.isOnline ? 'Online' : 'Offline'}
-                                </span>
-                              </div>
-                              <span className="text-[10px] text-gray-300">•</span>
-                              <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${busynessMode === 'High' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' : 'bg-blue-500/10 border-blue-500/20 text-blue-500'}`}>
-                                <TrendingUp size={10} />
-                                <span className="text-[9px] font-black uppercase tracking-wider">{busynessMode} Demand</span>
-                              </div>
+                            
+                            <div className="h-5 overflow-hidden flex items-center relative w-64 mt-0.5">
+                              <AnimatePresence mode="wait">
+                                {activeOrders.length > 0 ? (
+                                  <motion.span
+                                    key="active-pay"
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="absolute text-xs text-gray-400 font-bold"
+                                  >
+                                    Current payout: £{activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}
+                                  </motion.span>
+                                ) : (
+                                  <motion.span
+                                    key={onlineStatusLoopText + '_sub'}
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -5 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="absolute text-xs text-gray-400 font-bold"
+                                  >
+                                    {isOnBreak ? "Taking a pause from offers" : "We're finding trips for you"}
+                                  </motion.span>
+                                )}
+                              </AnimatePresence>
                             </div>
                           </div>
                         )}
                       </div>
 
-                      <button className="text-black p-2" onClick={(e) => { e.stopPropagation(); setIsBottomMenuOpen(true); }}>
-                        <List size={28} />
+                      <button 
+                        className="text-white hover:text-[#22c55e] p-2.5 bg-white/5 border border-white/5 hover:border-white/10 rounded-full transition-all active:scale-90 shrink-0" 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          setCurrentScreen('trip_preferences'); 
+                        }}
+                      >
+                        <SlidersHorizontal size={18} />
                       </button>
                     </div>
                   </motion.div>
@@ -11943,17 +12001,43 @@ export default function App() {
 
               </div>
             ) : (
-              <NewDashboard 
-                user={user} 
-                earnings={earnings} 
-                startShift={handleGoOnline} 
-                setCurrentScreen={setCurrentScreen}
-                busynessMode={busynessMode}
-                globalSurge={globalSurge}
-                vigilanteAdActive={vigilanteAdActive}
-                joinedAirportId={joinedAirportId}
-                userQueuePosition={userQueuePosition}
-              />
+              <>
+                {!isBottomMenuOpen && (
+                  <div className="absolute bottom-0 left-0 right-0 z-[150]">
+                    <motion.div 
+                      key="offline-bar"
+                      initial={{ y: 100 }}
+                      animate={{ y: 0 }}
+                      className="w-full bg-[#0c0d10] border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.8)] flex flex-col rounded-t-[40px] overflow-hidden text-white pb-6 px-8 py-5"
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="text-left select-none font-sans">
+                          <p className="font-display text-xl font-black text-white tracking-tight leading-none">You're offline</p>
+                          <p className="text-xs text-gray-400 font-bold mt-1">Go online to receive trips.</p>
+                        </div>
+                        
+                        <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setCurrentScreen('trip_preferences'); 
+                          }}
+                          className="text-white hover:text-[#22c55e] p-2.5 bg-white/5 border border-white/5 hover:border-white/10 rounded-full transition-all active:scale-95 shrink-0" 
+                        >
+                          <SlidersHorizontal size={18} />
+                        </button>
+                      </div>
+
+                      <button 
+                        onClick={handleGoOnline}
+                        className="w-full py-4.5 bg-[#22c55e] hover:bg-[#1db053] text-black rounded-2xl font-black text-base uppercase tracking-widest flex items-center justify-center gap-3 transition-colors active:scale-95 duration-300 shadow-[0_12px_28px_rgba(34,197,94,0.35)]"
+                      >
+                        <Navigation size={18} fill="currentColor" className="transform rotate-45" />
+                        Go Online
+                      </button>
+                    </motion.div>
+                  </div>
+                )}
+              </>
             )}
 
             <AnimatePresence>
@@ -11985,18 +12069,18 @@ export default function App() {
                     animate={{ y: 0 }}
                     exit={{ y: '100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className={`absolute bottom-0 left-0 right-0 rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] flex flex-col max-h-[70vh] ${theme === 'dark' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black'}`}
+                    className="absolute bottom-0 left-0 right-0 rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] border-t border-white/10 flex flex-col max-h-[70vh] bg-[#0c0d10] text-white"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex flex-col items-center pt-4 pb-2 shrink-0">
-                      <div className={`w-12 h-1.5 rounded-full mb-4 ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-200'}`} />
+                      <div className="w-12 h-1.5 rounded-full mb-4 bg-white/10" />
                     </div>
                     
                     <div className="relative flex-1 flex flex-col min-h-0">
                       <div className="overflow-y-auto px-6 pb-20 custom-scrollbar flex-1">
                         <div className="flex justify-between w-full mb-8 px-4">
-                          <button onClick={() => { setIsSideMenuOpen(true); setIsBottomMenuOpen(false); }} className="flex flex-col items-center gap-2">
-                            <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Menu size={24} /></div>
+                          <button onClick={() => { setIsSideMenuOpen(true); setIsBottomMenuOpen(false); }} className="flex flex-col items-center gap-2 text-white">
+                            <div className="p-4 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 transition-colors"><Menu size={24} /></div>
                             <span className="text-xs font-bold">Menu</span>
                           </button>
                           
@@ -12005,9 +12089,9 @@ export default function App() {
                               <motion.div 
                                 animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.1, 0.4] }}
                                 transition={{ duration: 2, repeat: Infinity }}
-                                className="absolute inset-0 bg-blue-500 rounded-full"
+                                className="absolute inset-0 bg-[#22c55e] rounded-full"
                               />
-                              <div className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg relative z-10">
+                              <div className="w-14 h-14 bg-emerald-600 rounded-full flex items-center justify-center text-white shadow-lg relative z-10">
                                 <Navigation size={28} className="animate-pulse" />
                               </div>
                             </div>
@@ -12024,7 +12108,7 @@ export default function App() {
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -6 }}
                                     transition={{ duration: 0.25 }}
-                                    className="absolute text-[10px] font-black tracking-widest uppercase text-blue-600 text-center"
+                                    className="absolute text-[10px] font-black tracking-widest uppercase text-[#22c55e] text-center"
                                   >
                                     {onlineStatusLoopText === 'finding_trips' ? 'Finding trips' : "You're online"}
                                   </motion.span>
@@ -12033,8 +12117,8 @@ export default function App() {
                             </div>
                           </div>
 
-                          <button onClick={() => setIsSearchOpen(true)} className="flex flex-col items-center gap-2">
-                            <div className={`p-4 rounded-full ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Search size={24} /></div>
+                          <button onClick={() => setIsSearchOpen(true)} className="flex flex-col items-center gap-2 text-white">
+                            <div className="p-4 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 transition-colors"><Search size={24} /></div>
                             <span className="text-xs font-bold">Search</span>
                           </button>
                         </div>
@@ -13237,14 +13321,14 @@ export default function App() {
           )}
 
           {currentScreen === 'wallet' && (
-            <motion.div key="wallet" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
+            <motion.div key="wallet" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-[#0a0a0c] text-white p-6 overflow-y-auto pb-32">
               <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
+                <button onClick={() => setCurrentScreen('home')} className="w-10 h-10 bg-white/5 border border-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"><X size={20} /></button>
                 <h1 className="text-3xl font-black">Wallet</h1>
               </div>
-              <div className="bg-gray-100 rounded-3xl p-8 mb-6">
-                <p className="text-sm font-bold text-gray-400 mb-1 uppercase tracking-widest">Balance</p>
-                <h2 className="text-5xl font-black">£{earnings.toFixed(2)}</h2>
+              <div className="bg-[#121214] border border-white/5 rounded-3xl p-8 mb-6 shadow-2xl">
+                <p className="text-[10px] font-black text-[#22c55e] mb-1 uppercase tracking-widest font-mono">Available Balance</p>
+                <h2 className="text-5xl font-black text-white">£{earnings.toFixed(2)}</h2>
                 <button 
                   onClick={() => {
                     if (earnings > 0) {
@@ -13252,17 +13336,17 @@ export default function App() {
                     }
                   }}
                   disabled={earnings <= 0}
-                  className="mt-6 w-full py-4 bg-black text-white rounded-2xl font-black active:scale-95 transition-transform disabled:opacity-40"
+                  className="mt-6 w-full py-4 bg-[#22c55e] hover:bg-[#1fbd52] text-black rounded-2xl font-black text-sm uppercase tracking-wider active:scale-95 transition-all shadow-lg shadow-[#22c55e]/15 disabled:bg-neutral-800 disabled:text-neutral-500 disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none"
                 >
                   CASH OUT
                 </button>
               </div>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-black text-xl">Payout Accounts</h3>
+                  <h3 className="font-black text-lg">Payout Accounts</h3>
                   <button 
                     onClick={() => setCurrentScreen('payment_methods')} 
-                    className="text-xs font-black text-blue-600 uppercase tracking-widest"
+                    className="text-xs font-black text-[#22c55e] uppercase tracking-widest"
                   >
                     Manage
                   </button>
@@ -13272,25 +13356,25 @@ export default function App() {
                   {(user.paymentMethods || [
                     { id: '1', type: 'bank', last4: '9876', bankName: 'Monzo', isDefault: true, isReal: false }
                   ]).map((method, idx) => (
-                    <div key={`payout-acc-${method.id}-${idx}`} className="flex items-center justify-between p-4 border border-gray-100 rounded-2xl">
+                    <div key={`payout-acc-${method.id}-${idx}`} className="flex items-center justify-between p-4 border border-white/5 bg-black/40 rounded-2xl text-white">
                       <div className="flex items-center gap-4">
-                        <div className={method.type === 'stripe' ? 'text-[#635BFF]' : 'text-blue-600'}>
+                        <div className={method.type === 'stripe' ? 'text-[#22c55e]' : 'text-amber-500'}>
                           {method.type === 'stripe' ? <Shield size={20} /> : method.type === 'bank' ? <Landmark size={20} /> : <CreditCard size={20} />}
                         </div>
                         <div>
-                          <p className="font-bold text-sm">
+                          <p className="font-bold text-sm text-white">
                             {method.type === 'stripe' ? 'Stripe Connect' : method.type === 'bank' ? method.bankName : 'Personal Card'}
                             {method.type === 'stripe' ? (
-                              <span className="ml-2 text-[8px] bg-indigo-50 text-[#635BFF] border border-[#635bff]/10 px-1.5 py-0.5 rounded font-black uppercase">Stripe Sandbox</span>
+                              <span className="ml-2 text-[8px] bg-[#635BFF]/15 text-[#635BFF] border border-[#635BFF]/30 px-1.5 py-0.5 rounded font-black uppercase">Stripe Sandbox</span>
                             ) : method.isReal && (
-                              <span className="ml-2 text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-black uppercase">Real Link</span>
+                              <span className="ml-2 text-[8px] bg-[#22c55e]/15 text-[#22c55e] px-1.5 py-0.5 rounded font-black uppercase">Real Link</span>
                             )}
                           </p>
-                          <p className="text-xs text-gray-400">•••• {method.last4}</p>
+                          <p className="text-xs text-gray-500 font-mono mt-0.5">•••• {method.last4}</p>
                         </div>
                       </div>
                       {method.isDefault && (
-                        <span className="text-[10px] font-black text-gray-400 uppercase">Default</span>
+                        <span className="text-[10px] font-black text-gray-500 uppercase">Default</span>
                       )}
                     </div>
                   ))}
@@ -13918,18 +14002,50 @@ export default function App() {
           )}
 
           {currentScreen === 'account' && (
-            <motion.div key="account" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
+            <motion.div key="account" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full p-6 overflow-y-auto pb-32 bg-[#0a0a0c] text-white">
               <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => setCurrentScreen('home')} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><X size={24} /></button>
+                <button onClick={() => setCurrentScreen('home')} className="w-10 h-10 bg-white/5 border border-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"><X size={20} /></button>
                 <h1 className="text-3xl font-black">Account</h1>
               </div>
-              <div className="flex flex-col items-center mb-6">
-                <div className={`w-24 h-24 rounded-full overflow-hidden border-4 shadow-xl mb-3 ${theme === 'dark' ? 'border-white/10' : 'border-white'}`}>
+              <div className="flex flex-col items-center mb-8 bg-[#121214] border border-white/5 p-6 rounded-[32px] shadow-xl">
+                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#eab308] shadow-2xl mb-4 relative group">
                   <img src={user.profilePic || "https://picsum.photos/seed/driver/200/200"} alt="Me" className="w-full h-full object-cover" />
+                  <div className="absolute bottom-0 inset-x-0 bg-black/60 py-0.5 text-[8px] font-black uppercase text-[#eab308] tracking-widest text-center">
+                    PRO
+                  </div>
                 </div>
-                <h2 className="text-xl font-black">{user.name}</h2>
-                <div className="flex flex-col items-center gap-1">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{currentCity} • {userTier} Partner</p>
+                
+                <h2 className="text-2xl font-black text-white">{user.name}</h2>
+                <div className="flex items-center gap-1.5 mt-1 mb-4">
+                  <Star size={14} fill="#eab308" className="text-[#eab308]" />
+                  <p className="text-xs font-extrabold text-[#eab308] uppercase tracking-wider">{userTier} Driver</p>
+                </div>
+
+                {/* Level up / Experience Progression Module */}
+                <div className="w-full bg-black/40 rounded-2xl p-4 border border-white/5">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest font-mono">Level 23</span>
+                    <span className="text-[10px] font-black text-[#eab308] uppercase tracking-widest font-mono">2,450 / 3,500 XP</span>
+                  </div>
+                  <div className="w-full h-2.5 bg-neutral-900 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-[#eab308] to-yellow-500 rounded-full shadow-[0_0_8px_rgba(234,179,8,0.5)]" style={{ width: '70%' }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Core Driver Key Statistics Grid */}
+              <div className="grid grid-cols-3 gap-3 mb-8">
+                <div className="bg-[#121214] border border-white/5 p-4 rounded-2xl text-center">
+                  <p className="text-lg font-black text-white leading-none mb-1">98%</p>
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest font-mono">Completion</p>
+                </div>
+                <div className="bg-[#121214] border border-white/5 p-4 rounded-2xl text-center">
+                  <p className="text-lg font-black text-[#eab308] leading-none mb-1">4.85 ★</p>
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest font-mono font-sans">Rating</p>
+                </div>
+                <div className="bg-[#121214] border border-white/5 p-4 rounded-2xl text-center">
+                  <p className="text-lg font-black text-white leading-none mb-1">92%</p>
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest font-mono">Acceptance</p>
                 </div>
               </div>
 
@@ -13941,17 +14057,17 @@ export default function App() {
                     exit={{ height: 0, opacity: 0, marginBottom: 0 }}
                     className="overflow-hidden"
                   >
-                    <div className={`p-5 rounded-[32px] border-2 flex flex-col gap-4 shadow-xl ${theme === 'dark' ? 'bg-orange-600/10 border-orange-500/30' : 'bg-orange-50 border-orange-200 shadow-orange-100'}`}>
+                    <div className="p-5 rounded-[32px] border border-orange-500/20 flex flex-col gap-4 shadow-xl bg-orange-950/20">
                       <div className="flex items-start justify-between">
                         <div className="flex gap-4">
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${theme === 'dark' ? 'bg-orange-500/20 text-orange-500' : 'bg-orange-100 text-orange-600'}`}>
+                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-orange-550/20 text-orange-500 bg-orange-500/10">
                             <ShieldAlert size={24} />
                           </div>
                           <div>
-                            <p className="font-black text-lg text-orange-950 dark:text-orange-100">Insurance Alert</p>
+                            <p className="font-black text-lg text-orange-100">Insurance Alert</p>
                             <div className="flex items-center gap-2">
                               <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" />
-                              <p className="text-[10px] font-black text-orange-800/60 dark:text-orange-400/60 uppercase tracking-[0.1em]">
+                              <p className="text-[10px] font-black text-orange-400/70 uppercase tracking-[0.1em]">
                                 Expires {insuranceDaysLeft}d ({insuranceExpiry})
                               </p>
                             </div>
@@ -13959,18 +14075,18 @@ export default function App() {
                         </div>
                         <button 
                           onClick={() => setDismissedExpiries(prev => [...prev, "Vehicle Insurance"])}
-                          className={`p-2 rounded-full transition-colors ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
+                          className="p-2 rounded-full transition-colors hover:bg-white/10"
                         >
-                          <X size={18} className="text-orange-950 dark:text-orange-200" />
+                          <X size={18} className="text-orange-200" />
                         </button>
                       </div>
-                      <p className="text-xs font-bold leading-relaxed text-orange-900/80 dark:text-orange-300/80">
+                      <p className="text-xs font-bold leading-relaxed text-orange-355/90">
                         Your vehicle insurance is set to expire soon. Avoid an account block by updating your policy details now.
                       </p>
                       
                       <button 
                         onClick={() => setCurrentScreen('insurance')}
-                        className="w-full py-3 bg-orange-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-600/20 active:scale-95 transition-transform"
+                        className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-600/20 active:scale-95 transition-transform"
                       >
                         RENEW NOW
                       </button>
@@ -13979,10 +14095,10 @@ export default function App() {
                 )}
               </AnimatePresence>
 
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {[
-                  { icon: <Music size={18} className="text-emerald-500 animate-pulse" />, label: "🔊 Alert Pings & Custom Sounds", action: () => setCurrentScreen('audio_settings') },
-                  { icon: <Activity size={18} className="text-[#10b981]" />, label: "Vercel Web Analytics (Live HUD)", action: () => setShowWebAnalytics(true) },
+                  { icon: <Music size={18} className="text-[#22c55e] animate-pulse" />, label: "🔊 Alert Pings & Custom Sounds", action: () => setCurrentScreen('audio_settings') },
+                  { icon: <Activity size={18} className="text-[#22c55e]" />, label: "Vercel Web Analytics (Live HUD)", action: () => setShowWebAnalytics(true) },
                   { icon: <User size={18} />, label: "Personal Information", action: () => setCurrentScreen('personal_details') },
                   { icon: <ShieldCheck size={18} />, label: "Insurance & Plan", action: () => setCurrentScreen('insurance') },
                   { icon: <CarIcon size={18} />, label: "Vehicle Details", action: () => setCurrentScreen('vehicle_details') },
@@ -14026,38 +14142,38 @@ export default function App() {
                   <button 
                     key={`account-menu-${idx}`} 
                     onClick={item.action}
-                    className={`w-full flex items-center justify-between p-4 rounded-2xl transition-colors ${theme === 'dark' ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}
+                    className="w-full flex items-center justify-between p-4 rounded-2xl transition-all hover:bg-white/5 bg-[#121214] border border-white/5"
                   >
                     <div className="flex items-center gap-4">
                       <div className="text-gray-400">{item.icon}</div>
-                      <span className="font-bold">{item.label}</span>
+                      <span className="font-bold text-sm text-white">{item.label}</span>
                     </div>
-                    <ArrowRight size={20} className="text-gray-300" />
+                    <ArrowRight size={20} className="text-gray-650" />
                   </button>
                 ))}
 
                 {/* Background Activity Labs Section */}
-                <div className={`p-6 rounded-3xl mt-6 border-2 ${theme === 'dark' ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-100'}`}>
+                <div className="p-6 rounded-[32px] mt-6 border border-amber-500/20 bg-amber-500/5">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-black text-lg flex items-center gap-2">
+                    <h3 className="font-black text-lg flex items-center gap-2 text-white">
                       <Zap size={20} className={isKeepAliveActive && user.isOnline ? "text-amber-500 animate-pulse" : "text-amber-500"} />
                       Background Activity Labs
                     </h3>
-                    <span className="p-1 px-2.5 bg-yellow-500/10 border border-yellow-500/30 text-yellow-600 dark:text-yellow-500 rounded text-[9px] font-black uppercase tracking-wider font-mono">LABS</span>
+                    <span className="p-1 px-2.5 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded text-[9px] font-black uppercase tracking-wider font-mono">LABS</span>
                   </div>
-                  <p className="text-xs text-slate-500 font-bold mb-4">
+                  <p className="text-xs text-slate-400 font-medium mb-4">
                     Mobile/desktop operating systems automatically freeze browser timers when you minimize tabs. Activate this <strong>Keep-Alive system</strong> to receive instant dispatch orders and system audio rings even when your screen is locked.
                   </p>
                   
                   <div className="space-y-4">
                     {/* Status 1: System Notification check */}
-                    <div className={`flex items-center justify-between p-3.5 rounded-2xl ${theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-white border border-gray-100 shadow-sm'}`}>
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/5 bg-black/40">
                       <div>
-                        <p className="font-bold text-xs">Device Locked Screen Banners</p>
-                        <p className="text-[10px] text-gray-400 font-bold">
+                        <p className="font-bold text-xs text-white">Device Locked Screen Banners</p>
+                        <p className="text-[10px] text-gray-400 font-bold mt-0.5">
                           {"Notification" in window ? (
                             Notification.permission === 'granted' ? (
-                              <span className="text-emerald-500 font-black">● Granted & Active</span>
+                              <span className="text-[#22c55e] font-black">● Granted & Active</span>
                             ) : Notification.permission === 'denied' ? (
                               <span className="text-rose-500 font-black">● Blocked by Browser</span>
                             ) : (
@@ -14076,7 +14192,7 @@ export default function App() {
                               addDebugLog('info', `Notification permission updated to: ${perm}`);
                             });
                           }}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                          className="px-3 py-1.5 bg-[#22c55e] hover:bg-[#1ebd52] text-black rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer font-sans"
                         >
                           Allow Banners
                         </button>
@@ -14084,10 +14200,10 @@ export default function App() {
                     </div>
 
                     {/* Status 2: Audio Keep-Alive Switch */}
-                    <div className={`flex items-center justify-between p-3.5 rounded-2xl ${theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-white border border-gray-100 shadow-sm'}`}>
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/5 bg-black/40 font-bold">
                       <div>
-                        <p className="font-bold text-xs">Stay-Alive Low Audio Wave</p>
-                        <p className="text-[10px] text-slate-400 font-bold">Locks sound channel to prevent sleep processes</p>
+                        <p className="font-bold text-xs text-white">Stay-Alive Low Audio Wave</p>
+                        <p className="text-[10px] text-slate-400 font-bold mt-0.5">Locks sound channel to prevent sleep processes</p>
                       </div>
                       <div 
                         onClick={() => {
@@ -14096,7 +14212,7 @@ export default function App() {
                           localStorage.setItem('hyper_driver_keep_alive_engine', updated ? 'true' : 'false');
                           addToast(updated ? "Keep-Alive Enabled" : "Keep-Alive Disabled", updated ? "Stay-alive low frequency wave loop playing." : "Stay-alive sound module suspended.", "info");
                         }}
-                        className={`w-12 h-6 rounded-full relative p-1 transition-colors cursor-pointer ${isKeepAliveActive ? 'bg-amber-500' : 'bg-gray-300'}`}
+                        className={`w-12 h-6 rounded-full relative p-1 transition-colors cursor-pointer ${isKeepAliveActive ? 'bg-[#22c55e]' : 'bg-neutral-800'}`}
                       >
                         <motion.div 
                           animate={{ x: isKeepAliveActive ? 24 : 0 }}
@@ -14106,50 +14222,50 @@ export default function App() {
                     </div>
 
                     {/* Status 3: Web Worker Thread Status */}
-                    <div className={`flex items-center justify-between p-3.5 rounded-2xl ${theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-white border border-gray-100 shadow-sm'}`}>
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/5 bg-black/40 font-bold">
                       <div>
-                        <p className="font-bold text-xs">Independent Worker Ticks</p>
-                        <p className="text-[10px] text-gray-400 font-bold">Counts background CPU cycles triggered</p>
+                        <p className="font-bold text-xs text-white">Independent Worker Ticks</p>
+                        <p className="text-[10px] text-gray-400 font-bold mt-0.5">Counts background CPU cycles triggered</p>
                       </div>
-                      <div className="font-mono text-xs font-black px-2.5 py-1 bg-slate-900 border border-slate-800 rounded-lg text-amber-500">
+                      <div className="font-mono text-xs font-black px-2.5 py-1 bg-slate-900 border border-slate-850 rounded-lg text-amber-500">
                         {backgroundTicks} TICKS
                       </div>
                     </div>
 
                     {/* Action 4: Real system push badge test action */}
-                    <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex flex-col gap-2 mt-2">
-                      <p className="text-[11px] text-slate-500 dark:text-gray-300 font-bold">
+                    <div className="p-4 bg-emerald-550/5 border border-emerald-500/20 bg-emerald-500/5 rounded-2xl flex flex-col gap-2 mt-2">
+                      <p className="text-[11px] text-gray-300 font-bold leading-normal">
                         <strong>Test it:</strong> Tap the button below, then immediately lock your phone screen or go to your phone Home screen. You will receive a simulated real dispatch order with ringing audio in 5 seconds!
                       </p>
                       <button 
                         onClick={triggerFiveSecondBackgroundTest}
-                        className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white rounded-xl text-[10px] font-black uppercase tracking-wider font-mono shadow-md text-center cursor-pointer active:scale-95 transition-transform"
+                        className="w-full py-2.5 bg-[#22c55e] hover:bg-[#1fbd52] text-black rounded-xl text-[10px] font-black uppercase tracking-wider font-mono shadow-md text-center cursor-pointer active:scale-95 transition-all duration-200"
                       >
                         ⚡ START LOCK-SCREEN BANNER TEST
                       </button>
                     </div>
 
                     {/* Phone PWA instructions */}
-                    <div className="text-[10px] text-gray-400 leading-normal pl-2 border-l-2 border-amber-300 space-y-1">
-                      <p className="font-bold text-gray-600 dark:text-gray-300">📱 Mobile Setup:</p>
+                    <div className="text-[10px] text-gray-400 leading-normal pl-2 border-l-2 border-[#22c55e] space-y-1 font-bold">
+                      <p className="font-bold text-gray-300">📱 Mobile Setup:</p>
                       <p>• iOS (iPhone): Tap Safari <strong className="text-blue-500">"Share"</strong> icon → select <strong className="text-blue-500">"Add to Home Screen"</strong>. Launch app from your device Home screen as a standalone PWA for full background support.</p>
                       <p>• Android (Chrome): Tap the <strong className="text-blue-500">"Add to Home screen"</strong> option to enable lock-screen system alerts cleanly.</p>
                     </div>
                   </div>
                 </div>
                 
-                <div className={`p-4 rounded-2xl mt-4 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
+                <div className="p-4 rounded-2xl mt-4 bg-white/5 border border-white/5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="text-blue-500"><Zap size={24} /></div>
+                      <div className="text-[#22c55e]"><Zap size={24} /></div>
                       <div>
-                        <p className="font-bold">Battery Saver</p>
-                        <p className="text-xs text-gray-400 font-bold">Disable heavy map effects</p>
+                        <p className="font-bold text-white">Battery Saver</p>
+                        <p className="text-xs text-gray-400 font-bold mt-0.5">Disable heavy map effects</p>
                       </div>
                     </div>
                     <div 
                       onClick={() => setIsLowPerformance(!isLowPerformance)}
-                      className={`w-12 h-6 rounded-full relative p-1 transition-colors cursor-pointer ${isLowPerformance ? 'bg-blue-500' : 'bg-gray-300'}`}
+                      className={`w-12 h-6 rounded-full relative p-1 transition-all duration-300 cursor-pointer ${isLowPerformance ? 'bg-[#22c55e]' : 'bg-[#121214]'}`}
                     >
                       <motion.div 
                         animate={{ x: isLowPerformance ? 24 : 0 }}
@@ -14159,18 +14275,18 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className={`p-4 rounded-2xl mt-4 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
+                <div className="p-4 rounded-2xl mt-4 bg-white/5 border border-white/5 bg-[#121214]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="text-blue-500"><Moon size={24} /></div>
+                      <div className="text-[#22c55e]"><Moon size={24} /></div>
                       <div>
-                        <p className="font-bold">Night Mode</p>
-                        <p className="text-xs text-gray-400 font-bold">Always use dark map</p>
+                        <p className="font-bold text-white">Night Mode</p>
+                        <p className="text-xs text-gray-400 font-bold mt-0.5">Always use dark map</p>
                       </div>
                     </div>
                     <div 
                       onClick={() => setIsNightMode(!isNightMode)}
-                      className={`w-12 h-6 rounded-full relative p-1 transition-colors cursor-pointer ${isNightMode ? 'bg-blue-500' : 'bg-gray-300'}`}
+                      className={`w-12 h-6 rounded-full relative p-1 transition-all duration-300 cursor-pointer ${isNightMode ? 'bg-[#22c55e]' : 'bg-neutral-800'}`}
                     >
                       <motion.div 
                         animate={{ x: isNightMode ? 24 : 0 }}
@@ -14180,18 +14296,18 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className={`p-4 rounded-2xl mt-4 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-50'}`}>
+                <div className="p-4 rounded-2xl mt-4 bg-white/5 border border-white/5 bg-[#121214]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="text-blue-500"><Navigation size={24} /></div>
+                      <div className="text-[#22c55e]"><Navigation size={24} /></div>
                       <div>
-                        <p className="font-bold">Simulate Movement</p>
-                        <p className="text-xs text-gray-400 font-bold">Test map movement without moving</p>
+                        <p className="font-bold text-white">Simulate Movement</p>
+                        <p className="text-xs text-gray-400 font-bold mt-0.5">Test map movement without moving</p>
                       </div>
                     </div>
                     <div 
                       onClick={() => setIsSimulatingMovement(!isSimulatingMovement)}
-                      className={`w-12 h-6 rounded-full relative p-1 transition-colors cursor-pointer ${isSimulatingMovement ? 'bg-green-500' : 'bg-gray-300'}`}
+                      className={`w-12 h-6 rounded-full relative p-1 transition-all duration-300 cursor-pointer ${isSimulatingMovement ? 'bg-[#22c55e]' : 'bg-neutral-800'}`}
                     >
                       <motion.div 
                         animate={{ x: isSimulatingMovement ? 24 : 0 }}
@@ -14202,24 +14318,24 @@ export default function App() {
                 </div>
 
                 {/* CarPlay Remote Display Section */}
-                <div className={`p-6 rounded-3xl mt-6 border-2 ${theme === 'dark' ? 'bg-blue-500/10 border-blue-500/20' : 'bg-blue-50 border-blue-100'}`}>
-                  <h3 className="font-black text-lg mb-4 flex items-center gap-2">
-                    <Smartphone size={20} className="text-blue-600" />
+                <div className="p-6 rounded-[32px] mt-6 border border-blue-500/20 bg-blue-500/5">
+                  <h3 className="font-black text-lg mb-4 flex items-center gap-2 text-white">
+                    <Smartphone size={20} className="text-blue-500" />
                     CarPlay Remote Sync
                   </h3>
-                  <p className="text-xs text-gray-500 font-bold mb-4">
+                  <p className="text-xs text-gray-400 font-medium mb-4">
                     Use this device as a dedicated CarPlay display. Connect another device to control it.
                   </p>
                   
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-black/40 border border-white/5 font-bold">
                       <div>
-                        <p className="font-bold">Remote Display Mode</p>
-                        <p className="text-[10px] text-gray-400 font-bold">Follows other device's state</p>
+                        <p className="font-bold text-xs text-white">Remote Display Mode</p>
+                        <p className="text-[10px] text-gray-450 font-bold mt-0.5">Follows other device's state</p>
                       </div>
                       <div 
                         onClick={() => setIsCarPlayRemoteMode(!isCarPlayRemoteMode)}
-                        className={`w-12 h-6 rounded-full relative p-1 transition-colors cursor-pointer ${isCarPlayRemoteMode ? 'bg-blue-600' : 'bg-gray-300'}`}
+                        className={`w-12 h-6 rounded-full relative p-1 transition-all duration-305 cursor-pointer ${isCarPlayRemoteMode ? 'bg-[#22c55e]' : 'bg-neutral-800'}`}
                       >
                         <motion.div 
                           animate={{ x: isCarPlayRemoteMode ? 24 : 0 }}
@@ -14353,22 +14469,22 @@ export default function App() {
           )}
 
           {currentScreen === 'earnings' && (
-            <motion.div key="earnings" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
+            <motion.div key="earnings" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full p-6 overflow-y-auto pb-32 bg-[#0a0a0c] text-white">
               <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => setCurrentScreen('home')} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><X size={24} /></button>
+                <button onClick={() => setCurrentScreen('home')} className="p-2 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 text-white active:scale-95 transition-transform"><X size={20} /></button>
                 <h1 className="font-display text-3xl font-black tracking-tight">Earnings</h1>
               </div>
 
               {/* Tabs */}
-              <div className={`flex p-1 rounded-2xl mb-8 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}>
+              <div className="flex p-1 rounded-2xl mb-8 bg-white/5 border border-white/5">
                 {(['today', 'weekly', 'recent'] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setEarningsTab(tab)}
                     className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
                       earningsTab === tab 
-                        ? (theme === 'dark' ? 'bg-white text-black shadow-lg' : 'bg-black text-white shadow-lg')
-                        : 'text-gray-400'
+                        ? 'bg-[#22c55e] text-black shadow-lg shadow-[#22c55e]/20'
+                        : 'text-gray-400 hover:text-white'
                     }`}
                   >
                     {tab}
@@ -14376,9 +14492,9 @@ export default function App() {
                 ))}
               </div>
 
-              <div className={`${theme === 'dark' ? 'bg-white/5' : 'bg-black text-white'} rounded-3xl p-8 mb-8 relative overflow-hidden`}>
+              <div className="bg-[#121214] border border-white/5 rounded-3xl p-8 mb-8 relative overflow-hidden shadow-2xl">
                 <div className="flex justify-between items-start mb-2">
-                  <p className="text-sm font-bold opacity-60 uppercase tracking-widest">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#22c55e]">
                     {earningsTab === 'today' ? 'Today' : earningsTab === 'weekly' ? 'This Week' : 'Total Earnings'}
                   </p>
                   <button 
@@ -14388,9 +14504,9 @@ export default function App() {
                         setEarningsGoal(parseFloat(newGoal));
                       }
                     }}
-                    className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors"
+                    className="p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-colors"
                   >
-                    <Target size={16} />
+                    <Target size={14} className="text-[#22c55e]" />
                   </button>
                 </div>
                 <h2 className="font-display text-5xl font-black mb-6 tracking-tighter">£{(earningsTab === 'today' ? earnings * 0.15 : earnings).toFixed(2)}</h2>
@@ -14398,7 +14514,7 @@ export default function App() {
                 {earnings > 0 && (
                   <button 
                     onClick={() => setCurrentScreen('wallet')}
-                    className="mb-6 w-full py-4 bg-white text-black rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-transform"
+                    className="mb-6 w-full py-4 bg-[#22c55e] hover:bg-[#1fbd52] text-black rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-transform shadow-lg shadow-[#22c55e]/15"
                   >
                     CASH OUT £{earnings.toFixed(2)}
                   </button>
@@ -14410,21 +14526,21 @@ export default function App() {
                     <span>Daily Goal Progress</span>
                     <span>{Math.min(100, Math.round((earnings / earningsGoal) * 100))}%</span>
                   </div>
-                  <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden">
                     <motion.div 
                       initial={{ width: 0 }}
                       animate={{ width: `${Math.min(100, (earnings / earningsGoal) * 100)}%` }}
-                      className={`h-full rounded-full ${earnings >= earningsGoal ? 'bg-green-500' : 'bg-blue-500'}`}
+                      className={`h-full rounded-full ${earnings >= earningsGoal ? 'bg-[#22c55e] shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-[#eab308] shadow-[0_0_8px_rgba(234,179,8,0.5)]'}`}
                     />
                   </div>
                 </div>
 
                 <div className="flex gap-4">
-                  <div className="flex-1 bg-white/10 p-4 rounded-2xl">
+                  <div className="flex-1 bg-black/30 p-4 rounded-2xl border border-white/5">
                     <p className="text-[10px] font-bold opacity-60 uppercase mb-1">Trips</p>
                     <p className="text-xl font-black">{earningsTab === 'today' ? 2 : user.deliveries}</p>
                   </div>
-                  <div className="flex-1 bg-white/10 p-4 rounded-2xl">
+                  <div className="flex-1 bg-black/30 p-4 rounded-2xl border border-white/5">
                     <p className="text-[10px] font-bold opacity-60 uppercase mb-1">Online</p>
                     <p className="text-xl font-black">{earningsTab === 'today' ? '1h 15m' : '4h 22m'}</p>
                   </div>
@@ -14438,22 +14554,22 @@ export default function App() {
                   </h3>
                   <button 
                     onClick={() => setCurrentScreen('payment_methods')}
-                    className="flex items-center gap-2 text-blue-600 font-black text-[10px] uppercase tracking-widest bg-blue-50 dark:bg-blue-500/10 px-3 py-1.5 rounded-full active:scale-95 transition-transform"
+                    className="flex items-center gap-2 text-[#22c55e] font-black text-[10px] uppercase tracking-widest bg-[#22c55e]/10 border border-[#22c55e]/20 px-3 py-1.5 rounded-full active:scale-95 transition-transform"
                   >
                     <CreditCard size={14} />
                     Payments & Payouts
                   </button>
                 </div>
                 {(earningsTab === 'today' ? [1, 2] : [1, 2, 3, 4, 5]).map(i => (
-                  <div key={`earnings-entry-${i}`} className={`flex items-center justify-between py-2 border-b ${theme === 'dark' ? 'border-white/5' : 'border-gray-100'}`}>
+                  <div key={`earnings-entry-${i}`} className="flex items-center justify-between py-2 border-b border-white/5">
                     <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center text-green-500 ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}><Check size={24} /></div>
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center text-[#22c55e] bg-[#22c55e]/5 border border-[#22c55e]/10"><Check size={20} /></div>
                       <div>
-                        <p className="font-bold">Delivery • {['Greggs', 'McDonald\'s', 'Subway', 'KFC', 'Burger King'][i % 5]}</p>
+                        <p className="font-bold text-sm">Delivery • {['Greggs', 'McDonald\'s', 'Subway', 'KFC', 'Burger King'][i % 5]}</p>
                         <p className="text-xs text-gray-400">{earningsTab === 'today' ? 'Today' : 'Yesterday'}, {getArrivalTime(-(i * 60))}</p>
                       </div>
                     </div>
-                    <p className="font-black text-lg">£{(5 + Math.random() * 5).toFixed(2)}</p>
+                    <p className="font-black text-lg text-white">£{(5 + Math.random() * 5).toFixed(2)}</p>
                   </div>
                 ))}
               </div>
@@ -15027,8 +15143,8 @@ export default function App() {
       </div>
 
       {/* Bottom Nav */}
-      {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && !isOffAppSimulated && (
-        <div className="h-20 bg-white border-t border-gray-100 flex items-center justify-around px-2 z-[2000] shrink-0 relative pb-4 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+      {!['onboarding', 'documents', 'face_verification', 'home'].includes(currentScreen) && !isOffAppSimulated && (
+        <div className="h-20 bg-[#0c0c0d] border-t border-white/5 flex items-center justify-around px-2 z-[2000] shrink-0 relative pb-4 shadow-2xl">
           <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={22} />} label="Home" badgeCount={activeOrders.length > 0 ? activeOrders.length : undefined} />
           <NavButton 
             active={isBottomMenuOpen || currentScreen === 'trip_history'} 
@@ -15041,7 +15157,7 @@ export default function App() {
             badgeCount={activeOrders.filter(o => o.status === 'accepted').length > 0 ? activeOrders.filter(o => o.status === 'accepted').length : undefined}
           />
           <NavButton active={currentScreen === 'earnings' || currentScreen === 'earnings_detail'} onClick={() => setCurrentScreen('earnings_detail')} icon={<DollarSign size={22} />} label="Earnings" />
-          <NavButton active={currentScreen === 'account' || currentScreen === 'work_hub'} onClick={() => setCurrentScreen('account')} icon={<Menu size={22} />} label="More" />
+          <NavButton active={currentScreen === 'account'} onClick={() => setCurrentScreen('account')} icon={<User size={22} />} label="Account" />
         </div>
       )}
       {/* Rating & Level Up Overlays */}
@@ -16159,13 +16275,13 @@ const DebugMonitorView = ({
 
 function NavButton({ active, onClick, icon, label, badgeCount }: { active: boolean, onClick: () => void, icon: ReactNode, label: string, badgeCount?: number }) {
   return (
-    <button onClick={onClick} className={`flex flex-col items-center p-1 transition-all relative ${active ? 'text-white' : 'text-gray-500'}`}>
-      <div className={`p-1 rounded-full transition-colors flex items-center justify-center ${active ? 'bg-white/10' : ''}`}>
+    <button onClick={onClick} className={`flex flex-col items-center p-1 transition-all relative ${active ? 'text-[#22c55e]' : 'text-gray-500'}`}>
+      <div className={`p-1.5 rounded-full transition-colors flex items-center justify-center ${active ? 'bg-emerald-500/10 text-[#22c55e]' : 'hover:bg-white/5 text-gray-500'}`}>
         {icon}
       </div>
-      <span className="text-[9px] font-black uppercase tracking-tight leading-none mt-0.5">{label}</span>
+      <span className="text-[10px] font-black uppercase tracking-wider leading-none mt-1">{label}</span>
       {badgeCount !== undefined && badgeCount > 0 && (
-        <div className="absolute top-0 right-0 w-4 h-4 bg-blue-600 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-black">
+        <div className="absolute top-0 right-1 w-4 h-4 bg-[#ef4444] text-white text-[8px] font-black rounded-full flex items-center justify-center border border-[#0a0a0c]">
           {badgeCount}
         </div>
       )}

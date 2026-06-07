@@ -502,7 +502,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             {/* Marker 2: Active Navigation Stops Pinpoints */}
             {location && isNavigating && currentStops.map((stop, i) => (
               <AdvancedMarker 
-                key={`gmap-stop-${stop.orderId}-${stop.type}`} 
+                key={`gmap-stop-${stop.orderId}-${stop.type}-${i}`} 
                 position={{ lat: stop.location.latitude, lng: stop.location.longitude }}
               >
                 <div className="flex flex-col items-center">
