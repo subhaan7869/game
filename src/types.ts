@@ -33,6 +33,7 @@ export interface Order {
   surgeMultiplier?: number;
   pickupPos?: { lat: number, lng: number };
   dropoffPos?: { lat: number, lng: number };
+  brand?: 'uber' | 'bolt';
 }
 
 export interface NavSimulation {

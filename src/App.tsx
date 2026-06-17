@@ -90,6 +90,7 @@ import {
   Wrench,
   Sparkles,
   Gauge,
+  Layers,
   CloudRain
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -113,6 +114,7 @@ import { WebAnalyticsDashboard } from './components/WebAnalyticsDashboard';
 import SimulatedHomeScreen from './components/SimulatedHomeScreen';
 import { CompanionChat } from './components/CompanionChat';
 import { MultiplayerHub, OtherDriver } from './components/MultiplayerHub';
+import { AppLauncherScreen } from './components/AppLauncherScreen';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
@@ -902,7 +904,12 @@ const SideMenu = ({
   earningsGoal,
   setEarningsGoal,
   busynessMode,
-  endShift
+  endShift,
+  autoPauseSecondApp,
+  setAutoPauseSecondApp,
+  activeBrand,
+  setActiveBrand,
+  setShowAppLauncher
 }: { 
   user: UserProfile, 
   setIsSideMenuOpen: (val: boolean) => void,
@@ -917,7 +924,12 @@ const SideMenu = ({
   earningsGoal: number,
   setEarningsGoal: (val: number) => void,
   busynessMode: 'Low' | 'Medium' | 'High',
-  endShift: () => void
+  endShift: () => void,
+  autoPauseSecondApp: boolean,
+  setAutoPauseSecondApp: (val: boolean) => void,
+  activeBrand: 'uber' | 'bolt' | 'both',
+  setActiveBrand: (val: 'uber' | 'bolt' | 'both') => void,
+  setShowAppLauncher: (val: boolean) => void
 }) => {
   return (
     <motion.div 
@@ -925,7 +937,13 @@ const SideMenu = ({
       animate={{ x: 0 }}
       exit={{ x: '-100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed left-0 top-0 bottom-0 w-[85%] max-w-[320px] z-[2000] bg-[#0c0d10] text-white flex flex-col shadow-[20px_0_60px_rgba(0,0,0,0.6)] border-r border-white/5"
+      className={`fixed left-0 top-0 bottom-0 w-[85%] max-w-[320px] z-[2000] flex flex-col shadow-[20px_0_60px_rgba(0,0,0,0.6)] border-r transition-all duration-500 ${
+        activeBrand === 'bolt' 
+          ? 'bg-gradient-to-b from-[#021d0e] to-[#030a05] text-white border-r-[#00ea72]/20 shadow-[0_0_40px_rgba(0,252,114,0.06)]' 
+          : activeBrand === 'both'
+          ? 'bg-gradient-to-b from-[#0e071e] to-[#05020d] text-white border-r-purple-500/20 shadow-[0_0_40px_rgba(168,85,247,0.06)]' 
+          : 'bg-[#0c0d10] text-white border-r-white/5'
+      }`}
       onClick={(e) => e.stopPropagation()}
     >
       <div className="p-6 pt-10 flex-1 overflow-y-auto custom-scrollbar flex flex-col">
@@ -996,9 +1014,21 @@ const SideMenu = ({
             <button 
               key={`side-menu-item-new-${i}`}
               onClick={item.action}
-              className="w-full flex items-center gap-4 p-4 rounded-2xl transition-all hover:bg-white/[0.04] text-gray-300 hover:text-white group active:scale-98 text-left"
+              className={`w-full flex items-center gap-4 p-4 transition-all group active:scale-98 text-left ${
+                activeBrand === 'bolt'
+                  ? 'hover:bg-[#00ea72]/10 rounded-[24px] text-gray-300 hover:text-white'
+                  : activeBrand === 'both'
+                  ? 'hover:bg-purple-500/10 rounded-[20px] text-gray-300 hover:text-white'
+                  : 'hover:bg-white/[0.04] rounded-2xl text-gray-300 hover:text-white'
+              }`}
             >
-              <div className="text-[#22c55e] opacity-85 group-hover:opacity-100 transition-opacity">{item.icon}</div>
+              <div className={`transition-all ${
+                activeBrand === 'bolt'
+                  ? 'text-[#00ff88]'
+                  : activeBrand === 'both'
+                  ? 'text-purple-400'
+                  : 'text-[#22c55e] opacity-85 group-hover:opacity-100'
+              }`}>{item.icon}</div>
               <span className="font-bold text-sm tracking-tight text-white/90 group-hover:text-white transition-colors">{item.label}</span>
               {item.badge}
             </button>
@@ -1030,12 +1060,45 @@ const SideMenu = ({
             <button 
               key={`side-menu-item-sec-${i}`}
               onClick={item.action}
-              className="w-full flex items-center gap-4 p-4 rounded-2xl transition-all hover:bg-white/[0.04] text-gray-400 hover:text-white group active:scale-98 text-left"
+              className={`w-full flex items-center gap-4 p-4 transition-all group active:scale-98 text-left ${
+                activeBrand === 'bolt'
+                  ? 'hover:bg-[#00ea72]/10 rounded-[24px]'
+                  : activeBrand === 'both'
+                  ? 'hover:bg-purple-500/10 rounded-[20px]'
+                  : 'hover:bg-white/[0.04] rounded-2xl'
+              }`}
             >
-              <div className="text-gray-500 group-hover:text-gray-350 transition-colors">{item.icon}</div>
+              <div className={`transition-colors ${
+                activeBrand === 'bolt'
+                  ? 'text-[#00ea72]/85 group-hover:text-[#00ff88]'
+                  : activeBrand === 'both'
+                  ? 'text-purple-400/85 group-hover:text-purple-300'
+                  : 'text-gray-500 group-hover:text-gray-350'
+              }`}>{item.icon}</div>
               <span className="font-bold text-sm tracking-tight text-white/75 group-hover:text-white transition-colors">{item.label}</span>
             </button>
           ))}
+        </div>
+
+        {/* Smart Multi-App Auto-Pause toggle option */}
+        <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl mt-6 flex items-center justify-between shrink-0">
+          <div>
+            <p className="text-xs font-black text-white/90">Multi-App Auto-Pause</p>
+            <p className="text-[9px] text-gray-550 font-bold leading-tight mt-0.5 max-w-[150px]">Pause other network when on active trips</p>
+          </div>
+          <button
+            onClick={() => setAutoPauseSecondApp(!autoPauseSecondApp)}
+            className={`w-11 h-6 rounded-full transition-colors flex items-center p-1 cursor-pointer shrink-0 ${
+              autoPauseSecondApp ? 'bg-[#00ca72]' : 'bg-white/10'
+            }`}
+          >
+            <motion.div
+              layout
+              className="w-4 h-4 bg-black rounded-full"
+              animate={{ x: autoPauseSecondApp ? 20 : 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            />
+          </button>
         </div>
 
         {/* GO OFFLINE Action Button - dynamically displayed if currently Online */}
@@ -1880,10 +1943,14 @@ const NewUserForm = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[500] flex items-center justify-center p-3 sm:p-4">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/70" />
-      <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white w-full max-w-sm rounded-[28px] p-5 shadow-2xl relative z-10 max-h-[94vh] flex flex-col">
-        <div className="overflow-y-auto flex-1 no-scrollbar space-y-4">
+    <div className="fixed inset-0 z-[500] bg-black overflow-y-auto pb-24 flex flex-col items-center pt-8 md:pt-16 px-4 no-scrollbar">
+      {/* Floating Authentication Card */}
+      <motion.div 
+        initial={{ scale: 0.95, opacity: 0 }} 
+        animate={{ scale: 1, opacity: 1 }} 
+        className="bg-white w-full max-w-sm rounded-[28px] p-5 shadow-2xl relative z-10 flex flex-col mb-12 border border-slate-200 text-black shrink-0"
+      >
+        <div className="space-y-4">
           
           {authMode === 'options' && (
             <div className="space-y-4 text-center">
@@ -5534,6 +5601,7 @@ export default function App() {
   });
   const engineNodeRef = useRef<{ osc1: OscillatorNode; osc2: OscillatorNode; gain: GainNode; filter: BiquadFilterNode; ctx: AudioContext } | null>(null);
   const workerRef = useRef<Worker | null>(null);
+  const nextBackgroundCheckTicksRef = useRef<number>(75 + Math.floor(Math.random() * 75));
   const currentOrderAudioRef = useRef<HTMLAudioElement | null>(null);
   const currentWebAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const [backgroundTicks, setBackgroundTicks] = useState(0);
@@ -5621,6 +5689,7 @@ export default function App() {
   };
   const [isOffAppSimulated, setIsOffAppSimulated] = useState(false);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
+  const [showAppLauncher, setShowAppLauncher] = useState<boolean>(false);
   const [isCarPlaySynced, setIsCarPlaySynced] = useState(false);
   const [isCarPlayRemoteMode, setIsCarPlayRemoteMode] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -5631,6 +5700,68 @@ export default function App() {
       return 'dark';
     }
   });
+  
+  const [activeBrand, setActiveBrand] = useState<'uber' | 'bolt' | 'both'>('uber');
+
+  const [uberOnline, setUberOnline] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('hyper_driver_uber_online') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const [boltOnline, setBoltOnline] = useState<boolean>(false);
+
+  const [autoPauseSecondApp, setAutoPauseSecondApp] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('hyper_driver_auto_pause');
+      return saved !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const [wasUberOnlinePaused, setWasUberOnlinePaused] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('hyper_driver_was_uber_paused') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const [wasBoltOnlinePaused, setWasBoltOnlinePaused] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('hyper_driver_was_bolt_paused') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('hyper_driver_active_brand', activeBrand);
+  }, [activeBrand]);
+
+  useEffect(() => {
+    localStorage.setItem('hyper_driver_uber_online', String(uberOnline));
+  }, [uberOnline]);
+
+  useEffect(() => {
+    localStorage.setItem('hyper_driver_bolt_online', String(boltOnline));
+  }, [boltOnline]);
+
+  useEffect(() => {
+    localStorage.setItem('hyper_driver_auto_pause', String(autoPauseSecondApp));
+  }, [autoPauseSecondApp]);
+
+  useEffect(() => {
+    localStorage.setItem('hyper_driver_was_uber_paused', String(wasUberOnlinePaused));
+  }, [wasUberOnlinePaused]);
+
+  useEffect(() => {
+    localStorage.setItem('hyper_driver_was_bolt_paused', String(wasBoltOnlinePaused));
+  }, [wasBoltOnlinePaused]);
+
   const [earningsTab, setEarningsTab] = useState<'today' | 'weekly' | 'recent'>('today');
   
   // User Profile State
@@ -5875,6 +6006,60 @@ export default function App() {
     speed: 15 + Math.random() * 15
   });
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
+
+  // Standby Auto Pause / Resume Multi-App engine
+  useEffect(() => {
+    if (!autoPauseSecondApp) return;
+
+    if (activeOrders.length > 0) {
+      // We have active trip(s). Put the OTHER app on standby.
+      const activeBrandOnTrip = activeOrders[0].brand || 'uber';
+      if (activeBrandOnTrip === 'uber') {
+        setBoltOnline(isOnline => {
+          if (isOnline) {
+            setWasBoltOnlinePaused(true);
+            setTimeout(() => {
+              addToast("Bolt Auto-Paused ⏸️", "Bolt paused automatically to keep full focus on your Uber trip.", "info");
+            }, 100);
+            return false;
+          }
+          return isOnline;
+        });
+      } else if (activeBrandOnTrip === 'bolt') {
+        setUberOnline(isOnline => {
+          if (isOnline) {
+            setWasUberOnlinePaused(true);
+            setTimeout(() => {
+              addToast("Uber Auto-Paused ⏸️", "Uber paused automatically to keep full focus on your Bolt trip.", "info");
+            }, 100);
+            return false;
+          }
+          return isOnline;
+        });
+      }
+    } else {
+      // No active trips. Resume previously paused apps.
+      setWasUberOnlinePaused(wasPaused => {
+        if (wasPaused) {
+          setUberOnline(true);
+          setTimeout(() => {
+            addToast("Uber Auto-Resumed ▶️", "Uber dispatch resume active since your Bolt trip completed.", "success");
+          }, 100);
+        }
+        return false;
+      });
+      setWasBoltOnlinePaused(wasPaused => {
+        if (wasPaused) {
+          setBoltOnline(true);
+          setTimeout(() => {
+            addToast("Bolt Auto-Resumed ▶️", "Bolt dispatch resume active since your Uber trip completed.", "success");
+          }, 100);
+        }
+        return false;
+      });
+    }
+  }, [activeOrders.length, autoPauseSecondApp]);
+
   const [joinedAirportId, setJoinedAirportId] = useState<string | null>(() => {
     try {
       const saved = localStorage.getItem('hyper_driver_joined_airport_id');
@@ -8486,27 +8671,39 @@ export default function App() {
 
   // Map Background Component for depth and to prevent "black screen" feel
   const MapGrid = () => {
-    // Dynamic styling based on Busyness (Uber-like color shifts)
+    // Dynamic styling based on Busyness (Uber-like color shifts) and brand selection
     let baseBg = 'bg-[#0c0c0d]';
     let roadColor = '#3b82f6'; // Light blue
     let radialGlowColor = 'rgba(59,130,246,0.06)';
     let vignetteColor = 'rgba(0,0,0,0.4)';
 
-    if (busynessMode === 'High') {
-      baseBg = 'bg-[#150606]'; // Dark Crimson Tint
-      roadColor = '#ff3b30'; // Neon Crimson
-      radialGlowColor = 'rgba(239, 68, 68, 0.09)';
-      vignetteColor = 'rgba(25, 5, 5, 0.65)';
-    } else if (busynessMode === 'Medium') {
-      baseBg = 'bg-[#120a03]'; // Dark Amber/Gold Tint
-      roadColor = '#f59e0b'; // Gold
-      radialGlowColor = 'rgba(245, 158, 11, 0.07)';
-      vignetteColor = 'rgba(18, 10, 3, 0.55)';
+    if (activeBrand === 'bolt') {
+      baseBg = 'bg-[#02180b]'; // Deep Forest Midnight Green
+      roadColor = '#00ff88'; // Glowing Electric Green
+      radialGlowColor = 'rgba(0, 255, 136, 0.08)';
+      vignetteColor = 'rgba(2, 24, 11, 0.65)';
+    } else if (activeBrand === 'both') {
+      baseBg = 'bg-[#0a0518]'; // Deep Cyber Indigo/Violet
+      roadColor = '#c084fc'; // Vibrant Light Purple/Indigo
+      radialGlowColor = 'rgba(192, 132, 252, 0.12)';
+      vignetteColor = 'rgba(10, 5, 24, 0.65)';
     } else {
-      baseBg = 'bg-[#05090e]'; // Deep Blue-Green Teal Tint
-      roadColor = '#06b6d4'; // Cool Cyan/Teal
-      radialGlowColor = 'rgba(6, 182, 212, 0.06)';
-      vignetteColor = 'rgba(3, 8, 15, 0.45)';
+      if (busynessMode === 'High') {
+        baseBg = 'bg-[#150606]'; // Dark Crimson Tint
+        roadColor = '#ff3b30'; // Neon Crimson
+        radialGlowColor = 'rgba(239, 68, 68, 0.09)';
+        vignetteColor = 'rgba(25, 5, 5, 0.65)';
+      } else if (busynessMode === 'Medium') {
+        baseBg = 'bg-[#120a03]'; // Dark Amber/Gold Tint
+        roadColor = '#f59e0b'; // Gold
+        radialGlowColor = 'rgba(245, 158, 11, 0.07)';
+        vignetteColor = 'rgba(18, 10, 3, 0.55)';
+      } else {
+        baseBg = 'bg-[#05090e]'; // Deep Blue-Green Teal Tint
+        roadColor = '#06b6d4'; // Cool Cyan/Teal
+        radialGlowColor = 'rgba(6, 182, 212, 0.06)';
+        vignetteColor = 'rgba(3, 8, 15, 0.45)';
+      }
     }
 
     return (
@@ -8575,27 +8772,53 @@ export default function App() {
     const candidates = Array.from({ length: 5 }).map(() => {
       const type = getJobType();
       
-      let variant = 'Hyper Eats';
-      if (type === 'ride') {
-        const ridePool: string[] = [];
-        if (enabledServices.includes('rideshare')) ridePool.push('HyperX');
-        if (enabledServices.includes('intercity')) ridePool.push('Intercity Route');
-        if (enabledServices.includes('hyper_pet')) ridePool.push('Hyper Pet 🐾');
-        if (enabledServices.includes('hyperxl')) ridePool.push('HyperXL 🚙');
-        if (enabledServices.includes('green')) ridePool.push('Eco Green 🔋');
-        if (enabledServices.includes('assist')) ridePool.push('Assist Access ♿');
-        
-        if (ridePool.length > 0) {
-          variant = ridePool[Math.floor(Math.random() * ridePool.length)];
+      const orderBrand: 'uber' | 'bolt' = 'uber';
+
+      let variant = 'Uber Eats 🍔';
+      if (orderBrand === 'uber') {
+        if (type === 'ride') {
+          const ridePool: string[] = [];
+          if (enabledServices.includes('rideshare')) ridePool.push('UberX');
+          if (enabledServices.includes('intercity')) ridePool.push('Uber Intercity');
+          if (enabledServices.includes('hyper_pet')) ridePool.push('Uber Pet 🐾');
+          if (enabledServices.includes('hyperxl')) ridePool.push('UberXL 🚙');
+          if (enabledServices.includes('green')) ridePool.push('Uber Green 🔋');
+          if (enabledServices.includes('assist')) ridePool.push('Uber Assist ♿');
+          
+          if (ridePool.length > 0) {
+            variant = ridePool[Math.floor(Math.random() * ridePool.length)];
+          } else {
+            variant = 'UberX';
+          }
         } else {
-          variant = 'HyperX';
+          const delivPool: string[] = ['Uber Eats 🍔'];
+          if (enabledServices.includes('packages')) {
+            delivPool.push('Uber Connect 📦');
+          }
+          variant = delivPool[Math.floor(Math.random() * delivPool.length)];
         }
       } else {
-        const delivPool: string[] = ['Hyper Eats 🍔'];
-        if (enabledServices.includes('packages')) {
-          delivPool.push('Package Connect 📦');
+        if (type === 'ride') {
+          const ridePool: string[] = [];
+          if (enabledServices.includes('rideshare')) ridePool.push('Bolt Ride');
+          if (enabledServices.includes('intercity')) ridePool.push('Bolt Intercity');
+          if (enabledServices.includes('hyper_pet')) ridePool.push('Bolt Pet 🐾');
+          if (enabledServices.includes('hyperxl')) ridePool.push('Bolt XL 🚙');
+          if (enabledServices.includes('green')) ridePool.push('Bolt Green 🔋');
+          if (enabledServices.includes('assist')) ridePool.push('Bolt Assist ♿');
+          
+          if (ridePool.length > 0) {
+            variant = ridePool[Math.floor(Math.random() * ridePool.length)];
+          } else {
+            variant = 'Bolt Ride';
+          }
+        } else {
+          const delivPool: string[] = ['Bolt Food 🍔'];
+          if (enabledServices.includes('packages')) {
+            delivPool.push('Bolt Send 📦');
+          }
+          variant = delivPool[Math.floor(Math.random() * delivPool.length)];
         }
-        variant = delivPool[Math.floor(Math.random() * delivPool.length)];
       }
       
       const cityInfo = CITY_DATABASES[activeCityKey] || CITY_DATABASES["London"];
@@ -8612,7 +8835,7 @@ export default function App() {
       let pickupOffsetLat = (Math.random() - 0.5) * 0.02;
       let pickupOffsetLng = (Math.random() - 0.5) * 0.02;
 
-      if (variant === 'Intercity Route') {
+      if (variant.includes('Intercity')) {
         // Significantly longer distance for Intercity routes
         pickupOffsetLat = (Math.random() - 0.5) * 0.15;
         pickupOffsetLng = (Math.random() - 0.5) * 0.15;
@@ -8640,12 +8863,12 @@ export default function App() {
       let minPay = 5.00;
       customEstDist = tripDist + distToPickup;
 
-      if (variant === 'HyperX') {
+      if (variant.includes('UberX') || variant.includes('Bolt Ride')) {
         baseFee = 2.50;
         mileRate = 1.45;
         minuteRate = 0.15;
         minPay = 5.00;
-      } else if (variant === 'Intercity Route') {
+      } else if (variant.includes('Intercity')) {
         baseFee = 32.00;
         mileRate = 2.65;
         minuteRate = 0.25;
@@ -8653,33 +8876,32 @@ export default function App() {
         if (customEstDist < 15.0) {
           customEstDist += 15.5; // Ensure it feels long distance
         }
-      } else if (variant === 'Hyper Pet 🐾') {
+      } else if (variant.includes('Pet')) {
         baseFee = 4.50;
         mileRate = 1.80;
         minuteRate = 0.20;
         minPay = 9.00;
-      } else if (variant === 'HyperXL 🚙') {
+      } else if (variant.includes('XL')) {
         baseFee = 5.50;
         mileRate = 2.10;
         minuteRate = 0.20;
         minPay = 11.50;
-      } else if (variant === 'Eco Green 🔋') {
+      } else if (variant.includes('Green')) {
         baseFee = 3.00;
         mileRate = 1.60;
         minuteRate = 0.18;
         minPay = 6.50;
-      } else if (variant === 'Assist Access ♿') {
+      } else if (variant.includes('Assist')) {
         baseFee = 4.00;
         mileRate = 1.50;
         minuteRate = 0.30;
         minPay = 8.00;
-      } else if (variant === 'Package Connect 📦') {
+      } else if (variant.includes('Connect') || variant.includes('Send')) {
         baseFee = 3.50;
         mileRate = 1.30;
         minuteRate = 0.12;
         minPay = 5.50;
       } else {
-        // Hyper Eats or default delivery
         baseFee = 1.50;
         mileRate = 1.10;
         minuteRate = 0.15;
@@ -8689,12 +8911,12 @@ export default function App() {
       const estTime = Math.floor((customEstDist) * 4 + 3);
       const calculatedPay = baseFee + (customEstDist * mileRate) + (estTime * minuteRate);
       
-      const finalBasePay = Math.max(calculatedPay, minPay) + (variant === 'Eco Green 🔋' ? 2.00 : 0);
+      const finalBasePay = Math.max(calculatedPay, minPay) + (variant.includes('Green') ? 2.00 : 0);
       
       const isStacked = type === 'delivery' && activeOrders.length < 2 && Math.random() < 0.3;
       let batchCount = isStacked ? 2 : 1;
       
-      const petTipBoost = variant === 'Hyper Pet 🐾' ? (1.25) : 1;
+      const petTipBoost = variant.includes('Pet') ? (1.25) : 1;
       const pay = (finalBasePay + (Math.random() * 2)) * activeSurge * (isStacked ? 1.7 : 1) * petTipBoost;
 
       const verificationMethod = (['pin', 'photo', 'none'] as const)[Math.floor(Math.random() * 3)];
@@ -8703,8 +8925,8 @@ export default function App() {
       return {
         id: Math.random().toString(36).substring(2, 11),
         type,
-        customerName: isStacked ? `${customerName} (Max+1)` : (variant === 'HyperXL 🚙' ? `${customerName} (5 Passengers)` : customerName),
-        restaurantName: type === 'delivery' ? (variant === 'Package Connect 📦' ? "Parcel Center" : (chosenRestaurant?.name || "Local Kitchen")) : variant,
+        customerName: isStacked ? `${customerName} (Max+1)` : (variant.includes('XL') ? `${customerName} (5 Passengers)` : customerName),
+        restaurantName: type === 'delivery' ? ((variant.includes('Connect') || variant.includes('Send')) ? "Parcel Center" : (chosenRestaurant?.name || "Local Kitchen")) : variant,
         restaurantLocation: { latitude: pickupLat, longitude: pickupLng },
         pickupLocation: { latitude: pickupLat, longitude: pickupLng },
         customerLocation: { latitude: custLat, longitude: custLng },
@@ -8718,7 +8940,7 @@ export default function App() {
         estimatedDistance: Number(((customEstDist) * (isStacked ? 1.4 : 1)).toFixed(1)),
         estimatedTime: Math.floor(((customEstDist) * 5 + 4) * (isStacked ? 1.5 : 1)),
         status: 'pending' as const,
-        items: type === 'delivery' ? (variant === 'Package Connect 📦' ? ["Secure Parcel Delivery"] : ["Meal Deal", "Hyper Eats Order"]) : undefined,
+        items: type === 'delivery' ? ((variant.includes('Connect') || variant.includes('Send')) ? ["Secure Parcel Delivery"] : ["Meal Deal", orderBrand === 'uber' ? "Uber Eats Order" : "Bolt Food Order"]) : undefined,
         pin: Math.floor(1000 + Math.random() * 9000).toString(),
         isMatching: activeOrders.length > 0 || Math.random() < 0.25,
         surge: activeSurge > 1.0 ? activeSurge : undefined,
@@ -8728,7 +8950,8 @@ export default function App() {
         batchCount,
         verificationMethod,
         receiptRequired,
-        receiptVerified: false
+        receiptVerified: false,
+        brand: orderBrand
       } as Order;
     });
 
@@ -8751,20 +8974,9 @@ export default function App() {
       // Adjusted wait time based on busyness mode
       if (!user.isOnline || isOnBreak) return;
 
-      let baseWait = 1500;
-      let randomRange = 2500;
-
-      if (busynessMode === 'Low') {
-        baseWait = 45000;
-        randomRange = 75000; // 45s to 120s (2 minutes)
-      } else if (busynessMode === 'Medium') {
-        baseWait = 5000;
-        randomRange = 10000; // 5s to 15s
-      } else {
-        // High
-        baseWait = 1500;
-        randomRange = 2500; // 1.5s to 4s
-      }
+      // Random wait time between 5 to 10 minutes (300,000 to 600,000 ms)
+      const baseWait = 300000; // 5 minutes
+      const randomRange = 300000; // up to 10 minutes total
 
       const waitTime = baseWait + Math.random() * randomRange;
 
@@ -9122,9 +9334,10 @@ export default function App() {
           // Tick logic: If tab is backgrounded, the worker generates requests
           const isHidden = document.visibilityState === 'hidden' || document.hidden || isOffAppSimulated;
           if (isHidden && user.isOnline && !isOnBreak && activeOrders.length < 3 && !pendingOrder && radarOrders.length === 0) {
-            // Every 3 ticks (~12 seconds), run a background matching check
-            if (e.data.tickCount % 3 === 0) {
+            // Background check interval randomly 5 to 10 minutes (75 to 150 ticks of 4s)
+            if (e.data.tickCount >= nextBackgroundCheckTicksRef.current) {
               triggerBackgroundOrderGeneration();
+              nextBackgroundCheckTicksRef.current = e.data.tickCount + Math.floor(75 + Math.random() * 75);
             }
           }
         }
@@ -9192,6 +9405,17 @@ export default function App() {
       } else {
         setActiveOrders(prev => [...prev, { ...pendingOrder, status: 'accepted' }]);
         console.log(`Order Accepted: ${pendingOrder.id}, PIN: ${pendingOrder.pin}`);
+      }
+
+      // Auto Pause Second App when active on a current trip
+      if (autoPauseSecondApp) {
+        if (pendingOrder.brand === 'uber' && boltOnline) {
+          setBoltOnline(false);
+          addToast("Bolt Auto-Paused ⏸️", "Bolt paused to keep full focus on your Uber trip.", "info");
+        } else if (pendingOrder.brand === 'bolt' && uberOnline) {
+          setUberOnline(false);
+          addToast("Uber Auto-Paused ⏸️", "Uber paused to keep full focus on your Bolt trip.", "info");
+        }
       }
 
       // Increase acceptance rate
@@ -9373,6 +9597,8 @@ export default function App() {
 
   const startShift = () => {
     setUser(u => ({ ...u, isOnline: true }));
+    setUberOnline(true);
+    setBoltOnline(true);
     setIsOnBreak(false);
     setShiftStats({
       trips: 0,
@@ -9397,6 +9623,8 @@ export default function App() {
 
   const endShift = () => {
     setUser(u => ({ ...u, isOnline: false }));
+    setUberOnline(false);
+    setBoltOnline(false);
     setIsOnBreak(false);
     setShowShiftSummary(true);
   };
@@ -10084,6 +10312,35 @@ export default function App() {
       {isUnderMaintenance && <MaintenanceScreen onRetry={() => window.location.reload()} />}
       {isUpdating && <UpdateScreen progress={updateProgress} />}
       {isScanning && <ScanningScreen />}
+      {showAppLauncher && (
+        <AppLauncherScreen
+          activeBrand={activeBrand}
+          uberOnline={uberOnline}
+          setUberOnline={setUberOnline}
+          boltOnline={boltOnline}
+          setBoltOnline={setBoltOnline}
+          isOnline={user.isOnline}
+          startShift={startShift}
+          endShift={endShift}
+          onSelect={(brand) => {
+            setActiveBrand(brand);
+            setShowAppLauncher(false);
+            
+            // Auto-trigger online shift logic if either network is toggled online
+            if ((brand === 'uber' && uberOnline) || (brand === 'bolt' && boltOnline) || (brand === 'both' && (uberOnline || boltOnline))) {
+              if (!user.isOnline) {
+                startShift();
+              }
+            }
+
+            addToast(
+              brand === 'uber' ? 'Uber Workspace Loaded 🖤' : brand === 'bolt' ? 'Bolt Workspace Loaded 💚' : 'Dual-Dispatch Workspace Loaded 💜',
+              brand === 'uber' ? 'Minimal Slate interface active. Focus Mode stabilized.' : brand === 'bolt' ? 'Neon Emerald interface active. Organic pill design configured.' : 'Unified split map overlay ready.',
+              'success'
+            );
+          }}
+        />
+      )}
       
       {!isAuthReady ? (
         <LoadingScreen />
@@ -10152,6 +10409,11 @@ export default function App() {
                 setEarningsGoal={setEarningsGoal}
                 busynessMode={busynessMode}
                 endShift={endShift}
+                autoPauseSecondApp={autoPauseSecondApp}
+                setAutoPauseSecondApp={setAutoPauseSecondApp}
+                activeBrand={activeBrand}
+                setActiveBrand={setActiveBrand}
+                setShowAppLauncher={setShowAppLauncher}
               />
             </>
           )}
@@ -10185,18 +10447,18 @@ export default function App() {
             )}
 
             {currentScreen === 'documents' && (
-            <motion.div key="documents" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="h-full w-full bg-[#0a0a0c] text-white p-6 flex flex-col pb-24">
+            <motion.div key="documents" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="h-full w-full bg-[#0a0a0c] text-white p-6 flex flex-col pb-24 overflow-y-auto no-scrollbar font-sans">
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen(user.isOnline ? 'account' : 'onboarding')} className="w-10 h-10 bg-[#121214] border border-white/5 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"><ArrowRight className="rotate-180" size={20} /></button>
                 <h1 className="text-3xl font-black">Documents</h1>
               </div>
-              <p className="text-gray-405 font-bold mb-8 text-sm">Tap each item to upload your documents securely.</p>
+              <p className="text-gray-400 font-bold mb-8 text-sm">Tap each item to upload your documents securely.</p>
               
-              <div className="space-y-4 flex-1">
+              <div className="space-y-4 flex-1 mb-8">
                 {[
-                  { label: "Driving Licence", icon: <FileText /> },
-                  { label: "Vehicle Insurance", icon: <ShieldCheck /> },
-                  { label: "Bank Statement", icon: <CreditCard /> },
+                  { label: "Driving Licence", icon: <FileText size={20} /> },
+                  { label: "Vehicle Insurance", icon: <ShieldCheck size={20} /> },
+                  { label: "Bank Statement", icon: <CreditCard size={20} /> },
                 ].map((doc, i) => {
                   const isUploaded = uploadedDocs.includes(doc.label);
                   const isUploading = uploadingDoc === doc.label;
@@ -10231,7 +10493,7 @@ export default function App() {
                   disabled={!allDocsUploaded}
                   className={`w-full py-5 rounded-2xl font-black text-lg uppercase tracking-wider transition-all ${allDocsUploaded ? 'bg-[#22c55e] border-none text-black shadow-[0_12px_28px_rgba(34,197,94,0.3)] hover:bg-[#1fbd52]' : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'}`}
                 >
-                  NEXT
+                  Next
                 </button>
               </div>
             </motion.div>
@@ -10361,6 +10623,7 @@ export default function App() {
                     pendingOrder={pendingOrder}
                     theme={theme}
                     otherDrivers={otherOnlineDrivers}
+                    activeBrand={activeBrand}
                   />
                 ) : (
                   <MapGrid />
@@ -11803,7 +12066,13 @@ export default function App() {
                 <div className="p-4 flex justify-between items-center pointer-events-auto">
                   <button 
                     onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
-                    className="w-11 h-11 bg-neutral-900/90 backdrop-blur-md border border-white/10 rounded-full shadow-2xl flex items-center justify-center text-white active:scale-95 transition-transform shrink-0"
+                    className={`w-11 h-11 backdrop-blur-md rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 border ${
+                      activeBrand === 'bolt' 
+                        ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_10px_rgba(0,255,136,0.15)]'
+                        : activeBrand === 'both'
+                        ? 'bg-[#0d091a]/95 text-purple-300 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
+                        : 'bg-neutral-900/90 text-white border-white/10'
+                    }`}
                   >
                     <Menu size={20} />
                   </button>
@@ -11811,7 +12080,13 @@ export default function App() {
                   <motion.div 
                     initial={{ y: -50, scale: 0.9 }}
                     animate={{ y: 0, scale: 1 }}
-                    className="bg-[#0c0d10] text-[#22c55e] px-5 py-1.5 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 border border-white/10 cursor-pointer select-none min-w-[150px] max-w-[210px] min-h-[44px] transition-all relative"
+                    className={`px-5 py-1.5 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 cursor-pointer select-none min-w-[150px] max-w-[210px] min-h-[44px] transition-all relative border ${
+                      activeBrand === 'bolt' 
+                        ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_15px_rgba(0,255,136,0.15)]' 
+                        : activeBrand === 'both'
+                        ? 'bg-gradient-to-r from-blue-950/95 to-[#022413]/95 text-white border-purple-500/35 shadow-[0_0_20px_rgba(124,58,237,0.2)]'
+                        : 'bg-[#0c0d10] text-[#22c55e] border-white/10'
+                    }`}
                     onClick={() => {
                       setTopBarMode(prev => {
                         if (prev === 'today') return 'last_trip';
@@ -11827,7 +12102,9 @@ export default function App() {
                     </span>
 
                     <div className="flex items-center gap-1.5 justify-center leading-none">
-                      <span className="font-display text-base font-black tracking-tight select-none text-white">
+                      <span className={`font-display text-base font-black tracking-tight select-none ${
+                        activeBrand === 'bolt' ? 'text-[#00ff88]' : 'text-white'
+                      }`}>
                         {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
                         {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
                         {topBarMode === 'hyper_driver_pro' && `${user.points || 350} XP`}
@@ -11835,9 +12112,9 @@ export default function App() {
                     </div>
 
                     <div className="flex gap-1 mt-1 justify-center select-none">
-                      <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? 'bg-[#22c55e] w-2.5' : 'bg-white/30'}`} />
-                      <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? 'bg-[#22c55e] w-2.5' : 'bg-white/30'}`} />
-                      <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? 'bg-[#22c55e] w-2.5' : 'bg-white/30'}`} />
+                      <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? (activeBrand === 'bolt' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                      <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? (activeBrand === 'bolt' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                      <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? (activeBrand === 'bolt' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
                     </div>
                   </motion.div>
 
@@ -11848,20 +12125,199 @@ export default function App() {
                           setIsOffAppSimulated(true);
                           addToast("Off-App Mode", "Simulating background execution. Tap the floating dot/notification overlay to restore.", "info");
                         }}
-                        className="w-11 h-11 bg-slate-950 border border-white/10 hover:border-white/20 rounded-full shadow-2xl flex items-center justify-center text-blue-400 hover:text-white active:scale-95 transition-all text-sm uppercase font-black shrink-0"
+                        className={`w-11 h-11 border rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-all text-sm uppercase font-black shrink-0 ${
+                          activeBrand === 'bolt'
+                            ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_10px_rgba(0,255,136,0.15)]'
+                            : activeBrand === 'both'
+                            ? 'bg-[#0d091a]/95 text-indigo-400 border-purple-500/30'
+                            : 'bg-slate-950 text-blue-400 border-white/10'
+                        }`}
                         title="Simulate Minimize (Go Off-App)"
                       >
-                        <Smartphone size={20} className="text-blue-400 animate-pulse" />
+                        <Smartphone size={20} className={`${activeBrand === 'bolt' ? 'text-[#00ff88]' : activeBrand === 'both' ? 'text-purple-400' : 'text-blue-400'} animate-pulse`} />
                       </button>
                     )}
                     <button 
                       onClick={() => setIsSearchOpen(true)}
-                      className="w-11 h-11 bg-neutral-900/90 backdrop-blur-md border border-white/10 rounded-full shadow-2xl flex items-center justify-center text-white active:scale-95 transition-transform shrink-0"
+                      className={`w-11 h-11 backdrop-blur-md border rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 ${
+                        activeBrand === 'bolt'
+                          ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_10px_rgba(0,255,136,0.15)]'
+                          : activeBrand === 'both'
+                          ? 'bg-[#0d091a]/95 text-indigo-400 border-purple-500/30'
+                          : 'bg-neutral-900/90 text-white border-white/10'
+                      }`}
                     >
                       <Search size={20} />
                     </button>
                   </div>
                 </div>
+              </div>
+
+              {/* Android Multi-App Floating Swapper Bubble */}
+              <div className="absolute top-[280px] right-2 z-[600] pointer-events-none">
+                <motion.div 
+                  drag
+                  dragConstraints={{ top: -150, left: -340, right: 0, bottom: 300 }}
+                  dragElastic={0.15}
+                  dragMomentum={false}
+                  initial={{ x: 0, y: 0, opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="pointer-events-auto flex items-center gap-1.5 group font-sans"
+                >
+                  {/* Miniature Expandable Panel displaying online/offline switches and Theme Styles */}
+                  <motion.div 
+                    initial={{ width: 0, opacity: 0 }}
+                    whileHover={{ width: 'auto', opacity: 1 }}
+                    className="overflow-hidden bg-[#07080a]/95 backdrop-blur-md border border-white/10 rounded-2xl p-1 flex items-center gap-1.5 shadow-[0_10px_25px_rgba(0,0,0,0.5)] transition-all ease-out duration-300 pointer-events-auto h-11 mr-1 select-none px-2 shrink-0"
+                  >
+                    {/* DISPATCH NETWORKS */}
+                    <span className="text-[7px] text-gray-500 font-black tracking-widest uppercase mr-0.5 whitespace-nowrap">DISPATCH:</span>
+                    
+                    {/* Compact Uber Toggle */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setUberOnline(prev => {
+                          const next = !prev;
+                          if (next) {
+                            setUser(u => ({ ...u, isOnline: true }));
+                            addToast('Uber Dispatch Online', 'Now listening to active Uber trip requests.', 'success');
+                          } else {
+                            addToast('Uber Offline', 'Disconnected from Uber network.', 'info');
+                            if (!boltOnline) setUser(u => ({ ...u, isOnline: false }));
+                          }
+                          return next;
+                        });
+                      }}
+                      className={`h-8 px-2 rounded-xl flex items-center gap-1 font-sans font-black text-[9px] uppercase transition-all whitespace-nowrap ${
+                        uberOnline 
+                          ? 'bg-sky-500/10 text-sky-400 border border-sky-400/20' 
+                          : 'text-gray-500 hover:text-white bg-white/5 border border-transparent'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${uberOnline ? 'bg-sky-400 animate-pulse' : 'bg-gray-650'}`} />
+                      Uber
+                    </button>
+
+                    {/* Compact Bolt Toggle */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBoltOnline(prev => {
+                          const next = !prev;
+                          if (next) {
+                            setUser(u => ({ ...u, isOnline: true }));
+                            addToast('Bolt Dispatch Online', 'Now listening to active Bolt fare opportunities.', 'success');
+                          } else {
+                            addToast('Bolt Offline', 'Disconnected from Bolt network.', 'info');
+                            if (!uberOnline) setUser(u => ({ ...u, isOnline: false }));
+                          }
+                          return next;
+                        });
+                      }}
+                      className={`h-8 px-2 rounded-xl flex items-center gap-1 font-sans font-black text-[9px] uppercase transition-all whitespace-nowrap ${
+                        boltOnline 
+                          ? 'bg-[#00ca72]/10 text-[#00ca72] border border-[#00ca72]/20' 
+                          : 'text-gray-400 hover:text-white bg-white/5 border border-transparent'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${boltOnline ? 'bg-emerald-300 animate-pulse' : 'bg-gray-650'}`} />
+                      Bolt
+                    </button>
+
+                    <div className="w-[1px] h-5 bg-white/10 mx-0.5 shrink-0" />
+
+                    {/* SKIN STYLES */}
+                    <span className="text-[7px] text-gray-500 font-black tracking-widest uppercase mr-0.5 whitespace-nowrap">SKIN STYLE:</span>
+
+                    {/* Choose Uber Only */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveBrand('uber');
+                        addToast('Uber Skin Loaded 🖤', 'The workspace shifted to clean, minimalist dark Uber slate.', 'info');
+                      }}
+                      className={`h-8 w-8 rounded-xl flex items-center justify-center font-sans font-black text-[10px] transition-all shrink-0 ${
+                        activeBrand === 'uber'
+                          ? 'bg-white text-black font-extrabold shadow-md shadow-white/10'
+                          : 'text-gray-400 hover:text-white hover:bg-white/5'
+                      }`}
+                      title="Set Uber Minimalist Slate theme"
+                    >
+                      U
+                    </button>
+
+                    {/* Choose Bolt Only */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveBrand('bolt');
+                        addToast('Bolt Skin Loaded 💚', 'The workspace shifted to energetic, high-contrast neon Bolt emerald.', 'info');
+                      }}
+                      className={`h-8 w-8 rounded-xl flex items-center justify-center font-sans font-black text-[10px] transition-all shrink-0 ${
+                        activeBrand === 'bolt'
+                          ? 'bg-[#00ca72] text-black font-extrabold shadow-md shadow-[#00ca72]/20'
+                          : 'text-gray-400 hover:text-white hover:bg-white/5'
+                      }`}
+                      title="Set Bolt Neon Emerald theme"
+                    >
+                      B
+                    </button>
+
+                    {/* Choose BOTH combined */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveBrand('both');
+                        addToast('Dual-App Combined Skin Loaded 💜', 'Split HUD activated. View Uber and Bolt styles concurrently.', 'success');
+                      }}
+                      className={`h-8 px-2 rounded-xl flex items-center gap-1 font-sans font-black text-[9px] uppercase transition-all shrink-0 ${
+                        activeBrand === 'both'
+                          ? 'bg-gradient-to-r from-blue-500 to-[#00ca72] text-white shadow-md shadow-purple-500/25 font-extrabold'
+                          : 'text-gray-400 hover:text-white hover:bg-white/5'
+                      }`}
+                      title="Set Combined Dual split-screen theme"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                      Both
+                    </button>
+                  </motion.div>
+
+                  {/* Main Bubble */}
+                  <div className="relative">
+                    {/* Ring Indicators represent Uber online status */}
+                    <svg className="absolute -inset-1.5 w-[56px] h-[56px] -rotate-90 select-none pointer-events-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]">
+                      <circle 
+                        cx="28" 
+                        cy="28" 
+                        r="24" 
+                        stroke={uberOnline ? '#38bdf8' : '#374151'} 
+                        strokeWidth="3.5" 
+                        fill="transparent" 
+                        strokeLinecap="round"
+                        className="transition-colors duration-300"
+                      />
+                    </svg>
+
+                    <div
+                      className="w-11 h-11 bg-black text-white rounded-full flex items-center justify-center font-sans shadow-2xl relative border-2 border-transparent select-none overflow-hidden animate-none"
+                    >
+                      <div className="flex flex-col items-center justify-center w-full h-full bg-[#121214] transition-colors">
+                        <span className="font-extrabold text-[15px] tracking-tight text-white leading-none">U</span>
+                        <span className="text-[6px] tracking-widest font-black uppercase text-gray-400 mt-0.5 leading-none">UBER</span>
+                      </div>
+                    </div>
+
+                    {/* Tiny Auto-Pause standby active indicator letter dot */}
+                    {autoPauseSecondApp && (
+                      <span className="absolute top-0 right-0 w-3 h-3 bg-indigo-500 border border-black rounded-full flex items-center justify-center z-20 text-[6px] text-white font-black shadow-md select-none pointer-events-none" title="Multi-App Auto-Standby Active">
+                        A
+                      </span>
+                    )}
+                  </div>
+                </motion.div>
               </div>
 
               {/* Bottom Menu Toggle Button / Map Status Bar */}
@@ -11871,11 +12327,19 @@ export default function App() {
                     key="online-bar"
                     initial={{ y: 100 }}
                     animate={{ y: 0 }}
-                    className="w-full bg-[#0c0d10] border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.8)] flex flex-col rounded-t-[40px] overflow-hidden text-white pb-6"
+                    className={`w-full border-t flex flex-col rounded-t-[40px] overflow-hidden text-white pb-6 transition-all duration-700 ${
+                      activeBrand === 'bolt'
+                        ? 'bg-gradient-to-b from-[#022413] to-[#08090a] border-[#00ca72]/30 shadow-[0_-15px_40px_rgba(0,252,114,0.15)]'
+                        : activeBrand === 'both'
+                        ? 'bg-gradient-to-r from-[#0c0d12] via-[#081810] to-[#022413] border-indigo-500/35 shadow-[0_-15px_45px_rgba(124,58,237,0.15)]'
+                        : 'bg-[#0c0d10] border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.8)]'
+                    }`}
                   >
-                    {/* Uber-style scanning progress bar */}
+                    {/* Scanning progress bar */}
                     {user.isOnline && !isOnBreak && activeOrders.length === 0 && (
-                      <div className="w-full h-[4px] bg-emerald-500/10 relative overflow-hidden shrink-0">
+                      <div className={`w-full h-[4px] relative overflow-hidden shrink-0 ${
+                        activeBrand === 'bolt' ? 'bg-[#00ca72]/15' : activeBrand === 'both' ? 'bg-indigo-500/15' : 'bg-emerald-500/10'
+                      }`}>
                         <motion.div 
                           animate={{ 
                             left: ['-50%', '110%'] 
@@ -11885,7 +12349,13 @@ export default function App() {
                             repeat: Infinity, 
                             ease: "easeInOut" 
                           }}
-                          className="absolute top-0 bottom-0 w-[40%] bg-[#22c55e] rounded-full shadow-[0_0_12px_rgba(34,197,94,0.8)]"
+                          className={`absolute top-0 bottom-0 w-[40%] rounded-full ${
+                            activeBrand === 'bolt'
+                              ? 'bg-[#00ff88] shadow-[0_0_12px_rgba(0,255,136,0.8)]'
+                              : activeBrand === 'both'
+                              ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-[#00ff88] shadow-[0_0_15px_rgba(168,85,247,0.8)]'
+                              : 'bg-[#22c55e] shadow-[0_0_12px_rgba(34,197,94,0.8)]'
+                          }`}
                         />
                       </div>
                     )}
@@ -11896,9 +12366,33 @@ export default function App() {
                     >
                       <div className="flex items-center">
                         <div className="relative flex items-center justify-center mr-4">
-                          <span className={`${isOnBreak ? 'bg-orange-500/20' : 'bg-[#22c55e]/20'} absolute inline-flex h-10 w-10 rounded-full animate-ping`} />
-                          <span className={`${isOnBreak ? 'bg-orange-500/35' : 'bg-[#22c55e]/35'} absolute inline-flex h-7 w-7 rounded-full animate-pulse`} />
-                          <span className={`relative inline-flex rounded-full h-4 w-4 ${isOnBreak ? 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.8)]' : 'bg-[#22c55e] shadow-[0_0_15px_rgba(34,197,94,0.8)]'} border-2 border-black`} />
+                          <span className={`${
+                            isOnBreak 
+                              ? 'bg-orange-500/20' 
+                              : activeBrand === 'bolt' 
+                              ? 'bg-emerald-500/25' 
+                              : activeBrand === 'both' 
+                              ? 'bg-purple-500/25' 
+                              : 'bg-[#22c55e]/20'
+                          } absolute inline-flex h-10 w-10 rounded-full animate-ping`} />
+                          <span className={`${
+                            isOnBreak 
+                              ? 'bg-orange-500/35' 
+                              : activeBrand === 'bolt' 
+                              ? 'bg-emerald-500/40' 
+                              : activeBrand === 'both' 
+                              ? 'bg-purple-500/40' 
+                              : 'bg-[#22c55e]/35'
+                          } absolute inline-flex h-7 w-7 rounded-full animate-pulse`} />
+                          <span className={`relative inline-flex rounded-full h-4 w-4 ${
+                            isOnBreak 
+                              ? 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.8)]' 
+                              : activeBrand === 'bolt'
+                              ? 'bg-[#00ff88] shadow-[0_0_15px_rgba(0,255,136,0.8)] border-emerald-950'
+                              : activeBrand === 'both'
+                              ? 'bg-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.9)] border-indigo-950'
+                              : 'bg-[#22c55e] shadow-[0_0_15px_rgba(34,197,94,0.8)]'
+                          } border-2 border-black`} />
                         </div>
                       </div>
                       
@@ -11943,14 +12437,22 @@ export default function App() {
                                   </motion.span>
                                 ) : (
                                   <motion.span
-                                    key={onlineStatusLoopText}
+                                    key={`online-status-bar-${onlineStatusLoopText}`}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
                                     transition={{ duration: 0.3 }}
-                                    className="absolute font-display text-xl font-black text-white tracking-tight leading-none"
+                                    className={`absolute font-display text-xl font-black tracking-tight leading-none ${
+                                      activeBrand === 'bolt' ? 'text-[#00ff88]' : activeBrand === 'both' ? 'text-purple-300' : 'text-white'
+                                    }`}
                                   >
-                                    {isOnBreak ? "On Break" : "You're online"}
+                                    {isOnBreak 
+                                      ? "On Break" 
+                                      : activeBrand === 'both' 
+                                      ? "Duo-Scanning Active" 
+                                      : activeBrand === 'bolt' 
+                                      ? "Bolt scanning live" 
+                                      : "You're online"}
                                   </motion.span>
                                 )}
                               </AnimatePresence>
@@ -11976,7 +12478,13 @@ export default function App() {
                                     transition={{ duration: 0.3 }}
                                     className="absolute text-xs text-gray-400 font-bold"
                                   >
-                                    {isOnBreak ? "Taking a pause from offers" : "We're finding trips for you"}
+                                    {isOnBreak 
+                                      ? "Taking a pause from offers" 
+                                      : activeBrand === 'both' 
+                                      ? "Monitoring Uber & Bolt dispatch" 
+                                      : activeBrand === 'bolt'
+                                      ? "Finding opportunities near you"
+                                      : "Searching for trips"}
                                   </motion.span>
                                 )}
                               </AnimatePresence>
@@ -11986,7 +12494,9 @@ export default function App() {
                       </div>
 
                       <button 
-                        className="text-white hover:text-[#22c55e] p-2.5 bg-white/5 border border-white/5 hover:border-white/10 rounded-full transition-all active:scale-90 shrink-0" 
+                        className={`hover:text-[#22c55e] p-2.5 bg-white/5 border border-white/5 hover:border-white/10 rounded-full transition-all active:scale-90 shrink-0 ${
+                          activeBrand === 'bolt' ? 'text-[#00ff88] hover:text-[#00ca72]' : 'text-white'
+                        }`} 
                         onClick={(e) => { 
                           e.stopPropagation(); 
                           setCurrentScreen('trip_preferences'); 
@@ -12005,15 +12515,27 @@ export default function App() {
                 {!isBottomMenuOpen && (
                   <div className="absolute bottom-0 left-0 right-0 z-[150]">
                     <motion.div 
-                      key="offline-bar"
+                      key={`offline-bar-${activeBrand}`}
                       initial={{ y: 100 }}
                       animate={{ y: 0 }}
-                      className="w-full bg-[#0c0d10] border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.8)] flex flex-col rounded-t-[40px] overflow-hidden text-white pb-6 px-8 py-5"
+                      className={`w-full border-t flex flex-col transition-all duration-500 pb-6 px-8 py-5 ${
+                        activeBrand === 'bolt'
+                          ? 'bg-gradient-to-b from-[#021d0e]/95 via-[#030e06]/95 to-[#010804]/98 border-[#00ea72]/20 shadow-[0_-15px_35px_rgba(0,234,114,0.12)] rounded-t-[48px]'
+                          : activeBrand === 'both'
+                          ? 'bg-gradient-to-b from-[#0d071a]/95 via-[#0c0515]/95 to-[#06020c]/98 border-purple-500/20 shadow-[0_-15px_35px_rgba(168,85,247,0.12)] rounded-t-[36px]'
+                          : 'bg-[#08080a]/95 border-neutral-800 shadow-[0_-20px_50px_rgba(0,0,0,0.9)] rounded-t-[24px]'
+                      }`}
                     >
                       <div className="flex items-center justify-between mb-4">
-                        <div className="text-left select-none font-sans">
-                          <p className="font-display text-xl font-black text-white tracking-tight leading-none">You're offline</p>
-                          <p className="text-xs text-gray-400 font-bold mt-1">Go online to receive trips.</p>
+                        <div className="text-left select-none font-sans flex-1">
+                          <p className={`font-display text-xl font-black tracking-tight leading-none ${
+                            activeBrand === 'bolt' ? 'text-[#00ff88]' : activeBrand === 'both' ? 'text-purple-300' : 'text-white'
+                          }`}>
+                            {activeBrand === 'bolt' ? 'Bolt Driver Offline' : activeBrand === 'both' ? 'Dual-App Offline Feed' : "You're offline"}
+                          </p>
+                          <p className="text-xs text-gray-400 font-bold mt-1 max-w-[210px] leading-snug">
+                            {activeBrand === 'bolt' ? 'Vibrant high-demand rides are waiting! 💚' : activeBrand === 'both' ? 'Unlock split request queuing from Uber & Bolt.' : 'Go online to receive and filter trips.'}
+                          </p>
                         </div>
                         
                         <button 
@@ -12021,7 +12543,13 @@ export default function App() {
                             e.stopPropagation(); 
                             setCurrentScreen('trip_preferences'); 
                           }}
-                          className="text-white hover:text-[#22c55e] p-2.5 bg-white/5 border border-white/5 hover:border-white/10 rounded-full transition-all active:scale-95 shrink-0" 
+                          className={`p-2.5 border rounded-full transition-all active:scale-95 shrink-0 ${
+                            activeBrand === 'bolt' 
+                              ? 'bg-[#00ea72]/10 border-[#00ea72]/25 text-[#00ff88] hover:bg-[#00ea72]/20 hover:border-[#00ea72]/40 rounded-3xl'
+                              : activeBrand === 'both'
+                              ? 'bg-purple-500/10 border-purple-500/25 text-purple-300 hover:bg-purple-500/20 hover:border-purple-500/40'
+                              : 'bg-white/5 border-white/5 text-white hover:border-white/10'
+                          }`} 
                         >
                           <SlidersHorizontal size={18} />
                         </button>
@@ -12029,10 +12557,16 @@ export default function App() {
 
                       <button 
                         onClick={handleGoOnline}
-                        className="w-full py-4.5 bg-[#22c55e] hover:bg-[#1db053] text-black rounded-2xl font-black text-base uppercase tracking-widest flex items-center justify-center gap-3 transition-colors active:scale-95 duration-300 shadow-[0_12px_28px_rgba(34,197,94,0.35)]"
+                        className={`w-full py-4.5 font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 duration-300 ${
+                          activeBrand === 'bolt'
+                            ? 'bg-[#00ff88] hover:bg-[#00ca72] text-black shadow-[0_8px_20px_rgba(0,255,136,0.3)] hover:shadow-[0_12px_28px_rgba(0,255,136,0.5)] font-extrabold rounded-3xl'
+                            : activeBrand === 'both'
+                            ? 'bg-gradient-to-r from-blue-500 via-purple-600 to-[#00ff88] text-white shadow-[0_8px_24px_rgba(168,85,247,0.3)] hover:brightness-110'
+                            : 'bg-white hover:bg-neutral-200 text-black shadow-[0_8px_20px_rgba(255,255,255,0.1)] rounded-xl'
+                        }`}
                       >
                         <Navigation size={18} fill="currentColor" className="transform rotate-45" />
-                        Go Online
+                        Go Online {activeBrand === 'bolt' ? 'On Bolt' : activeBrand === 'both' ? 'Unified' : 'On Uber'}
                       </button>
                     </motion.div>
                   </div>
@@ -12069,7 +12603,13 @@ export default function App() {
                     animate={{ y: 0 }}
                     exit={{ y: '100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="absolute bottom-0 left-0 right-0 rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] border-t border-white/10 flex flex-col max-h-[70vh] bg-[#0c0d10] text-white"
+                    className={`absolute bottom-0 left-0 right-0 rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] border-t flex flex-col max-h-[70vh] text-white transition-all duration-500 ${
+                      activeBrand === 'bolt'
+                        ? 'bg-gradient-to-b from-[#011a0d]/95 to-[#030906]/98 border-[#00ea72]/30 shadow-[0_-15px_30px_rgba(0,252,114,0.12)]'
+                        : activeBrand === 'both'
+                        ? 'bg-gradient-to-b from-[#0a0518]/95 to-[#05020c]/98 border-purple-500/25 shadow-[0_-15px_30px_rgba(168,85,247,0.12)]'
+                        : 'bg-[#0c0d10] border-white/10'
+                    }`}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="flex flex-col items-center pt-4 pb-2 shrink-0">
@@ -12103,7 +12643,7 @@ export default function App() {
                               ) : (
                                 <AnimatePresence mode="wait">
                                   <motion.span
-                                    key={onlineStatusLoopText}
+                                    key={`offline-bubble-status-${onlineStatusLoopText}`}
                                     initial={{ opacity: 0, y: 6 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -6 }}
@@ -12139,7 +12679,7 @@ export default function App() {
                                   ) : (
                                     <AnimatePresence mode="wait">
                                       <motion.p
-                                        key={onlineStatusLoopText}
+                                        key={`active-promotions-status-${onlineStatusLoopText}`}
                                         initial={{ opacity: 0, y: 8 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: -8 }}
@@ -12438,7 +12978,7 @@ export default function App() {
                       return [];
                     })().map((order, idx) => (
                     <motion.div 
-                      key={order.id} 
+                      key={`interactive-bottom-card-${order.id}-${idx}`} 
                       initial={{ y: 100 }} 
                       animate={{ y: 0 }} 
                       exit={{ y: 100 }}
@@ -13895,28 +14435,60 @@ export default function App() {
           )}
 
           {currentScreen === 'safety' && (
-            <motion.div key="safety" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="h-full w-full bg-white text-black p-6">
+            <motion.div key="safety" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32 font-sans">
               <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
+                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform"><X size={24} /></button>
                 <h1 className="text-3xl font-black">Safety Toolkit</h1>
               </div>
               <div className="space-y-4">
-                <button className="w-full p-6 bg-red-50 text-red-600 rounded-3xl flex items-center gap-4 font-black text-xl">
-                  <div className="p-3 bg-red-600 text-white rounded-full"><Phone size={24} /></div>
-                  Emergency Assistance
+                <button 
+                  onClick={() => {
+                    addDebugLog('info', 'Triggered Emergency Call simulation.');
+                    window.location.href = "tel:911";
+                  }}
+                  className="w-full p-6 bg-red-600 text-white rounded-2xl flex items-center justify-between shadow-lg active:scale-95 transition-transform"
+                >
+                  <div className="flex items-center gap-4">
+                    <Phone size={32} />
+                    <div className="text-left">
+                      <p className="text-xl font-black">Emergency Assistance</p>
+                      <p className="text-sm font-bold opacity-80">Call 911</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={24} />
                 </button>
-                <div className="p-6 bg-gray-50 rounded-3xl space-y-4">
-                  <h3 className="font-black text-lg">Safety Features</h3>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold">Share Trip Status</span>
-                    <ArrowRight size={20} className="text-gray-300" />
+                <button 
+                  onClick={() => {
+                    addToast('Trip Shared', 'Your active position shared is currently broadcasted details.', 'success');
+                  }}
+                  className="w-full p-6 bg-gray-50 text-black rounded-2xl flex items-center justify-between border border-gray-100 active:scale-95 transition-transform"
+                >
+                  <div className="flex items-center gap-4">
+                    <Users size={32} className="text-blue-600" />
+                    <div className="text-left">
+                      <p className="text-xl font-black">Share My Trip</p>
+                      <p className="text-sm font-bold text-gray-400">Let friends track you</p>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold">RideCheck</span>
-                    <ArrowRight size={20} className="text-gray-300" />
+                  <ChevronRight size={24} className="text-gray-300" />
+                </button>
+                <button 
+                  onClick={() => {
+                    addToast('Trip Recording', 'Audio & video trace buffers registered to telemetry.', 'info');
+                  }}
+                  className="w-full p-6 bg-gray-50 text-black rounded-2xl flex items-center justify-between border border-gray-100 active:scale-95 transition-transform"
+                >
+                  <div className="flex items-center gap-4">
+                    <Camera size={32} className="text-blue-600" />
+                    <div className="text-left">
+                      <p className="text-xl font-black">Record My Trip</p>
+                      <p className="text-sm font-bold text-gray-400">Audio and video recording</p>
+                    </div>
                   </div>
-                </div>
+                  <ChevronRight size={24} className="text-gray-300" />
+                </button>
               </div>
+              <p className="mt-8 text-center text-xs font-bold text-gray-400">Your safety is our priority. These tools are available 24/7.</p>
             </motion.div>
           )}
 
@@ -14742,8 +15314,16 @@ export default function App() {
               exit={{ y: '100%', opacity: 0 }} 
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className={pendingOrder.isMatching 
-                ? "absolute inset-x-3 bottom-4 z-[5000] w-[calc(100%-24px)] max-w-md mx-auto bg-white text-black rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden border border-gray-100 p-6"
-                : "absolute inset-x-0 bottom-0 z-[5000] w-full max-w-md mx-auto bg-white text-black rounded-t-[36px] shadow-[0_-15px_45px_rgba(0,0,0,0.22)] flex flex-col overflow-hidden border-t border-gray-100 pb-2"
+                ? `absolute inset-x-3 bottom-0 md:bottom-4 z-[5000] w-[calc(100%-24px)] max-w-md mx-auto flex flex-col overflow-hidden border p-6 transition-all duration-500 ${
+                    pendingOrder.brand === 'bolt'
+                      ? 'bg-gradient-to-b from-[#021d0e] to-[#030905] text-white border-[#00ea72]/30 shadow-[0_25px_60px_rgba(0,252,114,0.18)] rounded-[40px]'
+                      : 'bg-white text-black rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-gray-100'
+                  }`
+                : `absolute inset-x-0 bottom-0 z-[5000] w-full max-w-md mx-auto flex flex-col overflow-hidden pb-2 transition-all duration-500 ${
+                    pendingOrder.brand === 'bolt'
+                      ? 'bg-gradient-to-b from-[#011a0d] to-[#030905] text-white border-t-[#00ea72]/25 shadow-[0_-15px_45px_rgba(0,252,114,0.1)] rounded-t-[44px]'
+                      : 'bg-white text-black rounded-t-[36px] shadow-[0_-15px_45px_rgba(0,0,0,0.22)] border-t border-gray-100'
+                  }`
               }
               id="uber-incoming-trip-sheet"
             >
@@ -14753,16 +15333,18 @@ export default function App() {
                   {/* Top Raw Code with selections and close button */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <div className="flex items-center gap-2 bg-[#1a1a1a] text-white px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-sm">
+                      <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-sm ${
+                        pendingOrder.brand === 'bolt' ? 'bg-[#00ca72] text-black font-extrabold' : 'bg-[#1a1a1a] text-white'
+                      }`}>
                         {pendingOrder.type === 'delivery' ? (
                           <>
-                            <Utensils size={13} className="text-white" />
-                            <span>Hyper Eats</span>
+                            <Utensils size={13} className={pendingOrder.brand === 'bolt' ? 'text-black' : 'text-white'} />
+                            <span>{pendingOrder.brand === 'bolt' ? 'Bolt Food' : 'Uber Eats'}</span>
                           </>
                         ) : (
                           <>
-                            <CarIcon size={13} className="text-white" fill="currentColor" />
-                            <span>{pendingOrder.restaurantName || "HyperX"}</span>
+                            <CarIcon size={13} className={pendingOrder.brand === 'bolt' ? 'text-black' : 'text-white'} fill="currentColor" />
+                            <span>{pendingOrder.restaurantName || (pendingOrder.brand === 'bolt' ? 'Bolt Ride' : 'UberX')}</span>
                           </>
                         )}
                       </div>
@@ -14782,81 +15364,92 @@ export default function App() {
                     
                     <button 
                       onClick={handleDeclineOrder}
-                      className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center transition-colors active:scale-90"
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors active:scale-90 ${
+                        pendingOrder.brand === 'bolt'
+                          ? 'bg-white/5 hover:bg-white/10 text-white border border-white/5'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-500'
+                      }`}
                       aria-label="Decline"
                     >
-                      <X size={16} className="text-gray-500" />
+                      <X size={16} className={pendingOrder.brand === 'bolt' ? 'text-gray-300' : 'text-gray-550'} />
                     </button>
                   </div>
 
                   {/* Premium display payout & rating */}
                   <div className="flex flex-col gap-1">
-                    <h2 className="font-sans text-[48px] font-black text-gray-900 tracking-tight leading-none">
+                    <h2 className={`font-sans text-[48px] font-black tracking-tight leading-none ${
+                      pendingOrder.brand === 'bolt' ? 'text-white' : 'text-gray-900'
+                    }`}>
                       £{pendingOrder.estimatedPay % 1 === 0 ? pendingOrder.estimatedPay.toFixed(0) : pendingOrder.estimatedPay.toFixed(2)}
                     </h2>
                     
-                    <div className="flex items-center gap-1 mt-1 bg-gray-100 border border-gray-200/50 w-fit px-2 py-0.5 rounded-md">
+                    <div className={`flex items-center gap-1 mt-1 border w-fit px-2 py-0.5 rounded-md ${
+                      pendingOrder.brand === 'bolt'
+                        ? 'bg-white/5 border-white/10 text-gray-300'
+                        : 'bg-gray-100 border-gray-200/50 text-gray-700'
+                    }`}>
                       <Star size={11} fill="#eab308" className="text-yellow-500" />
-                      <span className="font-sans font-black text-xs text-gray-700">4.94</span>
+                      <span className="font-sans font-black text-xs">4.94</span>
                     </div>
                   </div>
 
                   {/* Horizontal Divider */}
-                  <div className="h-px bg-gray-100 my-1" />
+                  <div className={`h-px my-1 ${pendingOrder.brand === 'bolt' ? 'bg-white/10' : 'bg-gray-100'}`} />
 
                   {/* Timeline with accurate metrics formatted */}
                   {(() => {
                     const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
+                    const isBolt = pendingOrder.brand === 'bolt';
                     if (isDouble) {
                       return (
                         <div className="relative pl-6 py-1 space-y-6">
                           {/* Vertical Connecting Line */}
-                          <div className="absolute left-[7px] top-[14px] bottom-[14px] w-[2px] bg-black" />
+                          <div className={`absolute left-[7px] top-[14px] bottom-[14px] w-[2px] ${isBolt ? 'bg-[#00ea72]/80' : 'bg-black'}`} />
 
                           {/* Top pickup locator dot/circle */}
-                          <div className="absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full bg-black border-2 border-white ring-2 ring-black" />
+                          <div className={`absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full border-2 border-white ring-2 ${isBolt ? 'bg-[#00ca72] ring-[#00ff88]/50' : 'bg-black ring-black'}`} />
 
                           {/* Middle dropoff circle/dot */}
-                          <div className="absolute left-[3px] top-[100px] w-2.5 h-2.5 rounded-full bg-blue-600 border-2 border-white ring-1 ring-blue-600" />
+                          <div className={`absolute left-[3px] top-[100px] w-2.5 h-2.5 rounded-full border-2 border-white ring-1 ${isBolt ? 'bg-[#00ea72] ring-[#00ea72]/50' : 'bg-blue-600 ring-blue-600'}`} />
 
                           {/* Bottom dropoff square design */}
-                          <div className="absolute left-[3px] bottom-[15px] w-2.5 h-2.5 bg-indigo-600" />
+                          <div className={`absolute left-[3px] bottom-[15px] w-2.5 h-2.5 ${isBolt ? 'bg-[#00ff88]' : 'bg-indigo-600'}`} />
 
                           {/* Pickup Info */}
                           <div>
-                            <p className="font-sans text-xs font-bold text-gray-500">
+                            <p className={`font-sans text-xs font-bold ${isBolt ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
                               3 min (0.5 mi)
                             </p>
-                            <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
+                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isBolt ? 'text-white' : 'text-gray-800'}`}>
                               {pendingOrder.restaurantName || "Pwllmelin Road, Cardiff, CF5 2NQ"}
                             </p>
-                            <p className="font-sans text-[11px] text-gray-400 font-bold">
+                            <p className={`font-sans text-[11px] font-bold ${isBolt ? 'text-gray-400' : 'text-gray-400'}`}>
                               {pendingOrder.type === 'delivery' ? "12 Kingsway, Holborn, London WC2B 6YB" : "Driver Pickup Point"}
                             </p>
                           </div>
 
                           {/* Dropoff 1 Info */}
                           <div>
-                            <p className="font-sans text-xs font-bold text-gray-500">
+                            <p className={`font-sans text-xs font-bold ${isBolt ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
                               {pendingOrder.estimatedTime} mins (approx) • Dropoff 1
                             </p>
-                            <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
+                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isBolt ? 'text-white' : 'text-gray-800'}`}>
                               {pendingOrder.customerName.replace(" + 1 more", "").replace(" (Max+1)", "").trim()}
                             </p>
-                            <p className="font-sans text-[11px] text-gray-400 font-bold">
+                            <p className={`font-sans text-[11px] font-bold ${isBolt ? 'text-gray-400' : 'text-gray-400'}`}>
                               48 High Holborn, London WC1V 6RL
                             </p>
                           </div>
 
                           {/* Dropoff 2 Info */}
                           <div>
-                            <p className="font-sans text-xs font-bold text-gray-500">
+                            <p className={`font-sans text-xs font-bold ${isBolt ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
                               +{Math.floor(pendingOrder.estimatedTime * 0.4)} mins • Dropoff 2 (Double)
                             </p>
-                            <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
+                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isBolt ? 'text-white' : 'text-gray-800'}`}>
                               Recipient (Part 2)
                             </p>
-                            <p className="font-sans text-[11px] text-gray-400 font-bold">
+                            <p className={`font-sans text-[11px] font-bold ${isBolt ? 'text-gray-400' : 'text-gray-400'}`}>
                               42 Southampton Row, London WC1B 4AR
                             </p>
                           </div>
@@ -14866,35 +15459,35 @@ export default function App() {
                       return (
                         <div className="relative pl-6 py-1 space-y-7">
                           {/* Vertical Connecting Line */}
-                          <div className="absolute left-[7px] top-[14px] bottom-[14px] w-[2px] bg-black" />
+                          <div className={`absolute left-[7px] top-[14px] bottom-[14px] w-[2px] ${isBolt ? 'bg-[#00ea72]/80' : 'bg-black'}`} />
 
                           {/* Top pickup locator dot/circle */}
-                          <div className="absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full bg-black border-2 border-white ring-2 ring-black" />
+                          <div className={`absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full border-2 border-white ring-2 ${isBolt ? 'bg-[#00ca72] ring-[#00ff88]/50' : 'bg-black ring-black'}`} />
 
                           {/* Bottom dropoff square design */}
-                          <div className="absolute left-[3px] bottom-[15px] w-2.5 h-2.5 bg-black" />
+                          <div className={`absolute left-[3px] bottom-[15px] w-2.5 h-2.5 ${isBolt ? 'bg-[#00ff88]' : 'bg-black'}`} />
 
                           {/* Time & distance metadata headers matching screenshot perfectly */}
                           <div>
-                            <p className="font-sans text-xs font-bold text-gray-500">
+                            <p className={`font-sans text-xs font-bold ${isBolt ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
                               3 min (0.5 mi)
                             </p>
-                            <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
+                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isBolt ? 'text-white' : 'text-gray-800'}`}>
                               {pendingOrder.restaurantName || "Pwllmelin Road, Cardiff, CF5 2NQ"}
                             </p>
-                            <p className="font-sans text-[11px] text-gray-400 font-bold">
+                            <p className={`font-sans text-[11px] font-bold ${isBolt ? 'text-gray-400' : 'text-gray-400'}`}>
                               {pendingOrder.type === 'delivery' ? "12 Kingsway, Holborn, London WC2B 6YB" : "Driver Pickup Point"}
                             </p>
                           </div>
 
                           <div>
-                            <p className="font-sans text-xs font-bold text-gray-500">
+                            <p className={`font-sans text-xs font-bold ${isBolt ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
                               {pendingOrder.estimatedTime} mins ({pendingOrder.estimatedDistance.toFixed(1)} mi)
                             </p>
-                            <p className="font-sans text-sm font-black text-gray-800 leading-snug mt-1">
+                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isBolt ? 'text-white' : 'text-gray-800'}`}>
                               {pendingOrder.customerName || "45 The Hayes, Cardiff"}
                             </p>
-                            <p className="font-sans text-[11px] text-gray-400 font-bold">
+                            <p className={`font-sans text-[11px] font-bold ${isBolt ? 'text-gray-400' : 'text-gray-400'}`}>
                               {pendingOrder.type === 'delivery' ? "48 High Holborn, London WC1V 6RL" : "Final Destination Address"}
                             </p>
                           </div>
@@ -14908,7 +15501,11 @@ export default function App() {
                     <button 
                       onClick={handleAcceptOrder}
                       disabled={isMatchingLoading || isMatchFailed}
-                      className="relative w-full py-4 bg-[#1a1a1a] hover:bg-black active:scale-[0.98] transition-all text-white rounded-2xl font-black text-lg shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden flex items-center justify-center min-h-[58px]"
+                      className={`relative w-full py-4 active:scale-[0.98] transition-all rounded-2xl font-black text-lg shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden flex items-center justify-center min-h-[58px] ${
+                        pendingOrder.brand === 'bolt' 
+                          ? 'bg-[#00ca72] hover:bg-[#00b465] text-black hover:text-black' 
+                          : 'bg-[#1a1a1a] hover:bg-black text-white hover:text-white'
+                      }`}
                     >
                       {/* Action progress countdown line */}
                       {!isMatchingLoading && !isMatchFailed && (
@@ -14917,7 +15514,9 @@ export default function App() {
                           initial={{ width: '100%' }}
                           animate={{ width: '0%' }}
                           transition={{ duration: 18, ease: 'linear' }}
-                          className="absolute bottom-0 left-0 h-1 bg-amber-500 z-20"
+                          className={`absolute bottom-0 left-0 h-1 z-20 ${
+                            pendingOrder.brand === 'bolt' ? 'bg-black/30' : 'bg-amber-500'
+                          }`}
                         />
                       )}
 
@@ -15102,7 +15701,11 @@ export default function App() {
                     <button 
                       onClick={handleAcceptOrder}
                       disabled={isMatchingLoading || isMatchFailed}
-                      className="relative w-full py-5 bg-[#00b050] hover:bg-[#009e48] active:scale-[0.98] transition-all text-white rounded-2xl font-black text-xl shadow-[0_12px_36px_rgba(0,176,80,0.32)] overflow-hidden flex items-center justify-center min-h-[64px]"
+                      className={`relative w-full py-5 active:scale-[0.98] transition-all rounded-2xl font-black text-xl overflow-hidden flex items-center justify-center min-h-[64px] ${
+                        pendingOrder.brand === 'bolt'
+                          ? 'bg-[#00ca72] hover:bg-[#00b865] text-black shadow-[0_12px_36px_rgba(0,202,114,0.32)] shadow-[#00ca72]/30'
+                          : 'bg-[#1a1a1a] hover:bg-black text-white shadow-[0_12px_36px_rgba(0,0,0,0.3)]'
+                      }`}
                     >
                       {/* Action progress countdown line */}
                       {!isMatchingLoading && !isMatchFailed && (
@@ -15111,7 +15714,9 @@ export default function App() {
                           initial={{ width: '100%' }}
                           animate={{ width: '0%' }}
                           transition={{ duration: 18, ease: 'linear' }}
-                          className="absolute bottom-0 left-0 h-1.5 bg-white/35 z-20"
+                          className={`absolute bottom-0 left-0 h-1.5 z-20 ${
+                            pendingOrder.brand === 'bolt' ? 'bg-black/25' : 'bg-white/35'
+                          }`}
                         />
                       )}
 

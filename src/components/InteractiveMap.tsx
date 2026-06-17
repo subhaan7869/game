@@ -36,6 +36,7 @@ export interface InteractiveMapProps {
   pendingOrder: any;
   theme?: 'light' | 'dark';
   otherDrivers?: OtherDriver[];
+  activeBrand?: 'uber' | 'bolt' | 'both';
 }
 
 // Check for Google Maps Platform API key in environments
@@ -319,7 +320,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   currentStops,
   pendingOrder,
   theme = 'dark',
-  otherDrivers = []
+  otherDrivers = [],
+  activeBrand = 'uber'
 }) => {
   const [mapType, setMapType] = useState<'hybrid' | 'roadmap'>('roadmap');
   const [viewAngle, setViewAngle] = useState<'top' | 'tilt'>('top');
@@ -417,12 +419,21 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {/* Bottom Banner Status Indicants */}
         <div className="absolute bottom-4 left-4 z-40 bg-[#111216]/90 backdrop-blur-md border border-white/10 rounded-2xl p-2.5 px-4 flex items-center gap-3 shadow-2xl">
           <div className="flex -space-x-1.5 overflow-hidden">
-            <span className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center ring-2 ring-black">
-              <ShieldCheck size={10} className="text-white" />
-            </span>
+            {activeBrand === 'both' ? (
+              <>
+                <span className="w-3.5 h-3.5 rounded-full bg-blue-500 border border-black" />
+                <span className="w-3.5 h-3.5 rounded-full bg-[#00ca72] border border-black" />
+              </>
+            ) : (
+              <span className={`w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-black ${activeBrand === 'bolt' ? 'bg-[#00ca72]' : 'bg-blue-500'}`}>
+                <ShieldCheck size={10} className="text-white" />
+              </span>
+            )}
           </div>
           <div className="text-left leading-none">
-            <p className="text-[9px] font-black text-blue-400 tracking-wider uppercase">Google Maps Live Link</p>
+            <p className={`text-[9px] font-black tracking-wider uppercase ${activeBrand === 'bolt' ? 'text-[#00ca72]' : activeBrand === 'both' ? 'text-[#a855f7]' : 'text-blue-400'}`}>
+              {activeBrand === 'both' ? 'Dual-Dispatch GPS Core' : activeBrand === 'bolt' ? 'Bolt Driver GPS Core' : 'Uber Driver GPS Core'}
+            </p>
             <p className="text-[10px] font-bold text-gray-300 mt-0.5">Tracking Drivers GPS Core</p>
           </div>
         </div>
@@ -454,16 +465,27 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               />
             )}
 
-            {/* Marker 1: Driver Current Location */}
             {location && (
               <AdvancedMarker position={driverLatLng}>
                 <div className="relative flex items-center justify-center">
                   {/* Radar ping ring */}
-                  <div className="absolute w-12 h-12 bg-blue-500/20 border border-blue-500/40 rounded-full animate-ping" style={{ animationDuration: '3s' }} />
+                  <div className={`absolute w-12 h-12 border rounded-full animate-ping ${
+                    activeBrand === 'bolt' 
+                      ? 'bg-[#00ca72]/20 border-[#00ca72]/40' 
+                      : activeBrand === 'both'
+                      ? 'bg-purple-500/20 border-purple-500/40'
+                      : 'bg-blue-500/20 border-blue-500/40'
+                  }`} style={{ animationDuration: '3s' }} />
                   
                   {/* Car or arrow representation */}
-                  <div className="w-9 h-9 bg-blue-600 rounded-full border-4 border-white shadow-2xl flex items-center justify-center transition-all" style={{ transform: `rotate(${heading - 45}deg)` }}>
-                    <Navigation size={14} className="text-white fill-white translate-y-[-1px] translate-x-[-1px]" />
+                  <div className={`w-9 h-9 rounded-full border-4 shadow-2xl flex items-center justify-center transition-all ${
+                    activeBrand === 'bolt'
+                      ? 'bg-[#00ca72] border-white text-black'
+                      : activeBrand === 'both'
+                      ? 'bg-gradient-to-tr from-blue-600 to-[#00ca72] border-purple-400 text-white shadow-[0_0_15px_rgba(124,58,237,0.5)]'
+                      : 'bg-blue-600 border-white text-white'
+                  }`} style={{ transform: `rotate(${heading - 45}deg)` }}>
+                    <Navigation size={14} className="fill-current translate-y-[-1px] translate-x-[-1px]" />
                   </div>
                 </div>
               </AdvancedMarker>

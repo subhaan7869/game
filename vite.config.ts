@@ -17,7 +17,8 @@ export default defineConfig(({mode}) => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-          navigateFallback: '/index.html'
+          navigateFallback: '/index.html',
+          maximumFileSizeToCacheInBytes: 3500000
         },
         manifest: {
           name: 'Hyper Driver Dashboard',
