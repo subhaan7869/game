@@ -44,39 +44,22 @@ export interface InteractiveMapProps {
   onNavigateToSurgeArea?: (area: any) => void;
 }
 
-// 1. Custom Driver Icon Constructor
-const getDriverIcon = (activeBrand: 'uber' | 'both' | 'bolt', heading: number) => {
+// 1. Custom Driver Icon Constructor using the highly realistic green car design
+const getDriverIcon = (heading: number) => {
   return L.divIcon({
-    className: '',
     html: `
-      <div class="relative flex items-center justify-center" style="width: 48px; height: 48px;">
-        <!-- Neon pulsing ring -->
-        <div class="absolute w-12 h-12 border rounded-full animate-ping ${
-          activeBrand === 'bolt' 
-            ? 'bg-emerald-500/20 border-emerald-500/40' 
-            : activeBrand === 'both'
-            ? 'bg-purple-500/20 border-purple-500/40'
-            : 'bg-blue-500/20 border-blue-500/40'
-        }" style="animation-duration: 3s"></div>
-        
-        <!-- Car or arrow icon indicator -->
-        <div class="w-9 h-9 rounded-full border-4 shadow-2xl flex items-center justify-center transition-all ${
-          activeBrand === 'bolt' 
-            ? 'bg-[#00ca72] border-white text-black' 
-            : activeBrand === 'both'
-            ? 'bg-gradient-to-tr from-blue-600 to-[#00ca72] border-purple-400 text-white'
-            : 'bg-blue-600 border-white text-white'
-        }" style="transform: rotate(${(heading || 0) - 45}deg); ${
-          activeBrand === 'both' ? 'box-shadow: 0 0 15px rgba(124,58,237,0.5);' : ''
-        }">
-          <svg class="w-4 h-4 fill-current text-white" viewBox="0 0 24 24">
+      <div id="leaflet-car-marker" class="relative w-8 h-8 flex items-center justify-center">
+        <div class="absolute inset-0 bg-[#13AA52]/45 rounded-full animate-ping opacity-60" style="animation-duration: 2.2s"></div>
+        <div class="w-5 h-5 bg-[#13AA52] border-2 border-white rounded-full shadow-md flex items-center justify-center transition-all" style="transform: rotate(${(heading || 0)}deg)">
+          <svg class="w-2.5 h-2.5 text-white fill-white" viewBox="0 0 24 24">
             <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
           </svg>
         </div>
       </div>
     `,
-    iconSize: [48, 48],
-    iconAnchor: [24, 24]
+    className: 'clear-div-icon',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
   });
 };
 
@@ -220,6 +203,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const stopsMarkersRef = useRef<L.Marker[]>([]);
   const surgeAreasMarkersRef = useRef<L.Marker[]>([]);
 
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+
   const routePolylineRef = useRef<L.Polyline | null>(null);
   const dashPolylineRef = useRef<L.Polyline | null>(null);
 
@@ -241,12 +226,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       attributionControl: false
     });
 
-    // Beautiful Dark Matter Map Tiles
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    // Beautiful high-fidelity Map Tiles matching Light/Dark theme dynamically
+    const tileUrl = theme === 'dark'
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+
+    const tileLayer = L.tileLayer(tileUrl, {
       maxZoom: 20,
       minZoom: 1
     }).addTo(map);
 
+    tileLayerRef.current = tileLayer;
     mapRef.current = map;
 
     return () => {
@@ -254,6 +244,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       mapRef.current = null;
     };
   }, []);
+
+  // Update Tile Layer URL source dynamically when theme toggles
+  useEffect(() => {
+    if (!mapRef.current || !tileLayerRef.current) return;
+    
+    const tileUrl = theme === 'dark'
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+
+    tileLayerRef.current.setUrl(tileUrl);
+  }, [theme]);
 
   // Synchronize dynamic Layers upon prop changes
   useEffect(() => {
@@ -264,10 +265,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     // 1. Update/Add Driver Marker
     if (!driverMarkerRef.current) {
-      driverMarkerRef.current = L.marker(driverLatLng, { icon: getDriverIcon(activeBrand, heading) }).addTo(map);
+      driverMarkerRef.current = L.marker(driverLatLng, { icon: getDriverIcon(heading) }).addTo(map);
     } else {
       driverMarkerRef.current.setLatLng(driverLatLng);
-      driverMarkerRef.current.setIcon(getDriverIcon(activeBrand, heading));
+      driverMarkerRef.current.setIcon(getDriverIcon(heading));
     }
 
     // 2. Sync rival drivers
