@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, X, Coffee, Lightbulb, Heart, HelpCircle, MessageSquare, AlertCircle, RefreshCw, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { db, auth } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 interface CompanionMessage {
   id: string;
@@ -15,13 +17,22 @@ interface UserProfile {
   tier: string;
   level: number;
   deliveriesToday: number;
+  uid?: string;
 }
 
 interface CompanionChatProps {
   theme: 'dark' | 'light';
   user: UserProfile;
   currentEarnings: number;
+  activeCityKey?: string;
+  activeOrders?: any[];
+  activeSurgeAreas?: any[];
+  hotspots?: any[];
+  isNightMode?: boolean;
+  isOnBreak?: boolean;
+  location?: { latitude: number; longitude: number } | null;
 }
+
 
 // Fallback responses if the Gemini API is unavailable or environment key is missing
 const FALLBACK_RESPONSES = [
@@ -34,9 +45,32 @@ const FALLBACK_RESPONSES = [
   "If traffic gets heavy, don't worry. Cozy ambient low-vibe radio is playing. Just glide through.",
 ];
 
-export const CompanionChat: React.FC<CompanionChatProps> = ({ theme, user, currentEarnings }) => {
+export const CompanionChat: React.FC<CompanionChatProps> = ({ 
+  theme, 
+  user, 
+  currentEarnings,
+  activeCityKey = 'London',
+  activeOrders = [],
+  activeSurgeAreas = [],
+  hotspots = [],
+  isNightMode = false,
+  isOnBreak = false,
+  location = null
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<CompanionMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('hyper_driver_copilot_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp)
+        }));
+      }
+    } catch (e) {
+      console.warn("Failed to load co-pilot chat history:", e);
+    }
     return [
       {
         id: 'initial',
@@ -46,10 +80,63 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ theme, user, curre
       }
     ];
   });
+
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(!process.env.GEMINI_API_KEY);
   
+  // Reload chats from Firestore on database mount
+  useEffect(() => {
+    const loadFromFirestore = async () => {
+      const uid = auth?.currentUser?.uid || user?.uid || 'driver_123';
+      try {
+        const { getDoc } = await import('firebase/firestore');
+        const docRef = doc(db, 'copilot_chats', uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && data.messages && data.messages.length > 0) {
+            const parsed = data.messages.map((m: any) => ({
+              ...m,
+              timestamp: new Date(m.timestamp)
+            }));
+            setMessages(parsed);
+          }
+        }
+      } catch (err) {
+        console.warn("Firestore copilot reload skipped:", err);
+      }
+    };
+    loadFromFirestore();
+  }, []);
+
+  // Save history on changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('hyper_driver_copilot_history', JSON.stringify(messages));
+    } catch (e) {
+      console.warn("Failed to save co-pilot chat history:", e);
+    }
+
+    const backupToFirestore = async () => {
+      const uid = auth?.currentUser?.uid || user?.uid || 'driver_123';
+      try {
+        await setDoc(doc(db, 'copilot_chats', uid), {
+          messages: messages.map(m => ({
+            id: m.id,
+            sender: m.sender,
+            text: m.text,
+            timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : new Date(m.timestamp).toISOString()
+          })),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (err) {
+        console.warn("Firestore copilot backup failed:", err);
+      }
+    };
+    backupToFirestore();
+  }, [messages]);
+
   // Voice preferences, default to TRUE so Gemini speaks aloud automatically!
   const [isVoiceOutputEnabled, setIsVoiceOutputEnabled] = useState(true);
   const [isSpeechSupported, setIsSpeechSupported] = useState(true);
@@ -216,9 +303,17 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ theme, user, curre
     try {
       if (process.env.GEMINI_API_KEY) {
         const { GoogleGenAI } = await import("@google/genai");
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const ai = new GoogleGenAI({
+          apiKey: process.env.GEMINI_API_KEY,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build'
+            }
+          }
+        });
 
-        const formattedHistory = messages.map(msg => ({
+        // Safe format of historical messages
+        const formattedHistory = messages.slice(-10).map(msg => ({
           role: msg.sender === 'driver' ? 'user' as const : 'model' as const,
           parts: [{ text: msg.text }]
         }));
@@ -228,21 +323,43 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({ theme, user, curre
           parts: [{ text: textToSend }]
         });
 
-        const systemInstruction = `You are 'Hyper Co-Pilot', a witty, motivating, and supportive AI companion chatbot. You are speaking to Hassen Nabeel, an elite food delivery and rideshare driver.
-Personal shift parameters:
-- Name: Hassen
-- Rating: ${user.rating} ★
-- Current Tier: ${user.tier}
-- Today's completed jobs: ${user.deliveriesToday}
-- Today's earnings: £${currentEarnings.toFixed(2)}
+        // Rich system context injection for highly useful road advice
+        const activeOrdersDetails = activeOrders && activeOrders.length > 0 
+          ? activeOrders.map(o => `[Order: ${o.id}, Status: ${o.status}, Type: ${o.type}, Customer: ${o.customerName}, Restaurant: ${o.restaurantName || 'Standard'}]`).join(', ') 
+          : 'None';
+        
+        const activeSurgeDetails = activeSurgeAreas && activeSurgeAreas.length > 0
+          ? activeSurgeAreas.map(s => `Surge ${s.name || 'Zone'} (${s.multiplier || '1.2'}x)`).join(', ')
+          : 'Normal traffic demand';
 
-Tone & Rules:
-1. Keep replies brief, energetic, and encouraging (1-2 sentences max). Drivers are on the move!
-2. Answer questions, offer motivational high-fives, suggest breaks, tell quick road-themed jokes, or give tactical advice.
-3. Keep the dialogue feeling fresh, positive, and full of high-vibes. Always refer to him as Hassen.`;
+        const coordinatesStr = location 
+          ? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`
+          : 'Standard Location';
+
+        const systemInstruction = `You are 'Hyper Co-Pilot', Hassen Nabeel's elite spatial digital co-driver.
+Hassen is navigating the workspace in City: ${activeCityKey}.
+Coordinates Telemetry: ${coordinatesStr}.
+
+Live shift state updates:
+- Rider/Driver Name: Hassen Nabeel
+- Quality Rating: ${user.rating} ★
+- Carrier Upgrade Tier: ${user.tier}
+- Today's completed delivery orders: ${user.deliveriesToday}
+- Today's total cash earnings: £${currentEarnings.toFixed(2)}
+- On break status: ${isOnBreak ? 'YES' : 'NO'}
+- Night mode status: ${isNightMode ? 'YES' : 'NO'}
+- Active dispatch jobs: ${activeOrdersDetails}
+- Surge multipliers: ${activeSurgeDetails}
+- Nearby demand hotspots: ${hotspots ? hotspots.length : 0} surge nodes active.
+
+Rules:
+1. Always address him as Hassen.
+2. Keep responses witty, energetic, motivating, and incredibly tailored to his coordinates or city.
+3. Keep replies very brief (usually 2 sentences max) so he can parse them safely while driving.
+4. Offer tactical advice: suggest specific streets, hotspots, rest times, tell snappy driving jokes, or cheer his milestones!`;
 
         const result = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.5-flash',
           contents: formattedHistory,
           config: {
             systemInstruction,
@@ -320,7 +437,7 @@ Tone & Rules:
   return (
     <>
       {/* Floating Toggle Button */}
-      <div className="fixed left-6 bottom-[230px] z-[2300]">
+      <div className="fixed left-6 bottom-[230px] z-[2300] pointer-events-auto">
         <motion.button
           id="co-pilot-toggle-button"
           whileHover={{ scale: 1.05 }}
@@ -361,7 +478,7 @@ Tone & Rules:
             animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 50, x: -20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-            className="fixed left-6 bottom-[290px] w-[340px] h-[460px] rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.65)] border border-white/5 flex flex-col overflow-hidden z-[2350] bg-[#0a0a0c]/95 backdrop-blur-xl text-white"
+            className="fixed left-6 bottom-[290px] w-[340px] h-[460px] rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.65)] border border-white/5 flex flex-col overflow-hidden z-[2350] bg-[#0a0a0c]/95 backdrop-blur-xl text-white pointer-events-auto"
           >
             {/* Header */}
             <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/5">

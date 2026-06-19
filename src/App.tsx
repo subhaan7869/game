@@ -5716,13 +5716,9 @@ export default function App() {
     }
   });
 
-  const [boltOnline, setBoltOnline] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('hyper_driver_bolt_online') !== 'false';
-    } catch (e) {
-      return true;
-    }
-  });
+  // Bolt is completely removed - hold as flat false constants
+  const boltOnline = false;
+  const setBoltOnline = (val?: any) => {};
 
   const [autoPauseSecondApp, setAutoPauseSecondApp] = useState<boolean>(() => {
     try {
@@ -9798,7 +9794,14 @@ export default function App() {
     setIsVerifyingReceipt(true);
     try {
       const { GoogleGenAI } = await import("@google/genai");
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
+      const ai = new GoogleGenAI({
+        apiKey: process.env.GEMINI_API_KEY as string,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build'
+          }
+        }
+      });
       const prompt = "Analyze this image. Is it a receipt from Hyper Eats? Answer strictly 'true' or 'false'. We are verifying it for a driver app.";
       const imagePart = {
         inlineData: {
@@ -9807,8 +9810,8 @@ export default function App() {
         },
       };
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: { parts: [imagePart, { text: prompt }] },
+        model: "gemini-3-flash-lite",
+        contents: [imagePart, { text: prompt }],
       });
       
       const isReceipt = response.text ? response.text.toLowerCase().includes('true') : false;
@@ -10720,7 +10723,7 @@ export default function App() {
               
               {/* Check for online status starts here */}
               {user.isOnline ? (
-                <div className="h-full w-full relative overflow-hidden bg-transparent">
+                <div className="h-full w-full relative overflow-hidden bg-transparent pointer-events-none">
 
                   {/* Map Mode Controller Selector Pill */}
                   <div className="absolute top-28 left-4 z-50 flex items-center bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl p-1 shadow-2xl pointer-events-auto">
@@ -10883,7 +10886,7 @@ export default function App() {
                     zIndex: 2000
                   }}
                   onClick={() => setPendingOrder(order)}
-                  className="cursor-pointer group"
+                  className="cursor-pointer group pointer-events-auto"
                 >
                   <div className="relative">
                     <div className={`absolute inset-0 bg-blue-500 rounded-full opacity-20 ${isLowPerformance ? '' : 'animate-ping'}`} />
@@ -10908,7 +10911,7 @@ export default function App() {
 
               {/* Floating Music/Radio Controller Overlay */}
               {user.isOnline && !pendingOrder && (
-                <div className="absolute right-6 bottom-64 z-[2100] flex flex-col items-end gap-3">
+                <div className="absolute right-6 bottom-64 z-[2100] flex flex-col items-end gap-3 pointer-events-auto">
                   <AnimatePresence>
                     {isRadioExpanded && (
                       <motion.div
@@ -10947,7 +10950,7 @@ export default function App() {
 
               {/* Safety Toolkit Button */}
               {user.isOnline && !pendingOrder && (
-                <div className="absolute right-6 bottom-48 z-50">
+                <div className="absolute right-6 bottom-48 z-50 pointer-events-auto">
                   <button 
                     onClick={() => sendNotification("Safety Toolkit", "Emergency assistance and safety features are active.")}
                     className="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-transform border border-blue-400"
@@ -11762,7 +11765,7 @@ export default function App() {
                   {location && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       {/* Pulsing blue dot for driver */}
-                      {mapCoreMode === 'cyber_disabled' && (
+                      {(mapCoreMode as string) === 'cyber_disabled' && (
                         <div className="relative z-10" style={{ transform: `translate(${mapOffset.x}px, ${mapOffset.y}px)` }}>
                           {user.isOnline ? (
                             <div className="w-10 h-10 bg-white rounded-full shadow-xl flex items-center justify-center border-2 border-blue-500">
