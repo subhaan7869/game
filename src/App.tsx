@@ -1047,6 +1047,11 @@ const SideMenu = ({
               action: () => { setCurrentScreen('account'); setIsSideMenuOpen(false); } 
             },
             { 
+              icon: <Layers size={20} />, 
+              label: "Relaunch Workspace", 
+              action: () => { setShowAppLauncher(true); setIsSideMenuOpen(false); } 
+            },
+            { 
               icon: <Shield size={20} />, 
               label: "Help", 
               action: () => { setCurrentScreen('safety'); setIsSideMenuOpen(false); } 
@@ -5689,7 +5694,7 @@ export default function App() {
   };
   const [isOffAppSimulated, setIsOffAppSimulated] = useState(false);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
-  const [showAppLauncher, setShowAppLauncher] = useState<boolean>(false);
+  const [showAppLauncher, setShowAppLauncher] = useState<boolean>(true);
   const [isCarPlaySynced, setIsCarPlaySynced] = useState(false);
   const [isCarPlayRemoteMode, setIsCarPlayRemoteMode] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -5711,7 +5716,13 @@ export default function App() {
     }
   });
 
-  const [boltOnline, setBoltOnline] = useState<boolean>(false);
+  const [boltOnline, setBoltOnline] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('hyper_driver_bolt_online') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
 
   const [autoPauseSecondApp, setAutoPauseSecondApp] = useState<boolean>(() => {
     try {
@@ -5901,7 +5912,7 @@ export default function App() {
   // Location & Orders
   const [location, setLocation] = useState<Location | null>({ latitude: 51.5074, longitude: -0.1278 }); // Default to London
   const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
-  const [useRealGPS, setUseRealGPS] = useState(false);
+  const [useRealGPS, setUseRealGPS] = useState(true);
   const [zoom, setZoom] = useState(1);
 
   // Touch Pinch-to-Zoom references
@@ -6468,8 +6479,29 @@ export default function App() {
         }
       } else if (type === 'radar') {
         const now = audioCtx.currentTime;
-        playTone(1000, now, 0.15, 'sine', 0.12);
-        playTone(1350, now + 0.1, 0.25, 'sine', 0.08);
+        // Tri-tone soaring high-frequency crystal chime (echoing sonar feel)
+        const playRadarPing = (freq: number, triggerTime: number, duration: number, vol = 0.15) => {
+          const oscNode = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
+          
+          oscNode.type = 'sine';
+          oscNode.frequency.setValueAtTime(freq, triggerTime);
+          oscNode.frequency.exponentialRampToValueAtTime(freq * 0.9, triggerTime + duration);
+          
+          gainNode.gain.setValueAtTime(0.001, triggerTime);
+          gainNode.gain.linearRampToValueAtTime(vol, triggerTime + 0.008);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, triggerTime + duration);
+          
+          oscNode.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+          
+          oscNode.start(triggerTime);
+          oscNode.stop(triggerTime + duration);
+        };
+
+        playRadarPing(2200, now, 0.18, 0.16);
+        playRadarPing(2936, now + 0.05, 0.22, 0.13);
+        playRadarPing(3951, now + 0.10, 0.30, 0.10);
       } else if (type === 'accept') {
         const now = audioCtx.currentTime;
         playTone(554.37, now, 0.08, 'sine', 0.08);
@@ -6697,13 +6729,7 @@ export default function App() {
     return Boolean(key) && key !== "YOUR_API_KEY" && key.trim() !== "";
   }, []);
 
-  const [mapCoreMode, setMapCoreMode] = useState<'cyber' | 'google'>(() => {
-    const key = process.env.GOOGLE_MAPS_PLATFORM_KEY || 
-                (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY || 
-                "";
-    const hasKey = Boolean(key) && key !== "YOUR_API_KEY" && key.trim() !== "";
-    return hasKey ? 'google' : 'cyber';
-  });
+  const [mapCoreMode, setMapCoreMode] = useState<'cyber' | 'google'>('google');
 
   const insuranceExpiry = user.documentExpiries?.["Vehicle Insurance"];
   const insuranceDaysLeft = useMemo(() => {
@@ -7622,7 +7648,7 @@ export default function App() {
     const hasJob = activeOrders.length > 0;
     const isNavBusy = !hasJob && !!busyAreaTarget;
     
-    if (!isNavigating || !user.isOnline || (!hasJob && !isNavBusy) || !location) {
+    if (!isNavigating || !user.isOnline || (!hasJob && !isNavBusy) || !location || useRealGPS) {
       if (isNavigating && !hasJob && !isNavBusy) {
         setIsNavigating(false);
       }
@@ -7685,7 +7711,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(moveInterval);
-  }, [isNavigating, user.isOnline, activeOrders.length > 0, !!busyAreaTarget, location === null]);
+  }, [isNavigating, user.isOnline, activeOrders.length > 0, !!busyAreaTarget, location === null, useRealGPS]);
 
   // Synchronize Nav Simulation with current active stop or busyAreaTarget
   useEffect(() => {
@@ -7741,7 +7767,7 @@ export default function App() {
 
   // GPS Drift Effect (Subtle jitter when online but stationary)
   useEffect(() => {
-    if (!user.isOnline || isNavigating || !location || isLowPerformance) return;
+    if (!user.isOnline || isNavigating || !location || isLowPerformance || useRealGPS) return;
 
     const driftInterval = setInterval(() => {
       // Very small drift: ~0.000005 degrees is approx 0.5 meters
@@ -7758,7 +7784,7 @@ export default function App() {
     }, 5000); // Drastically reduced frequency for stability
 
     return () => clearInterval(driftInterval);
-  }, [user.isOnline, isNavigating, location === null, isLowPerformance]);
+  }, [user.isOnline, isNavigating, location === null, isLowPerformance, useRealGPS]);
 
   // Customer Response Timer Logic
   useEffect(() => {
@@ -8294,9 +8320,25 @@ export default function App() {
     if ("geolocation" in navigator) {
       watchId.current = navigator.geolocation.watchPosition(
         (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          const currentHeading = position.coords.heading;
+
+          if (currentHeading !== null && currentHeading !== undefined && !isNaN(currentHeading)) {
+            setHeading(currentHeading);
+          } else if (locationRef.current) {
+            const dLat = lat - locationRef.current.latitude;
+            const dLng = lng - locationRef.current.longitude;
+            // Threshold movement check to prevent stationary jitter
+            if (Math.abs(dLat) > 0.00001 || Math.abs(dLng) > 0.00001) {
+              const angle = Math.atan2(dLng, dLat) * (180 / Math.PI);
+              setHeading(angle);
+            }
+          }
+
           setLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
+            latitude: lat,
+            longitude: lng,
           });
         },
         (error) => console.error("Error tracking location:", error),
@@ -8340,10 +8382,8 @@ export default function App() {
     }
     lastNoteRef.current = { title, body, time: now };
     
-    // Real Notifications: Only dispatch system browser alerts when the driver is ONLINE and NOT ON THE ACTIVE APP!
-    // "not on the app" means: standard window is hidden OR they have simulated background / off-app mode toggled on.
-    const isOffApp = document.visibilityState === 'hidden' || document.hidden || isOffAppSimulated;
-    if (user.isOnline && isOffApp && "Notification" in window && Notification.permission === "granted") {
+    // Real Notifications: Dispatch system browser alerts whenever driver is ONLINE (even if on the active app tab)
+    if (user.isOnline && "Notification" in window && Notification.permission === "granted") {
       try {
         // Prefer service worker showNotification details when available for reliable background dispatch on Android/PWA
         if (navigator.serviceWorker && navigator.serviceWorker.ready) {
@@ -8772,7 +8812,14 @@ export default function App() {
     const candidates = Array.from({ length: 5 }).map(() => {
       const type = getJobType();
       
-      const orderBrand: 'uber' | 'bolt' = 'uber';
+      let orderBrand: 'uber' | 'bolt' = 'uber';
+      if (uberOnline && boltOnline) {
+        orderBrand = Math.random() < 0.5 ? 'uber' : 'bolt';
+      } else if (boltOnline) {
+        orderBrand = 'bolt';
+      } else {
+        orderBrand = 'uber';
+      }
 
       let variant = 'Uber Eats 🍔';
       if (orderBrand === 'uber') {
@@ -8974,9 +9021,20 @@ export default function App() {
       // Adjusted wait time based on busyness mode
       if (!user.isOnline || isOnBreak) return;
 
-      // Random wait time between 5 to 10 minutes (300,000 to 600,000 ms)
-      const baseWait = 300000; // 5 minutes
-      const randomRange = 300000; // up to 10 minutes total
+      let baseWait = 1500;
+      let randomRange = 2500;
+
+      if (busynessMode === 'Low') {
+        baseWait = 45000;
+        randomRange = 75000; // 45s to 120s (2 minutes)
+      } else if (busynessMode === 'Medium') {
+        baseWait = 5000;
+        randomRange = 10000; // 5s to 15s
+      } else {
+        // High
+        baseWait = 1500;
+        randomRange = 2500; // 1.5s to 4s
+      }
 
       const waitTime = baseWait + Math.random() * randomRange;
 
@@ -9334,10 +9392,9 @@ export default function App() {
           // Tick logic: If tab is backgrounded, the worker generates requests
           const isHidden = document.visibilityState === 'hidden' || document.hidden || isOffAppSimulated;
           if (isHidden && user.isOnline && !isOnBreak && activeOrders.length < 3 && !pendingOrder && radarOrders.length === 0) {
-            // Background check interval randomly 5 to 10 minutes (75 to 150 ticks of 4s)
-            if (e.data.tickCount >= nextBackgroundCheckTicksRef.current) {
+            // Every 3 ticks (~12 seconds), run a background matching check
+            if (e.data.tickCount % 3 === 0) {
               triggerBackgroundOrderGeneration();
-              nextBackgroundCheckTicksRef.current = e.data.tickCount + Math.floor(75 + Math.random() * 75);
             }
           }
         }
@@ -10624,6 +10681,29 @@ export default function App() {
                     theme={theme}
                     otherDrivers={otherOnlineDrivers}
                     activeBrand={activeBrand}
+                    useRealGPS={useRealGPS}
+                    setUseRealGPS={setUseRealGPS}
+                    activeCityCenter={activeCityCenter}
+                    activeSurgeAreas={activeSurgeAreas}
+                    onNavigateToSurgeArea={(area) => {
+                      if (activeOrders.length > 0) {
+                        addToast("Busy Area Locked", "Complete your current active orders first before navigating to a surge zone.", "alert");
+                        return;
+                      }
+                      const surgeAreaLocation = {
+                        latitude: activeCityCenter.latitude + area.lat,
+                        longitude: activeCityCenter.longitude + area.lng
+                      };
+                      setBusyAreaTarget({
+                        id: area.id,
+                        name: area.name,
+                        location: surgeAreaLocation
+                      });
+                      setIsNavigating(true);
+                      setMapOffset({ x: 0, y: 0 }); // reset pan offset to lock onto vehicle
+                      addToast("Navigation Engaged", `Vehicle routed to ${area.name} (${area.multiplier}x Surge).`, "success");
+                      sendNotification("Surge Routing Active", `Heading towards Piccadilly ${area.multiplier}x epicenter.`);
+                    }}
                   />
                 ) : (
                   <MapGrid />
@@ -12139,185 +12219,12 @@ export default function App() {
                     )}
                     <button 
                       onClick={() => setIsSearchOpen(true)}
-                      className={`w-11 h-11 backdrop-blur-md border rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 ${
-                        activeBrand === 'bolt'
-                          ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_10px_rgba(0,255,136,0.15)]'
-                          : activeBrand === 'both'
-                          ? 'bg-[#0d091a]/95 text-indigo-400 border-purple-500/30'
-                          : 'bg-neutral-900/90 text-white border-white/10'
-                      }`}
+                      className="w-11 h-11 bg-slate-950 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0"
                     >
                       <Search size={20} />
                     </button>
                   </div>
                 </div>
-              </div>
-
-              {/* Android Multi-App Floating Swapper Bubble */}
-              <div className="absolute top-[280px] right-2 z-[600] pointer-events-none">
-                <motion.div 
-                  drag
-                  dragConstraints={{ top: -150, left: -340, right: 0, bottom: 300 }}
-                  dragElastic={0.15}
-                  dragMomentum={false}
-                  initial={{ x: 0, y: 0, opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="pointer-events-auto flex items-center gap-1.5 group font-sans"
-                >
-                  {/* Miniature Expandable Panel displaying online/offline switches and Theme Styles */}
-                  <motion.div 
-                    initial={{ width: 0, opacity: 0 }}
-                    whileHover={{ width: 'auto', opacity: 1 }}
-                    className="overflow-hidden bg-[#07080a]/95 backdrop-blur-md border border-white/10 rounded-2xl p-1 flex items-center gap-1.5 shadow-[0_10px_25px_rgba(0,0,0,0.5)] transition-all ease-out duration-300 pointer-events-auto h-11 mr-1 select-none px-2 shrink-0"
-                  >
-                    {/* DISPATCH NETWORKS */}
-                    <span className="text-[7px] text-gray-500 font-black tracking-widest uppercase mr-0.5 whitespace-nowrap">DISPATCH:</span>
-                    
-                    {/* Compact Uber Toggle */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setUberOnline(prev => {
-                          const next = !prev;
-                          if (next) {
-                            setUser(u => ({ ...u, isOnline: true }));
-                            addToast('Uber Dispatch Online', 'Now listening to active Uber trip requests.', 'success');
-                          } else {
-                            addToast('Uber Offline', 'Disconnected from Uber network.', 'info');
-                            if (!boltOnline) setUser(u => ({ ...u, isOnline: false }));
-                          }
-                          return next;
-                        });
-                      }}
-                      className={`h-8 px-2 rounded-xl flex items-center gap-1 font-sans font-black text-[9px] uppercase transition-all whitespace-nowrap ${
-                        uberOnline 
-                          ? 'bg-sky-500/10 text-sky-400 border border-sky-400/20' 
-                          : 'text-gray-500 hover:text-white bg-white/5 border border-transparent'
-                      }`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${uberOnline ? 'bg-sky-400 animate-pulse' : 'bg-gray-650'}`} />
-                      Uber
-                    </button>
-
-                    {/* Compact Bolt Toggle */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setBoltOnline(prev => {
-                          const next = !prev;
-                          if (next) {
-                            setUser(u => ({ ...u, isOnline: true }));
-                            addToast('Bolt Dispatch Online', 'Now listening to active Bolt fare opportunities.', 'success');
-                          } else {
-                            addToast('Bolt Offline', 'Disconnected from Bolt network.', 'info');
-                            if (!uberOnline) setUser(u => ({ ...u, isOnline: false }));
-                          }
-                          return next;
-                        });
-                      }}
-                      className={`h-8 px-2 rounded-xl flex items-center gap-1 font-sans font-black text-[9px] uppercase transition-all whitespace-nowrap ${
-                        boltOnline 
-                          ? 'bg-[#00ca72]/10 text-[#00ca72] border border-[#00ca72]/20' 
-                          : 'text-gray-400 hover:text-white bg-white/5 border border-transparent'
-                      }`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${boltOnline ? 'bg-emerald-300 animate-pulse' : 'bg-gray-650'}`} />
-                      Bolt
-                    </button>
-
-                    <div className="w-[1px] h-5 bg-white/10 mx-0.5 shrink-0" />
-
-                    {/* SKIN STYLES */}
-                    <span className="text-[7px] text-gray-500 font-black tracking-widest uppercase mr-0.5 whitespace-nowrap">SKIN STYLE:</span>
-
-                    {/* Choose Uber Only */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveBrand('uber');
-                        addToast('Uber Skin Loaded 🖤', 'The workspace shifted to clean, minimalist dark Uber slate.', 'info');
-                      }}
-                      className={`h-8 w-8 rounded-xl flex items-center justify-center font-sans font-black text-[10px] transition-all shrink-0 ${
-                        activeBrand === 'uber'
-                          ? 'bg-white text-black font-extrabold shadow-md shadow-white/10'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5'
-                      }`}
-                      title="Set Uber Minimalist Slate theme"
-                    >
-                      U
-                    </button>
-
-                    {/* Choose Bolt Only */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveBrand('bolt');
-                        addToast('Bolt Skin Loaded 💚', 'The workspace shifted to energetic, high-contrast neon Bolt emerald.', 'info');
-                      }}
-                      className={`h-8 w-8 rounded-xl flex items-center justify-center font-sans font-black text-[10px] transition-all shrink-0 ${
-                        activeBrand === 'bolt'
-                          ? 'bg-[#00ca72] text-black font-extrabold shadow-md shadow-[#00ca72]/20'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5'
-                      }`}
-                      title="Set Bolt Neon Emerald theme"
-                    >
-                      B
-                    </button>
-
-                    {/* Choose BOTH combined */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveBrand('both');
-                        addToast('Dual-App Combined Skin Loaded 💜', 'Split HUD activated. View Uber and Bolt styles concurrently.', 'success');
-                      }}
-                      className={`h-8 px-2 rounded-xl flex items-center gap-1 font-sans font-black text-[9px] uppercase transition-all shrink-0 ${
-                        activeBrand === 'both'
-                          ? 'bg-gradient-to-r from-blue-500 to-[#00ca72] text-white shadow-md shadow-purple-500/25 font-extrabold'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5'
-                      }`}
-                      title="Set Combined Dual split-screen theme"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-                      Both
-                    </button>
-                  </motion.div>
-
-                  {/* Main Bubble */}
-                  <div className="relative">
-                    {/* Ring Indicators represent Uber online status */}
-                    <svg className="absolute -inset-1.5 w-[56px] h-[56px] -rotate-90 select-none pointer-events-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]">
-                      <circle 
-                        cx="28" 
-                        cy="28" 
-                        r="24" 
-                        stroke={uberOnline ? '#38bdf8' : '#374151'} 
-                        strokeWidth="3.5" 
-                        fill="transparent" 
-                        strokeLinecap="round"
-                        className="transition-colors duration-300"
-                      />
-                    </svg>
-
-                    <div
-                      className="w-11 h-11 bg-black text-white rounded-full flex items-center justify-center font-sans shadow-2xl relative border-2 border-transparent select-none overflow-hidden animate-none"
-                    >
-                      <div className="flex flex-col items-center justify-center w-full h-full bg-[#121214] transition-colors">
-                        <span className="font-extrabold text-[15px] tracking-tight text-white leading-none">U</span>
-                        <span className="text-[6px] tracking-widest font-black uppercase text-gray-400 mt-0.5 leading-none">UBER</span>
-                      </div>
-                    </div>
-
-                    {/* Tiny Auto-Pause standby active indicator letter dot */}
-                    {autoPauseSecondApp && (
-                      <span className="absolute top-0 right-0 w-3 h-3 bg-indigo-500 border border-black rounded-full flex items-center justify-center z-20 text-[6px] text-white font-black shadow-md select-none pointer-events-none" title="Multi-App Auto-Standby Active">
-                        A
-                      </span>
-                    )}
-                  </div>
-                </motion.div>
               </div>
 
               {/* Bottom Menu Toggle Button / Map Status Bar */}

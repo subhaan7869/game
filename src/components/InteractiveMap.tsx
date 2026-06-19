@@ -36,7 +36,12 @@ export interface InteractiveMapProps {
   pendingOrder: any;
   theme?: 'light' | 'dark';
   otherDrivers?: OtherDriver[];
-  activeBrand?: 'uber' | 'bolt' | 'both';
+  activeBrand?: 'uber' | 'both' | 'bolt';
+  useRealGPS?: boolean;
+  setUseRealGPS?: (val: boolean) => void;
+  activeCityCenter?: Location;
+  activeSurgeAreas?: any[];
+  onNavigateToSurgeArea?: (area: any) => void;
 }
 
 // Check for Google Maps Platform API key in environments
@@ -321,7 +326,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   pendingOrder,
   theme = 'dark',
   otherDrivers = [],
-  activeBrand = 'uber'
+  activeBrand = 'uber',
+  useRealGPS = false,
+  setUseRealGPS,
+  activeCityCenter,
+  activeSurgeAreas = [],
+  onNavigateToSurgeArea
 }) => {
   const [mapType, setMapType] = useState<'hybrid' | 'roadmap'>('roadmap');
   const [viewAngle, setViewAngle] = useState<'top' | 'tilt'>('top');
@@ -397,6 +407,20 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         
         {/* Dynamic Map Layers Overlay HUD */}
         <div className="absolute top-4 right-4 z-40 flex items-center gap-2">
+          {/* Live Geolocation Toggle Button */}
+          <button
+            onClick={() => setUseRealGPS?.(!useRealGPS)}
+            className={`h-9 px-3 border rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xl active:scale-90 backdrop-blur-md ${
+              useRealGPS 
+                ? 'bg-emerald-500/90 text-black border-emerald-400 hover:bg-emerald-400' 
+                : 'bg-[#111216]/90 hover:bg-[#18191f] border-white/10 text-white'
+            }`}
+            title="Toggle Live GPS Tracker / Simulated Ride Mode"
+          >
+            <div className={`w-2 h-2 rounded-full ${useRealGPS ? 'bg-black animate-pulse' : 'bg-gray-400'}`} />
+            <span className="uppercase tracking-wider">{useRealGPS ? 'Live GPS: ON' : 'Live GPS: OFF'}</span>
+          </button>
+
           {/* View Map style toggle */}
           <button
             onClick={() => setMapType(prev => prev === 'roadmap' ? 'hybrid' : 'roadmap')}
@@ -578,6 +602,46 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 </AdvancedMarker>
               </>
             )}
+
+            {/* Premium Translucent Uber-style Surge Heatmap Overlays */}
+            {isOnline && activeSurgeAreas && activeSurgeAreas.map((area) => {
+              const baseCenter = activeCityCenter || location || { latitude: 51.5074, longitude: -0.1278 };
+              const lat = baseCenter.latitude + area.lat;
+              const lng = baseCenter.longitude + area.lng;
+              
+              return (
+                <React.Fragment key={`gmap-surge-${area.id}`}>
+                  {/* Huge Translucent Surge Pulsing Glow Base Circle */}
+                  <AdvancedMarker position={{ lat, lng }}>
+                    <div className="relative flex items-center justify-center pointer-events-none select-none -translate-y-[15px]">
+                      {/* Nested levels of beautiful radial red/orange glow with standard CSS blur to match real heatmaps */}
+                      <div className="absolute w-[280px] h-[280px] rounded-full bg-[radial-gradient(circle,_rgba(239,68,68,0.22)_0%,_rgba(249,115,22,0.08)_50%,_transparent_100%)] animate-pulse blur-md" style={{ animationDuration: '3.5s' }} />
+                      <div className="absolute w-[140px] h-[140px] rounded-full bg-[radial-gradient(circle,_rgba(239,68,68,0.35)_0%,_rgba(220,38,38,0.06)_60%,_transparent_100%)] blur-sm" />
+                    </div>
+                  </AdvancedMarker>
+
+                  {/* Interactive Surge Multiplier Bubble Tooltip Badge */}
+                  <AdvancedMarker position={{ lat, lng }}>
+                    <div className="relative flex flex-col items-center select-none -translate-y-[15px]">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNavigateToSurgeArea?.(area);
+                        }}
+                        className="px-2.5 py-1 bg-black text-white hover:bg-white hover:text-black border border-white/20 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.6)] flex items-center gap-1.5 transition-all hover:scale-110 active:scale-95 cursor-pointer pointer-events-auto z-40"
+                        title={`Click to navigate to ${area.name} (${area.multiplier}x Surge)`}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping shrink-0" />
+                        <span className="font-sans font-black text-[10px] tracking-tight uppercase">{area.multiplier}x Surge</span>
+                      </button>
+                      <div className="px-1.5 py-0.5 bg-black/75 rounded-md text-gray-300 font-bold text-[7.5px] uppercase tracking-wider mt-1 border border-white/5 shadow-md">
+                        {area.name}
+                      </div>
+                    </div>
+                  </AdvancedMarker>
+                </React.Fragment>
+              );
+            })}
           </Map>
         </div>
 
