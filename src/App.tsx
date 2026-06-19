@@ -11163,7 +11163,7 @@ export default function App() {
                   setSelectedRestaurant(null);
                 }}
                 onPan={(e, info) => {
-                  if (isPinchingRef.current) return;
+                  if (isPinchingRef.current || mapCoreMode !== 'cyber') return;
                   if (isNaN(info.delta.x) || isNaN(info.delta.y)) return;
                   setMapOffset(prev => ({
                     x: (prev.x || 0) + info.delta.x,
@@ -11174,50 +11174,57 @@ export default function App() {
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 onWheel={(e) => {
+                  if (mapCoreMode !== 'cyber') return;
                   const delta = e.deltaY;
                   // Scroll zoom: changes zoom slightly per notch
                   setZoom(prev => Math.max(0.4, Math.min(3.0, prev - delta * 0.0012)));
                 }}
-                className={`absolute inset-0 overflow-hidden cursor-grab active:cursor-grabbing ${isNightMode || theme === 'dark' ? 'bg-[#0e1014]' : 'bg-[#e5e3df]'} ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'blur-md grayscale opacity-50 pointer-events-none' : ''}`}
+                className={`absolute inset-0 overflow-hidden ${
+                  mapCoreMode === 'cyber' 
+                    ? `cursor-grab active:cursor-grabbing ${isNightMode || theme === 'dark' ? 'bg-[#0e1014]' : 'bg-[#e5e3df]'}` 
+                    : 'bg-transparent pointer-events-none'
+                } ${(lockoutUntil && Date.now() < lockoutUntil) || Object.values(customerTimers).some(t => Number(t) > 0) ? 'blur-md grayscale opacity-50 pointer-events-none' : ''}`}
               >
                 {/* Background Layer (Roads/Blocks Optimized) */}
-                <div className="absolute inset-0 pointer-events-none" style={{ 
-                  transform: `translate(${mapOffset.x}px, ${mapOffset.y}px)`,
-                  willChange: 'transform'
-                }}>
-                  {/* Hyper Driver-like Road Base */}
-                  <div className="absolute inset-[-1500px] border-none" style={{ backgroundColor: theme === 'dark' || isNightMode ? '#181a1f' : '#f0ece1' }} />
-                  
-                  {/* Fine Road Grid */}
-                  <div className="absolute inset-[-1500px] opacity-100" style={{ 
-                    backgroundImage: `
-                      linear-gradient(90deg, ${theme === 'dark' || isNightMode ? '#252830' : '#ffffff'} ${12 * zoom}px, transparent ${12 * zoom}px),
-                      linear-gradient(${theme === 'dark' || isNightMode ? '#252830' : '#ffffff'} ${12 * zoom}px, transparent ${12 * zoom}px)
-                    `,
-                    backgroundSize: `${160 * zoom}px ${160 * zoom}px`
-                  }} />
-                  
-                  {/* Major Arterial Roads */}
-                  <div className="absolute inset-[-1500px] opacity-100" style={{ 
-                    backgroundImage: `
-                      linear-gradient(90deg, ${theme === 'dark' || isNightMode ? '#303440' : '#ffffff'} ${18 * zoom}px, transparent ${18 * zoom}px),
-                      linear-gradient(${theme === 'dark' || isNightMode ? '#303440' : '#ffffff'} ${18 * zoom}px, transparent ${18 * zoom}px)
-                    `,
-                    backgroundSize: `${640 * zoom}px ${640 * zoom}px`
-                  }} />
-                  
-                  {/* Buildings Grid */}
-                  <div className="absolute inset-[-1500px] opacity-[0.3]" style={{ 
-                    backgroundImage: `
-                      linear-gradient(45deg, ${theme === 'dark' || isNightMode ? '#1a1c22' : '#e4e1d5'} 25%, transparent 25%, transparent 75%, ${theme === 'dark' || isNightMode ? '#1a1c22' : '#e4e1d5'} 75%, ${theme === 'dark' || isNightMode ? '#1a1c22' : '#e4e1d5'})
-                    `,
-                    backgroundSize: `${80 * zoom}px ${80 * zoom}px`,
-                    backgroundPosition: `0 0`
-                  }} />
-                </div>
+                {mapCoreMode === 'cyber' && (
+                  <div className="absolute inset-0 pointer-events-none" style={{ 
+                    transform: `translate(${mapOffset.x}px, ${mapOffset.y}px)`,
+                    willChange: 'transform'
+                  }}>
+                    {/* Hyper Driver-like Road Base */}
+                    <div className="absolute inset-[-1500px] border-none" style={{ backgroundColor: theme === 'dark' || isNightMode ? '#181a1f' : '#f0ece1' }} />
+                    
+                    {/* Fine Road Grid */}
+                    <div className="absolute inset-[-1500px] opacity-100" style={{ 
+                      backgroundImage: `
+                        linear-gradient(90deg, ${theme === 'dark' || isNightMode ? '#252830' : '#ffffff'} ${12 * zoom}px, transparent ${12 * zoom}px),
+                        linear-gradient(${theme === 'dark' || isNightMode ? '#252830' : '#ffffff'} ${12 * zoom}px, transparent ${12 * zoom}px)
+                      `,
+                      backgroundSize: `${160 * zoom}px ${160 * zoom}px`
+                    }} />
+                    
+                    {/* Major Arterial Roads */}
+                    <div className="absolute inset-[-1500px] opacity-100" style={{ 
+                      backgroundImage: `
+                        linear-gradient(90deg, ${theme === 'dark' || isNightMode ? '#303440' : '#ffffff'} ${18 * zoom}px, transparent ${18 * zoom}px),
+                        linear-gradient(${theme === 'dark' || isNightMode ? '#303440' : '#ffffff'} ${18 * zoom}px, transparent ${18 * zoom}px)
+                      `,
+                      backgroundSize: `${640 * zoom}px ${640 * zoom}px`
+                    }} />
+                    
+                    {/* Buildings Grid */}
+                    <div className="absolute inset-[-1500px] opacity-[0.3]" style={{ 
+                      backgroundImage: `
+                        linear-gradient(45deg, ${theme === 'dark' || isNightMode ? '#1a1c22' : '#e4e1d5'} 25%, transparent 25%, transparent 75%, ${theme === 'dark' || isNightMode ? '#1a1c22' : '#e4e1d5'} 75%, ${theme === 'dark' || isNightMode ? '#1a1c22' : '#e4e1d5'})
+                      `,
+                      backgroundSize: `${80 * zoom}px ${80 * zoom}px`,
+                      backgroundPosition: `0 0`
+                    }} />
+                  </div>
+                )}
                 
                 {/* Traffic Lines (Simulated) */}
-                {location && !isLowPerformance && trafficSegments.map((seg, i) => {
+                {mapCoreMode === 'cyber' && location && !isLowPerformance && trafficSegments.map((seg, i) => {
                   const x1 = (seg.start.longitude - location.longitude) * MAP_SCALE;
                   const y1 = (location.latitude - seg.start.latitude) * MAP_SCALE;
                   const x2 = (seg.end.longitude - location.longitude) * MAP_SCALE;
@@ -11242,12 +11249,12 @@ export default function App() {
                 {/* Navigation Overlay */}
                 <AnimatePresence>
                   {isNavigating && activeOrders.length > 0 && (
-                    <div className="absolute top-0 left-0 right-0 z-[150] flex flex-col gap-3 p-4 pt-12">
+                    <div className="absolute top-0 left-0 right-0 z-[150] flex flex-col gap-3 p-4 pt-12 pointer-events-none">
                       <motion.div 
                         initial={{ y: -50, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: -50, opacity: 0 }}
-                        className="bg-[#1a1a1a] text-white px-6 py-4 rounded-[32px] shadow-2xl flex items-center justify-between border border-white/10 backdrop-blur-xl"
+                        className="bg-[#1a1a1a] text-white px-6 py-4 rounded-[32px] shadow-2xl flex items-center justify-between border border-white/10 backdrop-blur-xl pointer-events-auto"
                       >
                         <div className="flex items-center gap-5">
                           <div className="bg-blue-600 p-3 rounded-2xl shadow-[0_0_25px_rgba(37,99,235,0.4)]">
@@ -11339,14 +11346,16 @@ export default function App() {
                 </AnimatePresence>
 
                 {/* Parks/Green areas */}
-                <div className="absolute inset-0 opacity-20" style={{ 
-                  backgroundImage: `radial-gradient(circle, ${theme === 'dark' ? '#1d3a33' : '#a3d9a5'} 25%, transparent 85%), radial-gradient(circle, ${theme === 'dark' ? '#142a24' : '#88c98a'} 15%, transparent 70%)`,
-                  backgroundSize: `${600 * zoom}px ${600 * zoom}px, ${500 * zoom}px ${500 * zoom}px`,
-                  transform: location ? `translate(${(location.longitude * PARK_SCALE + mapOffset.x) % (600 * zoom)}px, ${(location.latitude * PARK_SCALE + mapOffset.y) % (600 * zoom)}px)` : 'none'
-                }} />
+                {mapCoreMode === 'cyber' && (
+                  <div className="absolute inset-0 opacity-20" style={{ 
+                    backgroundImage: `radial-gradient(circle, ${theme === 'dark' ? '#1d3a33' : '#a3d9a5'} 25%, transparent 85%), radial-gradient(circle, ${theme === 'dark' ? '#142a24' : '#88c98a'} 15%, transparent 70%)`,
+                    backgroundSize: `${600 * zoom}px ${600 * zoom}px, ${500 * zoom}px ${500 * zoom}px`,
+                    transform: location ? `translate(${(location.longitude * PARK_SCALE + mapOffset.x) % (600 * zoom)}px, ${(location.latitude * PARK_SCALE + mapOffset.y) % (600 * zoom)}px)` : 'none'
+                  }} />
+                )}
 
                 {/* Surge Zones Visualization */}
-                {location && !isLowPerformance && activeSurgeAreas.map((area, i) => {
+                {mapCoreMode === 'cyber' && location && !isLowPerformance && activeSurgeAreas.map((area, i) => {
                   const x = (area.lng - location.longitude) * MAP_SCALE + mapOffset.x;
                   const y = (location.latitude - area.lat) * MAP_SCALE + mapOffset.y;
                   
@@ -11395,7 +11404,7 @@ export default function App() {
                 })}
 
                 {/* Hotspots (Busy Areas) */}
-                {location && !isLowPerformance && hotspots.map((spot, i) => {
+                {mapCoreMode === 'cyber' && location && !isLowPerformance && hotspots.map((spot, i) => {
                   const x = (spot.longitude - location.longitude) * MAP_SCALE + mapOffset.x;
                   const y = (location.latitude - spot.latitude) * MAP_SCALE + mapOffset.y;
                   return (
@@ -11419,7 +11428,7 @@ export default function App() {
                 })}
 
                 {/* Mock Restaurants (Busy Map) */}
-                {location && activeRestaurants.map((rest, i) => {
+                {mapCoreMode === 'cyber' && location && activeRestaurants.map((rest, i) => {
                   const cityInfo = CITY_DATABASES[activeCityKey] || CITY_DATABASES["London"];
                   const restLat = cityInfo.center.latitude + rest.offset.lat;
                   const restLng = cityInfo.center.longitude + rest.offset.lng;
@@ -11456,13 +11465,13 @@ export default function App() {
 
                 {/* Restaurant Busyness Modal */}
                 <AnimatePresence>
-                  {selectedRestaurant && (
+                  {mapCoreMode === 'cyber' && selectedRestaurant && (
                     <motion.div 
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 20 }}
                       onClick={(e) => e.stopPropagation()}
-                      className="absolute bottom-32 left-6 right-6 bg-white rounded-3xl p-6 shadow-2xl z-[300] text-black"
+                      className="absolute bottom-32 left-6 right-6 bg-white rounded-3xl p-6 shadow-2xl z-[300] text-black bg-transparent pointer-events-auto"
                     >
                       <div className="flex justify-between items-start mb-4">
                         <div>
@@ -11483,53 +11492,57 @@ export default function App() {
                 </AnimatePresence>
 
                 {/* Simulated Street Labels */}
-                <div className="absolute inset-0 pointer-events-none opacity-20 overflow-hidden">
-                  {(() => {
-                    const streetNames = CITY_DATABASES[activeCityKey]?.streets || ["High St", "London Rd", "Park Ave", "Station Way", "Broadway"];
-                    const mapOffsets = [
-                      { x: 100, y: 200 },
-                      { x: 420, y: 480 },
-                      { x: 700, y: 150 },
-                      { x: 180, y: 780 },
-                      { x: 620, y: 380 },
-                      { x: 300, y: 280 },
-                      { x: 520, y: 680 }
-                    ];
-                    return streetNames.map((name, i) => {
-                      const offsetPoint = mapOffsets[i % mapOffsets.length];
-                      return (
-                        <div 
-                          key={`street-${name}-${i}`}
-                          className={`absolute text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${theme === 'dark' ? 'text-white/40' : 'text-black/40'}`}
-                          style={{ 
-                            left: offsetPoint.x * zoom, 
-                            top: offsetPoint.y * zoom,
-                            transform: location ? `translate(${(location.longitude * LABEL_SCALE + mapOffset.x) % (1000 * zoom)}px, ${(location.latitude * LABEL_SCALE + mapOffset.y) % (1000 * zoom)}px)` : 'none'
-                          }}
-                        >
-                          {name}
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
+                {mapCoreMode === 'cyber' && (
+                  <div className="absolute inset-0 pointer-events-none opacity-20 overflow-hidden">
+                    {(() => {
+                      const streetNames = CITY_DATABASES[activeCityKey]?.streets || ["High St", "London Rd", "Park Ave", "Station Way", "Broadway"];
+                      const mapOffsets = [
+                        { x: 100, y: 200 },
+                        { x: 420, y: 480 },
+                        { x: 700, y: 150 },
+                        { x: 180, y: 780 },
+                        { x: 620, y: 380 },
+                        { x: 300, y: 280 },
+                        { x: 520, y: 680 }
+                      ];
+                      return streetNames.map((name, i) => {
+                        const offsetPoint = mapOffsets[i % mapOffsets.length];
+                        return (
+                          <div 
+                            key={`street-${name}-${i}`}
+                            className={`absolute text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${theme === 'dark' ? 'text-white/40' : 'text-black/40'}`}
+                            style={{ 
+                              left: offsetPoint.x * zoom, 
+                              top: offsetPoint.y * zoom,
+                              transform: location ? `translate(${(location.longitude * LABEL_SCALE + mapOffset.x) % (1000 * zoom)}px, ${(location.latitude * LABEL_SCALE + mapOffset.y) % (1000 * zoom)}px)` : 'none'
+                            }}
+                          >
+                            {name}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
 
                 {/* Region Outlines (Simulated) */}
-                <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-40">
-                  <path 
-                    d="M 100 100 Q 200 50 300 100 T 500 100 M 50 300 Q 150 250 250 300 T 450 300 M 200 500 Q 300 450 400 500 T 600 500" 
-                    fill="none" 
-                    stroke="blue" 
-                    strokeWidth="2" 
-                    strokeDasharray="5,5"
-                  />
-                  <path 
-                    d="M 150 150 L 250 100 L 350 150 L 250 200 Z M 400 400 L 500 350 L 600 400 L 500 450 Z" 
-                    fill="rgba(59, 130, 246, 0.05)" 
-                    stroke="blue" 
-                    strokeWidth="1.5"
-                  />
-                </svg>
+                {mapCoreMode === 'cyber' && (
+                  <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-40">
+                    <path 
+                      d="M 100 100 Q 200 50 300 100 T 500 100 M 50 300 Q 150 250 250 300 T 450 300 M 200 500 Q 300 450 400 500 T 600 500" 
+                      fill="none" 
+                      stroke="blue" 
+                      strokeWidth="2" 
+                      strokeDasharray="5,5"
+                    />
+                    <path 
+                      d="M 150 150 L 250 100 L 350 150 L 250 200 Z M 400 400 L 500 350 L 600 400 L 500 450 Z" 
+                      fill="rgba(59, 130, 246, 0.05)" 
+                      stroke="blue" 
+                      strokeWidth="1.5"
+                    />
+                  </svg>
+                )}
 
                 {mapCoreMode === 'cyber' && (
                   <>
@@ -11749,7 +11762,7 @@ export default function App() {
                   {location && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       {/* Pulsing blue dot for driver */}
-                      {mapCoreMode !== 'cyber' && (
+                      {mapCoreMode === 'cyber_disabled' && (
                         <div className="relative z-10" style={{ transform: `translate(${mapOffset.x}px, ${mapOffset.y}px)` }}>
                           {user.isOnline ? (
                             <div className="w-10 h-10 bg-white rounded-full shadow-xl flex items-center justify-center border-2 border-blue-500">
@@ -11774,7 +11787,7 @@ export default function App() {
                       )}
 
                       {/* Surge Badges and More Buttons */}
-                      {user.isOnline && !isNavigating && (
+                      {mapCoreMode === 'cyber' && user.isOnline && !isNavigating && (
                         <>
                           <div className="absolute top-1/4 right-1/4 bg-blue-600 text-white px-3 py-1 rounded-lg font-black shadow-lg flex items-center gap-1">
                             <span>1.4x</span>
@@ -11805,7 +11818,7 @@ export default function App() {
                       )}
 
                       {/* Restaurant and Customer markers */}
-                      {location && mapCoreMode !== 'cyber' && activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, idx) => {
+                      {location && mapCoreMode === 'cyber' && activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter).map((order, idx) => {
                         const isPickup = order.status === 'accepted';
                         const target = isPickup 
                           ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
@@ -11863,7 +11876,7 @@ export default function App() {
                       })}
 
                       {/* Pending Order Marker (Matching) */}
-                      {location && mapCoreMode !== 'cyber' && pendingOrder && (
+                      {location && mapCoreMode === 'cyber' && pendingOrder && (
                         <>
                           {[(pendingOrder.type === 'delivery' ? pendingOrder.restaurantLocation : pendingOrder.pickupLocation), pendingOrder.customerLocation].map((target, i) => {
                             if (!target) return null;
