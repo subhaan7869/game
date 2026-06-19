@@ -7820,7 +7820,14 @@ export default function App() {
     const handleForceReady = () => setIsAuthReady(true);
     window.addEventListener('force-auth-ready', handleForceReady);
 
+    // Dynamic fail-safe timeout to prevent hanging on splash screen
+    const fallbackTimer = setTimeout(() => {
+      setIsAuthReady(true);
+      console.warn("Auth initialization fallback triggered.");
+    }, 1500);
+
     const unsubscribe = onAuthStateChanged(auth, (fUser) => {
+      clearTimeout(fallbackTimer);
       setFirebaseUser(fUser);
       setIsAuthReady(true);
       
@@ -7862,6 +7869,7 @@ export default function App() {
     }
     
     return () => {
+      clearTimeout(fallbackTimer);
       unsubscribe();
       window.removeEventListener('force-auth-ready', handleForceReady);
     };
