@@ -42,6 +42,7 @@ export interface InteractiveMapProps {
   activeCityCenter?: Location;
   activeSurgeAreas?: any[];
   onNavigateToSurgeArea?: (area: any) => void;
+  routeWaypoints?: Location[];
 }
 
 // 1. Custom Driver Icon Constructor using the highly realistic green car design
@@ -152,18 +153,47 @@ const getPendingOfferIcon = (type: 'pickup' | 'dest', order: any) => {
 
 // 5. Surge Area Heatmap Overlay Constructor
 const getSurgeAreaIcon = (area: any) => {
+  let mainGrad = 'rgba(239, 68, 68, 0.22)';
+  let subGrad = 'rgba(249, 115, 22, 0.06)';
+  let centerGrad = 'rgba(239, 68, 68, 0.35)';
+  let edgeGrad = 'rgba(220, 38, 38, 0.08)';
+
+  if (area.periodId === 'breakfast') {
+    mainGrad = 'rgba(245, 158, 11, 0.25)';
+    subGrad = 'rgba(251, 191, 36, 0.08)';
+    centerGrad = 'rgba(251, 191, 36, 0.4)';
+    edgeGrad = 'rgba(251, 191, 36, 0.1)';
+  } else if (area.periodId === 'lunch') {
+    mainGrad = 'rgba(249, 115, 22, 0.25)';
+    subGrad = 'rgba(217, 119, 6, 0.08)';
+    centerGrad = 'rgba(249, 115, 22, 0.4)';
+    edgeGrad = 'rgba(217, 119, 6, 0.1)';
+  } else if (area.periodId === 'dinner') {
+    mainGrad = 'rgba(220, 38, 38, 0.25)';
+    subGrad = 'rgba(185, 28, 28, 0.08)';
+    centerGrad = 'rgba(220, 38, 38, 0.42)';
+    edgeGrad = 'rgba(185, 28, 28, 0.12)';
+  } else if (area.periodId === 'offpeak') {
+    mainGrad = 'rgba(16, 185, 129, 0.15)';
+    subGrad = 'rgba(45, 212, 191, 0.05)';
+    centerGrad = 'rgba(16, 185, 129, 0.25)';
+    edgeGrad = 'rgba(45, 212, 191, 0.06)';
+  }
+
+  const pingBgClass = area.periodId === 'offpeak' ? 'bg-emerald-500' : area.periodId === 'breakfast' ? 'bg-amber-500' : 'bg-orange-500';
+
   return L.divIcon({
     className: '',
     html: `
       <div class="relative flex flex-col items-center select-none" style="width: 280px; height: 280px; margin-left: -140px; margin-top: -140px;">
         <!-- Neon heat pulse rings nested perfectly -->
-        <div class="absolute w-[280px] h-[280px] rounded-full bg-[radial-gradient(circle,_rgba(239,68,68,0.22)_0%,_rgba(249,115,22,0.06)_50%,_transparent_100%)] animate-pulse blur-md pointer-events-none" style="animation-duration: 3.5s; top: 0; left: 0;"></div>
-        <div class="absolute w-[140px] h-[140px] rounded-full bg-[radial-gradient(circle,_rgba(239,68,68,0.35)_0%,_rgba(220,38,38,0.08)_60%,_transparent_100%)] blur-sm pointer-events-none" style="top: 70px; left: 70px;"></div>
+        <div class="absolute w-[280px] h-[280px] rounded-full bg-[radial-gradient(circle,_${mainGrad}_0%,_${subGrad}_50%,_transparent_100%)] animate-pulse blur-md pointer-events-none" style="animation-duration: 3.5s; top: 0; left: 0;"></div>
+        <div class="absolute w-[140px] h-[140px] rounded-full bg-[radial-gradient(circle,_${centerGrad}_0%,_${edgeGrad}_50%,_transparent_100%)] blur-sm pointer-events-none" style="top: 70px; left: 70px;"></div>
 
         <!-- Interactive multi center navigation button -->
         <div class="absolute top-[125px] flex flex-col items-center pointer-events-auto z-40">
           <button class="surge-nav-trigger px-2.5 py-1 bg-black text-white hover:bg-white hover:text-black border border-white/20 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.6)] flex items-center gap-1.5 transition-all hover:scale-110 active:scale-95 cursor-pointer pointer-events-auto">
-            <span class="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping shrink-0"></span>
+            <span class="w-1.5 h-1.5 rounded-full ${pingBgClass} animate-ping shrink-0"></span>
             <span class="font-sans font-black text-[10px] tracking-tight uppercase">${area.multiplier}x Surge</span>
           </button>
           <div class="px-1.5 py-0.5 bg-black/75 rounded-md text-gray-300 font-bold text-[7.5px] uppercase tracking-wider mt-1 border border-white/5 shadow-md">
@@ -191,7 +221,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   setUseRealGPS,
   activeCityCenter,
   activeSurgeAreas,
-  onNavigateToSurgeArea
+  onNavigateToSurgeArea,
+  routeWaypoints
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -314,7 +345,39 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       dashPolylineRef.current = null;
     }
 
-    if (isNavigating && currentStops.length > 0) {
+    if (isNavigating && routeWaypoints && routeWaypoints.length > 0) {
+      const pathPoints = [driverLatLng, ...routeWaypoints.map(wp => L.latLng(wp.latitude, wp.longitude))];
+
+      currentStops.forEach(st => {
+        const stLatLng = L.latLng(st.location.latitude, st.location.longitude);
+        const marker = L.marker(stLatLng, { icon: getStopIcon(st) }).addTo(map);
+        stopsMarkersRef.current.push(marker);
+      });
+
+      routePolylineRef.current = L.polyline(pathPoints, {
+        color: '#2563eb',
+        weight: 6,
+        opacity: 0.9,
+        lineJoin: 'round'
+      }).addTo(map);
+
+      dashPolylineRef.current = L.polyline(pathPoints, {
+        color: '#ffffff',
+        weight: 2,
+        opacity: 0.8,
+        dashArray: '5, 10',
+        lineJoin: 'round'
+      }).addTo(map);
+
+      // Fit bounds to show route path beautifully only when the route is constructed or recalulated.
+      // We check route length and first waypoint to identify recalculations, preventing jumping while moving.
+      const bounds = L.latLngBounds(pathPoints);
+      const boundsKey = routeWaypoints.length + "_" + (routeWaypoints[0]?.latitude || 0);
+      if ((map as any).lastBoundsKey !== boundsKey) {
+        (map as any).lastBoundsKey = boundsKey;
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
+    } else if (isNavigating && currentStops.length > 0) {
       const stopLatLngs = currentStops.map(s => L.latLng(s.location.latitude, s.location.longitude));
       const pathPoints = [driverLatLng, ...stopLatLngs];
 
@@ -339,7 +402,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         lineJoin: 'round'
       }).addTo(map);
 
-      // Fit bounds to show route path beautifully
       const bounds = L.latLngBounds(pathPoints);
       map.fitBounds(bounds, { padding: [50, 50] });
     }
@@ -429,7 +491,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     currentStops, 
     pendingOrder, 
     activeSurgeAreas, 
-    activeBrand
+    activeBrand,
+    routeWaypoints
   ]);
 
   return (

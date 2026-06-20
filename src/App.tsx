@@ -520,36 +520,52 @@ const Heatmap = ({
           const isHigh = ('demand' in area && area.demand === 'High') || area.name === 'Shoreditch';
           const isMedium = ('demand' in area && area.demand === 'Medium') || area.name === 'Soho';
           
+          let gradientBackground = '';
+          if (area.periodId === 'breakfast') {
+            const gradCol = isHigh ? 'rgba(245, 158, 11, 0.5)' : 'rgba(251, 191, 36, 0.35)';
+            gradientBackground = `radial-gradient(circle, ${gradCol} 0%, rgba(253, 230, 138, 0.15) 50%, rgba(245, 158, 11, 0) 100%)`;
+          } else if (area.periodId === 'lunch') {
+            const gradCol = isHigh ? 'rgba(249, 115, 22, 0.5)' : 'rgba(217, 119, 6, 0.35)';
+            gradientBackground = `radial-gradient(circle, ${gradCol} 0%, rgba(254, 215, 170, 0.15) 50%, rgba(249, 115, 22, 0) 100%)`;
+          } else if (area.periodId === 'dinner') {
+            const gradCol = isHigh ? 'rgba(220, 38, 38, 0.55)' : 'rgba(185, 28, 28, 0.4)';
+            gradientBackground = `radial-gradient(circle, ${gradCol} 0%, rgba(254, 202, 202, 0.18) 50%, rgba(220, 38, 38, 0) 100%)`;
+          } else if (area.periodId === 'offpeak') {
+            gradientBackground = 'radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(45, 212, 191, 0.1) 50%, rgba(16, 185, 129, 0) 100%)';
+          } else {
+            gradientBackground = isHigh 
+              ? 'radial-gradient(circle, rgba(239, 68, 68, 0.45) 0%, rgba(249, 115, 22, 0.15) 50%, rgba(239, 68, 68, 0) 100%)' 
+              : isMedium 
+                ? 'radial-gradient(circle, rgba(234, 179, 8, 0.4) 0%, rgba(245, 158, 11, 0.15) 50%, rgba(234, 179, 8, 0) 100%)'
+                : 'radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, rgba(45, 212, 191, 0.1) 50%, rgba(16, 185, 129, 0) 100%)';
+          }
+          
           // Let size dynamically scale with zoom. Bigger areas should have larger glow
           const size = area.radius * 3.8 * MAP_SCALE;
-
-          return (
-            <div 
-              key={`heatmap-glow-${idx}`}
-              className="absolute pointer-events-none"
-              style={{
-                width: size,
-                height: size,
-                left: centerX,
-                top: centerY,
-                transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`
-              }}
-            >
-              <motion.div 
-                animate={{ 
-                  scale: [1, 1.05, 1],
-                  opacity: [0.35 * intensity, 0.55 * intensity, 0.35 * intensity]
-                }}
-                transition={{ duration: 6 + (idx % 3) * 2, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute inset-0 rounded-full blur-[45px] sm:blur-[60px]"
-                style={{
-                  background: isHigh 
-                    ? 'radial-gradient(circle, rgba(239, 68, 68, 0.45) 0%, rgba(249, 115, 22, 0.15) 50%, rgba(239, 68, 68, 0) 100%)' 
-                    : isMedium 
-                      ? 'radial-gradient(circle, rgba(234, 179, 8, 0.4) 0%, rgba(245, 158, 11, 0.15) 50%, rgba(234, 179, 8, 0) 100%)'
-                      : 'radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, rgba(45, 212, 191, 0.1) 50%, rgba(16, 185, 129, 0) 100%)',
-                }}
-              />
+ 
+           return (
+             <div 
+               key={`heatmap-glow-${idx}`}
+               className="absolute pointer-events-none"
+               style={{
+                 width: size,
+                 height: size,
+                 left: centerX,
+                 top: centerY,
+                 transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`
+               }}
+             >
+               <motion.div 
+                 animate={{ 
+                   scale: [1, 1.05, 1],
+                   opacity: [0.35 * intensity, 0.55 * intensity, 0.35 * intensity]
+                 }}
+                 transition={{ duration: 6 + (idx % 3) * 2, repeat: Infinity, ease: "easeInOut" }}
+                 className="absolute inset-0 rounded-full blur-[45px] sm:blur-[60px]"
+                 style={{
+                   background: gradientBackground,
+                 }}
+               />
             </div>
           );
         })
@@ -4392,7 +4408,9 @@ const AudioSettingsScreen = ({
   setYoutubeVolume,
   onCustomSoundUpload,
   onClearCustomSound,
-  playHyperSound
+  playHyperSound,
+  isVoiceMuted,
+  setIsVoiceMuted
 }: {
   theme: string,
   onClose: () => void,
@@ -4408,7 +4426,9 @@ const AudioSettingsScreen = ({
   setYoutubeVolume: (val: number) => void,
   onCustomSoundUpload: (event: React.ChangeEvent<HTMLInputElement>) => void,
   onClearCustomSound: () => void,
-  playHyperSound: (type: any) => void
+  playHyperSound: (type: any) => void,
+  isVoiceMuted: boolean,
+  setIsVoiceMuted: (val: boolean) => void
 }) => {
   const isDark = theme === 'dark';
   
@@ -4463,6 +4483,28 @@ const AudioSettingsScreen = ({
           >
             <Volume2 size={16} className="animate-pulse" />
             <span>📢 Test Alert Ping</span>
+          </button>
+        </div>
+
+        {/* Vocal Dispatch assistant toggle */}
+        <div className={`p-5 rounded-[32px] border flex items-center justify-between gap-4 transition-all hover:border-blue-500/30 ${isDark ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'}`}>
+          <div className="flex items-center gap-4 text-left">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isVoiceMuted ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+              {isVoiceMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+            </div>
+            <div>
+              <h4 className="font-black text-base">Vocal Dispatch Guide</h4>
+              <p className="text-[10px] text-gray-400 font-bold mt-0.5 uppercase tracking-wide">
+                {isVoiceMuted ? '🔴 Announcements Muted' : '🟢 Aloud Voice Dispatch Enabled'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsVoiceMuted(!isVoiceMuted)}
+            className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${isVoiceMuted ? 'bg-gray-700' : 'bg-emerald-600'} relative flex items-center shrink-0 cursor-pointer`}
+          >
+            <div className={`w-6 h-6 rounded-full bg-white transition-all duration-300 shadow-md ${isVoiceMuted ? 'translate-x-0' : 'translate-x-6'}`} />
           </button>
         </div>
 
@@ -6163,6 +6205,21 @@ export default function App() {
   // Track isCustomSoundEnabled as a computed helper for backward compatibility inside components
   const isCustomSoundEnabled = soundPreference === 'custom_file';
 
+  const [isVoiceMuted, setIsVoiceMuted] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('hyper_driver_voice_muted');
+      return saved === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('hyper_driver_voice_muted', isVoiceMuted ? 'true' : 'false');
+    } catch (e) {}
+  }, [isVoiceMuted]);
+
   // Persistence hooks
   React.useEffect(() => {
     try {
@@ -7157,6 +7214,69 @@ export default function App() {
     }
   });
 
+  const [selectedTimePeriod, setSelectedTimePeriod] = useState<'realtime' | 'breakfast' | 'lunch' | 'dinner' | 'offpeak'>('realtime');
+
+  const getCurrentPeriodDetails = React.useCallback(() => {
+    if (selectedTimePeriod === 'realtime') {
+      const hr = new Date().getHours();
+      const isBreakfast = hr >= 7 && hr < 10;
+      const isLunch = hr >= 11 && hr <= 14;
+      const isDinner = hr >= 18 && hr <= 21;
+      const isAnyPeak = isBreakfast || isLunch || isDinner;
+      let label = 'Off-Peak';
+      if (isBreakfast) label = 'Breakfast';
+      else if (isLunch) label = 'Lunch';
+      else if (isDinner) label = 'Dinner';
+      return { id: isBreakfast ? 'breakfast' : isLunch ? 'lunch' : isDinner ? 'dinner' : 'offpeak', label, isPeak: isAnyPeak, hour: hr };
+    } else {
+      if (selectedTimePeriod === 'breakfast') return { id: 'breakfast', label: 'Breakfast', isPeak: true, hour: 8 };
+      if (selectedTimePeriod === 'lunch') return { id: 'lunch', label: 'Lunch Loop', isPeak: true, hour: 13 };
+      if (selectedTimePeriod === 'dinner') return { id: 'dinner', label: 'Dinner Surge', isPeak: true, hour: 19 };
+      return { id: 'offpeak', label: 'Off-Peak Slow', isPeak: false, hour: 15 };
+    }
+  }, [selectedTimePeriod]);
+
+  const getDynamicItemsForPeriod = React.useCallback((periodId: string, variant: string) => {
+    if (variant.includes('Connect') || variant.includes('Send')) {
+      return ["Secure Parcel Delivery 📦"];
+    }
+    const breakfastItems = [
+      ["Double Sausage McMuffin 🍳", "Golden Coffee Pot ☕", "Hash Brown 🥔"],
+      ["French Toast 🍞", "Vanilla Latte ☕", "Fresh Strawberries 🍓"],
+      ["Pancakes with Syrup 🥞", "Sausage Patty 🥩", "Orange Juice 🥤"],
+      ["Cinnamon Roll 🥐", "Hot Chocolate ☕", "Blueberry Muffin 🧁"]
+    ];
+    
+    const lunchItems = [
+      ["Chicken BLT Club Wrap 🌯", "Salt & Vinegar Crisps 🥔", "Cherry Coke 🥤"],
+      ["Smoked Salmon Salad Bowl 🥗", "Fresh Orange Slices 🍊", "Still Spring Water 💧"],
+      ["Classic Cheeseburger 🍔", "Seasoned French Fries 🍟", "Vanilla Milkshake 🥤"],
+      ["Sushi Salmon Bento Box 🍱", "Warm Edamame 🫛", "Green Tea Bottle 🍵"]
+    ];
+    
+    const dinnerItems = [
+      ["Stuffed Crust Pepperoni Pizza 🍕", "Garlic Pizza Bread 🫓", "Loaded Cheesy Fries 🍟"],
+      ["Fiery Double Beef Burger 🍔", "Crispy Onion Rings 🧅", "Sweet Potato Fries 🍟"],
+      ["Spicy Peri-Peri Chicken Half 🍗", "Spicy Rice 🍚", "Heirloom Tomato Salad 🥗"],
+      ["Tandoori Butter Chicken Curry 🍛", "Fresh Garlic Naan 🫓", "Crispy Vegetable Samosas 🥟"]
+    ];
+    
+    const offpeakItems = [
+      ["Warm Butter Pretzels 🥨", "Chocolate Chip Cookie 🍪"],
+      ["Glazed Doughnut Ring 🍩", "Iced Boba Milk Tea 🧋"],
+      ["Crispy Chicken Nuggets 🍗", "Curly Fries Bucket 🍟"],
+      ["Classic Pepperoni Slice 🍕", "Iced Matcha Tea 🍵"]
+    ];
+    
+    let pool = offpeakItems;
+    if (periodId === 'breakfast') pool = breakfastItems;
+    else if (periodId === 'lunch') pool = lunchItems;
+    else if (periodId === 'dinner') pool = dinnerItems;
+    
+    const selection = pool[Math.floor(Math.random() * pool.length)];
+    return selection;
+  }, []);
+
   useEffect(() => {
     try {
       localStorage.setItem('hd_enabled_services', JSON.stringify(enabledServices));
@@ -7169,11 +7289,12 @@ export default function App() {
   // Realistic Demand Simulation (every 5 mins) - manages global surges but does not override locator
   useEffect(() => {
     const simulateDemand = () => {
-      const hour = new Date().getHours();
-      const isPeak = (hour >= 11 && hour <= 14) || (hour >= 18 && hour <= 21);
+      const pDetails = getCurrentPeriodDetails();
+      const isPeak = pDetails.isPeak;
       
       const modes: ('Low' | 'Medium' | 'High')[] = isPeak ? ['Medium', 'High', 'High'] : ['Low', 'Low', 'Medium'];
       const newMode = modes[Math.floor(Math.random() * modes.length)];
+      setBusynessMode(newMode);
       
       let newSurge = 1.0;
       if (newMode === 'High') {
@@ -7184,17 +7305,17 @@ export default function App() {
       setGlobalSurge(newSurge);
       
       if (newSurge > 1.2 && user.isOnline) {
-        sendNotification("Surge Alert!", `Demand is spiking! Earnings are now ${newSurge.toFixed(1)}x higher in your area.`);
+        sendNotification(`Surge Alert (${pDetails.label})!`, `Demand is spiking during the ${pDetails.label} peak! Earnings are now ${newSurge.toFixed(1)}x higher.`);
         playHyperSound('order');
       }
     };
 
-    // Run once on mount
+    // Run once on mount or toggles
     simulateDemand();
     
     const interval = setInterval(simulateDemand, 300000); // 5 minutes
     return () => clearInterval(interval);
-  }, [user.isOnline]);
+  }, [user.isOnline, selectedTimePeriod, getCurrentPeriodDetails]);
 
   // Navigation Speed & Progress Simulation
   useEffect(() => {
@@ -7413,6 +7534,7 @@ export default function App() {
 
   // Web Speech vocal assistant guide
   const speakNav = React.useCallback((text: string) => {
+    if (isVoiceMuted) return;
     try {
       if ("speechSynthesis" in window) {
         window.speechSynthesis.cancel();
@@ -7422,7 +7544,7 @@ export default function App() {
         window.speechSynthesis.speak(utterance);
       }
     } catch (e) {}
-  }, []);
+  }, [isVoiceMuted]);
 
   // CarPlay Remote Sync
   useEffect(() => {
@@ -7496,17 +7618,72 @@ export default function App() {
     updateSync();
   }, [firebaseUser?.uid, isCarPlaySynced, activeOrders, isNavigating, isCarPlayRemoteMode]);
 
-  // Generate random hotspots around driver
+  // Generate random hotspots around driver with localized, period-themed clusters
   useEffect(() => {
-    if (location) {
+    if (location && activeCityCenter) {
       const generateHotspots = () => {
-        const hCount = isLowPerformance ? 5 : 15;
-        const newHotspots = Array.from({ length: hCount }).map(() => ({
-          latitude: location.latitude + (Math.random() - 0.5) * 0.05,
-          longitude: location.longitude + (Math.random() - 0.5) * 0.05,
-          intensity: 0.4 + Math.random() * 0.6,
-          size: 150 + Math.random() * 450
-        }));
+        const period = getCurrentPeriodDetails();
+        const hCount = isLowPerformance ? 6 : 18;
+        
+        // Let's establish dynamic cluster centers depending on the current simulated period
+        let centers: { lat: number, lng: number, weight: number }[] = [];
+        
+        if (period.id === 'breakfast') {
+          // Commuter/station and breakfast hubs cluster (e.g. King's Cross offset: +0.012 lat, -0.005 lng)
+          centers = [
+            { lat: activeCityCenter.latitude + 0.011, lng: activeCityCenter.longitude - 0.005, weight: 0.9 }, // Station node
+            { lat: activeCityCenter.latitude + 0.002, lng: activeCityCenter.longitude + 0.002, weight: 0.75 }, // Mid-High coffee joint
+            { lat: activeCityCenter.latitude - 0.003, lng: activeCityCenter.longitude + 0.004, weight: 0.6 }
+          ];
+        } else if (period.id === 'lunch') {
+          // Office districts, High Streets, Soho (e.g. Soho offset: -0.005 lat, -0.008 lng)
+          centers = [
+            { lat: activeCityCenter.latitude - 0.004, lng: activeCityCenter.longitude - 0.007, weight: 0.95 }, // Central Soho
+            { lat: activeCityCenter.latitude + 0.001, lng: activeCityCenter.longitude - 0.003, weight: 0.8 }, // Regent Office strip
+            { lat: activeCityCenter.latitude + 0.015, lng: activeCityCenter.longitude + 0.012, weight: 0.7 }  // Commercial Hub
+          ];
+        } else if (period.id === 'dinner') {
+          // Food streets & entertainment hubs: Soho (-0.005, -0.008) and Shoreditch (+0.005, +0.005)
+          centers = [
+            { lat: activeCityCenter.latitude + 0.005, lng: activeCityCenter.longitude + 0.005, weight: 0.95 }, // Shoreditch Nightlife
+            { lat: activeCityCenter.latitude - 0.005, lng: activeCityCenter.longitude - 0.008, weight: 0.9 },  // Soho Dining
+            { lat: activeCityCenter.latitude + 0.015, lng: activeCityCenter.longitude + 0.012, weight: 0.85 } // Piccadilly epicenter
+          ];
+        } else {
+          // Off-peak: dispersed dimmer spots, few primary central hubs
+          centers = [
+            { lat: activeCityCenter.latitude, lng: activeCityCenter.longitude, weight: 0.45 }
+          ];
+        }
+
+        const newHotspots = Array.from({ length: hCount }).map((_, idx) => {
+          // Allocate some coordinates based on cluster centers, others purely random disperse
+          const chosenCenter = centers[idx % centers.length];
+          const isClustered = Math.random() < 0.75;
+          
+          let lat = location.latitude;
+          let lng = location.longitude;
+          let intensity = 0.35 + Math.random() * 0.4;
+          
+          if (isClustered && chosenCenter) {
+            // Tight cluster dispersion (standard deviation ~0.0025 deg)
+            lat = chosenCenter.lat + (Math.random() - 0.5) * 0.005;
+            lng = chosenCenter.lng + (Math.random() - 0.5) * 0.005;
+            intensity = (0.55 + Math.random() * 0.45) * chosenCenter.weight;
+          } else {
+            // Wide dynamic distribution
+            lat = location.latitude + (Math.random() - 0.5) * 0.06;
+            lng = location.longitude + (Math.random() - 0.5) * 0.06;
+          }
+
+          return {
+            latitude: lat,
+            longitude: lng,
+            intensity,
+            size: 150 + Math.random() * 400
+          };
+        });
+        
         setHotspots(newHotspots as any);
       };
       
@@ -7514,7 +7691,7 @@ export default function App() {
       const interval = setInterval(generateHotspots, 20000); // Refresh every 20s
       return () => clearInterval(interval);
     }
-  }, [location === null]);
+  }, [location, activeCityCenter, selectedTimePeriod, getCurrentPeriodDetails]);
 
   // MULTIPLAYER LIVE GPS COORDINATES & PRESENCE SYNCHRONIZATION EFFECT
   useEffect(() => {
@@ -7644,7 +7821,7 @@ export default function App() {
     const hasJob = activeOrders.length > 0;
     const isNavBusy = !hasJob && !!busyAreaTarget;
     
-    if (!isNavigating || !user.isOnline || (!hasJob && !isNavBusy) || !location || useRealGPS) {
+    if (!isNavigating || !user.isOnline || hasJob || !isNavBusy || !location || useRealGPS) {
       if (isNavigating && !hasJob && !isNavBusy) {
         setIsNavigating(false);
       }
@@ -7671,30 +7848,42 @@ export default function App() {
       } else {
         return; // Nothing to navigate to
       }
-      
-      const dLat = target.latitude - loc.latitude;
-      const dLng = target.longitude - loc.longitude;
-      const distance = Math.sqrt(dLat * dLat + dLng * dLng);
-      
-      const speed = 0.00045; // Snappy movement (3x speed) for high quality testing flow
 
-      if (distance < speed * 1.5) {
-        setLocation(target);
-        setIsNavigating(false);
-        if (!onJob) {
-          setBusyAreaTarget(null);
-          sendNotification("Arrived", `Arrived at busy region: ${label}`, "success");
+      // Reset or generate route if target changed
+      if (!lastTargetRef.current || lastTargetRef.current.latitude !== target.latitude || lastTargetRef.current.longitude !== target.longitude) {
+        updateRouteWaypointsAsync(loc, target);
+        lastTargetRef.current = target;
+      }
+      
+      const speed = 0.00045; // Snappy movement for high quality testing flow
+      const nextWaypoint = routeRef.current[0] || target;
+      const dLatWay = nextWaypoint.latitude - loc.latitude;
+      const dLngWay = nextWaypoint.longitude - loc.longitude;
+      const distanceWay = Math.sqrt(dLatWay * dLatWay + dLngWay * dLngWay);
+
+      if (distanceWay < speed * 1.5) {
+        if (routeRef.current.length > 0) {
+          const updatedRoute = routeRef.current.slice(1);
+          routeRef.current = updatedRoute;
+          setRouteWaypoints(updatedRoute);
         } else {
-          sendNotification("Arrived", `You have arrived at ${label}`, "success");
+          setLocation(target);
+          setIsNavigating(false);
+          if (!onJob) {
+            setBusyAreaTarget(null);
+            sendNotification("Arrived", `Arrived at busy region: ${label}`, "success");
+          } else {
+            sendNotification("Arrived", `You have arrived at ${label}`, "success");
+          }
         }
         return;
       }
 
-      const moveRatio = speed / distance;
-      const moveLat = dLat * moveRatio;
-      const moveLng = dLng * moveRatio;
+      const moveRatio = speed / distanceWay;
+      const moveLat = dLatWay * moveRatio;
+      const moveLng = dLngWay * moveRatio;
 
-      const angle = Math.atan2(dLng, dLat) * (180 / Math.PI);
+      const angle = Math.atan2(dLngWay, dLatWay) * (180 / Math.PI);
       setHeading(angle);
 
       setLocation(prev => {
@@ -7991,35 +8180,87 @@ export default function App() {
   const routeRef = useRef<Location[]>([]);
   const lastTargetRef = useRef<Location | null>(null);
 
+  const generateTraffic = (center: Location) => {
+    const segments: { start: Location, end: Location, intensity: 'low' | 'medium' | 'high' }[] = [];
+    for (let i = 0; i < 15; i++) {
+      const start = {
+        latitude: center.latitude + (Math.random() - 0.5) * 0.02,
+        longitude: center.longitude + (Math.random() - 0.5) * 0.02,
+      };
+      const end = {
+        latitude: start.latitude + (Math.random() - 0.5) * 0.005,
+        longitude: start.longitude + (Math.random() - 0.5) * 0.005,
+      };
+      const intensities: ('low' | 'medium' | 'high')[] = ['low', 'medium', 'high'];
+      segments.push({ start, end, intensity: intensities[Math.floor(Math.random() * 3)] });
+    }
+    return segments;
+  };
+
+  const updateRouteWaypointsAsync = async (start: Location, end: Location) => {
+    try {
+      const url = `https://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+          const coords = data.routes[0].geometry.coordinates;
+          const fullRoute = coords.map((c: [number, number]) => ({
+            latitude: c[1],
+            longitude: c[0]
+          }));
+
+          const simplifiedRoute: Location[] = [fullRoute[0]];
+          let lastSaved = fullRoute[0];
+          for (let i = 1; i < fullRoute.length - 1; i++) {
+            const dLat = fullRoute[i].latitude - lastSaved.latitude;
+            const dLng = fullRoute[i].longitude - lastSaved.longitude;
+            const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+            if (dist >= 0.0006) {
+              simplifiedRoute.push(fullRoute[i]);
+              lastSaved = fullRoute[i];
+            }
+          }
+          if (fullRoute.length > 1) {
+            simplifiedRoute.push(fullRoute[fullRoute.length - 1]);
+          }
+
+          routeRef.current = simplifiedRoute;
+          setRouteWaypoints(simplifiedRoute);
+          setTrafficSegments(generateTraffic(start));
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("OSRM error, falling back to clean simulated streets zigzag", err);
+    }
+
+    const fallbackRoute: Location[] = [start];
+    const steps = 4;
+    for (let i = 1; i < steps; i++) {
+      const ratio = i / steps;
+      if (i % 2 === 1) {
+        fallbackRoute.push({
+          latitude: start.latitude + (end.latitude - start.latitude) * ratio,
+          longitude: start.longitude + (end.longitude - start.longitude) * (ratio - 1 / steps)
+        });
+      } else {
+        fallbackRoute.push({
+          latitude: start.latitude + (end.latitude - start.latitude) * (ratio - 1 / steps),
+          longitude: start.longitude + (end.longitude - start.longitude) * ratio
+        });
+      }
+    }
+    fallbackRoute.push(end);
+    routeRef.current = fallbackRoute;
+    setRouteWaypoints(fallbackRoute);
+    setTrafficSegments(generateTraffic(start));
+  };
+
   // Geolocation tracking & Navigation Simulation
   useEffect(() => {
     let angle = 0;
     let deviationChance = 0.01; // 1% chance to deviate each second
-
-    const generateRoute = (start: Location, end: Location) => {
-      const waypoints: Location[] = [start];
-      // Create a grid-like path (Manhattan-style)
-      waypoints.push({ latitude: start.latitude, longitude: end.longitude });
-      waypoints.push(end);
-      return waypoints;
-    };
-
-    const generateTraffic = (center: Location) => {
-      const segments: { start: Location, end: Location, intensity: 'low' | 'medium' | 'high' }[] = [];
-      for (let i = 0; i < 15; i++) {
-        const start = {
-          latitude: center.latitude + (Math.random() - 0.5) * 0.02,
-          longitude: center.longitude + (Math.random() - 0.5) * 0.02,
-        };
-        const end = {
-          latitude: start.latitude + (Math.random() - 0.5) * 0.005,
-          longitude: start.longitude + (Math.random() - 0.5) * 0.005,
-        };
-        const intensities: ('low' | 'medium' | 'high')[] = ['low', 'medium', 'high'];
-        segments.push({ start, end, intensity: intensities[Math.floor(Math.random() * 3)] });
-      }
-      return segments;
-    };
 
     if (isSimulatingMovement || isNavigating) {
       const interval = setInterval(() => {
@@ -8036,18 +8277,13 @@ export default function App() {
             
             // Reset route if target changed
             if (!lastTargetRef.current || lastTargetRef.current.latitude !== target.latitude || lastTargetRef.current.longitude !== target.longitude) {
-              const newRoute = generateRoute(prev, target);
-              routeRef.current = newRoute;
-              setRouteWaypoints(newRoute);
-              setTrafficSegments(generateTraffic(prev));
+              updateRouteWaypointsAsync(prev, target);
               lastTargetRef.current = target;
             }
 
             // Initial route generation if empty
             if (routeRef.current.length === 0) {
-              const newRoute = generateRoute(prev, target);
-              routeRef.current = newRoute;
-              setRouteWaypoints(newRoute);
+              updateRouteWaypointsAsync(prev, target);
             }
 
             // Check for deviation
@@ -8055,9 +8291,7 @@ export default function App() {
               setIsRecalculating(true);
               sendNotification("Traffic Alert", "Finding a faster route...");
               setTimeout(() => {
-                const newRoute = generateRoute(prev, target);
-                routeRef.current = newRoute;
-                setRouteWaypoints(newRoute);
+                updateRouteWaypointsAsync(prev, target);
                 setIsRecalculating(false);
               }, 1500);
               return prev;
@@ -8588,12 +8822,98 @@ export default function App() {
     multiplier: number;
     trend: 'stable' | 'rising' | 'falling';
     demand: 'Low' | 'Medium' | 'High';
+    periodId?: string;
   }[]>([
     { id: '1', name: "Shoreditch", lat: 0.005, lng: 0.005, radius: 0.008, multiplier: 2.1, trend: 'stable', demand: 'High' },
     { id: '2', name: "Soho", lat: -0.005, lng: -0.008, radius: 0.006, multiplier: 1.5, trend: 'rising', demand: 'Medium' },
     { id: '3', name: "King's Cross", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.1, trend: 'falling', demand: 'Low' },
     { id: 'fake_busy_area', name: "Piccadilly Hub (Fake Hotspot)", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising', demand: 'High' }
   ]);
+
+  // Synchronously update active surge areas parameters on peak periods simulation changes
+  useEffect(() => {
+    const period = getCurrentPeriodDetails();
+    
+    setActiveSurgeAreas(prev => {
+      return prev.map(area => {
+        let demand: 'Low' | 'Medium' | 'High' = area.demand;
+        let baseMultiplier = 1.0;
+        
+        if (period.id === 'breakfast') {
+          if (area.name.includes("King's Cross")) {
+            demand = 'High';
+            baseMultiplier = 2.4;
+          } else if (area.name.includes("Shoreditch")) {
+            demand = 'Medium';
+            baseMultiplier = 1.8;
+          } else if (area.name.includes("Soho")) {
+            demand = 'Low';
+            baseMultiplier = 1.2;
+          } else if (area.name.includes("Piccadilly")) {
+            demand = 'High';
+            baseMultiplier = 2.9;
+          }
+        } else if (period.id === 'lunch') {
+          if (area.name.includes("Soho")) {
+            demand = 'High';
+            baseMultiplier = 2.6;
+          } else if (area.name.includes("Shoreditch")) {
+            demand = 'Medium';
+            baseMultiplier = 1.9;
+          } else if (area.name.includes("King's Cross")) {
+            demand = 'Medium';
+            baseMultiplier = 1.6;
+          } else if (area.name.includes("Piccadilly")) {
+            demand = 'High';
+            baseMultiplier = 3.2;
+          }
+        } else if (period.id === 'dinner') {
+          if (area.name.includes("Shoreditch")) {
+            demand = 'High';
+            baseMultiplier = 2.8;
+          } else if (area.name.includes("Soho")) {
+            demand = 'High';
+            baseMultiplier = 2.7;
+          } else if (area.name.includes("King's Cross")) {
+            demand = 'Low';
+            baseMultiplier = 1.3;
+          } else if (area.name.includes("Piccadilly")) {
+            demand = 'High';
+            baseMultiplier = 3.9;
+          }
+        } else {
+          // Off-peak
+          if (area.name.includes("Shoreditch")) {
+            demand = 'Low';
+            baseMultiplier = 1.1;
+          } else if (area.name.includes("Soho")) {
+            demand = 'Low';
+            baseMultiplier = 1.2;
+          } else if (area.name.includes("King's Cross")) {
+            demand = 'Low';
+            baseMultiplier = 1.0;
+          } else if (area.name.includes("Piccadilly")) {
+            demand = 'Low';
+            baseMultiplier = 1.3;
+          }
+        }
+        
+        return {
+          ...area,
+          demand,
+          multiplier: baseMultiplier,
+          trend: (period.isPeak ? 'rising' : 'stable') as any,
+          periodId: period.id
+        };
+      });
+    });
+    
+    if (user.isOnline) {
+      addToast(`${period.label} Simulated`, `Hotspot demand scales recalibrated for ${period.label}.`, "success");
+      addDebugLog('info', `Simulating active hotspot demand peaks: ${period.label}.`);
+    }
+  }, [selectedTimePeriod, getCurrentPeriodDetails, user.isOnline]);
+
   const [surgeMultiplier, setSurgeMultiplier] = useState(1.0);
   const [lastDetectedAreaName, setLastDetectedAreaName] = useState<string>('Shoreditch');
 
@@ -8670,8 +8990,8 @@ export default function App() {
   useEffect(() => {
     if (location) {
       let maxSurge = 1.0;
-      const localLat = location.latitude - 51.5074;
-      const localLng = location.longitude - (-0.1278);
+      const localLat = location.latitude - activeCityCenter.latitude;
+      const localLng = location.longitude - activeCityCenter.longitude;
 
       activeSurgeAreas.forEach(area => {
         const d = Math.sqrt(Math.pow(localLat - area.lat, 2) + Math.pow(localLng - area.lng, 2));
@@ -8680,8 +9000,8 @@ export default function App() {
         }
       });
       
-      const hour = new Date().getHours();
-      const isPeak = (hour >= 11 && hour <= 14) || (hour >= 18 && hour <= 21);
+      const pDetails = getCurrentPeriodDetails();
+      const isPeak = pDetails.isPeak;
       
       if (isPeak && maxSurge === 1.0) {
         maxSurge = 1.2;
@@ -8689,7 +9009,7 @@ export default function App() {
 
       setSurgeMultiplier(maxSurge);
     }
-  }, [location, activeSurgeAreas]);
+  }, [location, activeSurgeAreas, activeCityCenter, getCurrentPeriodDetails]);
 
   const [screenSize, setScreenSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -8991,7 +9311,7 @@ export default function App() {
         estimatedDistance: Number(((customEstDist) * (isStacked ? 1.4 : 1)).toFixed(1)),
         estimatedTime: Math.floor(((customEstDist) * 5 + 4) * (isStacked ? 1.5 : 1)),
         status: 'pending' as const,
-        items: type === 'delivery' ? ((variant.includes('Connect') || variant.includes('Send')) ? ["Secure Parcel Delivery"] : ["Meal Deal", orderBrand === 'uber' ? "Uber Eats Order" : "Bolt Food Order"]) : undefined,
+        items: type === 'delivery' ? getDynamicItemsForPeriod(getCurrentPeriodDetails().id, variant) : undefined,
         pin: Math.floor(1000 + Math.random() * 9000).toString(),
         isMatching: activeOrders.length > 0 || Math.random() < 0.25,
         surge: activeSurge > 1.0 ? activeSurge : undefined,
@@ -10702,6 +11022,7 @@ export default function App() {
                     setUseRealGPS={setUseRealGPS}
                     activeCityCenter={activeCityCenter}
                     activeSurgeAreas={activeSurgeAreas}
+                    routeWaypoints={routeWaypoints}
                     onNavigateToSurgeArea={(area) => {
                       if (activeOrders.length > 0) {
                         addToast("Busy Area Locked", "Complete your current active orders first before navigating to a surge zone.", "alert");
@@ -10754,6 +11075,74 @@ export default function App() {
                     >
                       <MapPin size={10} />
                       Google Maps
+                    </button>
+                  </div>
+
+                  {/* Dynamic Simulated Peak Times Controller Panel */}
+                  <div className="absolute top-40 left-4 z-50 flex flex-col gap-1 bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 shadow-2xl pointer-events-auto w-36 font-sans">
+                    <div className="flex items-center justify-between px-1.5 py-1 border-b border-white/5 mb-1 select-none">
+                      <span className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Simulate Peak</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-pulse" />
+                    </div>
+                    
+                    <button
+                      onClick={() => setSelectedTimePeriod('realtime')}
+                      className={`px-2 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider text-left transition-all duration-300 flex items-center justify-between ${
+                        selectedTimePeriod === 'realtime'
+                          ? 'bg-blue-600/90 text-white shadow-md shadow-blue-600/30 ring-1 ring-blue-400/30 font-extrabold'
+                          : 'text-gray-400 hover:text-white hover:bg-white/5 font-semibold'
+                      }`}
+                    >
+                      <span>🕒 Real-Time</span>
+                      <span className="text-[7.5px] font-mono tracking-tight opacity-70">{new Date().getHours()}:00</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => setSelectedTimePeriod('breakfast')}
+                      className={`px-2 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider text-left transition-all duration-300 flex items-center justify-between ${
+                        selectedTimePeriod === 'breakfast'
+                          ? 'bg-amber-500 text-black shadow-md shadow-amber-500/20 ring-1 ring-amber-400/30 font-black'
+                          : 'text-gray-400 hover:text-white hover:bg-white/5 font-semibold'
+                      }`}
+                    >
+                      <span>🌅 Breakfast</span>
+                      <span className="text-[7.5px] font-mono opacity-70">08:00</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => setSelectedTimePeriod('lunch')}
+                      className={`px-2 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider text-left transition-all duration-300 flex items-center justify-between ${
+                        selectedTimePeriod === 'lunch'
+                          ? 'bg-orange-500 text-white shadow-md shadow-orange-500/30 ring-1 ring-orange-400/30 font-black'
+                          : 'text-gray-400 hover:text-white hover:bg-white/5 font-semibold'
+                      }`}
+                    >
+                      <span>🍟 Lunch Loop</span>
+                      <span className="text-[7.5px] font-mono opacity-70">12:30</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => setSelectedTimePeriod('dinner')}
+                      className={`px-2 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider text-left transition-all duration-300 flex items-center justify-between ${
+                        selectedTimePeriod === 'dinner'
+                          ? 'bg-red-600 text-white shadow-md shadow-red-600/30 ring-1 ring-red-400/30 font-black'
+                          : 'text-gray-400 hover:text-white hover:bg-white/5 font-semibold'
+                      }`}
+                    >
+                      <span>🍕 Dinner Rush</span>
+                      <span className="text-[7.5px] font-mono opacity-70">19:00</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => setSelectedTimePeriod('offpeak')}
+                      className={`px-2 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider text-left transition-all duration-300 flex items-center justify-between ${
+                        selectedTimePeriod === 'offpeak'
+                          ? 'bg-[#1a1a1e] text-zinc-300 shadow-inner'
+                          : 'text-gray-400 hover:text-white hover:bg-white/5 font-semibold'
+                      }`}
+                    >
+                      <span>💤 Off-Peak</span>
+                      <span className="text-[7.5px] font-mono opacity-70">15:00</span>
                     </button>
                   </div>
 
@@ -14974,6 +15363,8 @@ export default function App() {
               onCustomSoundUpload={handleCustomSoundUpload}
               onClearCustomSound={handleClearCustomSound}
               playHyperSound={playHyperSound}
+              isVoiceMuted={isVoiceMuted}
+              setIsVoiceMuted={setIsVoiceMuted}
             />
           )}
 
