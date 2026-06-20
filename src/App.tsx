@@ -7014,7 +7014,7 @@ export default function App() {
           setRadarOrders(prev => {
             const finalOrders = [...prev];
             generated.forEach(item => {
-              if (finalOrders.length < 4) {
+              if (finalOrders.length < 4 && !finalOrders.some(o => o.id === item.id)) {
                 finalOrders.push(item);
                 
                 // Clear order after 25 seconds if not picked
@@ -9461,10 +9461,16 @@ export default function App() {
             longitude: pendingOrder.customerLocation.longitude + (Math.random() - 0.5) * 0.005 
           }
         };
-        setActiveOrders(prev => [...prev, order1, order2]);
+        setActiveOrders(prev => {
+          const filtered = prev.filter(o => o.id !== order1.id && o.id !== order2.id);
+          return [...filtered, order1, order2];
+        });
         sendNotification("2 Jobs Accepted", `Stacked delivery: ${order1.customerName} & ${order2.customerName}`);
       } else {
-        setActiveOrders(prev => [...prev, { ...pendingOrder, status: 'accepted' }]);
+        setActiveOrders(prev => {
+          if (prev.some(o => o.id === pendingOrder.id)) return prev;
+          return [...prev, { ...pendingOrder, status: 'accepted' }];
+        });
         console.log(`Order Accepted: ${pendingOrder.id}, PIN: ${pendingOrder.pin}`);
       }
 
