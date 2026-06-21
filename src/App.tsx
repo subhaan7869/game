@@ -953,7 +953,7 @@ const SideMenu = ({
       animate={{ x: 0 }}
       exit={{ x: '-100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className={`fixed left-0 top-0 bottom-0 w-[85%] max-w-[320px] z-[2000] flex flex-col shadow-[20px_0_60px_rgba(0,0,0,0.6)] border-r transition-all duration-500 ${
+      className={`fixed left-0 top-0 bottom-0 w-[85%] max-w-[320px] z-[5000] flex flex-col shadow-[20px_0_60px_rgba(0,0,0,0.6)] border-r transition-all duration-500 pointer-events-auto ${
         activeBrand === 'bolt' 
           ? 'bg-gradient-to-b from-[#021d0e] to-[#030a05] text-white border-r-[#00ea72]/20 shadow-[0_0_40px_rgba(0,252,114,0.06)]' 
           : activeBrand === 'both'
@@ -10786,7 +10786,7 @@ export default function App() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setIsSideMenuOpen(false)}
-                className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm"
+                className="fixed inset-0 z-[4900] bg-black/60 backdrop-blur-sm pointer-events-auto cursor-pointer"
               />
               <SideMenu 
                 user={user} 
@@ -11023,6 +11023,8 @@ export default function App() {
                     activeCityCenter={activeCityCenter}
                     activeSurgeAreas={activeSurgeAreas}
                     routeWaypoints={routeWaypoints}
+                    zoom={zoom}
+                    setZoom={setZoom}
                     onNavigateToSurgeArea={(area) => {
                       if (activeOrders.length > 0) {
                         addToast("Busy Area Locked", "Complete your current active orders first before navigating to a surge zone.", "alert");
@@ -11050,10 +11052,10 @@ export default function App() {
               
               {/* Check for online status starts here */}
               {user.isOnline ? (
-                <div className="h-full w-full relative overflow-hidden bg-transparent pointer-events-none">
+                <div className="h-full w-full relative overflow-hidden bg-transparent pointer-events-none z-[3550]">
 
                   {/* Map Mode Controller Selector Pill */}
-                  <div className="absolute top-28 left-4 z-50 flex items-center bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl p-1 shadow-2xl pointer-events-auto">
+                  <div className="absolute top-28 left-4 z-[3550] flex items-center bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl p-1 shadow-2xl pointer-events-auto">
                     <button
                       onClick={() => setMapCoreMode('cyber')}
                       className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-1.5 ${
@@ -11079,7 +11081,7 @@ export default function App() {
                   </div>
 
                   {/* Dynamic Simulated Peak Times Controller Panel */}
-                  <div className="absolute top-40 left-4 z-50 flex flex-col gap-1 bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 shadow-2xl pointer-events-auto w-36 font-sans">
+                  <div className="absolute top-40 left-4 z-[3550] flex flex-col gap-1 bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 shadow-2xl pointer-events-auto w-36 font-sans">
                     <div className="flex items-center justify-between px-1.5 py-1 border-b border-white/5 mb-1 select-none">
                       <span className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Simulate Peak</span>
                       <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-pulse" />
@@ -11149,7 +11151,7 @@ export default function App() {
                   {/* Target Price Float indicator */}
                   <div 
                     onClick={() => setCurrentScreen('trip_preferences')}
-                    className="absolute top-28 right-4 z-50 flex items-center gap-2 bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2 shadow-2xl pointer-events-auto cursor-pointer active:scale-95 hover:border-white/20 transition-all font-sans"
+                    className="absolute top-28 right-4 z-[3550] flex items-center gap-2 bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2 shadow-2xl pointer-events-auto cursor-pointer active:scale-95 hover:border-white/20 transition-all font-sans"
                   >
                     <Target size={12} className="text-blue-500" />
                     <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Target Pay:</span>
@@ -11159,7 +11161,7 @@ export default function App() {
                   {/* Floating Competitive Lobby Node */}
                   <div 
                     onClick={() => setCurrentScreen('multiplayer_hub')}
-                    className="absolute top-40 right-4 z-50 flex items-center gap-2.5 bg-gradient-to-r from-neutral-900 to-[#121215] backdrop-blur-md border border-amber-500/15 hover:border-amber-500/35 rounded-2xl px-4 py-2 shadow-2xl pointer-events-auto cursor-pointer active:scale-95 hover:brightness-110 transition-all text-left font-sans"
+                    className="absolute top-40 right-4 z-[3550] flex items-center gap-2.5 bg-gradient-to-r from-neutral-900 to-[#121215] backdrop-blur-md border border-amber-500/15 hover:border-amber-500/35 rounded-2xl px-4 py-2 shadow-2xl pointer-events-auto cursor-pointer active:scale-95 hover:brightness-110 transition-all text-left font-sans"
                   >
                     <Users size={12} className="text-amber-500 animate-pulse shrink-0" />
                     <div>
@@ -11220,7 +11222,7 @@ export default function App() {
 
               {/* Background Mode Indicator */}
               {user.isOnline && !isNavigating && (
-                <div className="absolute top-28 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
+                <div className="absolute top-28 left-1/2 -translate-x-1/2 z-[3550] flex flex-col items-center gap-2">
                   <div className={`px-4 py-1.5 rounded-full flex items-center gap-2 border shadow-2xl transition-all duration-300 ${theme === 'dark' ? 'bg-black border-white/20' : 'bg-white border-black/10'}`}>
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
                     <span className="text-[10px] font-black tracking-widest uppercase tracking-[0.2em]">Active</span>
@@ -11294,7 +11296,7 @@ export default function App() {
 
               {/* Speedometer Overlay */}
               {user.isOnline && !pendingOrder && (
-                <div className="absolute left-6 bottom-48 z-50 flex flex-col items-center">
+                <div className="absolute left-6 bottom-48 z-[3550] flex flex-col items-center">
                   <div className="w-20 h-20 bg-black/80 text-white rounded-full flex flex-col items-center justify-center shadow-2xl border border-white/10 backdrop-blur-md">
                     <span className="text-3xl font-black leading-none">
                       {isNavigating ? Math.floor(Math.random() * 15 + 25) : 0}
@@ -11345,7 +11347,7 @@ export default function App() {
 
               {/* Safety Toolkit Button */}
               {user.isOnline && !pendingOrder && (
-                <div className="absolute right-6 bottom-48 z-50 pointer-events-auto">
+                <div className="absolute right-6 bottom-48 z-[3550] pointer-events-auto">
                   <button 
                     onClick={() => sendNotification("Safety Toolkit", "Emergency assistance and safety features are active.")}
                     className="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-transform border border-blue-400"
@@ -12306,7 +12308,7 @@ export default function App() {
 
                 {/* Map Action Buttons */}
                 {user.isOnline && (
-                  <div className="absolute bottom-32 left-4 right-4 flex flex-col gap-4 items-end pointer-events-none">
+                  <div className="absolute bottom-32 left-4 right-4 flex flex-col gap-4 items-end pointer-events-none z-[3550]">
                     <div className="flex flex-col gap-2 pointer-events-auto">
                       <button 
                         onClick={() => setZoom(prev => Math.min(prev + 0.2, 3))}
@@ -12561,7 +12563,7 @@ export default function App() {
               </AnimatePresence>
 
               {/* Top Controls Overlay */}
-              <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+              <div className="absolute top-0 left-0 right-0 z-[4500] pointer-events-none">
                 <div className="p-4 flex justify-between items-center pointer-events-auto">
                   <button 
                     onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
@@ -12648,7 +12650,7 @@ export default function App() {
 
               {/* Bottom Menu Toggle Button / Map Status Bar */}
               {user.isOnline && !pendingOrder && !isBottomMenuOpen && (
-                <div className="absolute bottom-0 left-0 right-0 z-[150]">
+                <div className="absolute bottom-0 left-0 right-0 z-[4500]">
                   <motion.div 
                     key="online-bar"
                     initial={{ y: 100 }}
@@ -12839,7 +12841,7 @@ export default function App() {
             ) : (
               <>
                 {!isBottomMenuOpen && (
-                  <div className="absolute bottom-0 left-0 right-0 z-[150]">
+                  <div className="absolute bottom-0 left-0 right-0 z-[4500]">
                     <motion.div 
                       key={`offline-bar-${activeBrand}`}
                       initial={{ y: 100 }}
@@ -12916,20 +12918,20 @@ export default function App() {
 
             <AnimatePresence>
               {isBottomMenuOpen && user.isOnline && (
-                <div className="absolute inset-0 z-[150]">
+                <div className="absolute inset-0 z-[4600] pointer-events-auto">
                   <motion.div 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     onClick={() => setIsBottomMenuOpen(false)}
-                    className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                    className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto cursor-pointer"
                   />
                   <motion.div 
                     initial={{ y: '100%' }}
                     animate={{ y: 0 }}
                     exit={{ y: '100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className={`absolute bottom-0 left-0 right-0 rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] border-t flex flex-col max-h-[70vh] text-white transition-all duration-500 ${
+                    className={`absolute bottom-0 left-0 right-0 rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] border-t flex flex-col max-h-[70vh] text-white transition-all duration-500 pointer-events-auto ${
                       activeBrand === 'bolt'
                         ? 'bg-gradient-to-b from-[#011a0d]/95 to-[#030906]/98 border-[#00ea72]/30 shadow-[0_-15px_30px_rgba(0,252,114,0.12)]'
                         : activeBrand === 'both'
@@ -13267,7 +13269,7 @@ export default function App() {
 
               {/* Bottom Cards */}
               {!isBottomMenuOpen && !pendingOrder && !activeChatOrderId && (
-                <div className="absolute bottom-24 left-0 right-0 p-4 space-y-2 pointer-events-none z-[140]">
+                <div className="absolute bottom-24 left-0 right-0 p-4 space-y-2 pointer-events-none z-[3550]">
                   <AnimatePresence>
                     {(() => {
                       const baseList = activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter);
@@ -13581,7 +13583,7 @@ export default function App() {
           </AnimatePresence>
 
           {currentScreen === 'chat' && (
-            <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] bg-white text-black flex flex-col">
+            <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[6000] bg-white text-black flex flex-col">
               <div className="p-4 border-b border-gray-100 flex items-center gap-4 bg-white sticky top-0 z-10 shrink-0">
                 <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform">
                   <X size={22} />
@@ -17254,7 +17256,7 @@ const PolicyDocumentModal = ({
       animate={{ y: 0 }}
       exit={{ y: '100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed inset-0 z-[3000] bg-white flex flex-col pt-12"
+      className="fixed inset-0 z-[6100] bg-white flex flex-col pt-12"
     >
       <div className="absolute top-4 right-4 z-10">
         <button onClick={onClose} className="p-2 bg-gray-100 rounded-full">
@@ -17658,7 +17660,7 @@ export const InsuranceRenewalChat = ({
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }} 
       exit={{ opacity: 0 }} 
-      className="fixed inset-0 z-[2000] bg-white text-black flex flex-col"
+      className="fixed inset-0 z-[6000] bg-white text-black flex flex-col"
     >
       {/* Header */}
       <div className="p-4 border-b border-gray-100 flex items-center gap-4 bg-white sticky top-0 z-10 shrink-0">

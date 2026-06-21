@@ -43,6 +43,8 @@ export interface InteractiveMapProps {
   activeSurgeAreas?: any[];
   onNavigateToSurgeArea?: (area: any) => void;
   routeWaypoints?: Location[];
+  zoom?: number;
+  setZoom?: (zoom: number) => void;
 }
 
 // 1. Custom Driver Icon Constructor using the highly realistic green car design
@@ -222,7 +224,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   activeCityCenter,
   activeSurgeAreas,
   onNavigateToSurgeArea,
-  routeWaypoints
+  routeWaypoints,
+  zoom,
+  setZoom
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -250,9 +254,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     const startLat = location?.latitude || 51.5074;
     const startLng = location?.longitude || -0.1278;
 
+    const initialZoom = typeof zoom === 'number'
+      ? Math.round(12 + (zoom - 0.4) * (6 / 2.6))
+      : 15;
+
     const map = L.map(mapContainerRef.current, {
       center: [startLat, startLng],
-      zoom: 15,
+      zoom: initialZoom,
       zoomControl: false,
       attributionControl: false
     });
@@ -270,11 +278,28 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     tileLayerRef.current = tileLayer;
     mapRef.current = map;
 
+    // Listen to map zoom changes to sync back to parent
+    map.on('zoomend', () => {
+      const currentLeafletZoom = map.getZoom();
+      const newMultiplier = 0.4 + (currentLeafletZoom - 12) * (2.6 / 6);
+      setZoom?.(Math.max(0.4, Math.min(3.0, newMultiplier)));
+    });
+
     return () => {
       map.remove();
       mapRef.current = null;
     };
   }, []);
+
+  // Bidirectional sync for outer Zoom Controls
+  useEffect(() => {
+    if (mapRef.current && typeof zoom === 'number') {
+      const targetLeafletZoom = Math.round(12 + (zoom - 0.4) * (6 / 2.6));
+      if (mapRef.current.getZoom() !== targetLeafletZoom) {
+        mapRef.current.setZoom(targetLeafletZoom);
+      }
+    }
+  }, [zoom]);
 
   // Update Tile Layer URL source dynamically when theme toggles
   useEffect(() => {
