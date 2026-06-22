@@ -189,8 +189,8 @@ const getSurgeAreaIcon = (area: any) => {
     html: `
       <div class="relative flex flex-col items-center select-none" style="width: 280px; height: 280px; margin-left: -140px; margin-top: -140px;">
         <!-- Neon heat pulse rings nested perfectly -->
-        <div class="absolute w-[280px] h-[280px] rounded-full bg-[radial-gradient(circle,_${mainGrad}_0%,_${subGrad}_50%,_transparent_100%)] animate-pulse blur-md pointer-events-none" style="animation-duration: 3.5s; top: 0; left: 0;"></div>
-        <div class="absolute w-[140px] h-[140px] rounded-full bg-[radial-gradient(circle,_${centerGrad}_0%,_${edgeGrad}_50%,_transparent_100%)] blur-sm pointer-events-none" style="top: 70px; left: 70px;"></div>
+        <div class="absolute w-[280px] h-[280px] rounded-full animate-pulse blur-md pointer-events-none" style="background: radial-gradient(circle, ${mainGrad} 0%, ${subGrad} 50%, transparent 100%); animation-duration: 3.5s; top: 0; left: 0;"></div>
+        <div class="absolute w-[140px] h-[140px] rounded-full blur-sm pointer-events-none" style="background: radial-gradient(circle, ${centerGrad} 0%, ${edgeGrad} 50%, transparent 100%); top: 70px; left: 70px;"></div>
 
         <!-- Interactive multi center navigation button -->
         <div class="absolute top-[125px] flex flex-col items-center pointer-events-auto z-40">

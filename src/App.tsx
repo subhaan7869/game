@@ -7124,7 +7124,7 @@ export default function App() {
   const [isDestFilterOpen, setIsDestFilterOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
-  const [isNightMode, setIsNightMode] = useState(false);
+  const [isNightMode, setIsNightMode] = useState<boolean>(() => theme === 'dark');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerifyingToOnline, setIsVerifyingToOnline] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
@@ -7145,6 +7145,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('hyper_driver_earnings_goal', earningsGoal.toString());
   }, [earningsGoal]);
+
+  // Keep theme and isNightMode synchronized
+  useEffect(() => {
+    setTheme(isNightMode ? 'dark' : 'light');
+    try {
+      localStorage.setItem('hyper_driver_theme', isNightMode ? 'dark' : 'light');
+    } catch (e) {}
+  }, [isNightMode]);
   const [hotspots, setHotspots] = useState<{ latitude: number, longitude: number, intensity: number, size: number }[]>([]);
   
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -12308,7 +12316,7 @@ export default function App() {
 
                 {/* Map Action Buttons */}
                 {user.isOnline && (
-                  <div className="absolute bottom-32 left-4 right-4 flex flex-col gap-4 items-end pointer-events-none z-[3550]">
+                  <div className="absolute bottom-32 left-4 right-4 flex flex-col gap-4 items-end pointer-events-none z-[4550]">
                     <div className="flex flex-col gap-2 pointer-events-auto">
                       <button 
                         onClick={() => setZoom(prev => Math.min(prev + 0.2, 3))}
@@ -12931,7 +12939,7 @@ export default function App() {
                     animate={{ y: 0 }}
                     exit={{ y: '100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className={`absolute bottom-0 left-0 right-0 rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] border-t flex flex-col max-h-[70vh] text-white transition-all duration-500 pointer-events-auto ${
+                    className={`absolute bottom-0 left-0 right-0 rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] border-t flex flex-col h-[70vh] max-h-[70vh] text-white transition-all duration-500 pointer-events-auto ${
                       activeBrand === 'bolt'
                         ? 'bg-gradient-to-b from-[#011a0d]/95 to-[#030906]/98 border-[#00ea72]/30 shadow-[0_-15px_30px_rgba(0,252,114,0.12)]'
                         : activeBrand === 'both'
@@ -13585,7 +13593,7 @@ export default function App() {
           {currentScreen === 'chat' && (
             <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[6000] bg-white text-black flex flex-col">
               <div className="p-4 border-b border-gray-100 flex items-center gap-4 bg-white sticky top-0 z-10 shrink-0">
-                <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform">
+                <button onClick={() => { setCurrentScreen('home'); setActiveChatOrderId(null); }} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform">
                   <X size={22} />
                 </button>
                 <div className="flex-1 overflow-hidden">
