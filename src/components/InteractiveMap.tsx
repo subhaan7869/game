@@ -524,7 +524,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     <div className="w-full h-full min-h-[380px] rounded-[32px] overflow-hidden border border-white/10 bg-[#0d0e12] flex flex-col relative group select-none">
       
       {/* Absolute HUD Layer Overlays */}
-      <div className="absolute top-4 right-4 z-[1000] flex items-center gap-2">
+      <div className="absolute top-4 right-4 z-[5500] flex items-center gap-2 pointer-events-auto">
         {/* Toggle Live GPS Button */}
         <button
           onClick={() => setUseRealGPS?.(!useRealGPS)}
@@ -549,7 +549,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </button>
 
         {/* Custom Zoom Controls */}
-        <div className="flex flex-col bg-[#111216]/90 border border-white/10 rounded-xl overflow-hidden shadow-xl backdrop-blur-md z-[1001]">
+        <div className="flex flex-col bg-[#111216]/90 border border-white/10 rounded-xl overflow-hidden shadow-xl backdrop-blur-md z-[5501]">
           <button 
             onClick={() => mapRef.current?.zoomIn()} 
             className="w-9 h-9 flex items-center justify-center text-blue-400 border-b border-white/5 hover:bg-[#18191f] active:scale-90 transition-all cursor-pointer"

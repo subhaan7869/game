@@ -11006,7 +11006,7 @@ export default function App() {
           {currentScreen === 'home' && (
             <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
               {/* Main Map Backdrop (Online vs. Styled/dimmed Offline) */}
-              <div className={`h-full w-full absolute inset-0 z-0 transition-all duration-500 ${!user.isOnline ? 'grayscale brightness-[0.45] contrast-[1.1]' : ''}`}>
+              <div className={`h-full w-full absolute inset-0 transition-all duration-500 ${!user.isOnline ? 'grayscale brightness-[0.45] contrast-[1.1]' : ''}`}>
                 {mapCoreMode === 'google' ? (
                   <InteractiveMap
                     location={location}
@@ -11052,7 +11052,7 @@ export default function App() {
               
               {/* Check for online status starts here */}
               {user.isOnline ? (
-                <div className="h-full w-full relative overflow-hidden bg-transparent pointer-events-none z-[3550]">
+                <div className="h-full w-full absolute inset-0 overflow-hidden bg-transparent pointer-events-none z-[3550]">
 
                   {/* Map Mode Controller Selector Pill */}
                   <div className="absolute top-28 left-4 z-[3550] flex items-center bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl p-1 shadow-2xl pointer-events-auto">
@@ -12689,7 +12689,7 @@ export default function App() {
                     )}
 
                     <div 
-                      onClick={() => setIsBottomMenuOpen(true)}
+                      onClick={(e) => { e.stopPropagation(); setIsBottomMenuOpen(true); }}
                       className="flex items-center justify-between px-8 py-5 cursor-pointer hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors"
                     >
                       <div className="flex items-center">
