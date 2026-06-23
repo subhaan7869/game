@@ -954,9 +954,9 @@ Rules:
 
             {/* Chat Messages Body */}
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-              {messages.map((msg) => (
+              {messages.map((msg, mIdx) => (
                 <div 
-                  key={msg.id} 
+                  key={`${msg.id || mIdx}-${mIdx}`} 
                   className={`flex flex-col max-w-[85%] ${msg.sender === 'driver' ? 'self-end items-end' : 'self-start items-start'}`}
                 >
                   <div 

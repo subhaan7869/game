@@ -336,7 +336,7 @@ export const MultiplayerHub: React.FC<MultiplayerHubProps> = ({
                     // Simulates a random background rival driver claiming the order if you wait too long!
                     return (
                       <motion.div
-                        key={`radar-hub-${order.id}`}
+                        key={`radar-hub-${order.id || i}-${i}`}
                         initial={{ opacity: 0, y: 15 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
@@ -439,7 +439,7 @@ export const MultiplayerHub: React.FC<MultiplayerHubProps> = ({
 
                 return (
                   <div
-                    key={`leaderboard-${driver.uid}`}
+                    key={`leaderboard-${driver.uid || index}-${index}`}
                     className={`p-3 rounded-2xl flex items-center justify-between transition-all ${
                       isMe 
                         ? (isDark ? 'bg-blue-600/20 border-2 border-blue-500' : 'bg-blue-50 border-2 border-blue-200') 

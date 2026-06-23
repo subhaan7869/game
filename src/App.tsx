@@ -1301,7 +1301,7 @@ const ScheduledOrdersScreen = ({
       const scheduledTimeStr = `In ${offsetMin} mins (${formattedTime})`;
 
       generatedOffers.push({
-        id: `TXB-${Math.floor(Math.random() * 90000) + 10000}`,
+        id: `TXB-${Math.floor(Math.random() * 90000) + 10000}-${i}`,
         restaurantName: pickupPoi,
         pickupStreet,
         destinationName: destination,
@@ -1663,11 +1663,11 @@ const ScheduledOrdersScreen = ({
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {availableOffers.map(offer => {
+                    {availableOffers.map((offer, oIdx) => {
                       const estHourly = parseFloat((offer.estimatedPay / (offer.durationMinutes / 60)).toFixed(0));
                       return (
                         <div 
-                          key={offer.id} 
+                          key={`${offer.id || oIdx}-${oIdx}`} 
                           onClick={() => setSelectedOffer(offer)}
                           className={`p-5 rounded-[28px] border cursor-pointer hover:bg-white/[0.02] active:scale-[0.98] transition-all flex flex-col justify-between overflow-hidden relative group ${
                             offer.brand === 'uber' 
@@ -1744,12 +1744,12 @@ const ScheduledOrdersScreen = ({
                     </p>
                   </div>
                 ) : (
-                  scheduledOrders.map(order => {
+                  scheduledOrders.map((order, sIdx) => {
                     const brand = order.brand || (Math.random() < 0.5 ? 'uber' : 'bolt');
                     const hasDetail = !!order.distanceMiles;
                     return (
                       <div 
-                        key={order.id} 
+                        key={`${order.id || sIdx}-${sIdx}`} 
                         className={`p-6 rounded-[28px] border flex flex-col justify-between bg-white/[0.02] ${
                           brand === 'uber' ? 'border-white/5' : 'border-[#22c55e]/15'
                         }`}
@@ -9946,6 +9946,56 @@ export default function App() {
     return scoredCandidates.sort((a, b) => b.score - a.score)[0].order;
   };
 
+  // Pre-booking exact-time dispatcher helper
+  const dispatchScheduledOrder = React.useCallback(async (sch: ScheduledOrder) => {
+    try {
+      await deleteDoc(doc(db, 'scheduled_orders', sch.id));
+    } catch (e) {
+      console.error("Error consuming scheduled order:", e);
+    }
+    
+    const restLoc = location ? { 
+      latitude: location.latitude + (Math.random() - 0.5) * 0.01, 
+      longitude: location.longitude + (Math.random() - 0.5) * 0.01 
+    } : { latitude: 51.5074, longitude: -0.1278 };
+
+    const brand = sch.brand || (Math.random() < 0.5 ? 'uber' : 'bolt');
+    const finalPay = sch.estimatedPay || 15.00;
+    const finalDist = sch.distanceMiles || 3.5;
+    const finalDur = sch.durationMinutes || 12;
+
+    const popupOrder: Order = {
+      id: sch.id || `TXB-${Math.floor(Math.random() * 90000) + 10000}`,
+      type: 'ride', // Pre-booking Taxi/Ride Job
+      restaurantName: sch.restaurantName || "Pre-booked VIP Ride",
+      customerName: brand === 'uber' ? "Uber Reserved Passenger" : "Bolt Scheduled Passenger",
+      restaurantLocation: restLoc,
+      pickupLocation: restLoc,
+      customerLocation: { 
+        latitude: restLoc.latitude + (Math.random() - 0.5) * 0.03, 
+        longitude: restLoc.longitude + (Math.random() - 0.5) * 0.03 
+      },
+      estimatedPay: finalPay,
+      estimatedDistance: finalDist,
+      estimatedTime: finalDur,
+      status: 'pending',
+      items: [sch.notes || "VIP Pre-booking Ride Run"],
+      pin: Math.floor(1000 + Math.random() * 9000).toString(),
+      isMatching: false,
+      brand: brand,
+      isPreBooking: true,
+      scheduledTimeStr: sch.scheduledTime ? (typeof sch.scheduledTime === 'string' ? sch.scheduledTime : new Date(sch.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) : undefined
+    };
+
+    setPendingOrder(popupOrder);
+    setOrderExpiryTimer(30); // Pre-bookings get 30 seconds to accept
+    playHyperSound('order');
+    sendNotification("⏰ Pre-booking Time!", `Your scheduled ${brand === 'uber' ? 'Uber' : 'Bolt'} trip is due now!`);
+    if (addToast) {
+      addToast("Pre-booking Dispatch! ⏰", `Your scheduled ride (£${finalPay.toFixed(2)}) is now due!`, "alert");
+    }
+  }, [location, playHyperSound, sendNotification, addToast, setPendingOrder, setOrderExpiryTimer]);
+
   // Simulating incoming orders when online
   useEffect(() => {
     if (!user.isOnline) return;
@@ -9986,37 +10036,13 @@ export default function App() {
         // 15% chance for a scheduled trip if any exist
         const shouldPickScheduled = Math.random() < 0.15 && scheduledOrders.length > 0;
         
-        let newOrder: Order | null = null;
-        
         if (shouldPickScheduled) {
           const sch = scheduledOrders[0];
-          const restLoc = { 
-            latitude: location.latitude + (Math.random() - 0.5) * 0.01, 
-            longitude: location.longitude + (Math.random() - 0.5) * 0.01 
-          };
-          newOrder = {
-            id: sch.id,
-            type: 'delivery',
-            restaurantName: sch.restaurantName,
-            customerName: "Scheduled Pickup",
-            restaurantLocation: restLoc,
-            pickupLocation: restLoc,
-            customerLocation: { 
-              latitude: location.latitude + (Math.random() - 0.5) * 0.03, 
-              longitude: location.longitude + (Math.random() - 0.5) * 0.03 
-            },
-            estimatedPay: sch.estimatedPay,
-            estimatedDistance: 2.5,
-            estimatedTime: 12,
-            status: 'pending',
-            items: ["Scheduled Group Order"],
-            pin: Math.floor(1000 + Math.random() * 9000).toString(),
-            isMatching: activeOrders.length > 0 || Math.random() < 0.2
-          };
-          setScheduledOrders(prev => prev.filter(s => s.id !== sch.id));
-        } else {
-          newOrder = generateSmartOrder();
+          dispatchScheduledOrder(sch);
+          return;
         }
+
+        let newOrder = generateSmartOrder();
 
         // Apply final job preference filter and target price filter
         if (newOrder) {
@@ -10049,7 +10075,7 @@ export default function App() {
 
     scheduleNextOrder();
     return () => clearTimeout(timer);
-  }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference, targetPrice, busynessMode, isOnBreak, radarOrders.length]);
+  }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference, targetPrice, busynessMode, isOnBreak, radarOrders.length, dispatchScheduledOrder]);
 
   // Hyper-X Back-to-Back Queueing Simulator:
   // Decides to offer a queued, back-to-back request when a driver is delivering and nearing their drop-off point.
@@ -10267,6 +10293,41 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, [user.isOnline, location, joinedAirportId, activeOrders.length, pendingOrder === null, activeCityCenter, generateAirportOrder]);
+
+  // Background check effect for scheduled pre-bookings due time
+  useEffect(() => {
+    if (!firebaseUser || !user.isOnline) return;
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      for (const order of scheduledOrders) {
+        if (order.status !== 'pending') continue;
+
+        let scheduledDate: Date | null = null;
+        if (order.scheduledTime) {
+          if (typeof order.scheduledTime.toDate === 'function') {
+            scheduledDate = order.scheduledTime.toDate();
+          } else {
+            try {
+              scheduledDate = new Date(order.scheduledTime);
+            } catch (err) {
+              scheduledDate = null;
+            }
+          }
+        }
+
+        if (!scheduledDate || isNaN(scheduledDate.getTime())) continue;
+
+        // Dispatch if the scheduled time is reached (or within 15 seconds)
+        if (scheduledDate.getTime() <= now.getTime() + 15000) {
+          dispatchScheduledOrder(order);
+          break; // Trigger one at a time
+        }
+      }
+    }, 3000); // Check every 3 seconds for immediate response
+
+    return () => clearInterval(interval);
+  }, [firebaseUser, user.isOnline, scheduledOrders, dispatchScheduledOrder]);
 
   const triggerFiveSecondBackgroundTest = React.useCallback(() => {
     addToast("Testing Real Alerts", "Close this browser tab or minimize your screen NOW. You will receive a real system push alert in 5 seconds!", "info");
@@ -12285,6 +12346,11 @@ export default function App() {
                             </motion.div>
                           </div>
                           <div className="max-w-[180px]">
+                            {activeOrders.some(o => o.isPreBooking) && (
+                              <div className="px-2 py-0.5 rounded bg-purple-600 text-white text-[8px] font-black uppercase tracking-wider w-fit mb-1 shadow-sm animate-pulse">
+                                ⏰ PRE-BOOKING
+                              </div>
+                            )}
                             <p className="font-display text-xl font-black leading-tight tracking-tight truncate">
                               {currentStop?.label || (activeOrders[0]?.status === 'accepted' ? (activeOrders[0]?.type === 'delivery' ? activeOrders[0]?.restaurantName : 'Pickup Location') : 'Destination')}
                             </p>
@@ -13794,9 +13860,16 @@ export default function App() {
                                             {order.type === 'delivery' ? <Utensils size={28} /> : <User size={28} />}
                                           </div>
                                           <div>
-                                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${order.status === 'accepted' ? 'text-blue-500' : 'text-green-500'}`}>
-                                              {order.status === 'accepted' ? 'Incoming Pickup' : 'Ongoing Dropoff'}
-                                            </p>
+                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                              <p className={`text-[10px] font-black uppercase tracking-widest ${order.status === 'accepted' ? 'text-blue-500' : 'text-green-500'}`}>
+                                                {order.status === 'accepted' ? 'Incoming Pickup' : 'Ongoing Dropoff'}
+                                              </p>
+                                              {order.isPreBooking && (
+                                                <span className="px-1.5 py-0.5 rounded bg-purple-600 text-white text-[8px] font-black uppercase tracking-wider shadow-sm animate-pulse">
+                                                  ⏰ Pre-booking
+                                                </span>
+                                              )}
+                                            </div>
                                             <h3 className="font-display text-xl font-black leading-none">{order.status === 'accepted' ? order.restaurantName : order.customerName}</h3>
                                           </div>
                                         </div>
@@ -16299,6 +16372,11 @@ export default function App() {
                           </>
                         )}
                       </div>
+                      {pendingOrder.isPreBooking && (
+                        <span className="px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider font-mono shadow-sm bg-purple-600 text-white animate-pulse">
+                          ⏰ PRE-BOOKING
+                        </span>
+                      )}
                       {(() => {
                         const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
                         return (
@@ -16505,6 +16583,11 @@ export default function App() {
                         <span className="text-base leading-none">🍴</span>
                         <span className="align-middle">Add delivery</span>
                       </div>
+                      {pendingOrder.isPreBooking && (
+                        <span className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider font-mono shadow-sm bg-purple-600 text-white animate-pulse flex items-center gap-1">
+                          ⏰ PRE-BOOKING
+                        </span>
+                      )}
                       {(() => {
                         const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
                         return (

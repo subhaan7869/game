@@ -34,6 +34,8 @@ export interface Order {
   pickupPos?: { lat: number, lng: number };
   dropoffPos?: { lat: number, lng: number };
   brand?: 'uber' | 'bolt';
+  isPreBooking?: boolean;
+  scheduledTimeStr?: string;
 }
 
 export interface NavSimulation {
