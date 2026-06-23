@@ -64,6 +64,12 @@ export interface ScheduledOrder {
   scheduledTime: any;
   status: 'pending' | 'active' | 'completed';
   estimatedPay: number;
+  brand?: 'uber' | 'bolt';
+  distanceMiles?: number;
+  durationMinutes?: number;
+  vehicleClass?: string;
+  destinationName?: string;
+  notes?: string;
 }
 
 export type AppScreen = 'onboarding' | 'documents' | 'face_verification' | 'home' | 'earnings' | 'inbox' | 'account' | 'chat' | 'hyper_driver_pro' | 'wallet' | 'opportunities' | 'safety' | 'earnings_detail' | 'banking' | 'scheduled_orders' | 'rewards' | 'carplay_dashboard' | 'trip_history' | 'work_hub' | 'ratings' | 'planner' | 'hyper_driver_services' | 'vehicle_details' | 'payment_methods' | 'trip_preferences' | 'personal_details' | 'insurance' | 'audio_settings' | 'multiplayer_hub' | 'airport_queues';

@@ -91,7 +91,8 @@ import {
   Sparkles,
   Gauge,
   Layers,
-  CloudRain
+  CloudRain,
+  Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -1173,110 +1174,648 @@ const ScheduledOrdersScreen = ({
   setScheduledOrders, 
   onClose,
   firebaseUser,
-  sendNotification
+  sendNotification,
+  addToast,
+  activeCityKey = "London"
 }: { 
   scheduledOrders: ScheduledOrder[], 
   setScheduledOrders: React.Dispatch<React.SetStateAction<ScheduledOrder[]>>,
   onClose: () => void,
   firebaseUser: FirebaseUser | null,
-  sendNotification: (title: string, body: string) => void
+  sendNotification: (title: string, body: string) => void,
+  addToast?: (title: string, body: string, type?: 'info' | 'success' | 'alert' | 'message') => void,
+  activeCityKey?: string
 }) => {
-  const [isAdding, setIsAdding] = useState(false);
+  const [activeTab, setActiveTab] = useState<'available' | 'claimed'>('available');
+  const [availableOffers, setAvailableOffers] = useState<any[]>([]);
+  const [selectedOffer, setSelectedOffer] = useState<any | null>(null);
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [newOrder, setNewOrder] = useState({ restaurantName: '', time: '' });
+  const [countdown, setCountdown] = useState(60);
 
-  const handleAdd = async () => {
+  // Generate a premium offer
+  const triggerFreshOffers = () => {
+    const city = activeCityKey && CITY_DATABASES[activeCityKey] ? activeCityKey : "London";
+    const database = CITY_DATABASES[city];
+    const restaurantsPool = [
+      ...(database.restaurants?.High || []),
+      ...(database.restaurants?.Medium || []),
+      ...(database.restaurants?.Low || ["Premium Diner", "Central Station Delivery"])
+    ];
+    const streetsPool = database.streets || ["Regent St", "Oxford St", "Kingsway", "Holborn"];
+    
+    const count = 4 + Math.floor(Math.random() * 3); // 4-6 offers
+    const generatedOffers: any[] = [];
+    const landmarks = [
+      "Canary Wharf", "Mayfair Hotel", "Chelsea Harbour", "Battersea Power Station", 
+      "Royal Festival Hall", "Hampstead Heath", "Islington Green", "Whitechapel Central"
+    ];
+    
+    const uberClasses = ['UberX', 'UberXL', 'Comfort', 'Exec'];
+    const boltClasses = ['Bolt Standard', 'Bolt Premium', 'Bolt Electric', 'Bolt Comfort XL'];
+    const notesPool = [
+      "Premium rider client. Quiet trip preferred.",
+      "Customer traveling with 2 large suitcases. Trunk space needed.",
+      "Requires high rating driver. Deliver to front lobby desk.",
+      "Thermal bag carrier requested. Double sealed food items.",
+      "Corporate account passenger. Friendly greeting expected.",
+      "Punctual arrival required. Flight ticket timing buffer.",
+      "Handoff requested at rear courtyard gates. Code PIN: #4092"
+    ];
+
+    for (let i = 0; i < count; i++) {
+      const brand = Math.random() < 0.5 ? 'uber' : 'bolt';
+      const pickupRestaurant = restaurantsPool[Math.floor(Math.random() * restaurantsPool.length)];
+      const pickupStreet = streetsPool[Math.floor(Math.random() * streetsPool.length)];
+      const destination = landmarks[Math.floor(Math.random() * landmarks.length)] + ", " + streetsPool[(Math.floor(Math.random() * streetsPool.length) + 1) % streetsPool.length];
+      
+      const distanceMiles = parseFloat((2.5 + Math.random() * 11).toFixed(1));
+      const durationMinutes = Math.round(distanceMiles * 2.8 + 6);
+      
+      const ratePerMile = brand === 'bolt' ? 2.10 : 1.90;
+      const baseFare = brand === 'bolt' ? 8.50 : 7.00;
+      const estimatedPay = parseFloat((baseFare + (distanceMiles * ratePerMile) + (Math.random() * 4.5)).toFixed(2));
+      
+      const vehicleClass = brand === 'uber' 
+        ? uberClasses[Math.floor(Math.random() * uberClasses.length)]
+        : boltClasses[Math.floor(Math.random() * boltClasses.length)];
+        
+      const notes = notesPool[Math.floor(Math.random() * notesPool.length)];
+      
+      // Target time in future
+      const targetTime = new Date();
+      targetTime.setMinutes(targetTime.getMinutes() + Math.round(60 + i * 80 + Math.random() * 40));
+      const formattedTime = targetTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const isTomorrow = targetTime.getDate() !== new Date().getDate();
+      const scheduledTimeStr = `${isTomorrow ? 'Tomorrow' : 'Today'} @ ${formattedTime}`;
+
+      generatedOffers.push({
+        id: `PBK-${Math.floor(Math.random() * 90000) + 10000}`,
+        restaurantName: pickupRestaurant,
+        pickupStreet,
+        destinationName: destination,
+        distanceMiles,
+        durationMinutes,
+        scheduledTime: scheduledTimeStr,
+        scheduledTimestamp: targetTime.toISOString(),
+        estimatedPay,
+        brand,
+        vehicleClass,
+        notes
+      });
+    }
+
+    setAvailableOffers(generatedOffers);
+    localStorage.setItem('hyper_driver_available_prebookings', JSON.stringify(generatedOffers));
+    localStorage.setItem('hyper_driver_prebookings_last_updated', Date.now().toString());
+    setCountdown(60);
+  };
+
+  // Sync available offers on mount. Preserve if generated under 60s
+  useEffect(() => {
+    const cached = localStorage.getItem('hyper_driver_available_prebookings');
+    const cachedTimestampStr = localStorage.getItem('hyper_driver_prebookings_last_updated');
+    
+    if (cached && cachedTimestampStr) {
+      const elapsed = Date.now() - parseInt(cachedTimestampStr, 10);
+      if (elapsed < 60000) {
+        setAvailableOffers(JSON.parse(cached));
+        setCountdown(60 - Math.floor(elapsed / 1000));
+        return;
+      }
+    }
+    triggerFreshOffers();
+  }, [activeCityKey]);
+
+  // Tick timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          triggerFreshOffers();
+          if (addToast) {
+            addToast("Marketplace Refreshed 🔄", "A fresh list of pre-booking dispatch orders is available!", "info");
+          }
+          return 60;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [availableOffers]);
+
+  // Handle Accept/Claim Offer
+  const handleClaimOffer = async (offer: any) => {
+    if (!firebaseUser) {
+      if (addToast) addToast("Auth Required", "Please sign in to book pre-bookings.", "alert");
+      return;
+    }
+    
+    try {
+      const dbEntry = {
+        driverUid: firebaseUser.uid,
+        restaurantName: `${offer.restaurantName} (Claimed Pre-booking)`,
+        scheduledTime: offer.scheduledTimestamp,
+        status: 'pending',
+        estimatedPay: offer.estimatedPay,
+        distanceMiles: offer.distanceMiles,
+        durationMinutes: offer.durationMinutes,
+        brand: offer.brand,
+        vehicleClass: offer.vehicleClass,
+        destinationName: offer.destinationName,
+        notes: offer.notes
+      };
+
+      await addDoc(collection(db, 'scheduled_orders'), dbEntry);
+
+      // Remove from available local state and update cache
+      const updated = availableOffers.filter(o => o.id !== offer.id);
+      setAvailableOffers(updated);
+      localStorage.setItem('hyper_driver_available_prebookings', JSON.stringify(updated));
+
+      sendNotification("Pre-booking Claimed!", `Claimed high-paying ${offer.brand === 'uber' ? 'Uber' : 'Bolt'} pre-booking for ${offer.scheduledTime}!`);
+      if (addToast) addToast("Booking Confirmed! 🎉", `Added successfully. Payout: £${offer.estimatedPay.toFixed(2)}`, "success");
+      
+      // Navigate to claimed tab and reset detail screen
+      setSelectedOffer(null);
+      setActiveTab('claimed');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'scheduled_orders');
+    }
+  };
+
+  // Keep legacy manual scheduling capability
+  const handleAddCustom = async () => {
     if (!firebaseUser) return;
     try {
       await addDoc(collection(db, 'scheduled_orders'), {
         driverUid: firebaseUser.uid,
-        restaurantName: newOrder.restaurantName,
-        scheduledTime: serverTimestamp(), // Use native timestamp for better sorting/rules
+        restaurantName: `${newOrder.restaurantName} (Manual)`,
+        scheduledTime: newOrder.time || new Date(Date.now() + 3600000).toISOString(),
         status: 'pending',
-        estimatedPay: 10 + Math.random() * 15
+        estimatedPay: 12.50 + Math.random() * 15
       });
-      setIsAdding(false);
-      sendNotification("Order Scheduled", `Scheduled for ${newOrder.restaurantName}`);
+      setIsAddingCustom(false);
+      sendNotification("Order Scheduled", `Custom shift booked for ${newOrder.restaurantName}`);
+      if (addToast) addToast("Scheduled", `Custom shift queued successfully.`, "success");
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'scheduled_orders');
     }
   };
 
   return (
-    <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 flex flex-col">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <button onClick={onClose} className="p-2 bg-gray-100 rounded-full"><X size={24} /></button>
-          <h1 className="text-2xl font-black">Scheduled</h1>
-        </div>
-        <button onClick={() => setIsAdding(true)} className="p-2 bg-black text-white rounded-full"><Plus size={24} /></button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto space-y-4 pb-24">
-        {scheduledOrders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-            <Clock size={48} className="mb-4 opacity-20" />
-            <p className="font-bold">No scheduled orders</p>
+    <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-slate-950 text-white flex flex-col font-sans overflow-hidden">
+      
+      {/* SEPARATE MENU: Pre-Booking Detailed Slip View */}
+      {selectedOffer ? (
+        <div className="flex-1 flex flex-col h-full bg-slate-900 overflow-hidden">
+          {/* Detailed Slip Header */}
+          <div className="p-5 border-b border-white/10 flex items-center gap-4 bg-slate-950/80 sticky top-0 backdrop-blur-md z-40">
+            <button 
+              onClick={() => setSelectedOffer(null)} 
+              className="p-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-full text-white transition-all active:scale-95"
+            >
+              <ArrowRight className="rotate-180" size={20} />
+            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className={`px-2 py-0.5 rounded text-[9px] font-black tracking-wider uppercase ${
+                  selectedOffer.brand === 'uber' ? 'bg-white text-black' : 'bg-[#22c55e] text-black'
+                }`}>
+                  {selectedOffer.brand === 'uber' ? 'Uber Reserve' : 'Bolt Pre-book'}
+                </span>
+                <span className="text-[10px] text-gray-500 font-mono tracking-widest uppercase">{selectedOffer.id}</span>
+              </div>
+              <h2 className="font-black text-sm tracking-tight text-white">Pre-booking dispatch slip</h2>
+            </div>
           </div>
-        ) : (
-          scheduledOrders.map(order => (
-            <div key={order.id} className="p-6 bg-gray-50 rounded-[32px] border border-gray-100 flex justify-between items-center">
-              <div>
-                <h3 className="font-black text-lg">{order.restaurantName}</h3>
-                <p className="text-sm text-gray-500 font-bold">
-                  {order.scheduledTime?.toDate 
-                    ? order.scheduledTime.toDate().toLocaleString() 
-                    : new Date(order.scheduledTime).toLocaleString()}
-                </p>
-                <div className="mt-2 inline-block px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-[10px] font-black uppercase">
-                  {order.status}
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-28">
+            {/* Visual Route Representation with an elegant design */}
+            <div className="relative p-5 bg-black/40 rounded-[28px] border border-white/10 overflow-hidden min-h-[150px]">
+              <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(#22c55e_1px,transparent_1px)] [background-size:16px_16px]" />
+              
+              {/* Route line graphic */}
+              <div className="flex h-full flex-col justify-between relative pl-8 space-y-7">
+                <div className="absolute left-3 top-2.5 bottom-2.5 w-[2px] border-l-2 border-dashed border-gray-600 flex flex-col justify-between items-center z-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                </div>
+
+                <div className="relative z-10">
+                  <span className="text-[9px] font-mono tracking-wider uppercase text-[#22c55e] block font-black mb-0.5">PICKUP POI (A)</span>
+                  <h3 className="font-extrabold text-[#f1f5f9] text-base">{selectedOffer.restaurantName}</h3>
+                  <p className="text-xs text-gray-400 font-bold">{selectedOffer.pickupStreet || 'Main Avenue'}</p>
+                </div>
+
+                <div className="relative z-10">
+                  <span className="text-[9px] font-mono tracking-wider uppercase text-blue-400 block font-black mb-0.5">DROPOFF POI (B)</span>
+                  <h3 className="font-extrabold text-[#f1f5f9] text-base">{selectedOffer.destinationName}</h3>
+                  <p className="text-xs text-gray-400 font-bold">{activeCityKey} Metropolitan Area</p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="font-black text-xl text-green-600">£{order.estimatedPay.toFixed(2)}</p>
+
+              {/* Glowing vector path mock visual overlay */}
+              <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                <span className="text-[10px] text-gray-500 font-black tracking-wider uppercase">Route Preview Code:</span>
+                <span className="font-mono text-[10px] bg-slate-800 text-blue-400 px-2 py-0.5 rounded font-black">
+                  GPS_{activeCityKey.toUpperCase().slice(0, 3)}_ROUTE_OK
+                </span>
+              </div>
+            </div>
+
+            {/* Bento Grid Metrics */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-5 bg-white/5 border border-white/5 rounded-2xl flex flex-col justify-between">
+                <div className="flex items-center gap-2 mb-2 text-gray-400">
+                  <MapPin size={16} className="text-blue-400" />
+                  <span className="text-[10px] tracking-wider uppercase font-black">Miles Distance</span>
+                </div>
+                <div>
+                  <h4 className="text-2xl font-black">{selectedOffer.distanceMiles} <span className="text-xs text-gray-500 uppercase font-black">mi</span></h4>
+                  <p className="text-[9px] text-gray-500 font-bold mt-1">Direct transit line</p>
+                </div>
+              </div>
+
+              <div className="p-5 bg-white/5 border border-white/5 rounded-2xl flex flex-col justify-between">
+                <div className="flex items-center gap-2 mb-2 text-gray-400">
+                  <Clock size={16} className="text-orange-400" />
+                  <span className="text-[10px] tracking-wider uppercase font-black">Est. Duration</span>
+                </div>
+                <div>
+                  <h4 className="text-2xl font-black">{selectedOffer.durationMinutes} <span className="text-xs text-gray-500 uppercase font-black">mins</span></h4>
+                  <p className="text-[9px] text-gray-500 font-bold mt-1">Calculated traffic</p>
+                </div>
+              </div>
+
+              <div className="p-5 bg-white/5 border border-white/5 rounded-2xl flex flex-col justify-between">
+                <div className="flex items-center gap-2 mb-2 text-gray-400">
+                  <DollarSign size={16} className="text-emerald-400" />
+                  <span className="text-[10px] tracking-wider uppercase font-black">Est. Payout</span>
+                </div>
+                <div>
+                  <h4 className="text-2xl font-black text-emerald-400">£{selectedOffer.estimatedPay.toFixed(2)}</h4>
+                  <p className="text-[9px] text-gray-500 font-bold mt-1">Guaranteed pricing</p>
+                </div>
+              </div>
+
+              <div className="p-5 bg-white/5 border border-white/5 rounded-2xl flex flex-col justify-between">
+                <div className="flex items-center gap-2 mb-2 text-gray-400">
+                  <TrendingUp size={16} className="text-[#22c55e]" />
+                  <span className="text-[10px] tracking-wider uppercase font-black">Hourly Yield</span>
+                </div>
+                <div>
+                  <h4 className="text-2xl font-black text-[#22c55e]">
+                    £{parseFloat((selectedOffer.estimatedPay / (selectedOffer.durationMinutes / 60)).toFixed(2))}/hr
+                  </h4>
+                  <p className="text-[9px] text-gray-500 font-bold mt-1">Equivalent tier rate</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Target Booking Shift */}
+            <div className="p-5 bg-white/5 border border-white/5 rounded-2xl space-y-2">
+              <span className="text-[10px] font-black text-gray-400 tracking-wider uppercase block">Scheduled Dispatch Time</span>
+              <div className="flex items-center gap-3">
+                <div className="p-2 ml-1 bg-yellow-500/10 text-yellow-400 rounded-lg">
+                  <Calendar size={18} />
+                </div>
+                <div>
+                  <p className="font-extrabold text-white text-base leading-tight">{selectedOffer.scheduledTime}</p>
+                  <p className="text-[10px] text-gray-500 font-bold">Auto dispatch triggers 30m prior</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Vehicle Criteria & Requirements */}
+            <div className="p-5 bg-white/5 border border-white/5 rounded-2xl space-y-2">
+              <span className="text-[10px] font-black text-gray-400 tracking-wider uppercase block">Dispatcher Criteria</span>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-400">Vehicle Category Required:</span>
+                <span className="font-black text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded uppercase tracking-wider text-[10px]">
+                  {selectedOffer.vehicleClass}
+                </span>
+              </div>
+              <div className="h-[1px] bg-white/5 my-1" />
+              <div className="text-xs text-gray-300 italic">
+                <strong>Attention:</strong> {selectedOffer.notes}
+              </div>
+            </div>
+          </div>
+
+          {/* Action Toolbar */}
+          <div className="p-5 border-t border-white/10 bg-slate-950 flex gap-4">
+            <button 
+              onClick={() => setSelectedOffer(null)}
+              className="px-5 py-4 border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all active:scale-95"
+            >
+              Declines Offer
+            </button>
+            <button 
+              onClick={() => handleClaimOffer(selectedOffer)}
+              className="flex-1 py-4 bg-[#22c55e] hover:bg-[#1f9d4b] text-slate-950 rounded-2xl font-extrabold text-xs uppercase tracking-wider transition-all active:scale-95 border-b-4 border-green-800 shadow-lg shadow-green-950/20"
+            >
+              Confirm and claim job →
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* LIST VIEW (Tabs of Available Offers vs. My Scheduled Bookings) */
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
+          
+          {/* Header Panel */}
+          <div className="p-6 border-b border-white/5 bg-slate-900/40">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
                 <button 
-                  onClick={async () => {
-                    if (!firebaseUser) {
-                      sendNotification("Auth Required", "Please sign in to delete orders.");
-                      return;
-                    }
-                    try {
-                      await deleteDoc(doc(db, 'scheduled_orders', order.id));
-                    } catch (error) {
-                      handleFirestoreError(error, OperationType.DELETE, `scheduled_orders/${order.id}`);
-                    }
-                  }}
-                  className="mt-2 text-red-500 p-2"
+                  onClick={onClose} 
+                  className="p-2.5 bg-white/5 border border-white/10 hover:border-white/25 rounded-full text-white transition-all active:scale-90"
                 >
-                  <X size={20} />
+                  <ArrowRight className="rotate-180" size={18} />
+                </button>
+                <div>
+                  <h1 className="text-xl font-black tracking-tight">Pre-bookings Hub</h1>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{activeCityKey} Marketplace</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setIsAddingCustom(true)} 
+                  className="p-2.5 bg-white/5 border border-white/5 text-white/80 rounded-full hover:bg-white/10 active:scale-95 transition-transform"
+                  title="Manual booking override"
+                >
+                  <Plus size={18} />
                 </button>
               </div>
             </div>
-          ))
-        )}
-      </div>
 
+            {/* Custom Tab Switcher */}
+            <div className="mt-6 bg-black/45 p-1 rounded-2xl border border-white/5 flex gap-1 relative z-10">
+              <button
+                type="button"
+                onClick={() => setActiveTab('available')}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                  activeTab === 'available' 
+                    ? 'bg-white text-black font-extrabold shadow' 
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Available jobs
+                <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-ping" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('claimed')}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                  activeTab === 'claimed' 
+                    ? 'bg-white text-black font-extrabold shadow' 
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Claimed 
+                {scheduledOrders.length > 0 && (
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${activeTab === 'claimed' ? 'bg-black text-white' : 'bg-gray-800 text-white'}`}>
+                    {scheduledOrders.length}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 pb-28">
+            
+            {/* TAB: Available Offers Marketplace */}
+            {activeTab === 'available' && (
+              <>
+                {/* Timer Countdown Header */}
+                <div className="flex items-center justify-between p-3.5 bg-[#22c55e]/5 border border-[#22c55e]/15 rounded-2xl mb-2 text-[#22c55e]">
+                  <div className="flex items-center gap-2 text-xs font-bold leading-none">
+                    <Clock size={14} className="animate-pulse" />
+                    <span>Next marketplace refresh in: <strong>{countdown}s</strong></span>
+                  </div>
+                  <button 
+                    onClick={triggerFreshOffers} 
+                    className="flex items-center gap-1.5 px-2.5 py-1 bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[10px] uppercase font-black tracking-wider rounded-lg active:scale-90 transition-transform"
+                    title="Force refresh offer pool"
+                  >
+                    <RefreshCw size={10} />
+                    <span>Reload</span>
+                  </button>
+                </div>
+
+                {availableOffers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-gray-500 text-center">
+                    <RefreshCw size={44} className="mb-4 opacity-10 animate-spin" />
+                    <p className="font-bold">Locating high-paying premium dispatches...</p>
+                    <p className="text-[10px] text-gray-600 mt-1 max-w-xs uppercase leading-relaxed">Scanning local grids and premium corporate accounts...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {availableOffers.map(offer => {
+                      const estHourly = parseFloat((offer.estimatedPay / (offer.durationMinutes / 60)).toFixed(0));
+                      return (
+                        <div 
+                          key={offer.id} 
+                          onClick={() => setSelectedOffer(offer)}
+                          className={`p-5 rounded-[28px] border cursor-pointer hover:bg-white/[0.02] active:scale-[0.98] transition-all flex flex-col justify-between overflow-hidden relative group ${
+                            offer.brand === 'uber' 
+                              ? 'bg-slate-900/60 border-white/5 hover:border-white/10' 
+                              : 'bg-emerald-950/20 border-[#22c55e]/10 hover:border-[#22c55e]/20'
+                          }`}
+                        >
+                          {/* Top row */}
+                          <div className="flex justify-between items-start gap-4">
+                            <div>
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                  offer.brand === 'uber' 
+                                    ? 'bg-white text-black' 
+                                    : 'bg-[#22c55e] text-black'
+                                }`}>
+                                  {offer.brand === 'uber' ? 'Uber Reserve' : 'Bolt Pre-book'}
+                                </span>
+                                <span className="text-[10px] text-[#f59e0b] bg-yellow-500/10 px-1.5 py-0.2 rounded font-black tracking-wider uppercase">
+                                  {offer.scheduledTime}
+                                </span>
+                              </div>
+                              <h3 className="font-extrabold text-sm leading-tight text-white">{offer.restaurantName}</h3>
+                              <p className="text-[11px] text-gray-400 font-bold mt-0.5 flex items-center gap-1">
+                                <span className="font-bold pr-1 text-gray-505">to</span> {offer.destinationName.split(',')[0]}
+                              </p>
+                            </div>
+
+                            <div className="text-right">
+                              <p className="text-lg font-black text-emerald-400">£{offer.estimatedPay.toFixed(2)}</p>
+                              <p className="text-[9px] text-[#22c55e] font-black bg-[#22c55e]/10 px-1 rounded-md mt-1 italic">
+                                £{estHourly}/hr
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Divider */}
+                          <div className="h-[1px] bg-white/5 my-3.5" />
+
+                          {/* Footer details */}
+                          <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold uppercase tracking-wider pt-0.5">
+                            <div className="flex items-center gap-3">
+                              <span className="flex items-center gap-1">
+                                <MapPin size={11} className="text-blue-400" />
+                                <span className="text-gray-300 font-black">{offer.distanceMiles} mi</span>
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock size={11} className="text-orange-400" />
+                                <span className="text-gray-300 font-black">{offer.durationMinutes}m</span>
+                              </span>
+                            </div>
+
+                            <span className="text-blue-400 opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all text-[9.5px]">
+                              View slip &Claim →
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* TAB: My Claimed Pre-bookings */}
+            {activeTab === 'claimed' && (
+              <div className="space-y-4">
+                {scheduledOrders.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center p-12 text-center text-gray-500">
+                    <Calendar size={48} className="mb-4 opacity-20 text-white" />
+                    <p className="font-extrabold text-white">No confirmed pre-bookings yet</p>
+                    <p className="text-xs text-gray-500 mt-1 max-w-xs uppercase leading-relaxed font-bold">
+                      Claim active rider offers on the "Available jobs" marketplace tab to schedule your shifts in advance!
+                    </p>
+                  </div>
+                ) : (
+                  scheduledOrders.map(order => {
+                    const brand = order.brand || (Math.random() < 0.5 ? 'uber' : 'bolt');
+                    const hasDetail = !!order.distanceMiles;
+                    return (
+                      <div 
+                        key={order.id} 
+                        className={`p-6 rounded-[28px] border flex flex-col justify-between bg-white/[0.02] ${
+                          brand === 'uber' ? 'border-white/5' : 'border-[#22c55e]/15'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-4">
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                brand === 'uber' ? 'bg-white text-black' : 'bg-[#22c55e] text-black'
+                              }`}>
+                                {brand === 'uber' ? 'Uber Reserved' : 'Bolt Scheduled'}
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[8px] font-black uppercase tracking-wider">
+                                {order.status}
+                              </span>
+                            </div>
+                            <h3 className="font-black text-base text-white">{order.restaurantName}</h3>
+                            <p className="text-xs text-gray-400 font-bold mt-1">
+                              <strong>Dispatch code:</strong> {order.scheduledTime?.toDate 
+                                ? order.scheduledTime.toDate().toLocaleString() 
+                                : new Date(order.scheduledTime).toLocaleString()}
+                            </p>
+                            {order.destinationName && (
+                              <p className="text-[11px] text-gray-500 font-bold mt-0.5">
+                                TO: {order.destinationName}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="text-right flex flex-col items-end">
+                            <p className="font-black text-xl text-emerald-400">£{order.estimatedPay.toFixed(2)}</p>
+                            <button 
+                              onClick={async () => {
+                                if (!firebaseUser) {
+                                  sendNotification("Auth Required", "Please sign in to delete orders.");
+                                  return;
+                                }
+                                try {
+                                  await deleteDoc(doc(db, 'scheduled_orders', order.id));
+                                  if (addToast) addToast("Pre-booking Cancelled ❌", "Shift reference released from database successfully.", "info");
+                                } catch (error) {
+                                  handleFirestoreError(error, OperationType.DELETE, `scheduled_orders/${order.id}`);
+                                }
+                              }}
+                              className="mt-4 p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-full active:scale-90 transition-transform"
+                              title="Cancel / Release Shift"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {hasDetail && (
+                          <>
+                            <div className="h-[1.5px] bg-white/5 my-4" />
+                            <div className="flex items-center gap-4 text-[11px] text-gray-400 uppercase font-black">
+                              <span className="flex items-center gap-1">
+                                <MapPin size={12} className="text-blue-500" />
+                                {order.distanceMiles} mi
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock size={12} className="text-orange-400" />
+                                {order.durationMinutes} mins
+                              </span>
+                              {order.vehicleClass && (
+                                <span className="ml-auto text-orange-400 text-[10px]">
+                                  {order.vehicleClass}
+                                </span>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL OVERLAY: Legacy Custom manual pre-scheduling modal */}
       <AnimatePresence>
-        {isAdding && (
+        {isAddingCustom && (
           <div className="fixed inset-0 z-[500] flex items-end justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdding(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }} className="bg-white w-full max-w-md rounded-[32px] p-8 shadow-2xl relative z-10">
-              <h2 className="text-2xl font-black mb-6">Schedule Order</h2>
-              <div className="space-y-4 mb-8">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAddingCustom(false)} className="absolute inset-0 bg-black/80 backdrop-blur-md z-0" />
+            <motion.div initial={{ y: 150 }} animate={{ y: 0 }} exit={{ y: 150 }} className="bg-slate-900 w-full max-w-md rounded-[32px] p-8 border border-white/10 shadow-2xl relative z-10">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-black text-white">Inject Manual Shift Code</h2>
+                <button onClick={() => setIsAddingCustom(false)} className="p-1.5 bg-white/5 hover:bg-white/10 text-white rounded-full">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-4 mb-8 text-black">
                 <input 
                   type="text" 
-                  placeholder="Restaurant Name" 
-                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
+                  placeholder="Pickup Area or Client Name" 
+                  className="w-full p-4 bg-slate-800 text-white rounded-2xl border border-white/5 font-extrabold outline-none text-xs"
                   value={newOrder.restaurantName}
                   onChange={e => setNewOrder({...newOrder, restaurantName: e.target.value})}
                 />
                 <input 
                   type="datetime-local" 
-                  className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold"
+                  className="w-full p-4 bg-slate-800 text-white rounded-2xl border border-white/5 font-extrabold outline-none text-xs"
                   value={newOrder.time}
                   onChange={e => setNewOrder({...newOrder, time: e.target.value})}
                 />
               </div>
-              <button onClick={handleAdd} className="w-full py-5 bg-black text-white rounded-2xl font-black text-xl">SCHEDULE</button>
+
+              <button 
+                onClick={handleAddCustom} 
+                className="w-full py-4 bg-white text-black rounded-2xl font-black text-sm uppercase tracking-wider"
+              >
+                Schedule Shift manually
+              </button>
             </motion.div>
           </div>
         )}
@@ -15552,6 +16091,8 @@ export default function App() {
               onClose={() => setCurrentScreen('home')}
               firebaseUser={firebaseUser}
               sendNotification={sendNotification}
+              addToast={addToast}
+              activeCityKey={activeCityKey}
             />
           )}
 
