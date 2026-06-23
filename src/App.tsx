@@ -1197,44 +1197,94 @@ const ScheduledOrdersScreen = ({
   const triggerFreshOffers = () => {
     const city = activeCityKey && CITY_DATABASES[activeCityKey] ? activeCityKey : "London";
     const database = CITY_DATABASES[city];
-    const restaurantsPool = [
-      ...(database.restaurants?.High || []),
-      ...(database.restaurants?.Medium || []),
-      ...(database.restaurants?.Low || ["Premium Diner", "Central Station Delivery"])
+    
+    // Taxi specific premium pickup hubs depending on selected city
+    const taxiLondon = [
+      "Terminal 5 Arrivals (LHR)",
+      "Terminal 2 VIP Valet (LHR)",
+      "St Pancras International (Eurostar)",
+      "Hilton Park Lane Portico",
+      "The Savoy Hotel Main Entrance",
+      "Gatwick South Taxi-Loop",
+      "Canary Wharf Plaza East",
+      "Covent Garden Royal Opera House",
+      "The Shard Viewpoint Lobby",
+      "Mayfair Club Members Entrance",
+      "Battersea Boulevard Taxi Gate",
+      "Paddington Station West Dock"
     ];
+
+    const taxiNottingham = [
+      "Nottingham Railway Station (Taxi Rank)",
+      "Lace Market Theatre VIP Entrance",
+      "Wollaton Hall West Pavilion",
+      "Crowne Plaza Hotel Portico",
+      "Jury's Inn Station Street Lobby",
+      "Trent Bridge Cricket Ground",
+      "Queens Medical Centre Main Entrance",
+      "University Park East Drive",
+      "Victoria Centre North Taxi Port",
+      "Nottingham Express Transit VIP Hub"
+    ];
+
+    const taxiDefault = [
+      "Central Train Terminus Taxi Loop",
+      "Grand Plaza Executive Lounge",
+      "Metropolitan Airport Arrivals Terminal",
+      "Royal Symphony Hall VIP Circle",
+      "Sovereign Court Business Plaza"
+    ];
+
+    const pickupsPool = city === "London" 
+      ? taxiLondon 
+      : (city === "Nottingham" ? taxiNottingham : taxiDefault);
+
     const streetsPool = database.streets || ["Regent St", "Oxford St", "Kingsway", "Holborn"];
     
     const count = 4 + Math.floor(Math.random() * 3); // 4-6 offers
     const generatedOffers: any[] = [];
-    const landmarks = [
-      "Canary Wharf", "Mayfair Hotel", "Chelsea Harbour", "Battersea Power Station", 
-      "Royal Festival Hall", "Hampstead Heath", "Islington Green", "Whitechapel Central"
+    
+    const taxiLandmarks = [
+      "Chelsea Harbour VIP Docking", "Royal Festival Hall Concierge", 
+      "Westminster Office Hub", "Soho Member Square", 
+      "Belgravia Mews Private Court", "Kensington Court Gated Entrance",
+      "City Airport Executive Lounge", "Grand Hotel Portico"
     ];
     
-    const uberClasses = ['UberX', 'UberXL', 'Comfort', 'Exec'];
-    const boltClasses = ['Bolt Standard', 'Bolt Premium', 'Bolt Electric', 'Bolt Comfort XL'];
+    const taxiLandmarksNottingham = [
+      "Lace Market Penthouse", "The Park Estate Gatehouse",
+      "Nottingham Castle Courtyard", "Victoria Embankment Pavilion",
+      "Broadmarsh Business Quarter", "Wollaton Park Golf Club"
+    ];
+
+    const destinationsPool = city === "London" 
+      ? taxiLandmarks 
+      : (city === "Nottingham" ? taxiLandmarksNottingham : ["City Centre VIP Plaza", "Executive Executive Terminal"]);
+    
+    const uberClasses = ['Uber Taxi', 'Uber Exec', 'Comfort', 'UberXL Luxe'];
+    const boltClasses = ['Bolt Taxi', 'Bolt Premium', 'Bolt Comfort', 'Bolt Electric Luxe'];
     const notesPool = [
-      "Premium rider client. Quiet trip preferred.",
-      "Customer traveling with 2 large suitcases. Trunk space needed.",
-      "Requires high rating driver. Deliver to front lobby desk.",
-      "Thermal bag carrier requested. Double sealed food items.",
-      "Corporate account passenger. Friendly greeting expected.",
-      "Punctual arrival required. Flight ticket timing buffer.",
-      "Handoff requested at rear courtyard gates. Code PIN: #4092"
+      "Premium passenger. Appreciate VIP service and silent route.",
+      "Customer traveling with business luggage. Trunk must be clear.",
+      "Fastest route requested. Corporate client on tight timeline.",
+      "Wheelchair assistance/accessibility check cleared.",
+      "VIP account holder. Provide complimentary bottled water.",
+      "Punctual taxi arrival expected. Flight departure buffer active.",
+      "Contactless boarding requested. Keycard PIN: #2093"
     ];
 
     for (let i = 0; i < count; i++) {
       const brand = Math.random() < 0.5 ? 'uber' : 'bolt';
-      const pickupRestaurant = restaurantsPool[Math.floor(Math.random() * restaurantsPool.length)];
+      const pickupPoi = pickupsPool[Math.floor(Math.random() * pickupsPool.length)];
       const pickupStreet = streetsPool[Math.floor(Math.random() * streetsPool.length)];
-      const destination = landmarks[Math.floor(Math.random() * landmarks.length)] + ", " + streetsPool[(Math.floor(Math.random() * streetsPool.length) + 1) % streetsPool.length];
+      const destination = destinationsPool[Math.floor(Math.random() * destinationsPool.length)] + ", " + streetsPool[(Math.floor(Math.random() * streetsPool.length) + 1) % streetsPool.length];
       
-      const distanceMiles = parseFloat((2.5 + Math.random() * 11).toFixed(1));
-      const durationMinutes = Math.round(distanceMiles * 2.8 + 6);
+      const distanceMiles = parseFloat((1.5 + Math.random() * 7).toFixed(1));
+      const durationMinutes = Math.round(distanceMiles * 3.1 + 4);
       
-      const ratePerMile = brand === 'bolt' ? 2.10 : 1.90;
-      const baseFare = brand === 'bolt' ? 8.50 : 7.00;
-      const estimatedPay = parseFloat((baseFare + (distanceMiles * ratePerMile) + (Math.random() * 4.5)).toFixed(2));
+      const ratePerMile = brand === 'bolt' ? 2.30 : 2.10;
+      const baseFare = brand === 'bolt' ? 9.50 : 8.50;
+      const estimatedPay = parseFloat((baseFare + (distanceMiles * ratePerMile) + (Math.random() * 5.0)).toFixed(2));
       
       const vehicleClass = brand === 'uber' 
         ? uberClasses[Math.floor(Math.random() * uberClasses.length)]
@@ -1242,16 +1292,17 @@ const ScheduledOrdersScreen = ({
         
       const notes = notesPool[Math.floor(Math.random() * notesPool.length)];
       
-      // Target time in future
+      // Much quicker times in future: 3 to 30 mins
+      const offsetMin = Math.round(3 + i * 5 + Math.random() * 4);
       const targetTime = new Date();
-      targetTime.setMinutes(targetTime.getMinutes() + Math.round(60 + i * 80 + Math.random() * 40));
+      targetTime.setMinutes(targetTime.getMinutes() + offsetMin);
+      
       const formattedTime = targetTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const isTomorrow = targetTime.getDate() !== new Date().getDate();
-      const scheduledTimeStr = `${isTomorrow ? 'Tomorrow' : 'Today'} @ ${formattedTime}`;
+      const scheduledTimeStr = `In ${offsetMin} mins (${formattedTime})`;
 
       generatedOffers.push({
-        id: `PBK-${Math.floor(Math.random() * 90000) + 10000}`,
-        restaurantName: pickupRestaurant,
+        id: `TXB-${Math.floor(Math.random() * 90000) + 10000}`,
+        restaurantName: pickupPoi,
         pickupStreet,
         destinationName: destination,
         distanceMiles,
