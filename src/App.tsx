@@ -925,7 +925,8 @@ const SideMenu = ({
   setAutoPauseSecondApp,
   activeBrand,
   setActiveBrand,
-  setShowAppLauncher
+  setShowAppLauncher,
+  scheduledOrders = []
 }: { 
   user: UserProfile, 
   setIsSideMenuOpen: (val: boolean) => void,
@@ -945,7 +946,8 @@ const SideMenu = ({
   setAutoPauseSecondApp: (val: boolean) => void,
   activeBrand: 'uber' | 'bolt' | 'both',
   setActiveBrand: (val: 'uber' | 'bolt' | 'both') => void,
-  setShowAppLauncher: (val: boolean) => void
+  setShowAppLauncher: (val: boolean) => void,
+  scheduledOrders?: ScheduledOrder[]
 }) => {
   return (
     <motion.div 
@@ -1014,6 +1016,16 @@ const SideMenu = ({
               icon: <History size={20} />, 
               label: "Trips", 
               action: () => { setCurrentScreen('trip_history'); setIsSideMenuOpen(false); } 
+            },
+            { 
+              icon: <Clock size={20} />, 
+              label: "Pre-bookings", 
+              action: () => { setCurrentScreen('scheduled_orders'); setIsSideMenuOpen(false); },
+              badge: scheduledOrders.length > 0 ? (
+                <span className="ml-auto text-[10px] bg-[#22c55e]/15 border border-[#22c55e]/30 px-2 py-0.5 rounded-full font-black text-[#22c55e]">
+                  {scheduledOrders.length}
+                </span>
+              ) : undefined
             },
             { 
               icon: <Gift size={20} />, 
@@ -10816,6 +10828,7 @@ export default function App() {
                 activeBrand={activeBrand}
                 setActiveBrand={setActiveBrand}
                 setShowAppLauncher={setShowAppLauncher}
+                scheduledOrders={scheduledOrders}
               />
             </>
           )}
@@ -11371,6 +11384,14 @@ export default function App() {
                   theme={theme} 
                   user={user} 
                   currentEarnings={todayEarningsTotal} 
+                  activeCityKey={activeCityKey}
+                  activeOrders={activeOrders}
+                  activeSurgeAreas={activeSurgeAreas}
+                  hotspots={hotspots}
+                  isNightMode={isNightMode}
+                  isOnBreak={isOnBreak}
+                  location={location}
+                  customerMessages={messages}
                 />
               )}
 

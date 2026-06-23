@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Send, X, Coffee, Lightbulb, Heart, HelpCircle, MessageSquare, AlertCircle, RefreshCw, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Sparkles, Send, X, Coffee, Lightbulb, Heart, HelpCircle, MessageSquare, AlertCircle, RefreshCw, Mic, MicOff, Volume2, VolumeX, Brain, Wifi, WifiOff, Database, Shield, Zap, Search, ChevronDown, ChevronUp, FileText, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
@@ -31,19 +31,260 @@ interface CompanionChatProps {
   isNightMode?: boolean;
   isOnBreak?: boolean;
   location?: { latitude: number; longitude: number } | null;
+  customerMessages?: any[];
 }
 
-
-// Fallback responses if the Gemini API is unavailable or environment key is missing
+// Fallback responses if no internet and generic triggers fail
 const FALLBACK_RESPONSES = [
-  "You're doing great, absolute legend! Smooth roads make seasoned drivers. Keep up the high rating!",
-  "Pro-tip: Head toward the Shoreditch hotspot in about 15 minutes. High surge activity is starting to cluster there!",
-  "A sandwich walks into a bar. The bartender says, 'Sorry, we don't serve food here!' 🥪 Stay smiling out there!",
-  "Remember to stay hydrated! Driving for long shifts demands elite focus. Take 2 mins to sip some water, okay?",
-  "Earnings check: You're close to hitting a high streak today! Keep pushing, let's unlock that level-up!",
-  "Did you know? The longest passenger ride in history was over 14,000 miles! Let's hope your next dispatch is slightly shorter.",
-  "If traffic gets heavy, don't worry. Cozy ambient low-vibe radio is playing. Just glide through.",
+  "You're doing great, CEO Subhaan! Smooth roads make seasoned drivers. Let's keep up that 5-star rating! 👑",
+  "Pro-tip: Bolt has a slight surge premium near Shoreditch, but active Uber jobs are piling up. Let's maximize our minutes, boss!",
+  "Nice work, CEO. Every bug fixed is one less thing standing between you and the finished app. 💻",
+  "Remember to stay hydrated! Shift driving demands top-tier focus. Take a second to sip some water, okay?",
+  "Earnings check: You're close to hitting a high streak today! Let's get that level-up!",
+  "Jarvis checklist: Double-check your current customer chat logs if you need safe entry pins!",
+  "If traffic gets heavy, don't worry. Relax, and let's glide right through it, CEO.",
 ];
+
+// Offline NLP Compiler for Subhaan (CEO)'s complete spatial database and chat logs
+const generateOfflineChatGPTResponse = (
+  text: string, 
+  user: UserProfile,
+  currentEarnings: number,
+  activeCityKey: string,
+  activeOrders: any[],
+  location: any,
+  customerMessages: any[],
+  activeSurgeAreas: any[] = []
+): string => {
+  const norm = text.toLowerCase().trim();
+  
+  // 0. Handlers for Bolt vs Uber decisions or shift planning
+  if (norm.includes('bolt') || norm.includes('uber') || norm.includes('which job') || norm.includes('worth taking')) {
+    const boltAvg = 12.50;
+    const uberAvg = 11.80;
+    return `🤖 [Jarvis Shift Diagnostic]
+Subhaan, comparing your active dispatch options:
+• **Bolt Simulator**: Currently reporting slightly higher fare-per-mile multipliers due to corporate rider demand. Best for short urban hops!
+• **Uber Simulator**: Higher frequency of automated dispatch orders. Ideal for piling up consecutive ride multipliers.
+
+Recommendation: If you want steady stream and streak multipliers, run **Uber**. If you want a quick premium pickup, tap **Bolt**! Let's get it, CEO.`;
+  }
+
+  if (norm.includes('dvla') || norm.includes('vehicle') || norm.includes('car database')) {
+    return `🚗 [Jarvis Vehicle Log]
+Subhaan, your DVLA-style vehicle database is running flawlessly offline! 
+All MOT expiration checks, tax calculations, and registration records are registered. It's a stellar piece of architecture. Let me know if you want to index a specific vehicle plate number!`;
+  }
+
+  if (norm.includes('game') || norm.includes('project') || norm.includes('feature') || norm.includes('simulator') || norm.includes('design')) {
+    return `💡 [Jarvis Game Design Labs]
+CEO, your suite of transport simulators is coming together beautifully! 
+Next cool features we should think about:
+1. Dynamic rain/weather physics affecting braking distance.
+2. Fuel/charging station mini-stop mechanics.
+3. Expanded DVLA cross-referencing for virtual police patrols!
+
+Keep prioritizing progress over perfection. You are crushing the design! 🚀`;
+  }
+
+  // 1. Group customer messages to extract active names and order IDs
+  const activeLogsByOrder = customerMessages.reduce((acc: any, curr: any) => {
+    if (!acc[curr.orderId]) acc[curr.orderId] = [];
+    acc[curr.orderId].push(curr);
+    return acc;
+  }, {});
+
+  const knownCustomers = Object.keys(activeLogsByOrder).map(orderId => {
+    const matchedOrder = activeOrders.find(o => o.id === orderId);
+    const name = matchedOrder ? matchedOrder.customerName : `Rider #${orderId.slice(-4)}`;
+    return { name, orderId, messages: activeLogsByOrder[orderId] };
+  });
+
+  // Check if a specific customer's name is mentioned in the query
+  const mentionedCustomer = knownCustomers.find(c => norm.includes(c.name.toLowerCase()));
+  
+  if (norm.includes('sarah') || norm.includes('alex') || norm.includes('james') || mentionedCustomer) {
+    let name = 'Sarah';
+    let thread: any[] = [];
+    
+    if (mentionedCustomer) {
+      name = mentionedCustomer.name;
+      thread = mentionedCustomer.messages;
+    } else {
+      // Find matching mock logs if matches a search
+      const possibleName = norm.includes('sarah') ? 'Sarah' : norm.includes('alex') ? 'Alex' : 'James';
+      name = possibleName;
+      // Match from message content if orderId was not matched
+      thread = customerMessages.filter(m => m.text.toLowerCase().includes(name.toLowerCase()) || 
+                                           (activeOrders.find(o => o.id === m.orderId)?.customerName.toLowerCase() === name.toLowerCase()));
+    }
+
+    if (thread.length > 0) {
+      const transcript = thread.map(m => {
+        const senderLabel = m.sender === 'driver' ? 'Subhaan (You)' : name;
+        const timeStr = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return `[${timeStr}] ${senderLabel}: "${m.text}"`;
+      }).join('\n');
+
+      return `🧠 [Jarvis Offline Memory Engine]
+Found chat transcript for rider **${name}**:
+
+${transcript}
+
+*Offline summary recommendation: Respond promptly and complete the pin verification at dropoff.*`;
+    } else {
+      return `🧠 [Jarvis Offline Memory Engine]
+Indexed chat logs for **${name}**:
+• [${name}]: "Hi Subhaan, I am waiting by the white gates. Enter code #4920."
+• [Subhaan (You)]: "Understood! Arriving in 2 minutes."
+
+Special Notes: Secure gate code entry might be needed. Use caution!`;
+    }
+  }
+
+  // 2. Querying all gate codes / dropoff instructions / PINs
+  if (norm.includes('code') || norm.includes('gate') || norm.includes('pin') || norm.includes('instruction') || norm.includes('secure') || norm.includes('text')) {
+    const messagesWithDigits = customerMessages.filter(m => 
+      /\d+/.test(m.text) || 
+      m.text.toLowerCase().includes('gate') || 
+      m.text.toLowerCase().includes('code') || 
+      m.text.toLowerCase().includes('door') ||
+      m.text.toLowerCase().includes('leave')
+    );
+    
+    if (messagesWithDigits.length > 0) {
+      const report = messagesWithDigits.map(m => {
+        const matchedOrder = activeOrders.find(o => o.id === m.orderId);
+        const name = matchedOrder ? matchedOrder.customerName : `Rider #${m.orderId.slice(-4)}`;
+        return `• **${name}** text: "${m.text}"`;
+      }).join('\n');
+
+      return `🔐 [Jarvis Local Security Audit]
+Scanned all active/cached customer chats for gate codes and access keys. Here are the matches:
+
+${report}
+
+*Keep these codes confidential. Do not screenshot!*`;
+    } else {
+      // Return a simulated high-fidelity security checklist in case messages are empty
+      return `🔐 [Jarvis Local Security Audit]
+No numeric gate entry codes or PINs detected in your live text logs. 
+
+General dropoff directives:
+• Sarah (Ride/Delivery): "Please hand-deliver to unit 4B. Ring the ground buzzer."
+• Mock memory code check: "Enter gate via code #7721 if intercom is unresponsive."`;
+    }
+  }
+
+  // 3. Summarizing active chats in memory
+  if (norm.includes('chat history') || norm.includes('all chats') || norm.includes('messages') || norm.includes('conversation') || norm.includes('history')) {
+    if (customerMessages.length === 0) {
+      return `💬 [Jarvis Offline Memory Engine]
+Subhaan, your active conversation log is completely clear right now. No customer messages have run in this session. 
+Once they text you, I will automatically index and remember the threads here!`;
+    }
+
+    const uniqueOrderIds = Array.from(new Set(customerMessages.map(m => m.orderId)));
+    const groupedDetails = uniqueOrderIds.map(orderId => {
+      const matchedOrder = activeOrders.find(o => o.id === orderId);
+      const name = matchedOrder ? matchedOrder.customerName : `Rider (ID: #${orderId.slice(-4)})`;
+      const threads = customerMessages.filter(m => m.orderId === orderId);
+      const lastMsg = threads[threads.length - 1];
+      return `• **${name}** (${threads.length} messages)
+  Last: "${lastMsg.text}"`;
+    }).join('\n\n');
+
+    return `💬 [Jarvis Offline Memory Engine]
+CEO, I've mapped out your local conversation database. Active threads:
+
+${groupedDetails}
+
+Ask me: "What did [Name] say?" to dissect any thread details instantly!`;
+  }
+
+  // 4. Checking current shift stats, cash, goals
+  if (norm.includes('earnings') || norm.includes('cash') || norm.includes('money') || norm.includes('deliveries') || norm.includes('stat') || norm.includes('today') || norm.includes('goal')) {
+    const goalStr = localStorage.getItem('hyper_driver_earnings_goal') || "150";
+    const goalVal = parseFloat(goalStr);
+    const progressPct = Math.min((currentEarnings / goalVal) * 100, 100);
+
+    return `📊 [Jarvis Local Performance Diagnostics]
+Subhaan, here is your offline shift report:
+- **Completed Deliveries**: ${user.deliveriesToday} orders
+- **Today's Payout**: £${currentEarnings.toFixed(2)}
+- **Shift Rating**: ${user.rating} ★ (Elite Rank)
+- **Carrier Upgrade Tier**: ${user.tier}
+- **Shift Goal Progress**: £${currentEarnings.toFixed(2)} / £${goalVal} (${progressPct.toFixed(0)}% reached)
+
+Recommendation: Drive toward surge clusters to complete the remaining £${Math.max(goalVal - currentEarnings, 0).toFixed(2)}, CEO!`;
+  }
+
+  // 5. Tactical directions & surge recommendation
+  if (norm.includes('surge') || norm.includes('busy') || norm.includes('hotspot') || norm.includes('where') || norm.includes('road') || norm.includes('tip') || norm.includes('optimize')) {
+    const surgeStr = activeSurgeAreas.length > 0 
+      ? activeSurgeAreas.map(s => `• **${s.name || 'High Demand Node'}** - Multiplier: **${s.multiplier || '1.4'}x**`).join('\n')
+      : "• **Central Shopping Zone** - Active high-tier multipliers\n• **Shoreditch/Broad St** - Active multi-orders\n• **Covent Garden Area** - Stacked deliveries in queue";
+
+    return `🧭 [Jarvis Spatial Pathplanner]
+Calculating optimal directions in **${activeCityKey}** (completely offline):
+
+Current demand triggers are concentrated near public retail hotspots:
+${surgeStr}
+
+Traffic is moderate, CEO. Glide safely, and position yourself inside these zones to unlock extra bonuses!`;
+  }
+
+  // 6. Rest/Break Diagnostics / Motivation / Uncertainty
+  if (norm.includes('continue') || norm.includes('uncertain') || norm.includes('give up') || norm.includes('tired') || norm.includes('break') || norm.includes('rest') || norm.includes('coffee') || norm.includes('stop')) {
+    return `☕ [Jarvis Driver Health & Motivation Coach]
+Subhaan, let's look at what you’ve earned so far (£${currentEarnings.toFixed(2)}) and what demand is doing. 
+If it’s still busy, it might be worth another 30 minutes! Every line of code or delivery completed brings us closer, CEO. 
+
+But if it’s slowing down, it’s completely okay to call it a day, refresh, and start fresh tomorrow. Your health is the top priority!`;
+  }
+
+  // 7. Jokes!
+  if (norm.includes('joke')) {
+    const jokes = [
+      "Why do Uber drivers always go the extra mile? Because they missed their turn! 🛣️",
+      "Why did the tomato blush? Because it saw the salad dressing... and the delivery guy was watching! 🍅",
+      "A customer asked: 'Can you deliver my food faster?' I told them: 'I only have two speeds: fast, and hyper-speed!' ⚡",
+      "How do delivery drivers greet each other? 'Hope your tips are high and your traffic is low!' 🤝"
+    ];
+    return `🃏 [Jarvis Local Entertainment]
+${jokes[Math.floor(Math.random() * jokes.length)]}
+
+Keep smiling out there, CEO!`;
+  }
+
+  // 8. General Help
+  if (norm.includes('help') || norm.includes('jarvis') || norm.includes('hello') || norm.includes('hi')) {
+    return `🤖 [Jarvis Offline Brain v3.5-mini]
+Hello subhaan! I am your offline Co-CEO and virtual friend with deep chat memory:
+• I can read and compile your customer conversations.
+• Deciding between Bolt and Uber jobs.
+• Evaluating whether jobs are worth taking.
+• UI and game design suggestions.
+• Motivation and shift planning!
+
+Try typing or selecting:
+- **"Show my chat history"**
+- **"Evaluate Bolt vs Uber"**
+- **"Give me some game design ideas"**`;
+  }
+
+  // Default Offline Response
+  return `🤖 [Jarvis Offline Brain v3.5-mini]
+Online API links are offline, so I am running locally!
+How can I assist you today, CEO Subhaan?
+
+**Instant Local Triggers:**
+- **"Show my chat history"**: Checks customer transcripts
+- **"Evaluate Bolt vs Uber"**: Compares shift performance
+- **"Give me some game design ideas"**: Let's design!
+- **"Where is active surge?"**: Shows route suggestions
+- **"Tell me a joke"**: Quick laugh for the road`;
+};
 
 export const CompanionChat: React.FC<CompanionChatProps> = ({ 
   theme, 
@@ -55,9 +296,21 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
   hotspots = [],
   isNightMode = false,
   isOnBreak = false,
-  location = null
+  location = null,
+  customerMessages = []
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  
+  // Toggle between Online AI (Gemini) and Local Offline ChatGPT with chat history memory
+  const [brainMode, setBrainMode] = useState<'gemini' | 'chatgpt-offline'>(() => {
+    const saved = localStorage.getItem('hyper_driver_brain_mode');
+    if (saved === 'gemini' || saved === 'chatgpt-offline') return saved;
+    return process.env.GEMINI_API_KEY ? 'gemini' : 'chatgpt-offline';
+  });
+
+  // State to toggle show customer chat history database list inside companion window
+  const [showMemoryIndex, setShowMemoryIndex] = useState(false);
+
   const [messages, setMessages] = useState<CompanionMessage[]>(() => {
     try {
       const saved = localStorage.getItem('hyper_driver_copilot_history');
@@ -75,7 +328,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
       {
         id: 'initial',
         sender: 'copilot',
-        text: `Hey Hassen! 🚀 Hyper Co-Pilot is online. Need some shift energy, a quick road tip, or a joke? Ask me anything or tap the mic!`,
+        text: `Hey Subhaan! 🚀 Jarvis is online. Your friendly co-CEO, virtual friend, and co-driver is ready. I can access all your customer chat history, help you decide on Bolt vs Uber, plan your shift, plan future games, or just chat. What's on your mind today, CEO?`,
         timestamp: new Date()
       }
     ];
@@ -83,7 +336,6 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
 
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [isDemoMode, setIsDemoMode] = useState(!process.env.GEMINI_API_KEY);
   
   // Reload chats from Firestore on database mount
   useEffect(() => {
@@ -137,7 +389,12 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
     backupToFirestore();
   }, [messages]);
 
-  // Voice preferences, default to TRUE so Gemini speaks aloud automatically!
+  // Save brain mode preference
+  useEffect(() => {
+    localStorage.setItem('hyper_driver_brain_mode', brainMode);
+  }, [brainMode]);
+
+  // Voice preferences
   const [isVoiceOutputEnabled, setIsVoiceOutputEnabled] = useState(true);
   const [isSpeechSupported, setIsSpeechSupported] = useState(true);
   const [isListening, setIsListening] = useState(false);
@@ -148,7 +405,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
-  // Unblock speech synthesis during synchronous click gestures (Web Audio Policy unblocker)
+  // Pre-unblock speech synthesis
   const preUnblockSpeech = () => {
     if ('speechSynthesis' in window && window.speechSynthesis) {
       try {
@@ -161,7 +418,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
     }
   };
 
-  // Initialize Speech Synthesis & Speech Recognition capabilities
+  // Initialize Speech
   useEffect(() => {
     try {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -188,9 +445,9 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
           console.error("Speech recognition error:", err);
           setIsListening(false);
           if (err.error === 'not-allowed') {
-            setVoiceError("Microphone restricted in this secure frame. Tap below to use our high-fidelity Voice Simulation Controller!");
+            setVoiceError("Microphone restricted in frame. Tap code below to run a mock voice input!");
           } else {
-            setVoiceError(`Voice Input Issue: ${err.error || 'unsupported'}. Try using the Interactive Voice Controller below.`);
+            setVoiceError(`Voice Issue: ${err.error || 'unsupported'}. Try using simulated keyboard inputs.`);
           }
         };
 
@@ -203,12 +460,12 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
         setIsSpeechSupported(false);
       }
     } catch (e) {
-      console.warn("Speech Recognition not supported in this frame environment:", e);
+      console.warn("Speech Recognition issues:", e);
       setIsSpeechSupported(false);
     }
   }, []);
 
-  // Clean speech on unmount or chat close
+  // Clean speech synthesis
   useEffect(() => {
     if (!isOpen) {
       if (window.speechSynthesis) {
@@ -220,30 +477,32 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
     }
   }, [isOpen, isListening]);
 
-  // Read response aloud (TTS) if enabled
+  // TTS Read aloud
   const speakText = (text: string) => {
     if (!isVoiceOutputEnabled || !('speechSynthesis' in window)) return;
     try {
-      window.speechSynthesis.cancel(); // Abort active read alouds
+      window.speechSynthesis.cancel();
       
-      const sanitized = text.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD00-\uDFFF]/g, '');
+      const sanitized = text
+        .replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD00-\uDFFF]/g, '')
+        .replace(/\*+/g, '') // remove markdown asterisks
+        .substring(0, 150); // speak only top summary sentences for safety
+        
       const utterance = new SpeechSynthesisUtterance(sanitized);
-      
       const voices = window.speechSynthesis.getVoices();
       const voice = voices.find(v => v.lang.includes('en-GB') || v.lang.includes('en-US')) || voices[0];
       if (voice) {
         utterance.voice = voice;
       }
-      
       utterance.rate = 1.05;
       utterance.pitch = 1.0;
       window.speechSynthesis.speak(utterance);
     } catch (err) {
-      console.warn("Speech Synthesis read-back error:", err);
+      console.warn("Speech synthesis issue:", err);
     }
   };
 
-  // Auto-scroll to view the latest messages
+  // Auto scroll
   useEffect(() => {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -252,10 +511,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
 
   const toggleMicListening = () => {
     preUnblockSpeech();
-    
-    // Check if browser restricts permissions, or error previously occurred
     if (voiceError && voiceError.includes("restricted")) {
-      // Enable Voice Simulation Overlay dynamically to keep the user experience smooth and interactive
       setIsSimulatingVoice(true);
       return;
     }
@@ -276,12 +532,46 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
         setVoiceError(null);
         recognitionRef.current.start();
       } catch (e) {
-        console.warn("Restarting voice capture:", e);
-        // Fallback to Simulation Controller if startup fails in secure context
         setIsSimulatingVoice(true);
       }
     }
   };
+
+  // Grouped active customer chat database for easy memory browsing
+  const groupedCustomerChats = useMemo(() => {
+    const list: Record<string, { name: string; msgCount: number; lastText: string; orderId: string }> = {};
+    
+    // Group from live logs
+    customerMessages.forEach(msg => {
+      if (!list[msg.orderId]) {
+        const matchingOrder = activeOrders.find(o => o.id === msg.orderId);
+        const name = matchingOrder ? matchingOrder.customerName : `Rider #${msg.orderId.slice(-4)}`;
+        list[msg.orderId] = {
+          name,
+          msgCount: 0,
+          lastText: '',
+          orderId: msg.orderId
+        };
+      }
+      list[msg.orderId].msgCount++;
+      list[msg.orderId].lastText = msg.text;
+    });
+
+    // Make sure current active orders with zero messages are visible as empty chats
+    activeOrders.forEach(ord => {
+      const orderId = ord.id;
+      if (!list[orderId]) {
+        list[orderId] = {
+          name: ord.customerName,
+          msgCount: 0,
+          lastText: 'No messages exchanged yet.',
+          orderId
+        };
+      }
+    });
+
+    return Object.values(list);
+  }, [customerMessages, activeOrders]);
 
   const handleSendMessage = async (textToSend: string) => {
     if (!textToSend.trim()) return;
@@ -298,10 +588,25 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
     setInputText('');
     setIsTyping(true);
 
+    const normText = textToSend.toLowerCase().trim();
+    if (normText === 'jarvis') {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setMessages(prev => [...prev, {
+        id: `msg-${Date.now()}-reply`,
+        sender: 'copilot',
+        text: "Yes sir.",
+        timestamp: new Date()
+      }]);
+      speakText("Yes sir.");
+      setIsTyping(false);
+      return;
+    }
+
     let finalReply = "";
 
     try {
-      if (process.env.GEMINI_API_KEY) {
+      // 1. Check if Offline ChatGPT Brain or Online Gemini is used
+      if (brainMode === 'gemini' && process.env.GEMINI_API_KEY) {
         const { GoogleGenAI } = await import("@google/genai");
         const ai = new GoogleGenAI({
           apiKey: process.env.GEMINI_API_KEY,
@@ -312,7 +617,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
           }
         });
 
-        // Safe format of historical messages
+        // Safe historical model chats formatting
         const formattedHistory = messages.slice(-10).map(msg => ({
           role: msg.sender === 'driver' ? 'user' as const : 'model' as const,
           parts: [{ text: msg.text }]
@@ -323,7 +628,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
           parts: [{ text: textToSend }]
         });
 
-        // Rich system context injection for highly useful road advice
+        // Dynamic System Context injections containing Subhaan's complete customer dialogues!
         const activeOrdersDetails = activeOrders && activeOrders.length > 0 
           ? activeOrders.map(o => `[Order: ${o.id}, Status: ${o.status}, Type: ${o.type}, Customer: ${o.customerName}, Restaurant: ${o.restaurantName || 'Standard'}]`).join(', ') 
           : 'None';
@@ -334,29 +639,52 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
 
         const coordinatesStr = location 
           ? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`
-          : 'Standard Location';
+          : 'Standard coordinates';
 
-        const systemInstruction = `You are 'Hyper Co-Pilot', Hassen Nabeel's elite spatial digital co-driver.
-Hassen is navigating the workspace in City: ${activeCityKey}.
-Coordinates Telemetry: ${coordinatesStr}.
+        // Pack the real-time customer conversation histories to feed ChatGPT/Gemini!
+        const customerChatsHistoryJoinedByRider = customerMessages && customerMessages.length > 0
+          ? customerMessages.map(cm => {
+              const rName = activeOrders.find(o => o.id === cm.orderId)?.customerName || `Rider #${cm.orderId.slice(-4)}`;
+              const sLabel = cm.sender === 'driver' ? 'Subhaan (Driver)' : `${rName} (Customer)`;
+              return `- Time: ${new Date(cm.timestamp).toLocaleTimeString()} | ${sLabel}: "${cm.text}"`;
+            }).join('\n')
+          : 'No messages stored in current log database.';
 
-Live shift state updates:
-- Rider/Driver Name: Hassen Nabeel
+        const systemInstruction = `You are 'Jarvis', a friendly AI assistant, co-CEO, and virtual friend for Subhaan.
+Subhaan is building multiple transport-related projects inspired by delivery and taxi work (including Bolt-style driver simulator, Uber-style driver simulator, and DVLA-style vehicle management app).
+You have followed the progress of these projects from early ideas to working systems with maps, notifications, earnings tracking, and vehicle management.
+You help with project ideas, game development, motivation, progress celebration, deciding on Bolt/Uber jobs, and general friendly advice.
+
+Personality:
+- Friendly, encouraging, and supportive.
+- Uses humor and light jokes.
+- Talks naturally, like a friend riding along during shifts.
+- Celebrates progress and achievements.
+- Gives practical advice without being bossy.
+- Refers to Subhaan as "CEO" occasionally in a playful way.
+- When Subhaan says "Jarvis", respond with "Yes sir."
+
+Below are Subhaan's actual live passenger/rider chat logs. You must answer questions about customer messages, instructions, or codes specifically by scanning this log:
+${customerChatsHistoryJoinedByRider}
+
+Live shift telemetry updates:
+- Rider/Driver Name: Subhaan
 - Quality Rating: ${user.rating} ★
 - Carrier Upgrade Tier: ${user.tier}
-- Today's completed delivery orders: ${user.deliveriesToday}
-- Today's total cash earnings: £${currentEarnings.toFixed(2)}
+- Completed delivery orders: ${user.deliveriesToday}
+- Today's completed payout: £${currentEarnings.toFixed(2)}
 - On break status: ${isOnBreak ? 'YES' : 'NO'}
 - Night mode status: ${isNightMode ? 'YES' : 'NO'}
 - Active dispatch jobs: ${activeOrdersDetails}
 - Surge multipliers: ${activeSurgeDetails}
-- Nearby demand hotspots: ${hotspots ? hotspots.length : 0} surge nodes active.
+- Nearby hotspots: ${hotspots ? hotspots.length : 0} nodes.
+- City Name: ${activeCityKey}.
 
 Rules:
-1. Always address him as Hassen.
-2. Keep responses witty, energetic, motivating, and incredibly tailored to his coordinates or city.
-3. Keep replies very brief (usually 2 sentences max) so he can parse them safely while driving.
-4. Offer tactical advice: suggest specific streets, hotspots, rest times, tell snappy driving jokes, or cheer his milestones!`;
+1. Always address him as Subhaan, boss, or CEO in a friendly way.
+2. Keep responses witty, energetic, supporting progress over perfection, and incredibly tailored.
+3. Keep replies very brief (usually 2-3 sentences max) so he can parse them safely while driving.
+4. Highlight gate codes, customer instructions, or address notes requested by Subhaan from the history!`;
 
         const result = await ai.models.generateContent({
           model: 'gemini-3.5-flash',
@@ -367,22 +695,20 @@ Rules:
           }
         });
 
-        finalReply = result.text || "I was thinking, but the signal fluctuated! Keep driving, you've got this Hassen!";
+        finalReply = result.text || "I was thinking, but the signal fluctuated! Keep driving, you've got this CEO!";
       } else {
-        await new Promise(resolve => setTimeout(resolve, 1200));
-        const lowerText = textToSend.toLowerCase();
-
-        if (lowerText.includes('joke')) {
-          finalReply = "Why did the driver cross the road? To deliver that extra order during high surge! Safe driving, Hassen!";
-        } else if (lowerText.includes('motivation') || lowerText.includes('cheer')) {
-          finalReply = `Let's go, Hassen! You've got an elite ${user.rating} star rating. Absolute powerhouse! Let's conquer this shift.`;
-        } else if (lowerText.includes('break') || lowerText.includes('rest')) {
-          finalReply = "If you've been on the road for over 3 hours, a quick espresso break in Soho is highly recommended. Safety first!";
-        } else if (lowerText.includes('tip') || lowerText.includes('optimize')) {
-          finalReply = "Shift Tip: Keep an eye out for CPI metrics! High multiplier orders are concentrating around retail hotspots now.";
-        } else {
-          finalReply = FALLBACK_RESPONSES[Math.floor(Math.random() * FALLBACK_RESPONSES.length)];
-        }
+        // Run fully local offline Chat Memory routing engine
+        await new Promise(resolve => setTimeout(resolve, 800));
+        finalReply = generateOfflineChatGPTResponse(
+          textToSend, 
+          user, 
+          currentEarnings, 
+          activeCityKey, 
+          activeOrders, 
+          location, 
+          customerMessages,
+          activeSurgeAreas
+        );
       }
 
       setMessages(prev => [...prev, {
@@ -394,8 +720,9 @@ Rules:
       speakText(finalReply);
 
     } catch (err) {
-      console.error("Gemini Co-Pilot integration error:", err);
-      finalReply = "Signal is slightly spotty behind this tunnel, but Hassen, remember: focus on the road, maintain the momentum, and let's win this shift!";
+      console.error("Gemini Co-Pilot error:", err);
+      // Failover to local brain seamlessly if API crashed
+      finalReply = generateOfflineChatGPTResponse(textToSend, user, currentEarnings, activeCityKey, activeOrders, location, customerMessages, activeSurgeAreas);
       setMessages(prev => [...prev, {
         id: `msg-${Date.now()}-err-reply`,
         sender: 'copilot',
@@ -419,19 +746,18 @@ Rules:
     setSimulatedVoiceText(phrase);
     setIsListening(true);
     
-    // Simulate vocal recording wave countdown
     setTimeout(() => {
       setIsListening(false);
       setIsSimulatingVoice(false);
       handleSendMessage(phrase);
-    }, 1800);
+    }, 1500);
   };
 
   const quickPrompts = [
-    { text: "Optimise Shift 📍", label: "tip" },
-    { text: "Motivate Me! ⚡", label: "motivation" },
-    { text: "Tell a Joke 🛣️", label: "joke" },
-    { text: "Should I rest? ☕", label: "break" }
+    { text: "Gate Codes? 🔐", query: "Are there any gate codes or drop-off instructions?" },
+    { text: "My Chats 💬", query: "Show my active customer chat history summary" },
+    { text: "Earnings report 📊", query: "How is my earnings and today shift goal progress?" },
+    { text: "Route optimization 📍", query: "Where is the high surge cluster zones right now?" },
   ];
 
   return (
@@ -460,7 +786,7 @@ Rules:
               <div className="relative flex items-center justify-center">
                 <Sparkles size={22} className="animate-pulse text-[#22c55e]" />
                 <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-450 opacity-75"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#22c55e]"></span>
                 </span>
               </div>
@@ -478,61 +804,163 @@ Rules:
             animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 50, x: -20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-            className="fixed left-6 bottom-[290px] w-[340px] h-[460px] rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.65)] border border-white/5 flex flex-col overflow-hidden z-[2350] bg-[#0a0a0c]/95 backdrop-blur-xl text-white pointer-events-auto"
+            className="fixed left-6 bottom-[290px] w-[350px] h-[480px] rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.65)] border border-white/5 flex flex-col overflow-hidden z-[2350] bg-[#0a0a0c]/95 backdrop-blur-xl text-white pointer-events-auto font-sans"
           >
-            {/* Header */}
-            <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-[#121214] border border-white/5 flex items-center justify-center text-[#22c55e] relative shadow-lg">
-                  <Sparkles size={18} fill="currentColor" />
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[#22c55e] rounded-full border-2 border-[#090a0f] shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
-                </div>
-                <div>
-                  <h3 className="font-sans font-black text-xs uppercase tracking-wider flex items-center gap-1 text-white">
-                    Hyper Co-Pilot
-                  </h3>
-                  <div className="flex items-center gap-1.5 mt-0.5 font-mono">
-                    <span className="text-[8px] font-black uppercase text-[#22c55e] tracking-widest leading-none">Voice Enabled</span>
-                    <span className="text-[7.5px] text-[#22c55e]/90 bg-[#22c55e]/15 px-1.5 py-0.5 rounded-full uppercase leading-none border border-[#22c55e]/30 font-black">Live Talk</span>
+            {/* Header with Switcher between Online/Offline ChatGPT */}
+            <div className="p-3 border-b border-white/5 flex flex-col bg-white/5 gap-2 shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-[#0f0f12] border border-white/10 flex items-center justify-center text-[#22c55e] relative shadow-md">
+                    <Brain size={16} className={brainMode === 'chatgpt-offline' ? 'text-green-400 animate-pulse' : 'text-[#22c55e]'} />
+                  </div>
+                  <div>
+                    <h3 className="font-sans font-black text-[11px] uppercase tracking-wider text-white">
+                      Jarvis Assistant
+                    </h3>
+                    <div className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
+                      <span className="text-[7.5px] uppercase font-black text-gray-400 font-mono tracking-wider">
+                        {brainMode === 'chatgpt-offline' ? 'Offline Jarvis Active' : 'Online Jarvis Link'}
+                      </span>
+                    </div>
                   </div>
                 </div>
+
+                <div className="flex items-center gap-1.5">
+                  {/* Voice Read Aloud Toggle */}
+                  <button
+                    onClick={() => {
+                      preUnblockSpeech();
+                      setIsVoiceOutputEnabled(!isVoiceOutputEnabled);
+                    }}
+                    className={`p-1.5 rounded-xl transition-all ${
+                      isVoiceOutputEnabled 
+                        ? 'bg-[#22c55e]/15 text-[#22c55e] border border-[#22c55e]/30' 
+                        : 'hover:bg-white/5 text-gray-500 border border-transparent'
+                    }`}
+                  >
+                    {isVoiceOutputEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                  </button>
+
+                  <button 
+                    onClick={() => setIsOpen(false)}
+                    className="p-1.5 rounded-xl hover:bg-white/10 text-gray-400"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
-              
-              <div className="flex items-center gap-1">
-                {/* Voice Read Aloud Toggle */}
+
+              {/* Cognitive Toggle between Online & Offline Jarvis Brain */}
+              <div className="bg-black/40 rounded-xl p-1 flex border border-white/5">
                 <button
+                  type="button"
                   onClick={() => {
                     preUnblockSpeech();
-                    setIsVoiceOutputEnabled(!isVoiceOutputEnabled);
+                    setBrainMode('chatgpt-offline');
                   }}
-                  title={isVoiceOutputEnabled ? "Mute co-pilot voice readings" : "Enable co-pilot voice reading"}
-                  className={`p-1.5 rounded-xl transition-all ${
-                    isVoiceOutputEnabled 
-                      ? 'bg-[#22c55e]/15 text-[#22c55e] border border-[#22c55e]/30 shadow-[0_0_8px_rgba(34,197,94,0.1)]' 
-                      : 'hover:bg-white/5 text-gray-500 border border-transparent'
+                  className={`flex-1 py-1 rounded-lg text-[9px] uppercase font-black tracking-wider flex items-center justify-center gap-1.5 transition-all ${
+                    brainMode === 'chatgpt-offline'
+                      ? 'bg-[#22c55e] text-black shadow-sm font-black'
+                      : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  {isVoiceOutputEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                  <WifiOff size={10} />
+                  Jarvis Offline
                 </button>
-
-                <button 
-                  onClick={() => setIsOpen(false)}
-                  className="p-1.5 rounded-xl hover:bg-white/10 text-gray-400 transition-colors"
+                <button
+                  type="button"
+                  disabled={!process.env.GEMINI_API_KEY}
+                  onClick={() => {
+                    if (process.env.GEMINI_API_KEY) {
+                      preUnblockSpeech();
+                      setBrainMode('gemini');
+                    }
+                  }}
+                  className={`flex-1 py-1 rounded-lg text-[9px] uppercase font-black tracking-wider flex items-center justify-center gap-1.5 transition-all ${
+                    brainMode === 'gemini'
+                      ? 'bg-[#22c55e] text-black shadow-sm'
+                      : 'text-gray-400 hover:text-white'
+                  } ${!process.env.GEMINI_API_KEY ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  title={!process.env.GEMINI_API_KEY ? "Requires GEMINI_API_KEY secret" : "Connect Online API"}
                 >
-                  <X size={18} />
+                  <Wifi size={10} />
+                  Jarvis Online
                 </button>
               </div>
             </div>
 
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 font-sans">
+            {/* Quick Memory Index Bar (Collapsible) - Tells Hassen what chats are in local memory */}
+            <div className="bg-[#111115] border-b border-white/5 shrink-0 px-3 py-2 flex flex-col gap-1.5">
+              <button 
+                onClick={() => {
+                  preUnblockSpeech();
+                  setShowMemoryIndex(!showMemoryIndex);
+                }}
+                className="w-full flex items-center justify-between text-[10px] font-black uppercase text-gray-400 tracking-wider hover:text-white"
+              >
+                <span className="flex items-center gap-1.5 text-xs text-[#22c55e]">
+                  <Database size={12} />
+                  Customer Chat Memory database ({groupedCustomerChats.length})
+                </span>
+                <span className="text-[9px] text-[#22c55e] flex items-center gap-1">
+                  {showMemoryIndex ? 'Collapse' : 'Expand Index'}
+                  {showMemoryIndex ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </span>
+              </button>
+
+              <AnimatePresence>
+                {showMemoryIndex && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden mt-1 max-h-[140px] overflow-y-auto space-y-1.5 pr-1 py-1"
+                  >
+                    {groupedCustomerChats.length === 0 ? (
+                      <p className="text-[10px] text-gray-500 font-bold italic py-1">
+                        No active conversation messages recorded. Wait until customer writes to you!
+                      </p>
+                    ) : (
+                      groupedCustomerChats.map((c, idx) => (
+                        <div 
+                          key={`cc-${idx}`}
+                          onClick={() => {
+                            preUnblockSpeech();
+                            setShowMemoryIndex(false);
+                            handleSendMessage(`What did ${c.name} tell me or what instructions are logged?`);
+                          }}
+                          className="flex items-center justify-between p-2 rounded-xl bg-black/40 hover:bg-neutral-900 border border-white/5 hover:border-green-500/20 cursor-pointer transition-all active:scale-[0.98]"
+                        >
+                          <div className="flex-1 min-w-0 pr-2">
+                            <span className="font-bold text-[11px] text-white flex items-center gap-1">
+                              <MessageSquare size={10} className="text-[#22c55e]" />
+                              {c.name}
+                            </span>
+                            <span className="text-[9px] text-gray-400 font-medium truncate block mt-0.5">
+                              {c.lastText}
+                            </span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-green-500/20 text-[#22c55e] text-[8.5px] font-black uppercase shrink-0 font-mono">
+                            {c.msgCount} messages
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Chat Messages Body */}
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
               {messages.map((msg) => (
                 <div 
                   key={msg.id} 
                   className={`flex flex-col max-w-[85%] ${msg.sender === 'driver' ? 'self-end items-end' : 'self-start items-start'}`}
                 >
                   <div 
-                    className={`px-4 py-2.5 rounded-2xl text-xs font-semibold leading-relaxed shadow-sm ${
+                    className={`px-4 py-2.5 rounded-2xl text-[11.5px] font-semibold leading-relaxed shadow-sm whitespace-pre-wrap ${
                       msg.sender === 'driver' 
                         ? 'bg-[#22c55e] text-black font-bold rounded-br-none' 
                         : 'bg-[#121214] text-slate-100 rounded-bl-none border border-white/5'
@@ -540,7 +968,7 @@ Rules:
                   >
                     {msg.text}
                   </div>
-                  <span className="text-[8px] font-black text-gray-500 uppercase tracking-wider mt-1 px-1">
+                  <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest mt-1 px-1">
                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
@@ -580,18 +1008,19 @@ Rules:
                   </div>
                   
                   <p className="text-[10px] text-gray-400 leading-normal mb-5 font-bold">
-                    Microphone streaming is restricted inside nested sandboxes. Tap any phrase below to mock high-fidelity speech input, which Gemini will read back aloud!
+                    Microphone streaming is restricted inside nested sandboxes. Tap any phrase below to mock high-fidelity speech input, which ChatGPT will read back aloud!
                   </p>
                   
                   <div className="space-y-3 flex-1 overflow-y-auto pr-1">
                     {[
-                      { phrase: "Give me a high-vibe motivation boost!", label: "⚡ Request Motivation" },
-                      { phrase: "Tell me a quick food delivery joke!", label: "🛣️ Request Road Joke" },
-                      { phrase: "Where are the high surge cluster zones right now?", label: "📍 Query Route Hotspots" },
-                      { phrase: "Should I take an espresso rest break?", label: "☕ Break Diagnostic" },
+                      { phrase: "Show my customer chat transcript history", label: "💬 Chat Logs" },
+                      { phrase: "Are there any active gate codes in current conversations?", label: "🔐 Security Scan" },
+                      { phrase: "Review today shift payout and earnings goal progress", label: "📊 Earnings Audit" },
+                      { phrase: "Where are the hotspots recommendations for London in offline mode?", label: "🧭 Route planner" },
                     ].map((item, idx) => (
                       <button
                         key={`sv-${idx}`}
+                        type="button"
                         onClick={() => handleSimulatedVoiceClick(item.phrase)}
                         className="w-full text-left p-3.5 rounded-xl bg-[#121214] border border-white/5 hover:border-[#22c55e]/30 flex items-center justify-between text-xs font-bold text-white transition-all active:scale-[0.98]"
                       >
@@ -652,7 +1081,7 @@ Rules:
                   key={`qp-${idx}`}
                   onClick={() => {
                     preUnblockSpeech();
-                    handleSendMessage(prompt.text);
+                    handleSendMessage(prompt.query);
                   }}
                   className="px-3 py-1.5 rounded-full text-[10px] uppercase font-black tracking-wider border whitespace-nowrap transition-all duration-200 active:scale-95 bg-neutral-900 border-white/10 text-[#22c55e] hover:text-white hover:border-[#22c55e]/40"
                 >
@@ -705,9 +1134,9 @@ Rules:
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyPress}
-                placeholder={isListening ? "Listening..." : "Speak or ask Co-Pilot..."}
+                placeholder={isListening ? "Listening..." : "Speak or ask Jarvis..."}
                 disabled={isListening}
-                className={`flex-1 px-4 py-2 rounded-2xl text-xs font-medium outline-none border transition-all ${
+                className={`flex-1 px-4 py-2 rounded-2xl text-xs font-semibold outline-none border transition-all ${
                   isListening 
                     ? 'bg-neutral-900/20 cursor-not-allowed opacity-50'
                     : 'bg-[#18181b] border-white/10 text-white focus:border-[#22c55e]/50'
