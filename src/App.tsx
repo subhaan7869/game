@@ -617,7 +617,7 @@ const OrderDetailsModal = ({
       initial={{ y: '100%' }}
       animate={{ y: 0 }}
       exit={{ y: '100%' }}
-      className={`absolute inset-0 z-[2500] flex flex-col ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
+      className={`absolute inset-0 z-[4800] flex flex-col pointer-events-auto ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
     >
       <div className="p-6 flex items-center justify-between border-b border-white/5">
         <h2 className="text-2xl font-black">Trip Details</h2>
@@ -1176,7 +1176,9 @@ const ScheduledOrdersScreen = ({
   firebaseUser,
   sendNotification,
   addToast,
-  activeCityKey = "London"
+  activeCityKey = "London",
+  selectedServices = ['ride', 'delivery'],
+  activeBrand = 'uber'
 }: { 
   scheduledOrders: ScheduledOrder[], 
   setScheduledOrders: React.Dispatch<React.SetStateAction<ScheduledOrder[]>>,
@@ -1184,7 +1186,9 @@ const ScheduledOrdersScreen = ({
   firebaseUser: FirebaseUser | null,
   sendNotification: (title: string, body: string) => void,
   addToast?: (title: string, body: string, type?: 'info' | 'success' | 'alert' | 'message') => void,
-  activeCityKey?: string
+  activeCityKey?: string,
+  selectedServices?: JobType[],
+  activeBrand?: 'uber' | 'bolt' | 'both'
 }) => {
   const [activeTab, setActiveTab] = useState<'available' | 'claimed'>('available');
   const [availableOffers, setAvailableOffers] = useState<any[]>([]);
@@ -1235,9 +1239,36 @@ const ScheduledOrdersScreen = ({
       "Sovereign Court Business Plaza"
     ];
 
-    const pickupsPool = city === "London" 
-      ? taxiLondon 
-      : (city === "Nottingham" ? taxiNottingham : taxiDefault);
+    // Delivery restaurants
+    const deliveryLondon = [
+      "Wagamama (Covent Garden)",
+      "Nando's (Soho)",
+      "McDonald's (Leicester Square)",
+      "Dishoom (Shoreditch)",
+      "Shake Shack (Fitzrovia)",
+      "Itsu (Canary Wharf)",
+      "Pizza Express (Mayfair)",
+      "Five Guys (Kings Cross)"
+    ];
+
+    const deliveryNottingham = [
+      "Wagamama (Cornerhouse)",
+      "Nando's (Market Square)",
+      "McDonald's (Clumber Street)",
+      "Annie's Burger Shack (Lace Market)",
+      "Mowgli Street Food (Nottingham)",
+      "Five Guys (Nottingham)",
+      "Pizza Express (Nottingham)",
+      "Taco Bell (Nottingham)"
+    ];
+
+    const deliveryDefault = [
+      "Central Pizza & Pasta Hub",
+      "Gourmet Burger Kitchen",
+      "Supreme Sushi Bar",
+      "Golden Dragon Diner",
+      "The Grill House"
+    ];
 
     const streetsPool = database.streets || ["Regent St", "Oxford St", "Kingsway", "Holborn"];
     
@@ -1259,11 +1290,12 @@ const ScheduledOrdersScreen = ({
 
     const destinationsPool = city === "London" 
       ? taxiLandmarks 
-      : (city === "Nottingham" ? taxiLandmarksNottingham : ["City Centre VIP Plaza", "Executive Executive Terminal"]);
+      : (city === "Nottingham" ? taxiLandmarksNottingham : ["City Centre VIP Plaza", "Executive Terminal"]);
     
     const uberClasses = ['Uber Taxi', 'Uber Exec', 'Comfort', 'UberXL Luxe'];
     const boltClasses = ['Bolt Taxi', 'Bolt Premium', 'Bolt Comfort', 'Bolt Electric Luxe'];
-    const notesPool = [
+
+    const notesPoolRide = [
       "Premium passenger. Appreciate VIP service and silent route.",
       "Customer traveling with business luggage. Trunk must be clear.",
       "Fastest route requested. Corporate client on tight timeline.",
@@ -1273,27 +1305,79 @@ const ScheduledOrdersScreen = ({
       "Contactless boarding requested. Keycard PIN: #2093"
     ];
 
+    const notesPoolDelivery = [
+      "Leave at door. Please do not ring doorbell.",
+      "Ring doorbell. Customer will meet you at the gate.",
+      "Hand to customer. Gated entrance, dial #402 at the front gate.",
+      "Deliver to front desk reception. Customer will collect from there.",
+      "Drop off at flat 14B on the third floor. Elevator is on the left.",
+      "Ask for order receipt code #7729 at pickup counter."
+    ];
+
+    const isDeliveryOnly = selectedServices.includes('delivery') && !selectedServices.includes('ride');
+    const isRideOnly = selectedServices.includes('ride') && !selectedServices.includes('delivery');
+
     for (let i = 0; i < count; i++) {
-      const brand = Math.random() < 0.5 ? 'uber' : 'bolt';
-      const pickupPoi = pickupsPool[Math.floor(Math.random() * pickupsPool.length)];
+      // Respect active brand
+      let brand: 'uber' | 'bolt' = 'uber';
+      if (activeBrand === 'uber') {
+        brand = 'uber';
+      } else if (activeBrand === 'bolt') {
+        brand = 'bolt';
+      } else {
+        brand = Math.random() < 0.5 ? 'uber' : 'bolt';
+      }
+
+      // Determine type of job based on selected services
+      let offerType: 'ride' | 'delivery' = 'ride';
+      if (isDeliveryOnly) {
+        offerType = 'delivery';
+      } else if (isRideOnly) {
+        offerType = 'ride';
+      } else {
+        offerType = Math.random() < 0.5 ? 'delivery' : 'ride';
+      }
+
+      let pickupPoi = "";
+      let destination = "";
+      let vehicleClass = "";
+      let notes = "";
+
+      if (offerType === 'delivery') {
+        const deliveriesPool = city === "London" 
+          ? deliveryLondon 
+          : (city === "Nottingham" ? deliveryNottingham : deliveryDefault);
+        pickupPoi = deliveriesPool[Math.floor(Math.random() * deliveriesPool.length)];
+        
+        const custStreet = streetsPool[Math.floor(Math.random() * streetsPool.length)];
+        const houseNum = Math.floor(Math.random() * 150) + 1;
+        destination = `Flat ${Math.floor(Math.random() * 20) + 1}, ${houseNum} ${custStreet}`;
+        
+        vehicleClass = brand === 'uber' ? 'Uber Eats Courier' : 'Bolt Food Bag';
+        notes = notesPoolDelivery[Math.floor(Math.random() * notesPoolDelivery.length)];
+      } else {
+        const pickupsPool = city === "London" 
+          ? taxiLondon 
+          : (city === "Nottingham" ? taxiNottingham : taxiDefault);
+        pickupPoi = pickupsPool[Math.floor(Math.random() * pickupsPool.length)];
+        destination = destinationsPool[Math.floor(Math.random() * destinationsPool.length)] + ", " + streetsPool[(Math.floor(Math.random() * streetsPool.length) + 1) % streetsPool.length];
+        
+        vehicleClass = brand === 'uber' 
+          ? uberClasses[Math.floor(Math.random() * uberClasses.length)]
+          : boltClasses[Math.floor(Math.random() * boltClasses.length)];
+        notes = notesPoolRide[Math.floor(Math.random() * notesPoolRide.length)];
+      }
+
       const pickupStreet = streetsPool[Math.floor(Math.random() * streetsPool.length)];
-      const destination = destinationsPool[Math.floor(Math.random() * destinationsPool.length)] + ", " + streetsPool[(Math.floor(Math.random() * streetsPool.length) + 1) % streetsPool.length];
-      
       const distanceMiles = parseFloat((1.5 + Math.random() * 7).toFixed(1));
       const durationMinutes = Math.round(distanceMiles * 3.1 + 4);
       
-      const ratePerMile = brand === 'bolt' ? 2.30 : 2.10;
-      const baseFare = brand === 'bolt' ? 9.50 : 8.50;
-      const estimatedPay = parseFloat((baseFare + (distanceMiles * ratePerMile) + (Math.random() * 5.0)).toFixed(2));
+      const ratePerMile = offerType === 'delivery' ? 1.60 : (brand === 'bolt' ? 2.30 : 2.10);
+      const baseFare = offerType === 'delivery' ? 4.50 : (brand === 'bolt' ? 9.50 : 8.50);
+      const estimatedPay = parseFloat((baseFare + (distanceMiles * ratePerMile) + (Math.random() * 3.0)).toFixed(2));
       
-      const vehicleClass = brand === 'uber' 
-        ? uberClasses[Math.floor(Math.random() * uberClasses.length)]
-        : boltClasses[Math.floor(Math.random() * boltClasses.length)];
-        
-      const notes = notesPool[Math.floor(Math.random() * notesPool.length)];
-      
-      // Much quicker times in future: 3 to 30 mins
-      const offsetMin = Math.round(3 + i * 5 + Math.random() * 4);
+      // Much quicker times: 1 to 5 mins
+      const offsetMin = Math.round(1 + i + Math.random());
       const targetTime = new Date();
       targetTime.setMinutes(targetTime.getMinutes() + offsetMin);
       
@@ -1312,7 +1396,8 @@ const ScheduledOrdersScreen = ({
         estimatedPay,
         brand,
         vehicleClass,
-        notes
+        notes,
+        type: offerType
       });
     }
 
@@ -1322,21 +1407,10 @@ const ScheduledOrdersScreen = ({
     setCountdown(60);
   };
 
-  // Sync available offers on mount. Preserve if generated under 60s
+  // Sync available offers on service/brand/city changes. Always generate fresh to match selected mode.
   useEffect(() => {
-    const cached = localStorage.getItem('hyper_driver_available_prebookings');
-    const cachedTimestampStr = localStorage.getItem('hyper_driver_prebookings_last_updated');
-    
-    if (cached && cachedTimestampStr) {
-      const elapsed = Date.now() - parseInt(cachedTimestampStr, 10);
-      if (elapsed < 60000) {
-        setAvailableOffers(JSON.parse(cached));
-        setCountdown(60 - Math.floor(elapsed / 1000));
-        return;
-      }
-    }
     triggerFreshOffers();
-  }, [activeCityKey]);
+  }, [activeCityKey, selectedServices, activeBrand]);
 
   // Tick timer
   useEffect(() => {
@@ -1374,7 +1448,8 @@ const ScheduledOrdersScreen = ({
         brand: offer.brand,
         vehicleClass: offer.vehicleClass,
         destinationName: offer.destinationName,
-        notes: offer.notes
+        notes: offer.notes,
+        type: offer.type || 'ride'
       };
 
       await addDoc(collection(db, 'scheduled_orders'), dbEntry);
@@ -5792,7 +5867,7 @@ const DeliveryVerificationModal = ({
       initial={{ y: '100%' }}
       animate={{ y: 0 }}
       exit={{ y: '100%' }}
-      className="absolute inset-0 z-[4000] bg-white text-black flex flex-col"
+      className="absolute inset-0 z-[4000] bg-white text-black flex flex-col pointer-events-auto"
     >
       <div className="p-6 flex items-center justify-between border-b border-gray-100">
         <h2 className="text-2xl font-black">Verify Delivery</h2>
@@ -5965,7 +6040,7 @@ const ReceiptScanModal = ({
   };
 
   return (
-    <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="absolute inset-0 z-[5000] bg-black text-white flex flex-col overflow-hidden">
+    <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="absolute inset-0 z-[5000] bg-black text-white flex flex-col overflow-hidden pointer-events-auto">
       <div className="p-4 flex items-center justify-between border-b border-white/10 shrink-0">
         <h2 className="text-xl font-black">Scan Receipt</h2>
         <button onClick={onClose} className="p-2 bg-white/10 rounded-full"><X size={24} /></button>
@@ -9963,12 +10038,13 @@ export default function App() {
     const finalPay = sch.estimatedPay || 15.00;
     const finalDist = sch.distanceMiles || 3.5;
     const finalDur = sch.durationMinutes || 12;
+    const orderType = sch.type || 'ride';
 
     const popupOrder: Order = {
       id: sch.id || `TXB-${Math.floor(Math.random() * 90000) + 10000}`,
-      type: 'ride', // Pre-booking Taxi/Ride Job
-      restaurantName: sch.restaurantName || "Pre-booked VIP Ride",
-      customerName: brand === 'uber' ? "Uber Reserved Passenger" : "Bolt Scheduled Passenger",
+      type: orderType,
+      restaurantName: sch.restaurantName || (orderType === 'delivery' ? "Uber Eats Restaurant" : "Pre-booked VIP Ride"),
+      customerName: orderType === 'delivery' ? (sch.destinationName || "Uber Eats Customer") : (brand === 'uber' ? "Uber Reserved Passenger" : "Bolt Scheduled Passenger"),
       restaurantLocation: restLoc,
       pickupLocation: restLoc,
       customerLocation: { 
@@ -9979,7 +10055,7 @@ export default function App() {
       estimatedDistance: finalDist,
       estimatedTime: finalDur,
       status: 'pending',
-      items: [sch.notes || "VIP Pre-booking Ride Run"],
+      items: [sch.notes || (orderType === 'delivery' ? "Pre-booked Courier Run" : "VIP Pre-booking Ride Run")],
       pin: Math.floor(1000 + Math.random() * 9000).toString(),
       isMatching: false,
       brand: brand,
@@ -9990,9 +10066,20 @@ export default function App() {
     setPendingOrder(popupOrder);
     setOrderExpiryTimer(30); // Pre-bookings get 30 seconds to accept
     playHyperSound('order');
-    sendNotification("⏰ Pre-booking Time!", `Your scheduled ${brand === 'uber' ? 'Uber' : 'Bolt'} trip is due now!`);
+    
+    const notificationTitle = orderType === 'delivery' 
+      ? `🍔 Uber Eats Pre-booking!` 
+      : `⏰ Pre-booking Time!`;
+    const notificationBody = orderType === 'delivery'
+      ? `Your scheduled Uber Eats delivery is due now!`
+      : `Your scheduled ${brand === 'uber' ? 'Uber' : 'Bolt'} trip is due now!`;
+      
+    sendNotification(notificationTitle, notificationBody);
     if (addToast) {
-      addToast("Pre-booking Dispatch! ⏰", `Your scheduled ride (£${finalPay.toFixed(2)}) is now due!`, "alert");
+      const toastMsg = orderType === 'delivery'
+        ? `Your scheduled Uber Eats delivery (£${finalPay.toFixed(2)}) is now due!`
+        : `Your scheduled ride (£${finalPay.toFixed(2)}) is now due!`;
+      addToast("Pre-booking Dispatch! ⏰", toastMsg, "alert");
     }
   }, [location, playHyperSound, sendNotification, addToast, setPendingOrder, setOrderExpiryTimer]);
 
@@ -10033,15 +10120,6 @@ export default function App() {
 
         const services = selectedServices.length > 0 ? selectedServices : ['delivery', 'ride'] as JobType[];
 
-        // 15% chance for a scheduled trip if any exist
-        const shouldPickScheduled = Math.random() < 0.15 && scheduledOrders.length > 0;
-        
-        if (shouldPickScheduled) {
-          const sch = scheduledOrders[0];
-          dispatchScheduledOrder(sch);
-          return;
-        }
-
         let newOrder = generateSmartOrder();
 
         // Apply final job preference filter and target price filter
@@ -10058,7 +10136,7 @@ export default function App() {
               setOrderExpiryTimer(18); // Give 18 seconds to decide
               const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
               const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
-              sendNotification(prefix + (shouldPickScheduled ? "Scheduled" : "High Priority") + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "HyperX"}`);
+              sendNotification(prefix + "High Priority" + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "HyperX"}`);
             } else {
               // Auto-skipped/declined!
               sendNotification("Auto-Skip Filter", `Skipped £${newOrder.estimatedPay.toFixed(2)} trip - below £${targetPrice.toFixed(2)} target price.`);
@@ -14136,7 +14214,7 @@ export default function App() {
                     initial={{ opacity: 0 }} 
                     animate={{ opacity: 1 }} 
                     exit={{ opacity: 0 }} 
-                    className="absolute inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+                    className="absolute inset-0 z-[4900] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
                   >
                     <motion.div 
                       initial={{ scale: 0.9, y: 20 }} 
@@ -16217,6 +16295,8 @@ export default function App() {
               sendNotification={sendNotification}
               addToast={addToast}
               activeCityKey={activeCityKey}
+              selectedServices={selectedServices}
+              activeBrand={activeBrand}
             />
           )}
 
