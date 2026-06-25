@@ -48,7 +48,25 @@ export interface InteractiveMapProps {
 }
 
 // 1. Custom Driver Icon Constructor using the highly realistic green car design
-const getDriverIcon = (heading: number) => {
+const getDriverIcon = (heading: number, isOnline?: boolean) => {
+  if (isOnline === false) {
+    // Elegant white circle compass marker with black navigation arrow inside
+    return L.divIcon({
+      html: `
+        <div id="leaflet-car-marker" class="relative w-12 h-12 flex items-center justify-center">
+          <div class="w-10 h-10 bg-white border border-gray-200 rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.18)] flex items-center justify-center transition-all duration-300">
+            <svg class="w-5 h-5 text-neutral-800 fill-current" viewBox="0 0 24 24" style="transform: rotate(${(heading || 0) - 45}deg); transition: transform 0.3s ease-out">
+              <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+            </svg>
+          </div>
+        </div>
+      `,
+      className: 'clear-div-icon',
+      iconSize: [48, 48],
+      iconAnchor: [24, 24]
+    });
+  }
+
   return L.divIcon({
     html: `
       <div id="leaflet-car-marker" class="relative w-8 h-8 flex items-center justify-center">
@@ -321,10 +339,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     // 1. Update/Add Driver Marker
     if (!driverMarkerRef.current) {
-      driverMarkerRef.current = L.marker(driverLatLng, { icon: getDriverIcon(heading) }).addTo(map);
+      driverMarkerRef.current = L.marker(driverLatLng, { icon: getDriverIcon(heading, isOnline) }).addTo(map);
     } else {
       driverMarkerRef.current.setLatLng(driverLatLng);
-      driverMarkerRef.current.setIcon(getDriverIcon(heading));
+      driverMarkerRef.current.setIcon(getDriverIcon(heading, isOnline));
     }
 
     // 2. Sync rival drivers

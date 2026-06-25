@@ -11755,8 +11755,8 @@ export default function App() {
 
           {currentScreen === 'home' && (
             <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
-              {/* Main Map Backdrop (Online vs. Styled/dimmed Offline) */}
-              <div className={`h-full w-full absolute inset-0 transition-all duration-500 ${!user.isOnline ? 'grayscale brightness-[0.45] contrast-[1.1]' : ''}`}>
+              {/* Main Map Backdrop */}
+              <div className="h-full w-full absolute inset-0 transition-all duration-500">
                 {mapCoreMode === 'google' ? (
                   <InteractiveMap
                     location={location}
@@ -13327,88 +13327,124 @@ export default function App() {
 
               {/* Top Controls Overlay */}
               <div className="absolute top-0 left-0 right-0 z-[4500] pointer-events-none">
-                <div className="p-4 flex justify-between items-center pointer-events-auto">
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
-                    className={`w-11 h-11 backdrop-blur-md rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 border ${
-                      activeBrand === 'bolt' 
-                        ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_10px_rgba(0,255,136,0.15)]'
-                        : activeBrand === 'both'
-                        ? 'bg-[#0d091a]/95 text-purple-300 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
-                        : 'bg-neutral-900/90 text-white border-white/10'
-                    }`}
-                  >
-                    <Menu size={20} />
-                  </button>
-                  
-                  <motion.div 
-                    initial={{ y: -50, scale: 0.9 }}
-                    animate={{ y: 0, scale: 1 }}
-                    className={`px-5 py-1.5 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 cursor-pointer select-none min-w-[150px] max-w-[210px] min-h-[44px] transition-all relative border ${
-                      activeBrand === 'bolt' 
-                        ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_15px_rgba(0,255,136,0.15)]' 
-                        : activeBrand === 'both'
-                        ? 'bg-gradient-to-r from-blue-950/95 to-[#022413]/95 text-white border-purple-500/35 shadow-[0_0_20px_rgba(124,58,237,0.2)]'
-                        : 'bg-[#0c0d10] text-[#22c55e] border-white/10'
-                    }`}
-                    onClick={() => {
-                      setTopBarMode(prev => {
-                        if (prev === 'today') return 'last_trip';
-                        if (prev === 'last_trip') return 'hyper_driver_pro';
-                        return 'today';
-                      });
-                    }}
-                  >
-                    <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none">
-                      {topBarMode === 'today' && "Today's Earnings"}
-                      {topBarMode === 'last_trip' && "Last Trip Payout"}
-                      {topBarMode === 'hyper_driver_pro' && `Hyper Pro - ${user.tier || 'Diamond'}`}
-                    </span>
-
-                    <div className="flex items-center gap-1.5 justify-center leading-none">
-                      <span className={`font-display text-base font-black tracking-tight select-none ${
-                        activeBrand === 'bolt' ? 'text-[#00ff88]' : 'text-white'
-                      }`}>
-                        {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
-                        {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
-                        {topBarMode === 'hyper_driver_pro' && `${user.points || 350} XP`}
-                      </span>
-                    </div>
-
-                    <div className="flex gap-1 mt-1 justify-center select-none">
-                      <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? (activeBrand === 'bolt' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
-                      <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? (activeBrand === 'bolt' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
-                      <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? (activeBrand === 'bolt' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
-                    </div>
-                  </motion.div>
-
-                  <div className="flex items-center gap-2">
-                    {user.isOnline && (
-                      <button 
-                        onClick={() => {
-                          setIsOffAppSimulated(true);
-                          addToast("Off-App Mode", "Simulating background execution. Tap the floating dot/notification overlay to restore.", "info");
-                        }}
-                        className={`w-11 h-11 border rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-all text-sm uppercase font-black shrink-0 ${
-                          activeBrand === 'bolt'
-                            ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_10px_rgba(0,255,136,0.15)]'
-                            : activeBrand === 'both'
-                            ? 'bg-[#0d091a]/95 text-indigo-400 border-purple-500/30'
-                            : 'bg-slate-950 text-blue-400 border-white/10'
-                        }`}
-                        title="Simulate Minimize (Go Off-App)"
-                      >
-                        <Smartphone size={20} className={`${activeBrand === 'bolt' ? 'text-[#00ff88]' : activeBrand === 'both' ? 'text-purple-400' : 'text-blue-400'} animate-pulse`} />
-                      </button>
-                    )}
+                {!user.isOnline ? (
+                  /* High Fidelity Offline Header matching the reference image perfectly */
+                  <div className="p-4 pt-6 flex justify-between items-center pointer-events-auto">
                     <button 
                       onClick={() => setIsSearchOpen(true)}
-                      className="w-11 h-11 bg-slate-950 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0"
+                      className="w-12 h-12 bg-white text-black rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center active:scale-90 transition-transform shrink-0"
                     >
-                      <Search size={20} />
+                      <Search size={22} strokeWidth={3} className="text-black" />
+                    </button>
+                    
+                    <div className="flex flex-col items-center">
+                      <div className="px-5 py-2 bg-black border-[2px] border-white rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.2)] flex items-center justify-center min-w-[130px] h-[46px]">
+                        <span className="font-sans text-lg font-black tracking-tight text-white flex items-center gap-0.5">
+                          <span className="text-emerald-400 font-bold">£</span>
+                          {todayEarningsTotal.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="mt-[-8px] px-2.5 py-0.5 bg-white border border-gray-200 rounded text-[9px] font-black uppercase tracking-wider text-black shadow-md z-10 font-sans font-bold">
+                        TODAY
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
+                      className="w-12 h-12 rounded-full border-[2px] border-white shadow-[0_6px_20px_rgba(0,0,0,0.12)] overflow-hidden active:scale-90 transition-transform shrink-0"
+                    >
+                      <img 
+                        src={user.profilePic || "https://picsum.photos/seed/driver/100/100"} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover" 
+                      />
                     </button>
                   </div>
-                </div>
+                ) : (
+                  /* Standard Online Header */
+                  <div className="p-4 flex justify-between items-center pointer-events-auto">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
+                      className={`w-11 h-11 backdrop-blur-md rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 border ${
+                        activeBrand === 'bolt' 
+                          ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_10px_rgba(0,255,136,0.15)]'
+                          : activeBrand === 'both'
+                          ? 'bg-[#0d091a]/95 text-purple-300 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
+                          : 'bg-neutral-900/90 text-white border-white/10'
+                      }`}
+                    >
+                      <Menu size={20} />
+                    </button>
+                    
+                    <motion.div 
+                      initial={{ y: -50, scale: 0.9 }}
+                      animate={{ y: 0, scale: 1 }}
+                      className={`px-5 py-1.5 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 cursor-pointer select-none min-w-[150px] max-w-[210px] min-h-[44px] transition-all relative border ${
+                        activeBrand === 'bolt' 
+                          ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_15px_rgba(0,255,136,0.15)]' 
+                          : activeBrand === 'both'
+                          ? 'bg-gradient-to-r from-blue-950/95 to-[#022413]/95 text-white border-purple-500/35 shadow-[0_0_20px_rgba(124,58,237,0.2)]'
+                          : 'bg-[#0c0d10] text-[#22c55e] border-white/10'
+                      }`}
+                      onClick={() => {
+                        setTopBarMode(prev => {
+                          if (prev === 'today') return 'last_trip';
+                          if (prev === 'last_trip') return 'hyper_driver_pro';
+                          return 'today';
+                        });
+                      }}
+                    >
+                      <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none">
+                        {topBarMode === 'today' && "Today's Earnings"}
+                        {topBarMode === 'last_trip' && "Last Trip Payout"}
+                        {topBarMode === 'hyper_driver_pro' && `Hyper Pro - ${user.tier || 'Diamond'}`}
+                      </span>
+
+                      <div className="flex items-center gap-1.5 justify-center leading-none">
+                        <span className={`font-display text-base font-black tracking-tight select-none ${
+                          activeBrand === 'bolt' ? 'text-[#00ff88]' : 'text-white'
+                        }`}>
+                          {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
+                          {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
+                          {topBarMode === 'hyper_driver_pro' && `${user.points || 350} XP`}
+                        </span>
+                      </div>
+
+                      <div className="flex gap-1 mt-1 justify-center select-none">
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? (activeBrand === 'bolt' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? (activeBrand === 'bolt' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? (activeBrand === 'bolt' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                      </div>
+                    </motion.div>
+
+                    <div className="flex items-center gap-2">
+                      {user.isOnline && (
+                        <button 
+                          onClick={() => {
+                            setIsOffAppSimulated(true);
+                            addToast("Off-App Mode", "Simulating background execution. Tap the floating dot/notification overlay to restore.", "info");
+                          }}
+                          className={`w-11 h-11 border rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-all text-sm uppercase font-black shrink-0 ${
+                            activeBrand === 'bolt'
+                              ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_10px_rgba(0,255,136,0.15)]'
+                              : activeBrand === 'both'
+                              ? 'bg-[#0d091a]/95 text-indigo-400 border-purple-500/30'
+                              : 'bg-slate-950 text-blue-400 border-white/10'
+                          }`}
+                          title="Simulate Minimize (Go Off-App)"
+                        >
+                          <Smartphone size={20} className={`${activeBrand === 'bolt' ? 'text-[#00ff88]' : activeBrand === 'both' ? 'text-purple-400' : 'text-blue-400'} animate-pulse`} />
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => setIsSearchOpen(true)}
+                        className="w-11 h-11 bg-slate-950 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0"
+                      >
+                        <Search size={20} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Bottom Menu Toggle Button / Map Status Bar */}
@@ -13603,61 +13639,52 @@ export default function App() {
               </div>
             ) : (
               <>
+                {/* Center Floating GO Button */}
+                {!isBottomMenuOpen && (
+                  <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-[4500] pointer-events-auto flex flex-col items-center">
+                    <motion.div
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="relative"
+                    >
+                      {/* Outer glowing halo */}
+                      <div className="absolute -inset-3 rounded-full bg-[#1f52e3]/20 animate-ping pointer-events-none" style={{ animationDuration: '3s' }} />
+                      <div className="absolute -inset-2 rounded-full border-[2px] border-[#1f52e3]/45 pointer-events-none" />
+                      
+                      <button
+                        onClick={handleGoOnline}
+                        className="relative w-20 h-20 rounded-full bg-[#1f52e3] hover:bg-blue-600 active:scale-95 text-white flex items-center justify-center font-sans font-black text-2xl uppercase tracking-tight border-[4px] border-white shadow-[0_8px_30px_rgba(31,82,227,0.4)] transition-all duration-300"
+                      >
+                        GO
+                      </button>
+                    </motion.div>
+                  </div>
+                )}
+
+                {/* Bottom White Action Bar */}
                 {!isBottomMenuOpen && (
                   <div className="absolute bottom-0 left-0 right-0 z-[4500]">
                     <motion.div 
-                      key={`offline-bar-${activeBrand}`}
+                      key="offline-bottom-bar"
                       initial={{ y: 100 }}
                       animate={{ y: 0 }}
-                      className={`w-full border-t flex flex-col transition-all duration-500 pb-6 px-8 py-5 ${
-                        activeBrand === 'bolt'
-                          ? 'bg-gradient-to-b from-[#021d0e]/95 via-[#030e06]/95 to-[#010804]/98 border-[#00ea72]/20 shadow-[0_-15px_35px_rgba(0,234,114,0.12)] rounded-t-[48px]'
-                          : activeBrand === 'both'
-                          ? 'bg-gradient-to-b from-[#0d071a]/95 via-[#0c0515]/95 to-[#06020c]/98 border-purple-500/20 shadow-[0_-15px_35px_rgba(168,85,247,0.12)] rounded-t-[36px]'
-                          : 'bg-[#08080a]/95 border-neutral-800 shadow-[0_-20px_50px_rgba(0,0,0,0.9)] rounded-t-[24px]'
-                      }`}
+                      className="w-full bg-white border-t border-gray-100 shadow-[0_-10px_40px_rgba(0,0,0,0.12)] rounded-t-[32px] py-6 px-8 flex items-center justify-between pointer-events-auto cursor-pointer"
+                      onClick={() => {
+                        setCurrentScreen('trip_preferences');
+                      }}
                     >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="text-left select-none font-sans flex-1">
-                          <p className={`font-display text-xl font-black tracking-tight leading-none ${
-                            activeBrand === 'bolt' ? 'text-[#00ff88]' : activeBrand === 'both' ? 'text-purple-300' : 'text-white'
-                          }`}>
-                            {activeBrand === 'bolt' ? 'Bolt Driver Offline' : activeBrand === 'both' ? 'Dual-App Offline Feed' : "You're offline"}
-                          </p>
-                          <p className="text-xs text-gray-400 font-bold mt-1 max-w-[210px] leading-snug">
-                            {activeBrand === 'bolt' ? 'Vibrant high-demand rides are waiting! 💚' : activeBrand === 'both' ? 'Unlock split request queuing from Uber & Bolt.' : 'Go online to receive and filter trips.'}
-                          </p>
-                        </div>
-                        
-                        <button 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            setCurrentScreen('trip_preferences'); 
-                          }}
-                          className={`p-2.5 border rounded-full transition-all active:scale-95 shrink-0 ${
-                            activeBrand === 'bolt' 
-                              ? 'bg-[#00ea72]/10 border-[#00ea72]/25 text-[#00ff88] hover:bg-[#00ea72]/20 hover:border-[#00ea72]/40 rounded-3xl'
-                              : activeBrand === 'both'
-                              ? 'bg-purple-500/10 border-purple-500/25 text-purple-300 hover:bg-purple-500/20 hover:border-purple-500/40'
-                              : 'bg-white/5 border-white/5 text-white hover:border-white/10'
-                          }`} 
-                        >
-                          <SlidersHorizontal size={18} />
-                        </button>
+                      <button className="p-1.5 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center">
+                        <ChevronUp size={24} strokeWidth={3} className="text-black" />
+                      </button>
+                      
+                      <div className="text-center flex-1">
+                        <p className="font-sans text-[22px] font-black tracking-tight text-neutral-900 leading-none">
+                          You're offline
+                        </p>
                       </div>
-
-                      <button 
-                        onClick={handleGoOnline}
-                        className={`w-full py-4.5 font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 duration-300 ${
-                          activeBrand === 'bolt'
-                            ? 'bg-[#00ff88] hover:bg-[#00ca72] text-black shadow-[0_8px_20px_rgba(0,255,136,0.3)] hover:shadow-[0_12px_28px_rgba(0,255,136,0.5)] font-extrabold rounded-3xl'
-                            : activeBrand === 'both'
-                            ? 'bg-gradient-to-r from-blue-500 via-purple-600 to-[#00ff88] text-white shadow-[0_8px_24px_rgba(168,85,247,0.3)] hover:brightness-110'
-                            : 'bg-white hover:bg-neutral-200 text-black shadow-[0_8px_20px_rgba(255,255,255,0.1)] rounded-xl'
-                        }`}
-                      >
-                        <Navigation size={18} fill="currentColor" className="transform rotate-45" />
-                        Go Online {activeBrand === 'bolt' ? 'On Bolt' : activeBrand === 'both' ? 'Unified' : 'On Uber'}
+                      
+                      <button className="p-1.5 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center">
+                        <List size={24} strokeWidth={3} className="text-black" />
                       </button>
                     </motion.div>
                   </div>
