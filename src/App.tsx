@@ -2179,12 +2179,12 @@ const TripPreferencesModal = ({
               {[
                 {
                   id: 'rideshare',
-                  name: 'HyperX Rideshare',
-                  desc: 'Standard passenger requests',
-                  metric: '1.0x Base',
-                  badge: 'Standard',
-                  badgeColor: 'bg-blue-600/10 text-blue-500 border border-blue-600/20',
-                  icon: <User size={16} className="text-blue-500" />
+                  name: 'Uber Share / Co-riders 👥',
+                  desc: 'Rideshare trips with 2 separate passengers & stops',
+                  metric: '1.4x Multiplier',
+                  badge: 'Shared Ride',
+                  badgeColor: 'bg-amber-100 text-amber-800 border border-amber-200',
+                  icon: <User size={16} className="text-amber-600" />
                 },
                 {
                   id: 'intercity',
@@ -9947,7 +9947,7 @@ export default function App() {
       if (orderBrand === 'uber') {
         if (type === 'ride') {
           const ridePool: string[] = [];
-          if (enabledServices.includes('rideshare')) ridePool.push('UberX');
+          if (enabledServices.includes('rideshare')) ridePool.push('Uber Share 👥');
           if (enabledServices.includes('intercity')) ridePool.push('Uber Intercity');
           if (enabledServices.includes('hyper_pet')) ridePool.push('Uber Pet 🐾');
           if (enabledServices.includes('hyperxl')) ridePool.push('UberXL 🚙');
@@ -9957,7 +9957,7 @@ export default function App() {
           if (ridePool.length > 0) {
             variant = ridePool[Math.floor(Math.random() * ridePool.length)];
           } else {
-            variant = 'UberX';
+            variant = 'Uber Share 👥';
           }
         } else {
           const delivPool: string[] = ['Uber Eats 🍔'];
@@ -9969,7 +9969,7 @@ export default function App() {
       } else {
         if (type === 'ride') {
           const ridePool: string[] = [];
-          if (enabledServices.includes('rideshare')) ridePool.push('Hyper Ride ⚡');
+          if (enabledServices.includes('rideshare')) ridePool.push('Hyper Share 👥');
           if (enabledServices.includes('intercity')) ridePool.push('Hyper Intercity 🚀');
           if (enabledServices.includes('hyper_pet')) ridePool.push('Hyper Pet 🐾');
           if (enabledServices.includes('hyperxl')) ridePool.push('Hyper XL 🚙');
@@ -9979,7 +9979,7 @@ export default function App() {
           if (ridePool.length > 0) {
             variant = ridePool[Math.floor(Math.random() * ridePool.length)];
           } else {
-            variant = 'Hyper Ride ⚡';
+            variant = 'Hyper Share 👥';
           }
         } else {
           const delivPool: string[] = ['Hyper Express 🍔'];
@@ -10082,7 +10082,8 @@ export default function App() {
       
       const finalBasePay = Math.max(calculatedPay, minPay) + (variant.includes('Green') ? 2.00 : 0);
       
-      const isStacked = type === 'delivery' && activeOrders.length < 2 && Math.random() < 0.3;
+      const isRideshare = type === 'ride' && variant.includes('Share');
+      const isStacked = (type === 'delivery' && activeOrders.length < 2 && Math.random() < 0.3) || (isRideshare && activeOrders.length < 2);
       let batchCount = isStacked ? 2 : 1;
       
       const petTipBoost = variant.includes('Pet') ? (1.25) : 1;
@@ -10094,7 +10095,7 @@ export default function App() {
       return {
         id: Math.random().toString(36).substring(2, 11),
         type,
-        customerName: isStacked ? `${customerName} (Max+1)` : (variant.includes('XL') ? `${customerName} (5 Passengers)` : customerName),
+        customerName: isStacked ? (type === 'ride' ? `${customerName} & Co-rider 👥` : `${customerName} (Max+1)`) : (variant.includes('XL') ? `${customerName} (5 Passengers)` : customerName),
         restaurantName: type === 'delivery' ? ((variant.includes('Connect') || variant.includes('Send')) ? "Parcel Center" : (chosenRestaurant?.name || "Local Kitchen")) : variant,
         restaurantLocation: { latitude: pickupLat, longitude: pickupLng },
         pickupLocation: { latitude: pickupLat, longitude: pickupLng },
@@ -10618,10 +10619,11 @@ export default function App() {
 
       if (orderCountToAdd === 2) {
         // Split into 2 jobs as requested (max+1 logic)
+        const isRide = pendingOrder.type === 'ride';
         const order1: Order = {
           ...pendingOrder,
           id: pendingOrder.id + "_1",
-          customerName: pendingOrder.customerName.replace(" + 1 more", "").trim(),
+          customerName: pendingOrder.customerName.replace(" + 1 more", "").replace(" & Co-rider 👥", "").trim(),
           estimatedPay: Number((pendingOrder.estimatedPay * 0.55).toFixed(2)),
           status: 'accepted',
           isStacked: false,
@@ -10632,7 +10634,7 @@ export default function App() {
         const order2: Order = {
           ...pendingOrder,
           id: pendingOrder.id + "_2",
-          customerName: `${secondCustomer} (Part 2)`,
+          customerName: isRide ? `${secondCustomer} (Co-rider 👥)` : `${secondCustomer} (Part 2)`,
           estimatedPay: Number((pendingOrder.estimatedPay * 0.45).toFixed(2)),
           status: 'accepted',
           isStacked: false,
@@ -10647,7 +10649,11 @@ export default function App() {
           const filtered = prev.filter(o => o.id !== order1.id && o.id !== order2.id);
           return [...filtered, order1, order2];
         });
-        sendNotification("2 Jobs Accepted", `Stacked delivery: ${order1.customerName} & ${order2.customerName}`);
+        if (isRide) {
+          sendNotification("Shared Ride Accepted 👥", `Rideshare: ${order1.customerName} & ${order2.customerName}`);
+        } else {
+          sendNotification("2 Jobs Accepted", `Stacked delivery: ${order1.customerName} & ${order2.customerName}`);
+        }
       } else {
         setActiveOrders(prev => {
           if (prev.some(o => o.id === pendingOrder.id)) return prev;
@@ -14776,12 +14782,12 @@ export default function App() {
                     {[
                       {
                         id: 'rideshare',
-                        name: 'HyperX Rideshare',
-                        desc: 'Standard passenger ride requests',
-                        metric: '1.0x Base Fare',
-                        badge: 'Standard',
-                        badgeColor: 'bg-blue-600/10 text-blue-500 border border-blue-600/20',
-                        icon: <User size={18} className="text-blue-500" />
+                        name: 'Uber Share / Co-riders 👥',
+                        desc: 'Rideshare trips with 2 separate passengers & stops',
+                        metric: '1.4x Stacked Rate',
+                        badge: 'Shared Ride',
+                        badgeColor: 'bg-amber-100 text-amber-800 border border-amber-200',
+                        icon: <User size={18} className="text-amber-600" />
                       },
                       {
                         id: 'intercity',
@@ -16710,10 +16716,10 @@ export default function App() {
                               3 min (0.5 mi)
                             </p>
                             <p className={`font-sans text-sm font-black leading-snug mt-1 ${isBolt ? 'text-white' : 'text-gray-800'}`}>
-                              {pendingOrder.restaurantName || "Pwllmelin Road, Cardiff, CF5 2NQ"}
+                              {pendingOrder.type === 'ride' ? `Pickup Co-riders: ${pendingOrder.customerName.replace(" & Co-rider 👥", "").trim()}` : (pendingOrder.restaurantName || "Pwllmelin Road, Cardiff, CF5 2NQ")}
                             </p>
                             <p className={`font-sans text-[11px] font-bold ${isBolt ? 'text-gray-400' : 'text-gray-400'}`}>
-                              {pendingOrder.type === 'delivery' ? "12 Kingsway, Holborn, London WC2B 6YB" : "Driver Pickup Point"}
+                              {pendingOrder.type === 'delivery' ? "12 Kingsway, Holborn, London WC2B 6YB" : "Passenger Pickup Location"}
                             </p>
                           </div>
 
@@ -16723,23 +16729,23 @@ export default function App() {
                               {pendingOrder.estimatedTime} mins (approx) • Dropoff 1
                             </p>
                             <p className={`font-sans text-sm font-black leading-snug mt-1 ${isBolt ? 'text-white' : 'text-gray-800'}`}>
-                              {pendingOrder.customerName.replace(" + 1 more", "").replace(" (Max+1)", "").trim()}
+                              {pendingOrder.type === 'ride' ? `Dropoff 1: ${pendingOrder.customerName.replace(" & Co-rider 👥", "").trim()}` : pendingOrder.customerName.replace(" + 1 more", "").replace(" (Max+1)", "").trim()}
                             </p>
                             <p className={`font-sans text-[11px] font-bold ${isBolt ? 'text-gray-400' : 'text-gray-400'}`}>
-                              48 High Holborn, London WC1V 6RL
+                              {pendingOrder.type === 'ride' ? "Passenger 1 Destination" : "48 High Holborn, London WC1V 6RL"}
                             </p>
                           </div>
 
                           {/* Dropoff 2 Info */}
                           <div>
                             <p className={`font-sans text-xs font-bold ${isBolt ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
-                              +{Math.floor(pendingOrder.estimatedTime * 0.4)} mins • Dropoff 2 (Double)
+                              +{Math.floor(pendingOrder.estimatedTime * 0.4)} mins • Dropoff 2 (Shared)
                             </p>
                             <p className={`font-sans text-sm font-black leading-snug mt-1 ${isBolt ? 'text-white' : 'text-gray-800'}`}>
-                              Recipient (Part 2)
+                              {pendingOrder.type === 'ride' ? "Dropoff 2: Co-rider 👥" : "Recipient (Part 2)"}
                             </p>
                             <p className={`font-sans text-[11px] font-bold ${isBolt ? 'text-gray-400' : 'text-gray-400'}`}>
-                              42 Southampton Row, London WC1B 4AR
+                              {pendingOrder.type === 'ride' ? "Passenger 2 Destination" : "42 Southampton Row, London WC1B 4AR"}
                             </p>
                           </div>
                         </div>
@@ -16910,26 +16916,26 @@ export default function App() {
 
                             <div>
                               <p className="font-sans text-lg font-black text-gray-900 leading-tight">
-                                {pendingOrder.restaurantName || "Pizza Express - Holborn"}
+                                {pendingOrder.type === 'ride' ? "Shared Ride Co-riders Pickup" : (pendingOrder.restaurantName || "Pizza Express - Holborn")}
                               </p>
                               <p className="font-sans text-xs text-gray-500 font-bold mt-1">
                                 {pendingOrder.type === 'delivery' 
                                   ? "12 Kingsway, Holborn, London WC2B 6YB" 
-                                  : "Driver Pickup Point"}
+                                  : "Passenger Pickup Location"}
                               </p>
                             </div>
 
                             {/* First dropoff dot */}
                             <div className="relative pl-8 pb-1">
                               <div className="absolute left-[-31px] top-[4px] w-3.5 h-3.5 rounded-full bg-blue-600 flex items-center justify-center border-2 border-white">
-                                <div className="w-1 h-1 bg-white rounded-full" />
+                                <div className="w-1.5 h-1.5 bg-white rounded-full" />
                               </div>
                               <div>
                                 <p className="font-sans text-[15px] text-gray-600 font-black leading-tight">
-                                  Dropoff 1: {pendingOrder.customerName.replace(" + 1 more", "").replace(" (Max+1)", "").trim()}
+                                  Dropoff 1: {pendingOrder.type === 'ride' ? pendingOrder.customerName.replace(" & Co-rider 👥", "").trim() : pendingOrder.customerName.replace(" + 1 more", "").replace(" (Max+1)", "").trim()}
                                 </p>
                                 <p className="font-sans text-xs text-gray-400 font-bold mt-1">
-                                  48 High Holborn, London WC1V 6RL
+                                  {pendingOrder.type === 'ride' ? "Passenger 1 Destination" : "48 High Holborn, London WC1V 6RL"}
                                 </p>
                               </div>
                             </div>
@@ -16941,10 +16947,10 @@ export default function App() {
                               </div>
                               <div>
                                 <p className="font-sans text-[15px] text-gray-600 font-black leading-tight">
-                                  Dropoff 2: Recipient (Part 2)
+                                  Dropoff 2: {pendingOrder.type === 'ride' ? "Co-rider 👥" : "Recipient (Part 2)"}
                                 </p>
                                 <p className="font-sans text-xs text-gray-400 font-bold mt-1">
-                                  42 Southampton Row, London WC1B 4AR
+                                  {pendingOrder.type === 'ride' ? "Passenger 2 Destination" : "42 Southampton Row, London WC1B 4AR"}
                                 </p>
                               </div>
                             </div>
