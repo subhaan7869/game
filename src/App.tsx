@@ -116,6 +116,7 @@ import SimulatedHomeScreen from './components/SimulatedHomeScreen';
 import { CompanionChat } from './components/CompanionChat';
 import { MultiplayerHub, OtherDriver } from './components/MultiplayerHub';
 import { AppLauncherScreen } from './components/AppLauncherScreen';
+import { CommandCentreScreen } from './components/CommandCentreScreen';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
@@ -440,49 +441,98 @@ const MapSimulationView = ({ sim }: { sim: NavSimulation }) => {
 };
 
 const ShiftSummaryModal = ({ stats, onClose }: { stats: any, onClose: () => void }) => {
-  const duration = Math.floor((Date.now() - stats.startTime) / 60000); // minutes
+  // If the user has completed a live session trip, use it; otherwise provide high-fidelity simulated values for the shift
+  const trips = stats.trips > 0 ? stats.trips : 4;
+  const earnings = stats.earnings > 0 ? stats.earnings : 68.50;
+  const durationMin = stats.startTime > 0 ? Math.floor((Date.now() - stats.startTime) / 60000) : 210; // 3.5 hours
+  const miles = stats.milesDriven > 0 ? stats.milesDriven : 18.4;
+  const tips = stats.tips > 0 ? stats.tips : 12.00;
+  const bestTrip = stats.bestTrip > 0 ? stats.bestTrip : 24.50;
+  const longestTrip = stats.longestTrip > 0 ? stats.longestTrip : 7.2;
+  const avgPerTrip = earnings / trips;
+
+  const hoursStr = durationMin >= 60 ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m` : `${durationMin}m`;
+
   return (
-    <div className="fixed inset-0 z-[5000] bg-black/60 backdrop-blur-md flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-[5000] bg-neutral-950/85 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto">
       <motion.div 
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="w-full max-w-md bg-white rounded-[40px] p-8 flex flex-col items-center text-center overflow-hidden relative shadow-2xl"
+        initial={{ scale: 0.95, opacity: 0, y: 30 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        className="w-full max-w-xl bg-neutral-900 border border-neutral-800 text-white rounded-[40px] p-8 flex flex-col items-center relative shadow-2xl"
       >
-        <div className="absolute top-4 right-4">
-           <button onClick={onClose} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"><X size={24} className="text-black" /></button>
+        <div className="absolute top-6 right-6">
+          <button onClick={onClose} className="p-2 bg-neutral-800 hover:bg-neutral-700 text-gray-300 hover:text-white rounded-full transition-colors cursor-pointer"><X size={20} /></button>
         </div>
         
-        <div className="w-20 h-20 bg-blue-600 rounded-[32px] flex items-center justify-center mb-6 shadow-xl rotate-3">
-          <History size={40} className="text-white" />
+        <div className="w-16 h-16 bg-gradient-to-tr from-amber-500 to-orange-600 rounded-3xl flex items-center justify-center mb-5 shadow-lg shadow-amber-500/10 rotate-3">
+          <Trophy size={32} className="text-black" />
         </div>
 
-        <h2 className="text-3xl font-black text-black mb-2">Shift Completed</h2>
-        <p className="text-gray-400 font-bold mb-8">Great job today! Here's how you did.</p>
+        <h2 className="text-2xl font-black text-white mb-1 uppercase tracking-tight">Shift Operations Summary</h2>
+        <p className="text-gray-400 font-bold text-xs mb-8 uppercase tracking-widest">Fleet Shift Successfully Finalized</p>
 
-        <div className="grid grid-cols-2 gap-4 w-full mb-8">
-          <div className="bg-gray-50 p-6 rounded-3xl text-left border border-gray-100 shadow-sm">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Pay</p>
-            <h4 className="text-2xl font-black text-blue-600">£{stats.earnings.toFixed(2)}</h4>
+        {/* 8-field bento grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full mb-8 text-left">
+          
+          <div className="bg-neutral-950 border border-neutral-850 p-4 rounded-2xl">
+            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Hours Worked</p>
+            <h4 className="text-sm font-mono font-black text-neutral-100">{hoursStr}</h4>
           </div>
-          <div className="bg-gray-50 p-6 rounded-3xl text-left border border-gray-100 shadow-sm">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Trips Done</p>
-            <h4 className="text-2xl font-black text-black">{stats.trips}</h4>
+
+          <div className="bg-neutral-950 border border-neutral-850 p-4 rounded-2xl">
+            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Trips Done</p>
+            <h4 className="text-sm font-mono font-black text-neutral-100">{trips} trips</h4>
           </div>
-          <div className="bg-gray-50 p-6 rounded-3xl text-left border border-gray-100 shadow-sm">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Time Online</p>
-            <h4 className="text-2xl font-black text-black">{duration}m</h4>
+
+          <div className="bg-neutral-950 border border-neutral-850 p-4 rounded-2xl">
+            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Miles Driven</p>
+            <h4 className="text-sm font-mono font-black text-neutral-100">{miles.toFixed(1)} mi</h4>
           </div>
-          <div className="bg-gray-50 p-6 rounded-3xl text-left border border-gray-100 shadow-sm">
-             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Avg Rating</p>
-             <h4 className="text-2xl font-black text-green-600">5.0 ★</h4>
+
+          <div className="bg-neutral-950 border border-neutral-850 p-4 rounded-2xl">
+            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Earnings</p>
+            <h4 className="text-sm font-mono font-black text-emerald-400">£{earnings.toFixed(2)}</h4>
           </div>
+
+          <div className="bg-neutral-950 border border-neutral-850 p-4 rounded-2xl">
+            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Tips Collected</p>
+            <h4 className="text-sm font-mono font-black text-amber-400">£{tips.toFixed(2)}</h4>
+          </div>
+
+          <div className="bg-neutral-950 border border-neutral-850 p-4 rounded-2xl">
+            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Avg per Trip</p>
+            <h4 className="text-sm font-mono font-black text-indigo-400">£{avgPerTrip.toFixed(2)}</h4>
+          </div>
+
+          <div className="bg-neutral-950 border border-neutral-850 p-4 rounded-2xl">
+            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Best Trip</p>
+            <h4 className="text-sm font-mono font-black text-emerald-400">£{bestTrip.toFixed(2)}</h4>
+          </div>
+
+          <div className="bg-neutral-950 border border-neutral-850 p-4 rounded-2xl">
+            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1">Longest Trip</p>
+            <h4 className="text-sm font-mono font-black text-blue-400">{longestTrip.toFixed(1)} mi</h4>
+          </div>
+
+        </div>
+
+        {/* Level & XP Progression Indicator */}
+        <div className="w-full bg-neutral-950 border border-neutral-850 rounded-2xl p-4 mb-8 text-left">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[9px] font-black uppercase text-amber-400 tracking-widest">🏆 Driver Progression level</span>
+            <span className="text-[9px] font-mono text-gray-400">Level 8 (Gold Tier)</span>
+          </div>
+          <div className="w-full bg-neutral-800 h-2 rounded-full overflow-hidden mt-1.5">
+            <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500" style={{ width: '75%' }} />
+          </div>
+          <p className="text-[8px] font-bold text-gray-500 uppercase tracking-wider mt-2">Unlocks Diamond Level Perks at next interval</p>
         </div>
 
         <button 
           onClick={onClose}
-          className="w-full py-6 bg-black text-white rounded-3xl font-black text-xl shadow-xl active:scale-95 transition-transform"
+          className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg active:scale-95 transition-transform cursor-pointer"
         >
-          GO TO DASHBOARD
+          Return to Command Centre
         </button>
       </motion.div>
     </div>
@@ -1002,6 +1052,12 @@ const SideMenu = ({
         {/* Menu Navigation Items matching screen 06. HOME MENU in Image 3 */}
         <div className="space-y-1 mb-8">
           {[
+            { 
+              icon: <Gauge size={20} className="animate-pulse text-amber-400" />, 
+              label: "💎 Command Centre", 
+              action: () => { setCurrentScreen('command_centre'); setIsSideMenuOpen(false); },
+              badge: <span className="ml-auto text-[8px] bg-amber-500/25 border border-amber-500/40 px-2 py-0.5 rounded-full font-black text-amber-300 tracking-wider">PREMIUM</span>
+            },
             { 
               icon: <Mail size={20} />, 
               label: "Inbox", 
@@ -7598,7 +7654,11 @@ export default function App() {
   const [shiftStats, setShiftStats] = useState({
     trips: 0,
     earnings: 0,
-    startTime: 0
+    startTime: 0,
+    milesDriven: 0,
+    tips: 0,
+    bestTrip: 0,
+    longestTrip: 0
   });
 
   // REAL-TIME NAVIGATION SIMULATION LOOP
@@ -8070,9 +8130,15 @@ export default function App() {
   }, [currentCity]);
 
   const activeCityCenter = useMemo(() => {
+    if ((!currentCity || currentCity === "United Kingdom") && location) {
+      return {
+        latitude: Math.round(location.latitude * 100) / 100,
+        longitude: Math.round(location.longitude * 100) / 100
+      };
+    }
     const info = CITY_DATABASES[activeCityKey];
     return info ? info.center : { latitude: 51.5074, longitude: -0.1278 };
-  }, [activeCityKey]);
+  }, [activeCityKey, currentCity, location]);
 
   const [activeRestaurants, setActiveRestaurants] = useState<{
     name: string;
@@ -8191,6 +8257,65 @@ export default function App() {
       return saved ? parseInt(saved) : 0;
     } catch { return 0; }
   });
+
+  // Goal Mode state
+  const [selectedGoal, setSelectedGoal] = useState<'none' | '50' | '100' | '200'>(() => {
+    try {
+      const saved = localStorage.getItem('hd_selected_goal');
+      return (saved as any) || 'none';
+    } catch { return 'none'; }
+  });
+
+  // Incident Center state
+  const [incidents, setIncidents] = useState<{
+    id: string;
+    type: 'closure' | 'accident' | 'traffic' | 'checkpoint' | 'event';
+    title: string;
+    locationName: string;
+    minutesDelay: number;
+    severity: 'low' | 'medium' | 'high';
+  }[]>([
+    { id: 'inc_1', type: 'accident', title: 'Collison reported', locationName: 'A12 Blackwall Tunnel', minutesDelay: 18, severity: 'high' },
+    { id: 'inc_2', type: 'traffic', title: 'Heavy rush-hour queue', locationName: 'High Street Centric', minutesDelay: 10, severity: 'medium' },
+    { id: 'inc_3', type: 'closure', title: 'Gas main repair closure', locationName: 'Regent Street Eastbound', minutesDelay: 25, severity: 'high' },
+    { id: 'inc_4', type: 'checkpoint', title: 'Police Breathalyzer Checkpoint', locationName: 'A201 Broadway exit', minutesDelay: 5, severity: 'low' },
+    { id: 'inc_5', type: 'event', title: 'Football Match Crowds', locationName: 'Wembley Approach', minutesDelay: 15, severity: 'medium' }
+  ]);
+
+  // AI Jarvis Messages
+  const [aiMessages, setAiMessages] = useState<{
+    id: string;
+    text: string;
+    timestamp: string;
+    category: 'demand' | 'traffic' | 'system' | 'tip';
+  }[]>([
+    { id: 'msg_1', text: 'Weather is turning. Grab a hot beverage and prepare for high Eats demand.', timestamp: 'Just now', category: 'tip' },
+    { id: 'msg_2', text: 'Surge building around Piccadilly. Consider moving 1.5 miles east.', timestamp: '2m ago', category: 'demand' },
+    { id: 'msg_3', text: 'Accident on Blackwall Tunnel is causing significant route re-calculation delays.', timestamp: '15m ago', category: 'traffic' }
+  ]);
+
+  // Reputation States
+  const [reputation, setReputation] = useState({
+    speed: 4.8,
+    friendliness: 4.9,
+    foodHandling: 5.0,
+    navigation: 4.7,
+    acceptanceRate: 98
+  });
+
+  // Personal Records State
+  const [personalRecords, setPersonalRecords] = useState({
+    highestHourly: 42.50,
+    biggestTip: 20.00,
+    longestShift: 8.5,
+    bestDay: 215.30,
+    mostTripsInHour: 5
+  });
+
+  // Save selectedGoal to localStorage
+  useEffect(() => {
+    try { localStorage.setItem('hd_selected_goal', selectedGoal); } catch(e){}
+  }, [selectedGoal]);
   
   // Random dynamic event popups
   const [activeMemeEvent, setActiveMemeEvent] = useState<{
@@ -10739,7 +10864,11 @@ export default function App() {
     setShiftStats({
       trips: 0,
       earnings: 0,
-      startTime: Date.now()
+      startTime: Date.now(),
+      milesDriven: 0,
+      tips: 0,
+      bestTrip: 0,
+      longestTrip: 0
     });
     playHyperSound('accept');
 
@@ -11073,7 +11202,11 @@ export default function App() {
     setShiftStats(prev => ({
       ...prev,
       trips: prev.trips + 1,
-      earnings: prev.earnings + earnedPay
+      earnings: prev.earnings + earnedPay,
+      milesDriven: Number((prev.milesDriven + (order.estimatedDistance || 2.4)).toFixed(1)),
+      tips: prev.tips + tip,
+      bestTrip: Math.max(prev.bestTrip, earnedPay),
+      longestTrip: Math.max(prev.longestTrip, order.estimatedDistance || 2.4)
     }));
     setCompletedTrips(prev => [
       {
@@ -16337,6 +16470,38 @@ export default function App() {
             />
           )}
 
+          {currentScreen === 'command_centre' && (
+            <CommandCentreScreen 
+              user={user}
+              setUser={setUser}
+              location={location}
+              activeSurgeAreas={activeSurgeAreas}
+              hotspots={hotspots}
+              activeCityCenter={activeCityCenter}
+              activeBrand={activeBrand}
+              weatherState={weatherState}
+              setWeatherState={setWeatherState}
+              fuel={fuel}
+              setFuel={setFuel}
+              vehicleHealth={vehicleHealth}
+              setVehicleHealth={setVehicleHealth}
+              todayEarningsTotal={todayEarningsTotal}
+              completedTrips={completedTrips}
+              onClose={() => setCurrentScreen('home')}
+              selectedGoal={selectedGoal}
+              setSelectedGoal={setSelectedGoal}
+              incidents={incidents}
+              setIncidents={setIncidents}
+              aiMessages={aiMessages}
+              setAiMessages={setAiMessages}
+              reputation={reputation}
+              personalRecords={personalRecords}
+              activeOrders={activeOrders}
+              scheduledOrders={scheduledOrders}
+              addToast={addToast}
+            />
+          )}
+
           {currentScreen === 'earnings_detail' && (
             <EarningsDetail 
               earnings={earnings}
@@ -16354,7 +16519,7 @@ export default function App() {
           )}
 
           {/* Safety Fallback for unhandled screens */}
-          {!['onboarding', 'documents', 'face_verification', 'home', 'earnings', 'inbox', 'account', 'chat', 'hyper_driver_pro', 'wallet', 'opportunities', 'safety', 'earnings_detail', 'banking', 'scheduled_orders', 'rewards', 'carplay_dashboard', 'trip_history', 'work_hub', 'ratings', 'planner', 'hyper_driver_services', 'vehicle_details', 'payment_methods', 'trip_preferences', 'personal_details', 'insurance', 'audio_settings'].includes(currentScreen) && (
+          {!['onboarding', 'documents', 'face_verification', 'home', 'earnings', 'inbox', 'account', 'chat', 'hyper_driver_pro', 'wallet', 'opportunities', 'safety', 'earnings_detail', 'banking', 'scheduled_orders', 'rewards', 'carplay_dashboard', 'trip_history', 'work_hub', 'ratings', 'planner', 'hyper_driver_services', 'vehicle_details', 'payment_methods', 'trip_preferences', 'personal_details', 'insurance', 'audio_settings', 'command_centre'].includes(currentScreen) && (
             <motion.div 
               key="fallback" 
               initial={{ opacity: 0 }} 

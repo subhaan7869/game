@@ -492,7 +492,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     surgeAreasMarkersRef.current.forEach(m => m.remove());
     surgeAreasMarkersRef.current = [];
 
-    if (isOnline && activeSurgeAreas && activeSurgeAreas.length > 0) {
+    if (activeSurgeAreas && activeSurgeAreas.length > 0) {
       const baseCenter = activeCityCenter || location || { latitude: 51.5074, longitude: -0.1278 };
       activeSurgeAreas.forEach(area => {
         const lat = baseCenter.latitude + area.lat;
