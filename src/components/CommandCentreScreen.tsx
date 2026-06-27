@@ -309,7 +309,7 @@ export const CommandCentreScreen: React.FC<CommandCentreScreenProps> = ({
               </div>
               <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                <span className="text-[8px] font-black text-blue-400 tracking-wider uppercase">ACTIVE VOICE</span>
+                <span className="text-[8px] font-black text-blue-400 tracking-wider uppercase">ACTIVE ENGINE</span>
               </div>
             </div>
 

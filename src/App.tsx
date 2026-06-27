@@ -5219,26 +5219,19 @@ const AudioSettingsScreen = ({
           </button>
         </div>
 
-        {/* Vocal Dispatch assistant toggle */}
-        <div className={`p-5 rounded-[32px] border flex items-center justify-between gap-4 transition-all hover:border-blue-500/30 ${isDark ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'}`}>
+        {/* Vocal Dispatch assistant toggle (Voice removed per user request) */}
+        <div className={`p-5 rounded-[32px] border flex items-center justify-between gap-4 transition-all ${isDark ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'}`}>
           <div className="flex items-center gap-4 text-left">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isVoiceMuted ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-              {isVoiceMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 bg-red-500/10 text-red-500">
+              <VolumeX size={24} />
             </div>
             <div>
               <h4 className="font-black text-base">Vocal Dispatch Guide</h4>
               <p className="text-[10px] text-gray-400 font-bold mt-0.5 uppercase tracking-wide">
-                {isVoiceMuted ? '🔴 Announcements Muted' : '🟢 Aloud Voice Dispatch Enabled'}
+                🚫 Vocal synthesizers completely deactivated
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsVoiceMuted(!isVoiceMuted)}
-            className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${isVoiceMuted ? 'bg-gray-700' : 'bg-emerald-600'} relative flex items-center shrink-0 cursor-pointer`}
-          >
-            <div className={`w-6 h-6 rounded-full bg-white transition-all duration-300 shadow-md ${isVoiceMuted ? 'translate-x-0' : 'translate-x-6'}`} />
-          </button>
         </div>
 
         {/* Option Selectors */}
@@ -8342,19 +8335,10 @@ export default function App() {
     try { localStorage.setItem('hd_streak', deliveryStreak.toString()); } catch(e){}
   }, [deliveryStreak]);
 
-  // Web Speech vocal assistant guide
+  // Web Speech vocal assistant guide (Vocal announcements completely disabled per user request)
   const speakNav = React.useCallback((text: string) => {
-    if (isVoiceMuted) return;
-    try {
-      if ("speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.05;
-        utterance.pitch = 1.02;
-        window.speechSynthesis.speak(utterance);
-      }
-    } catch (e) {}
-  }, [isVoiceMuted]);
+    // Voice vocalizations removed per user request
+  }, []);
 
   // CarPlay Remote Sync
   useEffect(() => {
