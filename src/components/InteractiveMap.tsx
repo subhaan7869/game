@@ -36,7 +36,7 @@ export interface InteractiveMapProps {
   pendingOrder: any;
   theme?: 'light' | 'dark';
   otherDrivers?: OtherDriver[];
-  activeBrand?: 'uber' | 'both' | 'bolt';
+  activeBrand?: 'uber' | 'both' | 'hyper';
   useRealGPS?: boolean;
   setUseRealGPS?: (val: boolean) => void;
   activeCityCenter?: Location;
@@ -591,17 +591,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           {activeBrand === 'both' ? (
             <>
               <span className="w-3.5 h-3.5 rounded-full bg-blue-500 border border-black" />
-              <span className="w-3.5 h-3.5 rounded-full bg-[#00ca72] border border-black" />
+              <span className="w-3.5 h-3.5 rounded-full bg-purple-500 border border-black" />
             </>
           ) : (
-            <span className={`w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-black ${activeBrand === 'bolt' ? 'bg-[#00ca72]' : 'bg-blue-500'}`}>
+            <span className={`w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-black ${activeBrand === 'hyper' ? 'bg-purple-500' : 'bg-blue-500'}`}>
               <ShieldCheck size={10} className="text-white" />
             </span>
           )}
         </div>
         <div className="text-left leading-none">
-          <p className={`text-[9px] font-black tracking-wider uppercase ${activeBrand === 'bolt' ? 'text-[#00ca72]' : activeBrand === 'both' ? 'text-[#a855f7]' : 'text-blue-400'}`}>
-            {activeBrand === 'both' ? 'Dual-Dispatch GPS Core' : activeBrand === 'bolt' ? 'Bolt Driver GPS Core' : 'Uber Driver GPS Core'}
+          <p className={`text-[9px] font-black tracking-wider uppercase ${activeBrand === 'hyper' ? 'text-purple-400' : activeBrand === 'both' ? 'text-[#a855f7]' : 'text-blue-400'}`}>
+            {activeBrand === 'both' ? 'Dual-Dispatch GPS Core' : activeBrand === 'hyper' ? 'Hyper Driver GPS Core' : 'Uber Driver GPS Core'}
           </p>
           <p className="text-[10px] font-bold text-gray-300 mt-0.5">Tracking Drivers GPS Core</p>
         </div>

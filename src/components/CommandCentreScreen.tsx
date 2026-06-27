@@ -45,7 +45,7 @@ interface CommandCentreScreenProps {
   activeSurgeAreas: any[];
   hotspots: any[];
   activeCityCenter: Location;
-  activeBrand: 'uber' | 'bolt' | 'both';
+  activeBrand: 'uber' | 'hyper' | 'both';
   weatherState: 'clear' | 'rainy' | 'sunset' | 'night';
   setWeatherState: (state: 'clear' | 'rainy' | 'sunset' | 'night') => void;
   fuel: number;

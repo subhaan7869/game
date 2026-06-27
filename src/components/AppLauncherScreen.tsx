@@ -1,14 +1,14 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Sparkles, Navigation, Layers } from 'lucide-react';
+import { Sparkles, Navigation, Layers, ShieldCheck } from 'lucide-react';
 
 interface AppLauncherScreenProps {
-  activeBrand: 'uber' | 'bolt' | 'both';
-  onSelect: (brand: 'uber' | 'bolt' | 'both') => void;
+  activeBrand: 'uber' | 'hyper' | 'both';
+  onSelect: (brand: 'uber' | 'hyper' | 'both') => void;
   uberOnline: boolean;
   setUberOnline: React.Dispatch<React.SetStateAction<boolean>>;
-  boltOnline?: boolean;
-  setBoltOnline?: React.Dispatch<React.SetStateAction<boolean>>;
+  hyperOnline: boolean;
+  setHyperOnline: React.Dispatch<React.SetStateAction<boolean>>;
   isOnline: boolean;
   startShift: () => void;
   endShift: () => void;
@@ -19,6 +19,8 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
   onSelect,
   uberOnline,
   setUberOnline,
+  hyperOnline,
+  setHyperOnline,
   isOnline,
   startShift,
   endShift,
@@ -31,7 +33,19 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
     // Sync with global shift status
     if (nextVal && !isOnline) {
       startShift();
-    } else if (!nextVal && isOnline) {
+    } else if (!nextVal && isOnline && !hyperOnline) {
+      endShift();
+    }
+  };
+
+  const handleToggleHyper = () => {
+    const nextVal = !hyperOnline;
+    setHyperOnline(nextVal);
+    
+    // Sync with global shift status
+    if (nextVal && !isOnline) {
+      startShift();
+    } else if (!nextVal && isOnline && !uberOnline) {
       endShift();
     }
   };
@@ -43,7 +57,10 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
         <div className={`absolute -top-10 -right-10 w-[300px] h-[300px] blur-[130px] rounded-full transition-colors duration-1000 ${
           uberOnline ? 'bg-sky-500/15' : 'bg-sky-500/5'
         }`} />
-        <div className="absolute top-1/3 left-1/4 w-[400px] h-[400px] bg-sky-600/5 blur-[120px] rounded-full" />
+        <div className={`absolute bottom-10 left-10 w-[300px] h-[300px] blur-[130px] rounded-full transition-colors duration-1000 ${
+          hyperOnline ? 'bg-purple-500/15' : 'bg-purple-500/5'
+        }`} />
+        <div className="absolute top-1/3 left-1/4 w-[400px] h-[400px] bg-indigo-600/5 blur-[120px] rounded-full" />
       </div>
 
       {/* Top Header Block */}
@@ -69,7 +86,7 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
         </motion.h1>
         
         <p className="text-xs text-gray-400 font-bold max-w-sm mt-1.5 leading-snug">
-          Activate the premium driver carrier workspace client and launch into your shift.
+          Activate your driver connections and launch into your premium ridesharing workspaces.
         </p>
       </div>
 
@@ -84,7 +101,7 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
             </span>
           </div>
 
-          <div className="flex flex-col gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Uber App Offline/Online Trigger */}
             <div 
               onClick={handleToggleUber}
@@ -111,9 +128,42 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
                 </div>
               </div>
               <div className="text-left mt-1">
-                <span className="text-xs font-black uppercase text-white block">Uber Network Connection</span>
+                <span className="text-xs font-black uppercase text-white block">Uber Network</span>
                 <span className={`text-[10px] font-mono font-black uppercase tracking-wider block ${uberOnline ? 'text-sky-400' : 'text-gray-500'}`}>
-                  {uberOnline ? '● Online & Matching' : '○ Offline standby'}
+                  {uberOnline ? '● Online' : '○ Offline'}
+                </span>
+              </div>
+            </div>
+
+            {/* Hyper Rideshare Offline/Online Trigger */}
+            <div 
+              onClick={handleToggleHyper}
+              className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between h-[105px] select-none ${
+                hyperOnline 
+                  ? 'bg-purple-550/10 border-purple-450/40 shadow-[0_4px_20px_rgba(168,85,247,0.1)]' 
+                  : 'bg-white/[0.02] border-white/5 opacity-60 hover:opacity-100 hover:bg-white/[0.04]'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`w-8 h-8 rounded-xl font-sans font-black flex items-center justify-center text-sm ${
+                  hyperOnline ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20' : 'bg-white/5 text-gray-400'
+                }`}>
+                  H
+                </span>
+                {/* Switch indicator */}
+                <div className={`w-9 h-5 rounded-full p-0.5 transition-all relative ${hyperOnline ? 'bg-purple-600' : 'bg-neutral-800'}`}>
+                  <motion.div 
+                    layout
+                    className="w-4 h-4 bg-white rounded-full shadow-md"
+                    animate={{ x: hyperOnline ? 16 : 0 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  />
+                </div>
+              </div>
+              <div className="text-left mt-1">
+                <span className="text-xs font-black uppercase text-white block">Hyper Rideshare</span>
+                <span className={`text-[10px] font-mono font-black uppercase tracking-wider block ${hyperOnline ? 'text-purple-400' : 'text-gray-500'}`}>
+                  {hyperOnline ? '● Active' : '○ Standby'}
                 </span>
               </div>
             </div>
@@ -133,7 +183,9 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
             whileHover={{ scale: 1.01, y: -1 }}
             whileTap={{ scale: 0.99 }}
             onClick={() => onSelect('uber')}
-            className="cursor-pointer overflow-hidden rounded-[24px] border p-4.5 flex items-center justify-between transition-all bg-[#0b0e12] border-sky-500/30 shadow-[0_4px_25px_rgba(0,0,0,0.5)]"
+            className={`cursor-pointer overflow-hidden rounded-[24px] border p-4.5 flex items-center justify-between transition-all bg-[#0b0e12] ${
+              activeBrand === 'uber' ? 'border-sky-500 shadow-[0_4px_25px_rgba(56,189,248,0.15)]' : 'border-white/5 hover:border-white/10 shadow-lg'
+            }`}
           >
             <div className="flex items-center gap-3.5 text-left">
               <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-sans font-black text-lg transition-colors ${
@@ -146,7 +198,9 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-black tracking-tight uppercase text-white">Uber Driver Client</span>
-                  <span className="bg-sky-500/10 text-sky-400 font-mono text-[7px] font-black px-1.5 py-0.5 rounded uppercase">Active View</span>
+                  {activeBrand === 'uber' && (
+                    <span className="bg-sky-500/10 text-sky-400 font-mono text-[7px] font-black px-1.5 py-0.5 rounded uppercase">Active View</span>
+                  )}
                 </div>
                 <p className="text-[10px] font-bold text-gray-500 mt-0.5 leading-snug">
                   Monochrome clean Slate HUD template.
@@ -155,6 +209,70 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
             </div>
             <div className="w-8 h-8 rounded-full flex items-center justify-center bg-sky-500/15 text-sky-400">
               <Navigation size={13} className="transform rotate-45" />
+            </div>
+          </motion.div>
+
+          {/* Card B: Launch Hyper Rideshare Client */}
+          <motion.div
+            whileHover={{ scale: 1.01, y: -1 }}
+            whileTap={{ scale: 0.99 }}
+            onClick={() => onSelect('hyper')}
+            className={`cursor-pointer overflow-hidden rounded-[24px] border p-4.5 flex items-center justify-between transition-all bg-[#0d0a14] ${
+              activeBrand === 'hyper' ? 'border-purple-500 shadow-[0_4px_25px_rgba(168,85,247,0.15)]' : 'border-white/5 hover:border-white/10 shadow-lg'
+            }`}
+          >
+            <div className="flex items-center gap-3.5 text-left">
+              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-sans font-black text-lg transition-colors ${
+                hyperOnline 
+                  ? 'bg-purple-500/10 border border-purple-500/20 text-purple-400' 
+                  : 'bg-white/5 border border-white/10 text-gray-500'
+              }`}>
+                H
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black tracking-tight uppercase text-white">Hyper Rideshare Client</span>
+                  {activeBrand === 'hyper' && (
+                    <span className="bg-purple-500/10 text-purple-400 font-mono text-[7px] font-black px-1.5 py-0.5 rounded uppercase">Active View</span>
+                  )}
+                </div>
+                <p className="text-[10px] font-bold text-gray-500 mt-0.5 leading-snug">
+                  Vivid Electric Violet premium interface.
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-500/15 text-purple-400">
+              <ShieldCheck size={13} />
+            </div>
+          </motion.div>
+
+          {/* Card C: Launch Dual-Dispatch Hub */}
+          <motion.div
+            whileHover={{ scale: 1.01, y: -1 }}
+            whileTap={{ scale: 0.99 }}
+            onClick={() => onSelect('both')}
+            className={`cursor-pointer overflow-hidden rounded-[24px] border p-4.5 flex items-center justify-between transition-all bg-[#0f0e13] ${
+              activeBrand === 'both' ? 'border-indigo-500 shadow-[0_4px_25px_rgba(99,102,241,0.15)]' : 'border-white/5 hover:border-white/10 shadow-lg'
+            }`}
+          >
+            <div className="flex items-center gap-3.5 text-left">
+              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-sans font-black text-lg transition-colors bg-gradient-to-tr from-sky-500 to-purple-600 text-white`}>
+                <Layers size={16} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black tracking-tight uppercase text-white">Dual-Dispatch HUD</span>
+                  {activeBrand === 'both' && (
+                    <span className="bg-indigo-500/10 text-indigo-400 font-mono text-[7px] font-black px-1.5 py-0.5 rounded uppercase">Active View</span>
+                  )}
+                </div>
+                <p className="text-[10px] font-bold text-gray-500 mt-0.5 leading-snug">
+                  Unified multi-network split tracker.
+                </p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-indigo-500/15 text-indigo-400">
+              <Layers size={13} />
             </div>
           </motion.div>
         </div>

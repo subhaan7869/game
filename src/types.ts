@@ -33,7 +33,7 @@ export interface Order {
   surgeMultiplier?: number;
   pickupPos?: { lat: number, lng: number };
   dropoffPos?: { lat: number, lng: number };
-  brand?: 'uber' | 'bolt';
+  brand?: 'uber' | 'hyper';
   isPreBooking?: boolean;
   scheduledTimeStr?: string;
 }
@@ -66,7 +66,7 @@ export interface ScheduledOrder {
   scheduledTime: any;
   status: 'pending' | 'active' | 'completed';
   estimatedPay: number;
-  brand?: 'uber' | 'bolt';
+  brand?: 'uber' | 'hyper';
   distanceMiles?: number;
   durationMinutes?: number;
   vehicleClass?: string;

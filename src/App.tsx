@@ -995,8 +995,8 @@ const SideMenu = ({
   endShift: () => void,
   autoPauseSecondApp: boolean,
   setAutoPauseSecondApp: (val: boolean) => void,
-  activeBrand: 'uber' | 'bolt' | 'both',
-  setActiveBrand: (val: 'uber' | 'bolt' | 'both') => void,
+  activeBrand: 'uber' | 'hyper' | 'both',
+  setActiveBrand: (val: 'uber' | 'hyper' | 'both') => void,
   setShowAppLauncher: (val: boolean) => void,
   scheduledOrders?: ScheduledOrder[]
 }) => {
@@ -1007,8 +1007,8 @@ const SideMenu = ({
       exit={{ x: '-100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
       className={`fixed left-0 top-0 bottom-0 w-[85%] max-w-[320px] z-[5000] flex flex-col shadow-[20px_0_60px_rgba(0,0,0,0.6)] border-r transition-all duration-500 pointer-events-auto ${
-        activeBrand === 'bolt' 
-          ? 'bg-gradient-to-b from-[#021d0e] to-[#030a05] text-white border-r-[#00ea72]/20 shadow-[0_0_40px_rgba(0,252,114,0.06)]' 
+        activeBrand === 'hyper' 
+          ? 'bg-gradient-to-b from-[#14021d] to-[#07030a] text-white border-r-purple-500/20 shadow-[0_0_40px_rgba(168,85,247,0.06)]' 
           : activeBrand === 'both'
           ? 'bg-gradient-to-b from-[#0e071e] to-[#05020d] text-white border-r-purple-500/20 shadow-[0_0_40px_rgba(168,85,247,0.06)]' 
           : 'bg-[#0c0d10] text-white border-r-white/5'
@@ -1100,16 +1100,16 @@ const SideMenu = ({
               key={`side-menu-item-new-${i}`}
               onClick={item.action}
               className={`w-full flex items-center gap-4 p-4 transition-all group active:scale-98 text-left ${
-                activeBrand === 'bolt'
-                  ? 'hover:bg-[#00ea72]/10 rounded-[24px] text-gray-300 hover:text-white'
+                activeBrand === 'hyper'
+                  ? 'hover:bg-purple-500/10 rounded-[24px] text-purple-200 hover:text-white'
                   : activeBrand === 'both'
                   ? 'hover:bg-purple-500/10 rounded-[20px] text-gray-300 hover:text-white'
                   : 'hover:bg-white/[0.04] rounded-2xl text-gray-300 hover:text-white'
               }`}
             >
               <div className={`transition-all ${
-                activeBrand === 'bolt'
-                  ? 'text-[#00ff88]'
+                activeBrand === 'hyper'
+                  ? 'text-[#c084fc]'
                   : activeBrand === 'both'
                   ? 'text-purple-400'
                   : 'text-[#22c55e] opacity-85 group-hover:opacity-100'
@@ -1151,16 +1151,16 @@ const SideMenu = ({
               key={`side-menu-item-sec-${i}`}
               onClick={item.action}
               className={`w-full flex items-center gap-4 p-4 transition-all group active:scale-98 text-left ${
-                activeBrand === 'bolt'
-                  ? 'hover:bg-[#00ea72]/10 rounded-[24px]'
+                activeBrand === 'hyper'
+                  ? 'hover:bg-purple-500/10 rounded-[24px]'
                   : activeBrand === 'both'
                   ? 'hover:bg-purple-500/10 rounded-[20px]'
                   : 'hover:bg-white/[0.04] rounded-2xl'
               }`}
             >
               <div className={`transition-colors ${
-                activeBrand === 'bolt'
-                  ? 'text-[#00ea72]/85 group-hover:text-[#00ff88]'
+                activeBrand === 'hyper'
+                  ? 'text-[#c084fc]/85 group-hover:text-purple-300'
                   : activeBrand === 'both'
                   ? 'text-purple-400/85 group-hover:text-purple-300'
                   : 'text-gray-500 group-hover:text-gray-350'
@@ -1244,7 +1244,7 @@ const ScheduledOrdersScreen = ({
   addToast?: (title: string, body: string, type?: 'info' | 'success' | 'alert' | 'message') => void,
   activeCityKey?: string,
   selectedServices?: JobType[],
-  activeBrand?: 'uber' | 'bolt' | 'both'
+  activeBrand?: 'uber' | 'hyper' | 'both'
 }) => {
   const [activeTab, setActiveTab] = useState<'available' | 'claimed'>('available');
   const [availableOffers, setAvailableOffers] = useState<any[]>([]);
@@ -1349,7 +1349,7 @@ const ScheduledOrdersScreen = ({
       : (city === "Nottingham" ? taxiLandmarksNottingham : ["City Centre VIP Plaza", "Executive Terminal"]);
     
     const uberClasses = ['Uber Taxi', 'Uber Exec', 'Comfort', 'UberXL Luxe'];
-    const boltClasses = ['Bolt Taxi', 'Bolt Premium', 'Bolt Comfort', 'Bolt Electric Luxe'];
+    const hyperClasses = ['Hyper Ride ⚡', 'Hyper Premium', 'Hyper Black', 'Hyper Electric Luxe'];
 
     const notesPoolRide = [
       "Premium passenger. Appreciate VIP service and silent route.",
@@ -1375,13 +1375,13 @@ const ScheduledOrdersScreen = ({
 
     for (let i = 0; i < count; i++) {
       // Respect active brand
-      let brand: 'uber' | 'bolt' = 'uber';
+      let brand: 'uber' | 'hyper' = 'uber';
       if (activeBrand === 'uber') {
         brand = 'uber';
-      } else if (activeBrand === 'bolt') {
-        brand = 'bolt';
+      } else if (activeBrand === 'hyper') {
+        brand = 'hyper';
       } else {
-        brand = Math.random() < 0.5 ? 'uber' : 'bolt';
+        brand = Math.random() < 0.5 ? 'uber' : 'hyper';
       }
 
       // Determine type of job based on selected services
@@ -1409,7 +1409,7 @@ const ScheduledOrdersScreen = ({
         const houseNum = Math.floor(Math.random() * 150) + 1;
         destination = `Flat ${Math.floor(Math.random() * 20) + 1}, ${houseNum} ${custStreet}`;
         
-        vehicleClass = brand === 'uber' ? 'Uber Eats Courier' : 'Bolt Food Bag';
+        vehicleClass = brand === 'uber' ? 'Uber Eats Courier' : 'Hyper Express Courier';
         notes = notesPoolDelivery[Math.floor(Math.random() * notesPoolDelivery.length)];
       } else {
         const pickupsPool = city === "London" 
@@ -1420,7 +1420,7 @@ const ScheduledOrdersScreen = ({
         
         vehicleClass = brand === 'uber' 
           ? uberClasses[Math.floor(Math.random() * uberClasses.length)]
-          : boltClasses[Math.floor(Math.random() * boltClasses.length)];
+          : hyperClasses[Math.floor(Math.random() * hyperClasses.length)];
         notes = notesPoolRide[Math.floor(Math.random() * notesPoolRide.length)];
       }
 
@@ -1428,8 +1428,8 @@ const ScheduledOrdersScreen = ({
       const distanceMiles = parseFloat((1.5 + Math.random() * 7).toFixed(1));
       const durationMinutes = Math.round(distanceMiles * 3.1 + 4);
       
-      const ratePerMile = offerType === 'delivery' ? 1.60 : (brand === 'bolt' ? 2.30 : 2.10);
-      const baseFare = offerType === 'delivery' ? 4.50 : (brand === 'bolt' ? 9.50 : 8.50);
+      const ratePerMile = offerType === 'delivery' ? 1.60 : (brand === 'hyper' ? 2.45 : 2.10);
+      const baseFare = offerType === 'delivery' ? 4.50 : (brand === 'hyper' ? 10.50 : 8.50);
       const estimatedPay = parseFloat((baseFare + (distanceMiles * ratePerMile) + (Math.random() * 3.0)).toFixed(2));
       
       // Much quicker times: 1 to 5 mins
@@ -1515,7 +1515,7 @@ const ScheduledOrdersScreen = ({
       setAvailableOffers(updated);
       localStorage.setItem('hyper_driver_available_prebookings', JSON.stringify(updated));
 
-      sendNotification("Pre-booking Claimed!", `Claimed high-paying ${offer.brand === 'uber' ? 'Uber' : 'Bolt'} pre-booking for ${offer.scheduledTime}!`);
+      sendNotification("Pre-booking Claimed!", `Claimed high-paying ${offer.brand === 'uber' ? 'Uber' : 'Hyper'} pre-booking for ${offer.scheduledTime}!`);
       if (addToast) addToast("Booking Confirmed! 🎉", `Added successfully. Payout: £${offer.estimatedPay.toFixed(2)}`, "success");
       
       // Navigate to claimed tab and reset detail screen
@@ -1803,7 +1803,7 @@ const ScheduledOrdersScreen = ({
                           className={`p-5 rounded-[28px] border cursor-pointer hover:bg-white/[0.02] active:scale-[0.98] transition-all flex flex-col justify-between overflow-hidden relative group ${
                             offer.brand === 'uber' 
                               ? 'bg-slate-900/60 border-white/5 hover:border-white/10' 
-                              : 'bg-emerald-950/20 border-[#22c55e]/10 hover:border-[#22c55e]/20'
+                              : 'bg-purple-950/20 border-purple-500/10 hover:border-purple-500/20'
                           }`}
                         >
                           {/* Top row */}
@@ -1813,9 +1813,9 @@ const ScheduledOrdersScreen = ({
                                 <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
                                   offer.brand === 'uber' 
                                     ? 'bg-white text-black' 
-                                    : 'bg-[#22c55e] text-black'
+                                    : 'bg-purple-500 text-white'
                                 }`}>
-                                  {offer.brand === 'uber' ? 'Uber Reserve' : 'Bolt Pre-book'}
+                                  {offer.brand === 'uber' ? 'Uber Reserve' : 'Hyper Pre-book'}
                                 </span>
                                 <span className="text-[10px] text-[#f59e0b] bg-yellow-500/10 px-1.5 py-0.2 rounded font-black tracking-wider uppercase">
                                   {offer.scheduledTime}
@@ -6474,7 +6474,7 @@ export default function App() {
     }
   });
   
-  const [activeBrand, setActiveBrand] = useState<'uber' | 'bolt' | 'both'>('uber');
+  const [activeBrand, setActiveBrand] = useState<'uber' | 'hyper' | 'both'>('uber');
 
   const [uberOnline, setUberOnline] = useState<boolean>(() => {
     try {
@@ -6484,9 +6484,13 @@ export default function App() {
     }
   });
 
-  // Bolt is completely removed - hold as flat false constants
-  const boltOnline = false;
-  const setBoltOnline = (val?: any) => {};
+  const [hyperOnline, setHyperOnline] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('hyper_driver_hyper_online') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
 
   const [autoPauseSecondApp, setAutoPauseSecondApp] = useState<boolean>(() => {
     try {
@@ -6505,9 +6509,9 @@ export default function App() {
     }
   });
 
-  const [wasBoltOnlinePaused, setWasBoltOnlinePaused] = useState<boolean>(() => {
+  const [wasHyperOnlinePaused, setWasHyperOnlinePaused] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('hyper_driver_was_bolt_paused') === 'true';
+      return localStorage.getItem('hyper_driver_was_hyper_paused') === 'true';
     } catch (e) {
       return false;
     }
@@ -6522,8 +6526,8 @@ export default function App() {
   }, [uberOnline]);
 
   useEffect(() => {
-    localStorage.setItem('hyper_driver_bolt_online', String(boltOnline));
-  }, [boltOnline]);
+    localStorage.setItem('hyper_driver_hyper_online', String(hyperOnline));
+  }, [hyperOnline]);
 
   useEffect(() => {
     localStorage.setItem('hyper_driver_auto_pause', String(autoPauseSecondApp));
@@ -6534,8 +6538,8 @@ export default function App() {
   }, [wasUberOnlinePaused]);
 
   useEffect(() => {
-    localStorage.setItem('hyper_driver_was_bolt_paused', String(wasBoltOnlinePaused));
-  }, [wasBoltOnlinePaused]);
+    localStorage.setItem('hyper_driver_was_hyper_paused', String(wasHyperOnlinePaused));
+  }, [wasHyperOnlinePaused]);
 
   const [earningsTab, setEarningsTab] = useState<'today' | 'weekly' | 'recent'>('today');
   
@@ -6790,22 +6794,22 @@ export default function App() {
       // We have active trip(s). Put the OTHER app on standby.
       const activeBrandOnTrip = activeOrders[0].brand || 'uber';
       if (activeBrandOnTrip === 'uber') {
-        setBoltOnline(isOnline => {
+        setHyperOnline(isOnline => {
           if (isOnline) {
-            setWasBoltOnlinePaused(true);
+            setWasHyperOnlinePaused(true);
             setTimeout(() => {
-              addToast("Bolt Auto-Paused ⏸️", "Bolt paused automatically to keep full focus on your Uber trip.", "info");
+              addToast("Hyper Auto-Paused ⏸️", "Hyper paused automatically to keep full focus on your Uber trip.", "info");
             }, 100);
             return false;
           }
           return isOnline;
         });
-      } else if (activeBrandOnTrip === 'bolt') {
+      } else if (activeBrandOnTrip === 'hyper') {
         setUberOnline(isOnline => {
           if (isOnline) {
             setWasUberOnlinePaused(true);
             setTimeout(() => {
-              addToast("Uber Auto-Paused ⏸️", "Uber paused automatically to keep full focus on your Bolt trip.", "info");
+              addToast("Uber Auto-Paused ⏸️", "Uber paused automatically to keep full focus on your Hyper trip.", "info");
             }, 100);
             return false;
           }
@@ -6818,16 +6822,16 @@ export default function App() {
         if (wasPaused) {
           setUberOnline(true);
           setTimeout(() => {
-            addToast("Uber Auto-Resumed ▶️", "Uber dispatch resume active since your Bolt trip completed.", "success");
+            addToast("Uber Auto-Resumed ▶️", "Uber dispatch resume active since your Hyper trip completed.", "success");
           }, 100);
         }
         return false;
       });
-      setWasBoltOnlinePaused(wasPaused => {
+      setWasHyperOnlinePaused(wasPaused => {
         if (wasPaused) {
-          setBoltOnline(true);
+          setHyperOnline(true);
           setTimeout(() => {
-            addToast("Bolt Auto-Resumed ▶️", "Bolt dispatch resume active since your Uber trip completed.", "success");
+            addToast("Hyper Auto-Resumed ▶️", "Hyper dispatch resume active since your Uber trip completed.", "success");
           }, 100);
         }
         return false;
@@ -9835,11 +9839,11 @@ export default function App() {
     let radialGlowColor = 'rgba(59,130,246,0.06)';
     let vignetteColor = 'rgba(0,0,0,0.4)';
 
-    if (activeBrand === 'bolt') {
-      baseBg = 'bg-[#02180b]'; // Deep Forest Midnight Green
-      roadColor = '#00ff88'; // Glowing Electric Green
-      radialGlowColor = 'rgba(0, 255, 136, 0.08)';
-      vignetteColor = 'rgba(2, 24, 11, 0.65)';
+    if (activeBrand === 'hyper') {
+      baseBg = 'bg-[#0c0418]'; // Deep Midnight Violet/Purple
+      roadColor = '#a855f7'; // Glowing Electric Purple
+      radialGlowColor = 'rgba(168, 85, 247, 0.08)';
+      vignetteColor = 'rgba(12, 4, 24, 0.65)';
     } else if (activeBrand === 'both') {
       baseBg = 'bg-[#0a0518]'; // Deep Cyber Indigo/Violet
       roadColor = '#c084fc'; // Vibrant Light Purple/Indigo
@@ -9930,11 +9934,11 @@ export default function App() {
     const candidates = Array.from({ length: 5 }).map(() => {
       const type = getJobType();
       
-      let orderBrand: 'uber' | 'bolt' = 'uber';
-      if (uberOnline && boltOnline) {
-        orderBrand = Math.random() < 0.5 ? 'uber' : 'bolt';
-      } else if (boltOnline) {
-        orderBrand = 'bolt';
+      let orderBrand: 'uber' | 'hyper' = 'uber';
+      if (uberOnline && hyperOnline) {
+        orderBrand = Math.random() < 0.5 ? 'uber' : 'hyper';
+      } else if (hyperOnline) {
+        orderBrand = 'hyper';
       } else {
         orderBrand = 'uber';
       }
@@ -9965,22 +9969,22 @@ export default function App() {
       } else {
         if (type === 'ride') {
           const ridePool: string[] = [];
-          if (enabledServices.includes('rideshare')) ridePool.push('Bolt Ride');
-          if (enabledServices.includes('intercity')) ridePool.push('Bolt Intercity');
-          if (enabledServices.includes('hyper_pet')) ridePool.push('Bolt Pet 🐾');
-          if (enabledServices.includes('hyperxl')) ridePool.push('Bolt XL 🚙');
-          if (enabledServices.includes('green')) ridePool.push('Bolt Green 🔋');
-          if (enabledServices.includes('assist')) ridePool.push('Bolt Assist ♿');
+          if (enabledServices.includes('rideshare')) ridePool.push('Hyper Ride ⚡');
+          if (enabledServices.includes('intercity')) ridePool.push('Hyper Intercity 🚀');
+          if (enabledServices.includes('hyper_pet')) ridePool.push('Hyper Pet 🐾');
+          if (enabledServices.includes('hyperxl')) ridePool.push('Hyper XL 🚙');
+          if (enabledServices.includes('green')) ridePool.push('Hyper Eco 🔋');
+          if (enabledServices.includes('assist')) ridePool.push('Hyper Assist ♿');
           
           if (ridePool.length > 0) {
             variant = ridePool[Math.floor(Math.random() * ridePool.length)];
           } else {
-            variant = 'Bolt Ride';
+            variant = 'Hyper Ride ⚡';
           }
         } else {
-          const delivPool: string[] = ['Bolt Food 🍔'];
+          const delivPool: string[] = ['Hyper Express 🍔'];
           if (enabledServices.includes('packages')) {
-            delivPool.push('Bolt Send 📦');
+            delivPool.push('Hyper Courier 📦');
           }
           variant = delivPool[Math.floor(Math.random() * delivPool.length)];
         }
@@ -10143,7 +10147,7 @@ export default function App() {
       longitude: location.longitude + (Math.random() - 0.5) * 0.01 
     } : { latitude: 51.5074, longitude: -0.1278 };
 
-    const brand = sch.brand || (Math.random() < 0.5 ? 'uber' : 'bolt');
+    const brand = sch.brand || (Math.random() < 0.5 ? 'uber' : 'hyper');
     const finalPay = sch.estimatedPay || 15.00;
     const finalDist = sch.distanceMiles || 3.5;
     const finalDur = sch.durationMinutes || 12;
@@ -10153,7 +10157,7 @@ export default function App() {
       id: sch.id || `TXB-${Math.floor(Math.random() * 90000) + 10000}`,
       type: orderType,
       restaurantName: sch.restaurantName || (orderType === 'delivery' ? "Uber Eats Restaurant" : "Pre-booked VIP Ride"),
-      customerName: orderType === 'delivery' ? (sch.destinationName || "Uber Eats Customer") : (brand === 'uber' ? "Uber Reserved Passenger" : "Bolt Scheduled Passenger"),
+      customerName: orderType === 'delivery' ? (sch.destinationName || "Uber Eats Customer") : (brand === 'uber' ? "Uber Reserved Passenger" : "Hyper Scheduled Passenger"),
       restaurantLocation: restLoc,
       pickupLocation: restLoc,
       customerLocation: { 
@@ -10181,7 +10185,7 @@ export default function App() {
       : `⏰ Pre-booking Time!`;
     const notificationBody = orderType === 'delivery'
       ? `Your scheduled Uber Eats delivery is due now!`
-      : `Your scheduled ${brand === 'uber' ? 'Uber' : 'Bolt'} trip is due now!`;
+      : `Your scheduled ${brand === 'uber' ? 'Uber' : 'Hyper'} trip is due now!`;
       
     sendNotification(notificationTitle, notificationBody);
     if (addToast) {
@@ -10654,12 +10658,12 @@ export default function App() {
 
       // Auto Pause Second App when active on a current trip
       if (autoPauseSecondApp) {
-        if (pendingOrder.brand === 'uber' && boltOnline) {
-          setBoltOnline(false);
-          addToast("Bolt Auto-Paused ⏸️", "Bolt paused to keep full focus on your Uber trip.", "info");
-        } else if (pendingOrder.brand === 'bolt' && uberOnline) {
+        if (pendingOrder.brand === 'uber' && hyperOnline) {
+          setHyperOnline(false);
+          addToast("Hyper Auto-Paused ⏸️", "Hyper paused to keep full focus on your Uber trip.", "info");
+        } else if (pendingOrder.brand === 'hyper' && uberOnline) {
           setUberOnline(false);
-          addToast("Uber Auto-Paused ⏸️", "Uber paused to keep full focus on your Bolt trip.", "info");
+          addToast("Uber Auto-Paused ⏸️", "Uber paused to keep full focus on your Hyper trip.", "info");
         }
       }
 
@@ -10843,7 +10847,7 @@ export default function App() {
   const startShift = () => {
     setUser(u => ({ ...u, isOnline: true }));
     setUberOnline(true);
-    setBoltOnline(true);
+    setHyperOnline(true);
     setIsOnBreak(false);
     setShiftStats({
       trips: 0,
@@ -10873,7 +10877,7 @@ export default function App() {
   const endShift = () => {
     setUser(u => ({ ...u, isOnline: false }));
     setUberOnline(false);
-    setBoltOnline(false);
+    setHyperOnline(false);
     setIsOnBreak(false);
     setShowShiftSummary(true);
   };
@@ -11577,8 +11581,8 @@ export default function App() {
           activeBrand={activeBrand}
           uberOnline={uberOnline}
           setUberOnline={setUberOnline}
-          boltOnline={boltOnline}
-          setBoltOnline={setBoltOnline}
+          hyperOnline={hyperOnline}
+          setHyperOnline={setHyperOnline}
           isOnline={user.isOnline}
           startShift={startShift}
           endShift={endShift}
@@ -11587,15 +11591,15 @@ export default function App() {
             setShowAppLauncher(false);
             
             // Auto-trigger online shift logic if either network is toggled online
-            if ((brand === 'uber' && uberOnline) || (brand === 'bolt' && boltOnline) || (brand === 'both' && (uberOnline || boltOnline))) {
+            if ((brand === 'uber' && uberOnline) || (brand === 'hyper' && hyperOnline) || (brand === 'both' && (uberOnline || hyperOnline))) {
               if (!user.isOnline) {
                 startShift();
               }
             }
 
             addToast(
-              brand === 'uber' ? 'Uber Workspace Loaded 🖤' : brand === 'bolt' ? 'Bolt Workspace Loaded 💚' : 'Dual-Dispatch Workspace Loaded 💜',
-              brand === 'uber' ? 'Minimal Slate interface active. Focus Mode stabilized.' : brand === 'bolt' ? 'Neon Emerald interface active. Organic pill design configured.' : 'Unified split map overlay ready.',
+              brand === 'uber' ? 'Uber Workspace Loaded 🖤' : brand === 'hyper' ? 'Hyper Workspace Loaded 💜' : 'Dual-Dispatch Workspace Loaded 🔮',
+              brand === 'uber' ? 'Minimal Slate interface active. Focus Mode stabilized.' : brand === 'hyper' ? 'Electric Violet interface active. Premium Ride-Hailing engine loaded.' : 'Unified multi-app dashboard active.',
               'success'
             );
           }}
@@ -13483,8 +13487,8 @@ export default function App() {
                     <button 
                       onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
                       className={`w-11 h-11 backdrop-blur-md rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 border ${
-                        activeBrand === 'bolt' 
-                          ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_10px_rgba(0,255,136,0.15)]'
+                        activeBrand === 'hyper' 
+                          ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
                           : activeBrand === 'both'
                           ? 'bg-[#0d091a]/95 text-purple-300 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
                           : 'bg-neutral-900/90 text-white border-white/10'
@@ -13497,10 +13501,10 @@ export default function App() {
                       initial={{ y: -50, scale: 0.9 }}
                       animate={{ y: 0, scale: 1 }}
                       className={`px-5 py-1.5 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 cursor-pointer select-none min-w-[150px] max-w-[210px] min-h-[44px] transition-all relative border ${
-                        activeBrand === 'bolt' 
-                          ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_15px_rgba(0,255,136,0.15)]' 
+                        activeBrand === 'hyper' 
+                          ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]' 
                           : activeBrand === 'both'
-                          ? 'bg-gradient-to-r from-blue-950/95 to-[#022413]/95 text-white border-purple-500/35 shadow-[0_0_20px_rgba(124,58,237,0.2)]'
+                          ? 'bg-gradient-to-r from-blue-950/95 to-[#1a0c2e]/95 text-white border-purple-500/35 shadow-[0_0_20px_rgba(124,58,237,0.2)]'
                           : 'bg-[#0c0d10] text-[#22c55e] border-white/10'
                       }`}
                       onClick={() => {
@@ -13519,7 +13523,7 @@ export default function App() {
 
                       <div className="flex items-center gap-1.5 justify-center leading-none">
                         <span className={`font-display text-base font-black tracking-tight select-none ${
-                          activeBrand === 'bolt' ? 'text-[#00ff88]' : 'text-white'
+                          activeBrand === 'hyper' ? 'text-[#c084fc]' : 'text-white'
                         }`}>
                           {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
                           {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
@@ -13528,9 +13532,9 @@ export default function App() {
                       </div>
 
                       <div className="flex gap-1 mt-1 justify-center select-none">
-                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? (activeBrand === 'bolt' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
-                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? (activeBrand === 'bolt' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
-                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? (activeBrand === 'bolt' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? (activeBrand === 'hyper' ? 'bg-[#c084fc] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? (activeBrand === 'hyper' ? 'bg-[#c084fc] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? (activeBrand === 'hyper' ? 'bg-[#c084fc] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
                       </div>
                     </motion.div>
 
@@ -13542,15 +13546,15 @@ export default function App() {
                             addToast("Off-App Mode", "Simulating background execution. Tap the floating dot/notification overlay to restore.", "info");
                           }}
                           className={`w-11 h-11 border rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-all text-sm uppercase font-black shrink-0 ${
-                            activeBrand === 'bolt'
-                              ? 'bg-[#022413]/90 text-[#00ff88] border-[#00ff88]/30 shadow-[0_0_10px_rgba(0,255,136,0.15)]'
+                            activeBrand === 'hyper'
+                              ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
                               : activeBrand === 'both'
                               ? 'bg-[#0d091a]/95 text-indigo-400 border-purple-500/30'
                               : 'bg-slate-950 text-blue-400 border-white/10'
                           }`}
                           title="Simulate Minimize (Go Off-App)"
                         >
-                          <Smartphone size={20} className={`${activeBrand === 'bolt' ? 'text-[#00ff88]' : activeBrand === 'both' ? 'text-purple-400' : 'text-blue-400'} animate-pulse`} />
+                          <Smartphone size={20} className={`${activeBrand === 'hyper' ? 'text-[#c084fc]' : activeBrand === 'both' ? 'text-purple-400' : 'text-blue-400'} animate-pulse`} />
                         </button>
                       )}
                       <button 
@@ -13572,17 +13576,17 @@ export default function App() {
                     initial={{ y: 100 }}
                     animate={{ y: 0 }}
                     className={`w-full border-t flex flex-col rounded-t-[40px] overflow-hidden text-white pb-6 transition-all duration-700 ${
-                      activeBrand === 'bolt'
-                        ? 'bg-gradient-to-b from-[#022413] to-[#08090a] border-[#00ca72]/30 shadow-[0_-15px_40px_rgba(0,252,114,0.15)]'
+                      activeBrand === 'hyper'
+                        ? 'bg-gradient-to-b from-[#140224] to-[#08090a] border-purple-500/30 shadow-[0_-15px_40px_rgba(168,85,247,0.15)]'
                         : activeBrand === 'both'
-                        ? 'bg-gradient-to-r from-[#0c0d12] via-[#081810] to-[#022413] border-indigo-500/35 shadow-[0_-15px_45px_rgba(124,58,237,0.15)]'
+                        ? 'bg-gradient-to-r from-[#0c0d12] via-[#100818] to-[#140224] border-indigo-500/35 shadow-[0_-15px_45px_rgba(124,58,237,0.15)]'
                         : 'bg-[#0c0d10] border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.8)]'
                     }`}
                   >
                     {/* Scanning progress bar */}
                     {user.isOnline && !isOnBreak && activeOrders.length === 0 && (
                       <div className={`w-full h-[4px] relative overflow-hidden shrink-0 ${
-                        activeBrand === 'bolt' ? 'bg-[#00ca72]/15' : activeBrand === 'both' ? 'bg-indigo-500/15' : 'bg-emerald-500/10'
+                        activeBrand === 'hyper' ? 'bg-purple-500/15' : activeBrand === 'both' ? 'bg-indigo-500/15' : 'bg-emerald-500/10'
                       }`}>
                         <motion.div 
                           animate={{ 
@@ -13594,10 +13598,10 @@ export default function App() {
                             ease: "easeInOut" 
                           }}
                           className={`absolute top-0 bottom-0 w-[40%] rounded-full ${
-                            activeBrand === 'bolt'
-                              ? 'bg-[#00ff88] shadow-[0_0_12px_rgba(0,255,136,0.8)]'
+                            activeBrand === 'hyper'
+                              ? 'bg-[#c084fc] shadow-[0_0_12px_rgba(168,85,247,0.8)]'
                               : activeBrand === 'both'
-                              ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-[#00ff88] shadow-[0_0_15px_rgba(168,85,247,0.8)]'
+                              ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-[#c084fc] shadow-[0_0_15px_rgba(168,85,247,0.8)]'
                               : 'bg-[#22c55e] shadow-[0_0_12px_rgba(34,197,94,0.8)]'
                           }`}
                         />
@@ -13613,8 +13617,8 @@ export default function App() {
                           <span className={`${
                             isOnBreak 
                               ? 'bg-orange-500/20' 
-                              : activeBrand === 'bolt' 
-                              ? 'bg-emerald-500/25' 
+                              : activeBrand === 'hyper' 
+                              ? 'bg-purple-500/25' 
                               : activeBrand === 'both' 
                               ? 'bg-purple-500/25' 
                               : 'bg-[#22c55e]/20'
@@ -13622,8 +13626,8 @@ export default function App() {
                           <span className={`${
                             isOnBreak 
                               ? 'bg-orange-500/35' 
-                              : activeBrand === 'bolt' 
-                              ? 'bg-emerald-500/40' 
+                              : activeBrand === 'hyper' 
+                              ? 'bg-purple-500/40' 
                               : activeBrand === 'both' 
                               ? 'bg-purple-500/40' 
                               : 'bg-[#22c55e]/35'
@@ -13631,8 +13635,8 @@ export default function App() {
                           <span className={`relative inline-flex rounded-full h-4 w-4 ${
                             isOnBreak 
                               ? 'bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.8)]' 
-                              : activeBrand === 'bolt'
-                              ? 'bg-[#00ff88] shadow-[0_0_15px_rgba(0,255,136,0.8)] border-emerald-950'
+                              : activeBrand === 'hyper'
+                              ? 'bg-[#c084fc] shadow-[0_0_15px_rgba(168,85,247,0.8)] border-purple-950'
                               : activeBrand === 'both'
                               ? 'bg-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.9)] border-indigo-950'
                               : 'bg-[#22c55e] shadow-[0_0_15px_rgba(34,197,94,0.8)]'
@@ -13687,15 +13691,15 @@ export default function App() {
                                     exit={{ opacity: 0, y: -10 }}
                                     transition={{ duration: 0.3 }}
                                     className={`absolute font-display text-xl font-black tracking-tight leading-none ${
-                                      activeBrand === 'bolt' ? 'text-[#00ff88]' : activeBrand === 'both' ? 'text-purple-300' : 'text-white'
+                                      activeBrand === 'hyper' ? 'text-[#c084fc]' : activeBrand === 'both' ? 'text-purple-300' : 'text-white'
                                     }`}
                                   >
                                     {isOnBreak 
                                       ? "On Break" 
                                       : activeBrand === 'both' 
                                       ? "Duo-Scanning Active" 
-                                      : activeBrand === 'bolt' 
-                                      ? "Bolt scanning live" 
+                                      : activeBrand === 'hyper' 
+                                      ? "Hyper scanning live" 
                                       : "You're online"}
                                   </motion.span>
                                 )}
@@ -13725,8 +13729,8 @@ export default function App() {
                                     {isOnBreak 
                                       ? "Taking a pause from offers" 
                                       : activeBrand === 'both' 
-                                      ? "Monitoring Uber & Bolt dispatch" 
-                                      : activeBrand === 'bolt'
+                                      ? "Monitoring Uber & Hyper dispatch" 
+                                      : activeBrand === 'hyper'
                                       ? "Finding opportunities near you"
                                       : "Searching for trips"}
                                   </motion.span>
@@ -13739,7 +13743,7 @@ export default function App() {
 
                       <button 
                         className={`hover:text-[#22c55e] p-2.5 bg-white/5 border border-white/5 hover:border-white/10 rounded-full transition-all active:scale-90 shrink-0 ${
-                          activeBrand === 'bolt' ? 'text-[#00ff88] hover:text-[#00ca72]' : 'text-white'
+                          activeBrand === 'hyper' ? 'text-[#c084fc] hover:text-purple-400' : 'text-white'
                         }`} 
                         onClick={(e) => { 
                           e.stopPropagation(); 
@@ -13839,8 +13843,8 @@ export default function App() {
                     exit={{ y: '100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                     className={`absolute bottom-0 left-0 right-0 rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] border-t flex flex-col h-[70vh] max-h-[70vh] text-white transition-all duration-500 pointer-events-auto ${
-                      activeBrand === 'bolt'
-                        ? 'bg-gradient-to-b from-[#011a0d]/95 to-[#030906]/98 border-[#00ea72]/30 shadow-[0_-15px_30px_rgba(0,252,114,0.12)]'
+                      activeBrand === 'hyper'
+                        ? 'bg-gradient-to-b from-[#140224]/95 to-[#05020c]/98 border-purple-500/30 shadow-[0_-15px_30px_rgba(168,85,247,0.12)]'
                         : activeBrand === 'both'
                         ? 'bg-gradient-to-b from-[#0a0518]/95 to-[#05020c]/98 border-purple-500/25 shadow-[0_-15px_30px_rgba(168,85,247,0.12)]'
                         : 'bg-[#0c0d10] border-white/10'
@@ -16595,13 +16599,13 @@ export default function App() {
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className={pendingOrder.isMatching 
                 ? `absolute inset-x-3 bottom-0 md:bottom-4 z-[5000] w-[calc(100%-24px)] max-w-md mx-auto flex flex-col overflow-hidden border p-6 transition-all duration-500 ${
-                    pendingOrder.brand === 'bolt'
-                      ? 'bg-gradient-to-b from-[#021d0e] to-[#030905] text-white border-[#00ea72]/30 shadow-[0_25px_60px_rgba(0,252,114,0.18)] rounded-[40px]'
+                    pendingOrder.brand === 'hyper'
+                      ? 'bg-gradient-to-b from-[#140224] to-[#08030d] text-white border-purple-500/30 shadow-[0_25px_60px_rgba(168,85,247,0.18)] rounded-[40px]'
                       : 'bg-white text-black rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-gray-100'
                   }`
                 : `absolute inset-x-0 bottom-0 z-[5000] w-full max-w-md mx-auto flex flex-col overflow-hidden pb-2 transition-all duration-500 ${
-                    pendingOrder.brand === 'bolt'
-                      ? 'bg-gradient-to-b from-[#011a0d] to-[#030905] text-white border-t-[#00ea72]/25 shadow-[0_-15px_45px_rgba(0,252,114,0.1)] rounded-t-[44px]'
+                    pendingOrder.brand === 'hyper'
+                      ? 'bg-gradient-to-b from-[#0d011a] to-[#08030d] text-white border-t-purple-500/25 shadow-[0_-15px_45px_rgba(168,85,247,0.1)] rounded-t-[44px]'
                       : 'bg-white text-black rounded-t-[36px] shadow-[0_-15px_45px_rgba(0,0,0,0.22)] border-t border-gray-100'
                   }`
               }
@@ -16614,17 +16618,17 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-sm ${
-                        pendingOrder.brand === 'bolt' ? 'bg-[#00ca72] text-black font-extrabold' : 'bg-[#1a1a1a] text-white'
+                        pendingOrder.brand === 'hyper' ? 'bg-purple-600 text-white font-extrabold' : 'bg-[#1a1a1a] text-white'
                       }`}>
                         {pendingOrder.type === 'delivery' ? (
                           <>
-                            <Utensils size={13} className={pendingOrder.brand === 'bolt' ? 'text-black' : 'text-white'} />
-                            <span>{pendingOrder.brand === 'bolt' ? 'Bolt Food' : 'Uber Eats'}</span>
+                            <Utensils size={13} className={pendingOrder.brand === 'hyper' ? 'text-white' : 'text-white'} />
+                            <span>{pendingOrder.brand === 'hyper' ? 'Hyper Express' : 'Uber Eats'}</span>
                           </>
                         ) : (
                           <>
-                            <CarIcon size={13} className={pendingOrder.brand === 'bolt' ? 'text-black' : 'text-white'} fill="currentColor" />
-                            <span>{pendingOrder.restaurantName || (pendingOrder.brand === 'bolt' ? 'Bolt Ride' : 'UberX')}</span>
+                            <CarIcon size={13} className={pendingOrder.brand === 'hyper' ? 'text-white' : 'text-white'} fill="currentColor" />
+                            <span>{pendingOrder.restaurantName || (pendingOrder.brand === 'hyper' ? 'Hyper Ride' : 'UberX')}</span>
                           </>
                         )}
                       </div>
@@ -16650,26 +16654,26 @@ export default function App() {
                     <button 
                       onClick={handleDeclineOrder}
                       className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors active:scale-90 ${
-                        pendingOrder.brand === 'bolt'
+                        pendingOrder.brand === 'hyper'
                           ? 'bg-white/5 hover:bg-white/10 text-white border border-white/5'
                           : 'bg-gray-100 hover:bg-gray-200 text-gray-500'
                       }`}
                       aria-label="Decline"
                     >
-                      <X size={16} className={pendingOrder.brand === 'bolt' ? 'text-gray-300' : 'text-gray-550'} />
+                      <X size={16} className={pendingOrder.brand === 'hyper' ? 'text-gray-300' : 'text-gray-550'} />
                     </button>
                   </div>
 
                   {/* Premium display payout & rating */}
                   <div className="flex flex-col gap-1">
                     <h2 className={`font-sans text-[48px] font-black tracking-tight leading-none ${
-                      pendingOrder.brand === 'bolt' ? 'text-white' : 'text-gray-900'
+                      pendingOrder.brand === 'hyper' ? 'text-white' : 'text-gray-900'
                     }`}>
                       £{pendingOrder.estimatedPay % 1 === 0 ? pendingOrder.estimatedPay.toFixed(0) : pendingOrder.estimatedPay.toFixed(2)}
                     </h2>
                     
                     <div className={`flex items-center gap-1 mt-1 border w-fit px-2 py-0.5 rounded-md ${
-                      pendingOrder.brand === 'bolt'
+                      pendingOrder.brand === 'hyper'
                         ? 'bg-white/5 border-white/10 text-gray-300'
                         : 'bg-gray-100 border-gray-200/50 text-gray-700'
                     }`}>
@@ -16679,12 +16683,12 @@ export default function App() {
                   </div>
 
                   {/* Horizontal Divider */}
-                  <div className={`h-px my-1 ${pendingOrder.brand === 'bolt' ? 'bg-white/10' : 'bg-gray-100'}`} />
+                  <div className={`h-px my-1 ${pendingOrder.brand === 'hyper' ? 'bg-white/10' : 'bg-gray-100'}`} />
 
                   {/* Timeline with accurate metrics formatted */}
                   {(() => {
                     const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
-                    const isBolt = pendingOrder.brand === 'bolt';
+                    const isBolt = pendingOrder.brand === 'hyper';
                     if (isDouble) {
                       return (
                         <div className="relative pl-6 py-1 space-y-6">
@@ -16787,8 +16791,8 @@ export default function App() {
                       onClick={handleAcceptOrder}
                       disabled={isMatchingLoading || isMatchFailed}
                       className={`relative w-full py-4 active:scale-[0.98] transition-all rounded-2xl font-black text-lg shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden flex items-center justify-center min-h-[58px] ${
-                        pendingOrder.brand === 'bolt' 
-                          ? 'bg-[#00ca72] hover:bg-[#00b465] text-black hover:text-black' 
+                        pendingOrder.brand === 'hyper' 
+                          ? 'bg-purple-600 hover:bg-purple-700 text-white hover:text-white' 
                           : 'bg-[#1a1a1a] hover:bg-black text-white hover:text-white'
                       }`}
                     >
@@ -16800,7 +16804,7 @@ export default function App() {
                           animate={{ width: '0%' }}
                           transition={{ duration: 18, ease: 'linear' }}
                           className={`absolute bottom-0 left-0 h-1 z-20 ${
-                            pendingOrder.brand === 'bolt' ? 'bg-black/30' : 'bg-amber-500'
+                            pendingOrder.brand === 'hyper' ? 'bg-black/30' : 'bg-amber-500'
                           }`}
                         />
                       )}
@@ -16992,8 +16996,8 @@ export default function App() {
                       onClick={handleAcceptOrder}
                       disabled={isMatchingLoading || isMatchFailed}
                       className={`relative w-full py-5 active:scale-[0.98] transition-all rounded-2xl font-black text-xl overflow-hidden flex items-center justify-center min-h-[64px] ${
-                        pendingOrder.brand === 'bolt'
-                          ? 'bg-[#00ca72] hover:bg-[#00b865] text-black shadow-[0_12px_36px_rgba(0,202,114,0.32)] shadow-[#00ca72]/30'
+                        pendingOrder.brand === 'hyper'
+                          ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-[0_12px_36px_rgba(168,85,247,0.32)] shadow-purple-500/30'
                           : 'bg-[#1a1a1a] hover:bg-black text-white shadow-[0_12px_36px_rgba(0,0,0,0.3)]'
                       }`}
                     >
@@ -17005,7 +17009,7 @@ export default function App() {
                           animate={{ width: '0%' }}
                           transition={{ duration: 18, ease: 'linear' }}
                           className={`absolute bottom-0 left-0 h-1.5 z-20 ${
-                            pendingOrder.brand === 'bolt' ? 'bg-black/25' : 'bg-white/35'
+                            pendingOrder.brand === 'hyper' ? 'bg-black/25' : 'bg-white/35'
                           }`}
                         />
                       )}
