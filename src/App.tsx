@@ -106,7 +106,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, HyperProTier, ScheduledOrder, CompletedTrip, NavSimulation, Quest } from './types';
+import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, BoltProTier, ScheduledOrder, CompletedTrip, NavSimulation, Quest } from './types';
 import { HyperDriverLogo } from './components/HyperDriverLogo';
 import { MediaControls } from './components/MediaControls';
 import { InteractiveMap } from './components/InteractiveMap';
@@ -1349,7 +1349,7 @@ const ScheduledOrdersScreen = ({
       : (city === "Nottingham" ? taxiLandmarksNottingham : ["City Centre VIP Plaza", "Executive Terminal"]);
     
     const uberClasses = ['Uber Taxi', 'Uber Exec', 'Comfort', 'UberXL Luxe'];
-    const hyperClasses = ['Hyper Ride ⚡', 'Hyper Premium', 'Hyper Black', 'Hyper Electric Luxe'];
+    const hyperClasses = ['Bolt Ride ⚡', 'Bolt Premium', 'Bolt Black', 'Bolt Electric Luxe'];
 
     const notesPoolRide = [
       "Premium passenger. Appreciate VIP service and silent route.",
@@ -1409,7 +1409,7 @@ const ScheduledOrdersScreen = ({
         const houseNum = Math.floor(Math.random() * 150) + 1;
         destination = `Flat ${Math.floor(Math.random() * 20) + 1}, ${houseNum} ${custStreet}`;
         
-        vehicleClass = brand === 'uber' ? 'Uber Eats Courier' : 'Hyper Express Courier';
+        vehicleClass = brand === 'uber' ? 'Uber Eats Courier' : 'Bolt Food Courier';
         notes = notesPoolDelivery[Math.floor(Math.random() * notesPoolDelivery.length)];
       } else {
         const pickupsPool = city === "London" 
@@ -2077,10 +2077,10 @@ const TripPreferencesModal = ({
   };
 
   const services = [
-    { id: 'delivery', label: 'Hyper Eats', desc: 'Food and grocery delivery', icon: <Coffee size={20} /> },
+    { id: 'delivery', label: 'Bolt Food', desc: 'Food and grocery delivery', icon: <Coffee size={20} /> },
     { 
       id: 'ride', 
-      label: 'HyperX', 
+      label: 'Bolt Ride', 
       desc: isInsuranceExpired ? 'Insurance Required' : 'Passenger trips', 
       icon: <User size={20} />, 
       disabled: vehicleType !== 'Car' || isInsuranceExpired,
@@ -2117,7 +2117,7 @@ const TripPreferencesModal = ({
             </div>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { type: 'Car', icon: <CarIcon size={20} />, label: "HyperX / Eats" },
+                { type: 'Car', icon: <CarIcon size={20} />, label: "Bolt Ride / Food" },
                 { type: 'Bike', icon: <BikeIcon size={20} />, label: "Eats Only" },
                 { type: 'Scooter', icon: <Zap size={20} />, label: "Eats Only" }
               ].map(v => (
@@ -2188,7 +2188,7 @@ const TripPreferencesModal = ({
                 },
                 {
                   id: 'intercity',
-                  name: 'Hyper Intercity 🛣️',
+                  name: 'Bolt Intercity 🛣️',
                   desc: 'Long-distance cross-county premium routes',
                   metric: 'Juicy 1.8x Pay',
                   badge: 'Premium',
@@ -2197,7 +2197,7 @@ const TripPreferencesModal = ({
                 },
                 {
                   id: 'hyper_pet',
-                  name: 'Hyper Pet 🐾',
+                  name: 'Bolt Pet 🐾',
                   desc: 'Riders with friendly domestic animals',
                   metric: '+25% Tip Boost',
                   badge: 'Pet Friendly',
@@ -2206,7 +2206,7 @@ const TripPreferencesModal = ({
                 },
                 {
                   id: 'hyperxl',
-                  name: 'HyperXL Premium 🚙',
+                  name: 'Bolt XL Premium 🚙',
                   desc: 'High-capacity vehicle matchings (5-6 riders)',
                   metric: 'Enhanced base',
                   badge: 'XL Size',
@@ -2337,7 +2337,7 @@ const TripPreferencesModal = ({
                 className={`w-full p-4 rounded-[24px] flex items-center justify-between border-2 transition-all text-left ${soundPreference === 'synthesized' ? 'border-blue-500 bg-blue-500/5' : 'border-transparent bg-gray-50 dark:bg-white/5'}`}
               >
                 <div>
-                  <p className="font-sans text-[13px] font-black">🔊 Hyper Synthesized Ping</p>
+                  <p className="font-sans text-[13px] font-black">🔊 Bolt Synthesized Ping</p>
                   <p className="font-sans text-[9px] text-gray-400 font-bold mt-0.5">High-fidelity digital simulation of the driver alarm</p>
                 </div>
                 {soundPreference === 'synthesized' && <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center"><Check size={10} className="text-white font-black" strokeWidth={4} /></div>}
@@ -2515,7 +2515,7 @@ const TripPreferencesModal = ({
                 </div>
               </div>
             </div>
-            <p className="text-[9px] text-gray-500 font-bold mt-4 text-center">Some features require Hyper Pro Gold status.</p>
+            <p className="text-[9px] text-gray-500 font-bold mt-4 text-center">Some features require Bolt Pro Gold status.</p>
           </div>
         </div>
 
@@ -2689,7 +2689,7 @@ const NewUserForm = ({
       setHasSeenOnboarding(true);
       localStorage.setItem('hyper_driver_has_seen_onboarding', 'true');
       setCurrentScreen('home');
-      sendNotification("Profile Synced", `Welcome to Hyper Driver, ${nameInput}!`);
+      sendNotification("Profile Synced", `Welcome to Dual Dispatch, ${nameInput}!`);
     } catch (error) {
       console.error("Create account failed:", error);
       sendNotification("Error", "Could not complete account configuration.");
@@ -2766,7 +2766,7 @@ const NewUserForm = ({
             <div className="space-y-3.5">
               <div>
                 <h2 className="text-2xl font-black tracking-tight leading-tight">Log In</h2>
-                <p className="text-gray-400 font-bold text-[10px]">Access your existing Hyper Driver cloud account.</p>
+                <p className="text-gray-400 font-bold text-[10px]">Access your existing Dual Dispatch cloud account.</p>
               </div>
 
               {errorMessage && (
@@ -3417,8 +3417,8 @@ const OnboardingFlow = ({
             <p className="text-gray-400 font-bold mb-8">How do you want to earn?</p>
             <div className="grid gap-4">
                   {[
-                    { id: 'HyperX', label: 'Hyper X', desc: 'Carry passengers around the city', icon: <CarIcon size={32} /> },
-                    { id: 'Hyper Eats', label: 'Hyper Eats', desc: 'Deliver food and groceries', icon: <BikeIcon size={32} /> },
+                    { id: 'BoltX', label: 'Bolt Ride', desc: 'Carry passengers around the city', icon: <CarIcon size={32} /> },
+                    { id: 'Bolt Food', label: 'Bolt Food', desc: 'Deliver food and groceries', icon: <BikeIcon size={32} /> },
                   ].map(item => (
                     <button 
                       key={`service-type-${item.id}`}
@@ -4172,7 +4172,7 @@ const VehicleDetailsScreen = ({
             <div className="flex-1 text-left">
               <h4 className="font-extrabold text-lg text-black dark:text-white flex items-center gap-2">
                 <Zap size={20} className="text-amber-500 animate-pulse shrink-0" />
-                Hyper-X Back-to-Back Queue
+                Bolt-X Back-to-Back Queue
               </h4>
               <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest mt-0.5 mb-1.5 font-mono">Continuous Queue Mode</p>
               <p className="text-xs text-gray-500 font-bold leading-normal">
@@ -4409,7 +4409,7 @@ const PaymentMethodsScreen = ({
             <AlertCircle size={22} />
           </div>
           <div className="space-y-2">
-            <h4 className="font-black text-sm uppercase tracking-wider">Hyper Driver Driver Sandbox Simulation</h4>
+            <h4 className="font-black text-sm uppercase tracking-wider">Dual Dispatch Driver Sandbox Simulation</h4>
             <p className="text-xs leading-relaxed opacity-85">
               This application is an <strong>educational game simulator</strong> designed to demonstrate open-banking and driver ledger flows. No real currency is generated or held by this app, so payouts are completed with <strong>virtual sandbox bank deposits</strong>.
             </p>
@@ -4511,9 +4511,9 @@ const PaymentMethodsScreen = ({
           <h3 className="font-black text-xl mb-4">Payout Statements</h3>
           <div className="space-y-3">
             {[
-              { id: 'tx-2', date: 'Yesterday', amount: 45.20, type: 'earnings', title: 'Hyper Driver Driver Earnings Settled', ref: 'FPS-831902-DRV', bank: 'Monzo' },
+              { id: 'tx-2', date: 'Yesterday', amount: 45.20, type: 'earnings', title: 'Dual Dispatch Driver Earnings Settled', ref: 'FPS-831902-DRV', bank: 'Monzo' },
               { id: 'tx-1', date: '3 days ago', amount: -65.00, type: 'payout', title: 'Faster Payments Payout', ref: 'FPS-491932-DRV', bank: 'Barclays' },
-              { id: 'tx-3', date: '5 days ago', amount: 38.50, type: 'earnings', title: 'Hyper Driver Driver Earnings Settled', ref: 'FPS-193021-DRV', bank: 'Monzo' },
+              { id: 'tx-3', date: '5 days ago', amount: 38.50, type: 'earnings', title: 'Dual Dispatch Driver Earnings Settled', ref: 'FPS-193021-DRV', bank: 'Monzo' },
             ].map(tx => (
               <div key={tx.id} className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                 <div>
@@ -5249,7 +5249,7 @@ const AudioSettingsScreen = ({
                   <Volume2 size={24} />
                 </div>
                 <div className="text-left">
-                  <h4 className="font-black text-base">🔊 Hyper Synthesized</h4>
+                  <h4 className="font-black text-base">🔊 Bolt Synthesized</h4>
                   <p className="text-[10px] font-semibold text-gray-400">High-fidelity synthesiser chime simulation</p>
                 </div>
               </div>
@@ -6095,7 +6095,7 @@ const ReceiptScanModal = ({
         <button onClick={onClose} className="p-2 bg-white/10 rounded-full"><X size={24} /></button>
       </div>
       <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center pb-10">
-        <p className="text-gray-400 font-bold mb-4 text-center text-sm">Scan the physical Hyper Eats receipt to confirm you've picked up the correct order.</p>
+        <p className="text-gray-400 font-bold mb-4 text-center text-sm">Scan the physical Bolt Food receipt to confirm you've picked up the correct order.</p>
         <div className="w-full max-w-[320px] aspect-[4/5] bg-gray-900 rounded-3xl overflow-hidden relative border-2 border-dashed border-gray-700">
            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
            <div className="absolute inset-0 border-[30px] border-black/40 pointer-events-none" />
@@ -6164,7 +6164,7 @@ const LoadingScreen = () => {
           </motion.div>
         </div>
         
-        <h1 className="text-white text-4xl font-black tracking-tighter uppercase italic mb-2 drop-shadow-2xl">Hyper Eats</h1>
+        <h1 className="text-white text-4xl font-black tracking-tighter uppercase italic mb-2 drop-shadow-2xl">Dual Dispatch</h1>
           <div className="flex flex-col items-center gap-6">
             <div className="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-[0.3em] animate-pulse">
               <span>Systems Ready</span>
@@ -13524,12 +13524,12 @@ export default function App() {
                       <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none">
                         {topBarMode === 'today' && "Today's Earnings"}
                         {topBarMode === 'last_trip' && "Last Trip Payout"}
-                        {topBarMode === 'hyper_driver_pro' && `Hyper Pro - ${user.tier || 'Diamond'}`}
+                        {topBarMode === 'hyper_driver_pro' && `Bolt Pro - ${user.tier || 'Diamond'}`}
                       </span>
 
                       <div className="flex items-center gap-1.5 justify-center leading-none">
                         <span className={`font-display text-base font-black tracking-tight select-none ${
-                          activeBrand === 'hyper' ? 'text-[#c084fc]' : 'text-white'
+                          activeBrand === 'hyper' ? 'text-[#00ff88]' : 'text-white'
                         }`}>
                           {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
                           {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
@@ -13538,9 +13538,9 @@ export default function App() {
                       </div>
 
                       <div className="flex gap-1 mt-1 justify-center select-none">
-                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? (activeBrand === 'hyper' ? 'bg-[#c084fc] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
-                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? (activeBrand === 'hyper' ? 'bg-[#c084fc] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
-                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? (activeBrand === 'hyper' ? 'bg-[#c084fc] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
                       </div>
                     </motion.div>
 
@@ -13553,7 +13553,7 @@ export default function App() {
                           }}
                           className={`w-11 h-11 border rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-all text-sm uppercase font-black shrink-0 ${
                             activeBrand === 'hyper'
-                              ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
+                              ? 'bg-[#090e0c]/90 text-[#00ff88] border-[#00ca72]/30 shadow-[0_0_10px_rgba(0,234,114,0.15)]'
                               : activeBrand === 'both'
                               ? 'bg-[#0d091a]/95 text-indigo-400 border-purple-500/30'
                               : 'bg-slate-950 text-blue-400 border-white/10'
@@ -14745,7 +14745,7 @@ export default function App() {
                     <div className="flex-1 text-left">
                       <h3 className="font-black text-xl mb-1 flex items-center gap-2 text-black dark:text-white">
                         <Zap size={20} className="text-amber-500 animate-pulse shrink-0" />
-                        Hyper-X Back-to-Back
+                        Bolt-X Back-to-Back
                       </h3>
                       <p className="text-xs font-black uppercase text-amber-500 tracking-widest mb-2 font-mono">Continuous Queue Mode</p>
                       <p className="text-xs text-gray-500 font-medium leading-relaxed">
@@ -14757,8 +14757,8 @@ export default function App() {
                       onClick={() => {
                         setHyperXAutoQueue(prev => {
                           const val = !prev;
-                          sendNotification("Queue Status Updated", val ? "Hyper-X Back-to-Back queue active" : "Hyper-X Back-to-Back queue disabled");
-                          addToast("Hyper-X Preferences", val ? "Back-to-back queue active! Accept rides near dropoffs." : "Back-to-back queue inactive.", "success");
+                          sendNotification("Queue Status Updated", val ? "Bolt-X Back-to-Back queue active" : "Bolt-X Back-to-Back queue disabled");
+                          addToast("Bolt-X Preferences", val ? "Back-to-back queue active! Accept rides near dropoffs." : "Back-to-back queue inactive.", "success");
                           return val;
                         });
                       }}
@@ -14791,7 +14791,7 @@ export default function App() {
                       },
                       {
                         id: 'intercity',
-                        name: 'Hyper Intercity 🛣️',
+                        name: 'Bolt Intercity 🛣️',
                         desc: 'Long-distance high mileage premium routes across counties',
                         metric: 'Juicy 1.8x Payouts',
                         badge: 'Premium Rate',
@@ -14800,7 +14800,7 @@ export default function App() {
                       },
                       {
                         id: 'hyper_pet',
-                        name: 'Hyper Pet 🐾',
+                        name: 'Bolt Pet 🐾',
                         desc: 'Riders traveling with friendly domestic animals and carriers',
                         metric: '+25% Tip Multiply Boost',
                         badge: 'Pet Friendly',
@@ -14809,7 +14809,7 @@ export default function App() {
                       },
                       {
                         id: 'hyperxl',
-                        name: 'HyperXL Premium 🚙',
+                        name: 'Bolt XL Premium 🚙',
                         desc: 'Group bookings (5-6 passengers) with enhanced base mileage rates',
                         metric: 'Enhanced Base Rate',
                         badge: 'Extra Large',
@@ -14909,7 +14909,7 @@ export default function App() {
             <motion.div key="pro" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform"><X size={24} /></button>
-                <h1 className="text-3xl font-black">Hyper Pro</h1>
+                <h1 className="text-3xl font-black">Bolt Pro</h1>
               </div>
               <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-[40px] p-8 text-white mb-8 relative overflow-hidden shadow-2xl shadow-blue-600/30">
                 <div className="relative z-10">
@@ -15320,7 +15320,7 @@ export default function App() {
                         <Car size={32} />
                       </div>
                       <div>
-                        <h3 className="text-xl font-black">HyperX</h3>
+                        <h3 className="text-xl font-black">Bolt Ride</h3>
                         <p className="text-xs font-bold opacity-60 italic">Accept passenger requests</p>
                       </div>
                     </div>
@@ -15337,7 +15337,7 @@ export default function App() {
                   </div>
                   <div className="flex gap-2">
                     <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-black uppercase tracking-widest">Insurance Verified</span>
-                    <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-black uppercase tracking-widest">HyperX Eligible</span>
+                    <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-black uppercase tracking-widest">Bolt Eligible</span>
                   </div>
                 </div>
 
@@ -15348,7 +15348,7 @@ export default function App() {
                         <ShoppingBag size={32} />
                       </div>
                       <div>
-                        <h3 className="text-xl font-black">Hyper Eats</h3>
+                        <h3 className="text-xl font-black">Bolt Food</h3>
                         <p className="text-xs font-bold opacity-60 italic">Accept food delivery requests</p>
                       </div>
                     </div>
@@ -15677,7 +15677,7 @@ export default function App() {
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">System Update</p>
                         </div>
                         <p className="font-black text-lg leading-tight mb-2">{note}</p>
-                        <p className="text-xs text-gray-400 font-bold">Just now • Hyper Eats Driver</p>
+                        <p className="text-xs text-gray-400 font-bold">Just now • Bolt Food Driver</p>
                       </div>
                     </motion.div>
                   ))
@@ -15774,7 +15774,7 @@ export default function App() {
                 <div className="grid grid-cols-1 gap-4">
                   {[
                     { id: 'coffee', name: 'Premium Coffee', price: 3.50, icon: <Coffee /> },
-                    { id: 'jacket', name: 'Hyper Eats Jacket', price: 45.00, icon: <Zap /> },
+                    { id: 'jacket', name: 'Bolt Delivery Jacket', price: 45.00, icon: <Zap /> },
                     { id: 'ebike', name: 'Electric Delivery Bike', price: 1200.00, icon: <Zap /> },
                     { id: 'iphone', name: 'iPhone 15 Pro', price: 999.00, icon: <Smartphone /> },
                     { id: 'tesla', name: 'Tesla Model 3', price: 35000.00, icon: <Zap /> },
@@ -16624,17 +16624,17 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-sm ${
-                        pendingOrder.brand === 'hyper' ? 'bg-purple-600 text-white font-extrabold' : 'bg-[#1a1a1a] text-white'
+                        pendingOrder.brand === 'hyper' ? 'bg-[#00ca72] text-white font-extrabold' : 'bg-[#1a1a1a] text-white'
                       }`}>
                         {pendingOrder.type === 'delivery' ? (
                           <>
                             <Utensils size={13} className={pendingOrder.brand === 'hyper' ? 'text-white' : 'text-white'} />
-                            <span>{pendingOrder.brand === 'hyper' ? 'Hyper Express' : 'Uber Eats'}</span>
+                            <span>{pendingOrder.brand === 'hyper' ? 'Bolt Food' : 'Uber Eats'}</span>
                           </>
                         ) : (
                           <>
                             <CarIcon size={13} className={pendingOrder.brand === 'hyper' ? 'text-white' : 'text-white'} fill="currentColor" />
-                            <span>{pendingOrder.restaurantName || (pendingOrder.brand === 'hyper' ? 'Hyper Ride' : 'UberX')}</span>
+                            <span>{pendingOrder.restaurantName || (pendingOrder.brand === 'hyper' ? 'Bolt Ride' : 'UberX')}</span>
                           </>
                         )}
                       </div>
@@ -17262,7 +17262,7 @@ export default function App() {
                     <CheckCircle2 size={24} />
                     <div>
                       <h4 className="font-extrabold text-sm text-emerald-300">Fast Bank Cash Out Complete</h4>
-                      <p className="text-xs text-emerald-400/80 leading-snug">The funds have successfully left our Hyper Driver payout vaults and are fully settled inside your linked {activePayout.bankName} account.</p>
+                      <p className="text-xs text-emerald-400/80 leading-snug">The funds have successfully left our Dual Dispatch payout vaults and are fully settled inside your linked {activePayout.bankName} account.</p>
                     </div>
                   </div>
 
@@ -18286,7 +18286,7 @@ const PolicyDocumentModal = ({
               </p>
               <div className="p-4 border-l-4 border-blue-600 bg-blue-50 text-blue-900">
                 <p className="font-bold mb-1">Exclusions</p>
-                <p className="text-xs">Coverage does not apply for off-platform commercial activities not authorized via the Hyper Driver interface.</p>
+                <p className="text-xs">Coverage does not apply for off-platform commercial activities not authorized via the Dual Dispatch interface.</p>
               </div>
             </section>
 
@@ -18641,7 +18641,7 @@ export const InsuranceRenewalChat = ({
           <h2 className="font-black text-lg truncate leading-tight">Sarah (Compliance)</h2>
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <p className="text-[9px] text-gray-400 font-black tracking-widest uppercase truncate">Hyper Driver Support • Compliance</p>
+            <p className="text-[9px] text-gray-400 font-black tracking-widest uppercase truncate">Dual Dispatch Support • Compliance</p>
           </div>
         </div>
         <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg">

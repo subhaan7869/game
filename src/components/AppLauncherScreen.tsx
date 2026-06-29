@@ -82,7 +82,7 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
           transition={{ delay: 0.1 }}
           className="font-display text-3xl font-black tracking-tight leading-none uppercase text-white"
         >
-          Hyper Dispatch Hub
+          Bolt Dispatch Hub
         </motion.h1>
         
         <p className="text-xs text-gray-400 font-bold max-w-sm mt-1.5 leading-snug">
@@ -282,7 +282,7 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
       {/* Footer Block */}
       <div className="relative z-10 w-full max-w-lg mx-auto flex flex-col items-center mt-6 text-center select-none shrink-0">
         <span className="font-mono text-[8px] font-black tracking-wider uppercase text-gray-600">
-          HYPER DRIVER COGNITIVE INTEGRAL DISPATCH LAYERS • VERSION 5.0
+          BOLT DRIVER COGNITIVE INTEGRAL DISPATCH LAYERS • VERSION 5.0
         </span>
         <div className="flex items-center gap-1.5 text-[9px] font-bold text-gray-700 mt-0.5">
           <span>Simulation Layer online</span>

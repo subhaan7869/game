@@ -94,7 +94,7 @@ export interface CompletedTrip {
   };
 }
 
-export type HyperProTier = 'Blue' | 'Gold' | 'Platinum' | 'Diamond';
+export type BoltProTier = 'Blue' | 'Gold' | 'Platinum' | 'Diamond';
 
 export interface Mission {
   id: string;
@@ -125,7 +125,7 @@ export interface UserProfile {
   email?: string;
   name: string;
   rating: number;
-  tier: HyperProTier;
+  tier: BoltProTier;
   points: number;
   experience: number; // For progression
   level: number;

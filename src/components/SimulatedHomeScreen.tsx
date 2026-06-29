@@ -88,7 +88,7 @@ export default function SimulatedHomeScreen({
       <div className="w-full px-5 pt-3 pb-2 flex items-center justify-between z-50 bg-black/30 backdrop-blur-sm shrink-0 border-b border-white/5">
         <div className="flex items-center gap-1">
           <span className="text-xs font-black tracking-tight font-mono text-slate-100">{timeStr}</span>
-          <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded ml-1 tracking-wider uppercase">HyperNet 5G</span>
+          <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded ml-1 tracking-wider uppercase">EE 5G</span>
           {isOnline && (
             <motion.div 
               animate={{ opacity: [0.6, 1, 0.6] }}
@@ -161,7 +161,7 @@ export default function SimulatedHomeScreen({
         {/* Simulated iOS Style App Icons Grid */}
         <div className="grid grid-cols-4 gap-y-7 gap-x-3 mt-4 max-w-sm mx-auto">
           
-          {/* Hyper Driver - Our App! */}
+          {/* Dual Dispatch - Our App! */}
           <div className="flex flex-col items-center">
             <button 
               onClick={onOpenApp}
@@ -180,7 +180,7 @@ export default function SimulatedHomeScreen({
                 </motion.div>
               )}
             </button>
-            <span className="text-[10px] text-slate-200 mt-1.5 font-bold tracking-tight text-center truncate w-full">Hyper Driver</span>
+            <span className="text-[10px] text-slate-200 mt-1.5 font-bold tracking-tight text-center truncate w-full">Dual Dispatch</span>
           </div>
 
           {[
@@ -194,7 +194,7 @@ export default function SimulatedHomeScreen({
           ].map((app, i) => (
             <div key={`mock-app-${i}`} className="flex flex-col items-center">
               <button 
-                onClick={() => addToast(`Mock Launch: ${app.label}`, "Simulated iOS device application placeholder. Open 'Hyper Driver' to return.", "info")}
+                onClick={() => addToast(`Mock Launch: ${app.label}`, "Simulated iOS device application placeholder. Open 'Dual Dispatch' to return.", "info")}
                 className={`w-14 h-14 ${app.bg} backdrop-blur shadow rounded-2xl flex items-center justify-center text-slate-300 active:scale-90 transition-all cursor-pointer hover:border-white/20`}
               >
                 {app.icon}

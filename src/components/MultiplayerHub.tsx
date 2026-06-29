@@ -532,7 +532,7 @@ export const MultiplayerHub: React.FC<MultiplayerHubProps> = ({
                   Driver Reputation Index
                 </h3>
                 <p className="text-xs text-gray-500 font-bold leading-relaxed mt-1">
-                  HyperX drivers are evaluated by our local dispatch algorithms on real-time metrics. High ratings unlock elite matches with up to 25% pay premium.
+                  Bolt drivers are evaluated by our local dispatch algorithms on real-time metrics. High ratings unlock elite matches with up to 25% pay premium.
                 </p>
               </div>
             </div>

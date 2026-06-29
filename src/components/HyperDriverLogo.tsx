@@ -94,7 +94,7 @@ export const HyperDriverLogo: React.FC<{ className?: string; size?: 'sm' | 'md' 
         textAnchor="middle"
         style={{ transform: 'skewX(-10deg)', transformOrigin: '300px 126px' }}
       >
-        HYPER
+        BOLT
       </text>
 
       {/* Text "DRIVER" slanted electric blue */}
