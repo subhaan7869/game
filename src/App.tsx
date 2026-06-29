@@ -6822,7 +6822,7 @@ export default function App() {
         if (wasPaused) {
           setUberOnline(true);
           setTimeout(() => {
-            addToast("Uber Auto-Resumed ▶️", "Uber dispatch resume active since your Hyper trip completed.", "success");
+            addToast("Uber Auto-Resumed ▶️", "Uber dispatch resume active since your Bolt trip completed.", "success");
           }, 100);
         }
         return false;
@@ -6831,7 +6831,7 @@ export default function App() {
         if (wasPaused) {
           setHyperOnline(true);
           setTimeout(() => {
-            addToast("Hyper Auto-Resumed ▶️", "Hyper dispatch resume active since your Uber trip completed.", "success");
+            addToast("Bolt Auto-Resumed ▶️", "Bolt dispatch resume active since your Uber trip completed.", "success");
           }, 100);
         }
         return false;
@@ -8221,7 +8221,7 @@ export default function App() {
   const [lastTrip, setLastTrip] = useState<{ amount: number, time: string, type: string } | null>({
     amount: 7.75,
     time: getArrivalTime(-45),
-    type: "Hyper Eats"
+    type: "Bolt Food"
   });
 
   const [fuel, setFuel] = useState<number>(() => {
@@ -9969,22 +9969,22 @@ export default function App() {
       } else {
         if (type === 'ride') {
           const ridePool: string[] = [];
-          if (enabledServices.includes('rideshare')) ridePool.push('Hyper Share 👥');
-          if (enabledServices.includes('intercity')) ridePool.push('Hyper Intercity 🚀');
-          if (enabledServices.includes('hyper_pet')) ridePool.push('Hyper Pet 🐾');
-          if (enabledServices.includes('hyperxl')) ridePool.push('Hyper XL 🚙');
-          if (enabledServices.includes('green')) ridePool.push('Hyper Eco 🔋');
-          if (enabledServices.includes('assist')) ridePool.push('Hyper Assist ♿');
+          if (enabledServices.includes('rideshare')) ridePool.push('Bolt Share 👥');
+          if (enabledServices.includes('intercity')) ridePool.push('Bolt Intercity 🚀');
+          if (enabledServices.includes('hyper_pet')) ridePool.push('Bolt Pet 🐾');
+          if (enabledServices.includes('hyperxl')) ridePool.push('Bolt XL 🚙');
+          if (enabledServices.includes('green')) ridePool.push('Bolt Eco 🔋');
+          if (enabledServices.includes('assist')) ridePool.push('Bolt Assist ♿');
           
           if (ridePool.length > 0) {
             variant = ridePool[Math.floor(Math.random() * ridePool.length)];
           } else {
-            variant = 'Hyper Share 👥';
+            variant = 'Bolt Share 👥';
           }
         } else {
-          const delivPool: string[] = ['Hyper Express 🍔'];
+          const delivPool: string[] = ['Bolt Food 🍔'];
           if (enabledServices.includes('packages')) {
-            delivPool.push('Hyper Courier 📦');
+            delivPool.push('Bolt Courier 📦');
           }
           variant = delivPool[Math.floor(Math.random() * delivPool.length)];
         }
@@ -10158,7 +10158,7 @@ export default function App() {
       id: sch.id || `TXB-${Math.floor(Math.random() * 90000) + 10000}`,
       type: orderType,
       restaurantName: sch.restaurantName || (orderType === 'delivery' ? "Uber Eats Restaurant" : "Pre-booked VIP Ride"),
-      customerName: orderType === 'delivery' ? (sch.destinationName || "Uber Eats Customer") : (brand === 'uber' ? "Uber Reserved Passenger" : "Hyper Scheduled Passenger"),
+      customerName: orderType === 'delivery' ? (sch.destinationName || "Uber Eats Customer") : (brand === 'uber' ? "Uber Reserved Passenger" : "Bolt Scheduled Passenger"),
       restaurantLocation: restLoc,
       pickupLocation: restLoc,
       customerLocation: { 
@@ -10186,7 +10186,7 @@ export default function App() {
       : `⏰ Pre-booking Time!`;
     const notificationBody = orderType === 'delivery'
       ? `Your scheduled Uber Eats delivery is due now!`
-      : `Your scheduled ${brand === 'uber' ? 'Uber' : 'Hyper'} trip is due now!`;
+      : `Your scheduled ${brand === 'uber' ? 'Uber' : 'Bolt'} trip is due now!`;
       
     sendNotification(notificationTitle, notificationBody);
     if (addToast) {
@@ -10666,10 +10666,10 @@ export default function App() {
       if (autoPauseSecondApp) {
         if (pendingOrder.brand === 'uber' && hyperOnline) {
           setHyperOnline(false);
-          addToast("Hyper Auto-Paused ⏸️", "Hyper paused to keep full focus on your Uber trip.", "info");
+          addToast("Bolt Auto-Paused ⏸️", "Bolt paused to keep full focus on your Uber trip.", "info");
         } else if (pendingOrder.brand === 'hyper' && uberOnline) {
           setUberOnline(false);
-          addToast("Uber Auto-Paused ⏸️", "Uber paused to keep full focus on your Hyper trip.", "info");
+          addToast("Uber Auto-Paused ⏸️", "Uber paused to keep full focus on your Bolt trip.", "info");
         }
       }
 
@@ -11604,8 +11604,8 @@ export default function App() {
             }
 
             addToast(
-              brand === 'uber' ? 'Uber Workspace Loaded 🖤' : brand === 'hyper' ? 'Hyper Workspace Loaded 💜' : 'Dual-Dispatch Workspace Loaded 🔮',
-              brand === 'uber' ? 'Minimal Slate interface active. Focus Mode stabilized.' : brand === 'hyper' ? 'Electric Violet interface active. Premium Ride-Hailing engine loaded.' : 'Unified multi-app dashboard active.',
+              brand === 'uber' ? 'Uber Workspace Loaded 🖤' : brand === 'hyper' ? 'Bolt Workspace Loaded 💚' : 'Dual-Dispatch Workspace Loaded 🔮',
+              brand === 'uber' ? 'Minimal Slate interface active. Focus Mode stabilized.' : brand === 'hyper' ? 'Mint Green interface active. Premium Bolt Ride-Hailing engine loaded.' : 'Unified multi-app dashboard active.',
               'success'
             );
           }}
@@ -13697,7 +13697,7 @@ export default function App() {
                                     exit={{ opacity: 0, y: -10 }}
                                     transition={{ duration: 0.3 }}
                                     className={`absolute font-display text-xl font-black tracking-tight leading-none ${
-                                      activeBrand === 'hyper' ? 'text-[#c084fc]' : activeBrand === 'both' ? 'text-purple-300' : 'text-white'
+                                      activeBrand === 'hyper' ? 'text-[#00ff88]' : activeBrand === 'both' ? 'text-purple-300' : 'text-white'
                                     }`}
                                   >
                                     {isOnBreak 
@@ -13705,7 +13705,7 @@ export default function App() {
                                       : activeBrand === 'both' 
                                       ? "Duo-Scanning Active" 
                                       : activeBrand === 'hyper' 
-                                      ? "Hyper scanning live" 
+                                      ? "Bolt scanning live" 
                                       : "You're online"}
                                   </motion.span>
                                 )}
@@ -13735,7 +13735,7 @@ export default function App() {
                                     {isOnBreak 
                                       ? "Taking a pause from offers" 
                                       : activeBrand === 'both' 
-                                      ? "Monitoring Uber & Hyper dispatch" 
+                                      ? "Monitoring Uber & Bolt dispatch" 
                                       : activeBrand === 'hyper'
                                       ? "Finding opportunities near you"
                                       : "Searching for trips"}

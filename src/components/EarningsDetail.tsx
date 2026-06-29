@@ -180,7 +180,7 @@ export const EarningsDetail = ({
                 Issue with this delivery?
              </button>
              <button className="w-full py-4 rounded-2xl font-black text-xs uppercase tracking-wider bg-[#121214] border border-white/5 text-gray-400 hover:text-white transition-all active:scale-95">
-                Contact Hyper Dispatch
+                Contact Bolt Dispatch
              </button>
           </div>
         </div>

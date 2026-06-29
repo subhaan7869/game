@@ -10,8 +10,29 @@
     <meta name="theme-color" content="#090a0f" />
     <link rel="apple-touch-icon" href="/icon.png" />
     <title>Hyper Driver Dashboard</title>
-    <!-- Google AdSense Auto Ads integration with pub-3590152533738920 -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3590152533738920" crossorigin="anonymous"></script>
+    <!-- Google AdSense Auto Ads integration with pub-3590152533738920 (Loaded safely to prevent cross-origin iframe issues) -->
+    <script>
+      (function() {
+        try {
+          // Check if we are inside an iframe (like AI Studio preview)
+          var isIframe = window.self !== window.top;
+          if (!isIframe) {
+            var script = document.createElement('script');
+            script.async = true;
+            script.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3590152533738920";
+            script.crossOrigin = "anonymous";
+            script.onerror = function() {
+              console.warn("Google AdSense script could not be loaded (it might be blocked by an ad-blocker).");
+            };
+            document.head.appendChild(script);
+          } else {
+            console.log("Google AdSense: Skipped loading script inside sandbox preview iframe to prevent cross-origin DOM exceptions.");
+          }
+        } catch (e) {
+          console.error("Google AdSense: Error during dynamic load checks:", e);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root">

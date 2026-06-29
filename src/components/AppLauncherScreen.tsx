@@ -58,7 +58,7 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
           uberOnline ? 'bg-sky-500/15' : 'bg-sky-500/5'
         }`} />
         <div className={`absolute bottom-10 left-10 w-[300px] h-[300px] blur-[130px] rounded-full transition-colors duration-1000 ${
-          hyperOnline ? 'bg-purple-500/15' : 'bg-purple-500/5'
+          hyperOnline ? 'bg-[#00ea72]/15' : 'bg-[#00ea72]/5'
         }`} />
         <div className="absolute top-1/3 left-1/4 w-[400px] h-[400px] bg-indigo-600/5 blur-[120px] rounded-full" />
       </div>
@@ -135,23 +135,23 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
               </div>
             </div>
 
-            {/* Hyper Rideshare Offline/Online Trigger */}
+            {/* Bolt Rideshare Offline/Online Trigger */}
             <div 
               onClick={handleToggleHyper}
               className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between h-[105px] select-none ${
                 hyperOnline 
-                  ? 'bg-purple-550/10 border-purple-450/40 shadow-[0_4px_20px_rgba(168,85,247,0.1)]' 
+                  ? 'bg-emerald-500/10 border-emerald-500/40 shadow-[0_4px_20px_rgba(16,185,129,0.1)]' 
                   : 'bg-white/[0.02] border-white/5 opacity-60 hover:opacity-100 hover:bg-white/[0.04]'
               }`}
             >
               <div className="flex items-center justify-between">
                 <span className={`w-8 h-8 rounded-xl font-sans font-black flex items-center justify-center text-sm ${
-                  hyperOnline ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20' : 'bg-white/5 text-gray-400'
+                  hyperOnline ? 'bg-[#00ca72] text-white shadow-sm shadow-[#00ca72]/20' : 'bg-white/5 text-gray-400'
                 }`}>
-                  H
+                  B
                 </span>
                 {/* Switch indicator */}
-                <div className={`w-9 h-5 rounded-full p-0.5 transition-all relative ${hyperOnline ? 'bg-purple-600' : 'bg-neutral-800'}`}>
+                <div className={`w-9 h-5 rounded-full p-0.5 transition-all relative ${hyperOnline ? 'bg-[#00ca72]' : 'bg-neutral-800'}`}>
                   <motion.div 
                     layout
                     className="w-4 h-4 bg-white rounded-full shadow-md"
@@ -161,8 +161,8 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
                 </div>
               </div>
               <div className="text-left mt-1">
-                <span className="text-xs font-black uppercase text-white block">Hyper Rideshare</span>
-                <span className={`text-[10px] font-mono font-black uppercase tracking-wider block ${hyperOnline ? 'text-purple-400' : 'text-gray-500'}`}>
+                <span className="text-xs font-black uppercase text-white block">Bolt Rideshare</span>
+                <span className={`text-[10px] font-mono font-black uppercase tracking-wider block ${hyperOnline ? 'text-[#00ff88]' : 'text-gray-500'}`}>
                   {hyperOnline ? '● Active' : '○ Standby'}
                 </span>
               </div>
@@ -212,36 +212,36 @@ export const AppLauncherScreen: React.FC<AppLauncherScreenProps> = ({
             </div>
           </motion.div>
 
-          {/* Card B: Launch Hyper Rideshare Client */}
+          {/* Card B: Launch Bolt Rideshare Client */}
           <motion.div
             whileHover={{ scale: 1.01, y: -1 }}
             whileTap={{ scale: 0.99 }}
             onClick={() => onSelect('hyper')}
-            className={`cursor-pointer overflow-hidden rounded-[24px] border p-4.5 flex items-center justify-between transition-all bg-[#0d0a14] ${
-              activeBrand === 'hyper' ? 'border-purple-500 shadow-[0_4px_25px_rgba(168,85,247,0.15)]' : 'border-white/5 hover:border-white/10 shadow-lg'
+            className={`cursor-pointer overflow-hidden rounded-[24px] border p-4.5 flex items-center justify-between transition-all bg-[#090e0c] ${
+              activeBrand === 'hyper' ? 'border-[#00ca72] shadow-[0_4px_25px_rgba(0,234,114,0.15)]' : 'border-white/5 hover:border-white/10 shadow-lg'
             }`}
           >
             <div className="flex items-center gap-3.5 text-left">
               <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-sans font-black text-lg transition-colors ${
                 hyperOnline 
-                  ? 'bg-purple-500/10 border border-purple-500/20 text-purple-400' 
+                  ? 'bg-emerald-500/10 border border-emerald-500/20 text-[#00ff88]' 
                   : 'bg-white/5 border border-white/10 text-gray-500'
               }`}>
-                H
+                B
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-black tracking-tight uppercase text-white">Hyper Rideshare Client</span>
+                  <span className="text-sm font-black tracking-tight uppercase text-white">Bolt Driver Client</span>
                   {activeBrand === 'hyper' && (
-                    <span className="bg-purple-500/10 text-purple-400 font-mono text-[7px] font-black px-1.5 py-0.5 rounded uppercase">Active View</span>
+                    <span className="bg-emerald-500/10 text-[#00ff88] font-mono text-[7px] font-black px-1.5 py-0.5 rounded uppercase">Active View</span>
                   )}
                 </div>
                 <p className="text-[10px] font-bold text-gray-500 mt-0.5 leading-snug">
-                  Vivid Electric Violet premium interface.
+                  Vivid Mint Green premium interface.
                 </p>
               </div>
             </div>
-            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-500/15 text-purple-400">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-emerald-500/15 text-[#00ff88]">
               <ShieldCheck size={13} />
             </div>
           </motion.div>
