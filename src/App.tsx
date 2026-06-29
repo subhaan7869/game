@@ -106,7 +106,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, BoltProTier, ScheduledOrder, CompletedTrip, NavSimulation, Quest } from './types';
+import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, HyperProTier, ScheduledOrder, CompletedTrip, NavSimulation, Quest } from './types';
 import { HyperDriverLogo } from './components/HyperDriverLogo';
 import { MediaControls } from './components/MediaControls';
 import { InteractiveMap } from './components/InteractiveMap';
@@ -115,7 +115,6 @@ import { WebAnalyticsDashboard } from './components/WebAnalyticsDashboard';
 import SimulatedHomeScreen from './components/SimulatedHomeScreen';
 import { CompanionChat } from './components/CompanionChat';
 import { MultiplayerHub, OtherDriver } from './components/MultiplayerHub';
-import { AppLauncherScreen } from './components/AppLauncherScreen';
 import { CommandCentreScreen } from './components/CommandCentreScreen';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -1132,11 +1131,6 @@ const SideMenu = ({
               action: () => { setCurrentScreen('account'); setIsSideMenuOpen(false); } 
             },
             { 
-              icon: <Layers size={20} />, 
-              label: "Relaunch Workspace", 
-              action: () => { setShowAppLauncher(true); setIsSideMenuOpen(false); } 
-            },
-            { 
               icon: <Shield size={20} />, 
               label: "Help", 
               action: () => { setCurrentScreen('safety'); setIsSideMenuOpen(false); } 
@@ -1349,7 +1343,7 @@ const ScheduledOrdersScreen = ({
       : (city === "Nottingham" ? taxiLandmarksNottingham : ["City Centre VIP Plaza", "Executive Terminal"]);
     
     const uberClasses = ['Uber Taxi', 'Uber Exec', 'Comfort', 'UberXL Luxe'];
-    const hyperClasses = ['Bolt Ride ⚡', 'Bolt Premium', 'Bolt Black', 'Bolt Electric Luxe'];
+    const hyperClasses = ['Hyper Ride ⚡', 'Hyper Premium', 'Hyper Black', 'Hyper Electric Luxe'];
 
     const notesPoolRide = [
       "Premium passenger. Appreciate VIP service and silent route.",
@@ -1409,7 +1403,7 @@ const ScheduledOrdersScreen = ({
         const houseNum = Math.floor(Math.random() * 150) + 1;
         destination = `Flat ${Math.floor(Math.random() * 20) + 1}, ${houseNum} ${custStreet}`;
         
-        vehicleClass = brand === 'uber' ? 'Uber Eats Courier' : 'Bolt Food Courier';
+        vehicleClass = brand === 'uber' ? 'Uber Eats Courier' : 'Hyper Eats Courier';
         notes = notesPoolDelivery[Math.floor(Math.random() * notesPoolDelivery.length)];
       } else {
         const pickupsPool = city === "London" 
@@ -1564,7 +1558,7 @@ const ScheduledOrdersScreen = ({
                 <span className={`px-2 py-0.5 rounded text-[9px] font-black tracking-wider uppercase ${
                   selectedOffer.brand === 'uber' ? 'bg-white text-black' : 'bg-[#22c55e] text-black'
                 }`}>
-                  {selectedOffer.brand === 'uber' ? 'Uber Reserve' : 'Bolt Pre-book'}
+                  {selectedOffer.brand === 'uber' ? 'Uber Reserve' : 'Hyper Pre-book'}
                 </span>
                 <span className="text-[10px] text-gray-500 font-mono tracking-widest uppercase">{selectedOffer.id}</span>
               </div>
@@ -1891,7 +1885,7 @@ const ScheduledOrdersScreen = ({
                               <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
                                 brand === 'uber' ? 'bg-white text-black' : 'bg-[#22c55e] text-black'
                               }`}>
-                                {brand === 'uber' ? 'Uber Reserved' : 'Bolt Scheduled'}
+                                {brand === 'uber' ? 'Uber Reserved' : 'Hyper Scheduled'}
                               </span>
                               <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[8px] font-black uppercase tracking-wider">
                                 {order.status}
@@ -2077,10 +2071,10 @@ const TripPreferencesModal = ({
   };
 
   const services = [
-    { id: 'delivery', label: 'Bolt Food', desc: 'Food and grocery delivery', icon: <Coffee size={20} /> },
+    { id: 'delivery', label: 'Hyper Eats', desc: 'Food and grocery delivery', icon: <Coffee size={20} /> },
     { 
       id: 'ride', 
-      label: 'Bolt Ride', 
+      label: 'Hyper Ride', 
       desc: isInsuranceExpired ? 'Insurance Required' : 'Passenger trips', 
       icon: <User size={20} />, 
       disabled: vehicleType !== 'Car' || isInsuranceExpired,
@@ -2117,7 +2111,7 @@ const TripPreferencesModal = ({
             </div>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { type: 'Car', icon: <CarIcon size={20} />, label: "Bolt Ride / Food" },
+                { type: 'Car', icon: <CarIcon size={20} />, label: "Hyper Ride / Eats" },
                 { type: 'Bike', icon: <BikeIcon size={20} />, label: "Eats Only" },
                 { type: 'Scooter', icon: <Zap size={20} />, label: "Eats Only" }
               ].map(v => (
@@ -2188,7 +2182,7 @@ const TripPreferencesModal = ({
                 },
                 {
                   id: 'intercity',
-                  name: 'Bolt Intercity 🛣️',
+                  name: 'Hyper Intercity 🛣️',
                   desc: 'Long-distance cross-county premium routes',
                   metric: 'Juicy 1.8x Pay',
                   badge: 'Premium',
@@ -2197,7 +2191,7 @@ const TripPreferencesModal = ({
                 },
                 {
                   id: 'hyper_pet',
-                  name: 'Bolt Pet 🐾',
+                  name: 'Hyper Pet 🐾',
                   desc: 'Riders with friendly domestic animals',
                   metric: '+25% Tip Boost',
                   badge: 'Pet Friendly',
@@ -2206,7 +2200,7 @@ const TripPreferencesModal = ({
                 },
                 {
                   id: 'hyperxl',
-                  name: 'Bolt XL Premium 🚙',
+                  name: 'Hyper XL Premium 🚙',
                   desc: 'High-capacity vehicle matchings (5-6 riders)',
                   metric: 'Enhanced base',
                   badge: 'XL Size',
@@ -2337,7 +2331,7 @@ const TripPreferencesModal = ({
                 className={`w-full p-4 rounded-[24px] flex items-center justify-between border-2 transition-all text-left ${soundPreference === 'synthesized' ? 'border-blue-500 bg-blue-500/5' : 'border-transparent bg-gray-50 dark:bg-white/5'}`}
               >
                 <div>
-                  <p className="font-sans text-[13px] font-black">🔊 Bolt Synthesized Ping</p>
+                  <p className="font-sans text-[13px] font-black">🔊 Hyper Synthesized Ping</p>
                   <p className="font-sans text-[9px] text-gray-400 font-bold mt-0.5">High-fidelity digital simulation of the driver alarm</p>
                 </div>
                 {soundPreference === 'synthesized' && <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center"><Check size={10} className="text-white font-black" strokeWidth={4} /></div>}
@@ -2515,7 +2509,7 @@ const TripPreferencesModal = ({
                 </div>
               </div>
             </div>
-            <p className="text-[9px] text-gray-500 font-bold mt-4 text-center">Some features require Bolt Pro Gold status.</p>
+            <p className="text-[9px] text-gray-500 font-bold mt-4 text-center">Some features require Hyper Pro Gold status.</p>
           </div>
         </div>
 
@@ -3417,8 +3411,8 @@ const OnboardingFlow = ({
             <p className="text-gray-400 font-bold mb-8">How do you want to earn?</p>
             <div className="grid gap-4">
                   {[
-                    { id: 'BoltX', label: 'Bolt Ride', desc: 'Carry passengers around the city', icon: <CarIcon size={32} /> },
-                    { id: 'Bolt Food', label: 'Bolt Food', desc: 'Deliver food and groceries', icon: <BikeIcon size={32} /> },
+                    { id: 'HyperX', label: 'Hyper Ride', desc: 'Carry passengers around the city', icon: <CarIcon size={32} /> },
+                    { id: 'Hyper Eats', label: 'Hyper Eats', desc: 'Deliver food and groceries', icon: <BikeIcon size={32} /> },
                   ].map(item => (
                     <button 
                       key={`service-type-${item.id}`}
@@ -4172,7 +4166,7 @@ const VehicleDetailsScreen = ({
             <div className="flex-1 text-left">
               <h4 className="font-extrabold text-lg text-black dark:text-white flex items-center gap-2">
                 <Zap size={20} className="text-amber-500 animate-pulse shrink-0" />
-                Bolt-X Back-to-Back Queue
+                Hyper-X Back-to-Back Queue
               </h4>
               <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest mt-0.5 mb-1.5 font-mono">Continuous Queue Mode</p>
               <p className="text-xs text-gray-500 font-bold leading-normal">
@@ -5249,7 +5243,7 @@ const AudioSettingsScreen = ({
                   <Volume2 size={24} />
                 </div>
                 <div className="text-left">
-                  <h4 className="font-black text-base">🔊 Bolt Synthesized</h4>
+                  <h4 className="font-black text-base">🔊 Hyper Synthesized</h4>
                   <p className="text-[10px] font-semibold text-gray-400">High-fidelity synthesiser chime simulation</p>
                 </div>
               </div>
@@ -6095,7 +6089,7 @@ const ReceiptScanModal = ({
         <button onClick={onClose} className="p-2 bg-white/10 rounded-full"><X size={24} /></button>
       </div>
       <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center pb-10">
-        <p className="text-gray-400 font-bold mb-4 text-center text-sm">Scan the physical Bolt Food receipt to confirm you've picked up the correct order.</p>
+        <p className="text-gray-400 font-bold mb-4 text-center text-sm">Scan the physical Hyper Eats receipt to confirm you've picked up the correct order.</p>
         <div className="w-full max-w-[320px] aspect-[4/5] bg-gray-900 rounded-3xl overflow-hidden relative border-2 border-dashed border-gray-700">
            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
            <div className="absolute inset-0 border-[30px] border-black/40 pointer-events-none" />
@@ -6462,7 +6456,7 @@ export default function App() {
   };
   const [isOffAppSimulated, setIsOffAppSimulated] = useState(false);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
-  const [showAppLauncher, setShowAppLauncher] = useState<boolean>(true);
+  const [showAppLauncher, setShowAppLauncher] = useState<boolean>(false);
   const [isCarPlaySynced, setIsCarPlaySynced] = useState(false);
   const [isCarPlayRemoteMode, setIsCarPlayRemoteMode] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -6474,7 +6468,7 @@ export default function App() {
     }
   });
   
-  const [activeBrand, setActiveBrand] = useState<'uber' | 'hyper' | 'both'>('uber');
+  const [activeBrand, setActiveBrand] = useState<'uber' | 'hyper' | 'both'>('both');
 
   const [uberOnline, setUberOnline] = useState<boolean>(() => {
     try {
@@ -6822,7 +6816,7 @@ export default function App() {
         if (wasPaused) {
           setUberOnline(true);
           setTimeout(() => {
-            addToast("Uber Auto-Resumed ▶️", "Uber dispatch resume active since your Bolt trip completed.", "success");
+            addToast("Uber Auto-Resumed ▶️", "Uber dispatch resume active since your Hyper trip completed.", "success");
           }, 100);
         }
         return false;
@@ -6831,7 +6825,7 @@ export default function App() {
         if (wasPaused) {
           setHyperOnline(true);
           setTimeout(() => {
-            addToast("Bolt Auto-Resumed ▶️", "Bolt dispatch resume active since your Uber trip completed.", "success");
+            addToast("Hyper Auto-Resumed ▶️", "Hyper dispatch resume active since your Uber trip completed.", "success");
           }, 100);
         }
         return false;
@@ -8221,7 +8215,7 @@ export default function App() {
   const [lastTrip, setLastTrip] = useState<{ amount: number, time: string, type: string } | null>({
     amount: 7.75,
     time: getArrivalTime(-45),
-    type: "Bolt Food"
+    type: "Hyper Eats"
   });
 
   const [fuel, setFuel] = useState<number>(() => {
@@ -9969,22 +9963,22 @@ export default function App() {
       } else {
         if (type === 'ride') {
           const ridePool: string[] = [];
-          if (enabledServices.includes('rideshare')) ridePool.push('Bolt Share 👥');
-          if (enabledServices.includes('intercity')) ridePool.push('Bolt Intercity 🚀');
-          if (enabledServices.includes('hyper_pet')) ridePool.push('Bolt Pet 🐾');
-          if (enabledServices.includes('hyperxl')) ridePool.push('Bolt XL 🚙');
-          if (enabledServices.includes('green')) ridePool.push('Bolt Eco 🔋');
-          if (enabledServices.includes('assist')) ridePool.push('Bolt Assist ♿');
+          if (enabledServices.includes('rideshare')) ridePool.push('Hyper Share 👥');
+          if (enabledServices.includes('intercity')) ridePool.push('Hyper Intercity 🚀');
+          if (enabledServices.includes('hyper_pet')) ridePool.push('Hyper Pet 🐾');
+          if (enabledServices.includes('hyperxl')) ridePool.push('Hyper XL 🚙');
+          if (enabledServices.includes('green')) ridePool.push('Hyper Eco 🔋');
+          if (enabledServices.includes('assist')) ridePool.push('Hyper Assist ♿');
           
           if (ridePool.length > 0) {
             variant = ridePool[Math.floor(Math.random() * ridePool.length)];
           } else {
-            variant = 'Bolt Share 👥';
+            variant = 'Hyper Share 👥';
           }
         } else {
-          const delivPool: string[] = ['Bolt Food 🍔'];
+          const delivPool: string[] = ['Hyper Eats 🍔'];
           if (enabledServices.includes('packages')) {
-            delivPool.push('Bolt Courier 📦');
+            delivPool.push('Hyper Courier 📦');
           }
           variant = delivPool[Math.floor(Math.random() * delivPool.length)];
         }
@@ -10032,7 +10026,7 @@ export default function App() {
       let minPay = 5.00;
       customEstDist = tripDist + distToPickup;
 
-      if (variant.includes('UberX') || variant.includes('Bolt Ride')) {
+      if (variant.includes('UberX') || variant.includes('Hyper Ride')) {
         baseFee = 2.50;
         mileRate = 1.45;
         minuteRate = 0.15;
@@ -10158,7 +10152,7 @@ export default function App() {
       id: sch.id || `TXB-${Math.floor(Math.random() * 90000) + 10000}`,
       type: orderType,
       restaurantName: sch.restaurantName || (orderType === 'delivery' ? "Uber Eats Restaurant" : "Pre-booked VIP Ride"),
-      customerName: orderType === 'delivery' ? (sch.destinationName || "Uber Eats Customer") : (brand === 'uber' ? "Uber Reserved Passenger" : "Bolt Scheduled Passenger"),
+      customerName: orderType === 'delivery' ? (sch.destinationName || "Uber Eats Customer") : (brand === 'uber' ? "Uber Reserved Passenger" : "Hyper Scheduled Passenger"),
       restaurantLocation: restLoc,
       pickupLocation: restLoc,
       customerLocation: { 
@@ -10186,7 +10180,7 @@ export default function App() {
       : `⏰ Pre-booking Time!`;
     const notificationBody = orderType === 'delivery'
       ? `Your scheduled Uber Eats delivery is due now!`
-      : `Your scheduled ${brand === 'uber' ? 'Uber' : 'Bolt'} trip is due now!`;
+      : `Your scheduled ${brand === 'uber' ? 'Uber' : 'Hyper'} trip is due now!`;
       
     sendNotification(notificationTitle, notificationBody);
     if (addToast) {
@@ -10666,10 +10660,10 @@ export default function App() {
       if (autoPauseSecondApp) {
         if (pendingOrder.brand === 'uber' && hyperOnline) {
           setHyperOnline(false);
-          addToast("Bolt Auto-Paused ⏸️", "Bolt paused to keep full focus on your Uber trip.", "info");
+          addToast("Hyper Auto-Paused ⏸️", "Hyper paused to keep full focus on your Uber trip.", "info");
         } else if (pendingOrder.brand === 'hyper' && uberOnline) {
           setUberOnline(false);
-          addToast("Uber Auto-Paused ⏸️", "Uber paused to keep full focus on your Bolt trip.", "info");
+          addToast("Uber Auto-Paused ⏸️", "Uber paused to keep full focus on your Hyper trip.", "info");
         }
       }
 
@@ -11582,35 +11576,6 @@ export default function App() {
       {isUnderMaintenance && <MaintenanceScreen onRetry={() => window.location.reload()} />}
       {isUpdating && <UpdateScreen progress={updateProgress} />}
       {isScanning && <ScanningScreen />}
-      {showAppLauncher && (
-        <AppLauncherScreen
-          activeBrand={activeBrand}
-          uberOnline={uberOnline}
-          setUberOnline={setUberOnline}
-          hyperOnline={hyperOnline}
-          setHyperOnline={setHyperOnline}
-          isOnline={user.isOnline}
-          startShift={startShift}
-          endShift={endShift}
-          onSelect={(brand) => {
-            setActiveBrand(brand);
-            setShowAppLauncher(false);
-            
-            // Auto-trigger online shift logic if either network is toggled online
-            if ((brand === 'uber' && uberOnline) || (brand === 'hyper' && hyperOnline) || (brand === 'both' && (uberOnline || hyperOnline))) {
-              if (!user.isOnline) {
-                startShift();
-              }
-            }
-
-            addToast(
-              brand === 'uber' ? 'Uber Workspace Loaded 🖤' : brand === 'hyper' ? 'Bolt Workspace Loaded 💚' : 'Dual-Dispatch Workspace Loaded 🔮',
-              brand === 'uber' ? 'Minimal Slate interface active. Focus Mode stabilized.' : brand === 'hyper' ? 'Mint Green interface active. Premium Bolt Ride-Hailing engine loaded.' : 'Unified multi-app dashboard active.',
-              'success'
-            );
-          }}
-        />
-      )}
       
       {!isAuthReady ? (
         <LoadingScreen />
@@ -13524,7 +13489,7 @@ export default function App() {
                       <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none">
                         {topBarMode === 'today' && "Today's Earnings"}
                         {topBarMode === 'last_trip' && "Last Trip Payout"}
-                        {topBarMode === 'hyper_driver_pro' && `Bolt Pro - ${user.tier || 'Diamond'}`}
+                        {topBarMode === 'hyper_driver_pro' && `Hyper Pro - ${user.tier || 'Diamond'}`}
                       </span>
 
                       <div className="flex items-center gap-1.5 justify-center leading-none">
@@ -13576,7 +13541,7 @@ export default function App() {
 
               {/* Bottom Menu Toggle Button / Map Status Bar */}
               {user.isOnline && !pendingOrder && !isBottomMenuOpen && (
-                <div className="absolute bottom-0 left-0 right-0 z-[4500]">
+                <div className="absolute bottom-20 left-0 right-0 z-[4500]">
                   <motion.div 
                     key="online-bar"
                     initial={{ y: 100 }}
@@ -13705,7 +13670,7 @@ export default function App() {
                                       : activeBrand === 'both' 
                                       ? "Duo-Scanning Active" 
                                       : activeBrand === 'hyper' 
-                                      ? "Bolt scanning live" 
+                                      ? "Hyper scanning live" 
                                       : "You're online"}
                                   </motion.span>
                                 )}
@@ -13735,7 +13700,7 @@ export default function App() {
                                     {isOnBreak 
                                       ? "Taking a pause from offers" 
                                       : activeBrand === 'both' 
-                                      ? "Monitoring Uber & Bolt dispatch" 
+                                      ? "Monitoring Uber & Hyper dispatch" 
                                       : activeBrand === 'hyper'
                                       ? "Finding opportunities near you"
                                       : "Searching for trips"}
@@ -13768,7 +13733,7 @@ export default function App() {
               <>
                 {/* Center Floating GO Button */}
                 {!isBottomMenuOpen && (
-                  <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-[4500] pointer-events-auto flex flex-col items-center">
+                  <div className="absolute bottom-52 left-1/2 -translate-x-1/2 z-[4500] pointer-events-auto flex flex-col items-center">
                     <motion.div
                       initial={{ scale: 0.9, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
@@ -13790,7 +13755,7 @@ export default function App() {
 
                 {/* Bottom White Action Bar */}
                 {!isBottomMenuOpen && (
-                  <div className="absolute bottom-0 left-0 right-0 z-[4500]">
+                  <div className="absolute bottom-20 left-0 right-0 z-[4500]">
                     <motion.div 
                       key="offline-bottom-bar"
                       initial={{ y: 100 }}
@@ -14745,7 +14710,7 @@ export default function App() {
                     <div className="flex-1 text-left">
                       <h3 className="font-black text-xl mb-1 flex items-center gap-2 text-black dark:text-white">
                         <Zap size={20} className="text-amber-500 animate-pulse shrink-0" />
-                        Bolt-X Back-to-Back
+                        Hyper-X Back-to-Back
                       </h3>
                       <p className="text-xs font-black uppercase text-amber-500 tracking-widest mb-2 font-mono">Continuous Queue Mode</p>
                       <p className="text-xs text-gray-500 font-medium leading-relaxed">
@@ -14757,8 +14722,8 @@ export default function App() {
                       onClick={() => {
                         setHyperXAutoQueue(prev => {
                           const val = !prev;
-                          sendNotification("Queue Status Updated", val ? "Bolt-X Back-to-Back queue active" : "Bolt-X Back-to-Back queue disabled");
-                          addToast("Bolt-X Preferences", val ? "Back-to-back queue active! Accept rides near dropoffs." : "Back-to-back queue inactive.", "success");
+                          sendNotification("Queue Status Updated", val ? "Hyper-X Back-to-Back queue active" : "Hyper-X Back-to-Back queue disabled");
+                          addToast("Hyper-X Preferences", val ? "Back-to-back queue active! Accept rides near dropoffs." : "Back-to-back queue inactive.", "success");
                           return val;
                         });
                       }}
@@ -14791,7 +14756,7 @@ export default function App() {
                       },
                       {
                         id: 'intercity',
-                        name: 'Bolt Intercity 🛣️',
+                        name: 'Hyper Intercity 🛣️',
                         desc: 'Long-distance high mileage premium routes across counties',
                         metric: 'Juicy 1.8x Payouts',
                         badge: 'Premium Rate',
@@ -14800,7 +14765,7 @@ export default function App() {
                       },
                       {
                         id: 'hyper_pet',
-                        name: 'Bolt Pet 🐾',
+                        name: 'Hyper Pet 🐾',
                         desc: 'Riders traveling with friendly domestic animals and carriers',
                         metric: '+25% Tip Multiply Boost',
                         badge: 'Pet Friendly',
@@ -14809,7 +14774,7 @@ export default function App() {
                       },
                       {
                         id: 'hyperxl',
-                        name: 'Bolt XL Premium 🚙',
+                        name: 'Hyper XL Premium 🚙',
                         desc: 'Group bookings (5-6 passengers) with enhanced base mileage rates',
                         metric: 'Enhanced Base Rate',
                         badge: 'Extra Large',
@@ -14909,7 +14874,7 @@ export default function App() {
             <motion.div key="pro" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="h-full w-full bg-white text-black p-6 overflow-y-auto pb-32">
               <div className="flex items-center gap-4 mb-8">
                 <button onClick={() => setCurrentScreen('home')} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform"><X size={24} /></button>
-                <h1 className="text-3xl font-black">Bolt Pro</h1>
+                <h1 className="text-3xl font-black">Hyper Pro</h1>
               </div>
               <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-[40px] p-8 text-white mb-8 relative overflow-hidden shadow-2xl shadow-blue-600/30">
                 <div className="relative z-10">
@@ -15320,7 +15285,7 @@ export default function App() {
                         <Car size={32} />
                       </div>
                       <div>
-                        <h3 className="text-xl font-black">Bolt Ride</h3>
+                        <h3 className="text-xl font-black">Hyper Ride</h3>
                         <p className="text-xs font-bold opacity-60 italic">Accept passenger requests</p>
                       </div>
                     </div>
@@ -15337,7 +15302,7 @@ export default function App() {
                   </div>
                   <div className="flex gap-2">
                     <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-black uppercase tracking-widest">Insurance Verified</span>
-                    <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-black uppercase tracking-widest">Bolt Eligible</span>
+                    <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-black uppercase tracking-widest">Hyper Eligible</span>
                   </div>
                 </div>
 
@@ -15348,7 +15313,7 @@ export default function App() {
                         <ShoppingBag size={32} />
                       </div>
                       <div>
-                        <h3 className="text-xl font-black">Bolt Food</h3>
+                        <h3 className="text-xl font-black">Hyper Eats</h3>
                         <p className="text-xs font-bold opacity-60 italic">Accept food delivery requests</p>
                       </div>
                     </div>
@@ -15677,7 +15642,7 @@ export default function App() {
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">System Update</p>
                         </div>
                         <p className="font-black text-lg leading-tight mb-2">{note}</p>
-                        <p className="text-xs text-gray-400 font-bold">Just now • Bolt Food Driver</p>
+                        <p className="text-xs text-gray-400 font-bold">Just now • Hyper Eats Driver</p>
                       </div>
                     </motion.div>
                   ))
@@ -15774,7 +15739,7 @@ export default function App() {
                 <div className="grid grid-cols-1 gap-4">
                   {[
                     { id: 'coffee', name: 'Premium Coffee', price: 3.50, icon: <Coffee /> },
-                    { id: 'jacket', name: 'Bolt Delivery Jacket', price: 45.00, icon: <Zap /> },
+                    { id: 'jacket', name: 'Hyper Delivery Jacket', price: 45.00, icon: <Zap /> },
                     { id: 'ebike', name: 'Electric Delivery Bike', price: 1200.00, icon: <Zap /> },
                     { id: 'iphone', name: 'iPhone 15 Pro', price: 999.00, icon: <Smartphone /> },
                     { id: 'tesla', name: 'Tesla Model 3', price: 35000.00, icon: <Zap /> },
@@ -16629,12 +16594,12 @@ export default function App() {
                         {pendingOrder.type === 'delivery' ? (
                           <>
                             <Utensils size={13} className={pendingOrder.brand === 'hyper' ? 'text-white' : 'text-white'} />
-                            <span>{pendingOrder.brand === 'hyper' ? 'Bolt Food' : 'Uber Eats'}</span>
+                            <span>{pendingOrder.brand === 'hyper' ? 'Hyper Eats' : 'Uber Eats'}</span>
                           </>
                         ) : (
                           <>
                             <CarIcon size={13} className={pendingOrder.brand === 'hyper' ? 'text-white' : 'text-white'} fill="currentColor" />
-                            <span>{pendingOrder.restaurantName || (pendingOrder.brand === 'hyper' ? 'Bolt Ride' : 'UberX')}</span>
+                            <span>{pendingOrder.restaurantName || (pendingOrder.brand === 'hyper' ? 'Hyper Ride' : 'UberX')}</span>
                           </>
                         )}
                       </div>
@@ -16694,57 +16659,57 @@ export default function App() {
                   {/* Timeline with accurate metrics formatted */}
                   {(() => {
                     const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
-                    const isBolt = pendingOrder.brand === 'hyper';
+                    const isHyper = pendingOrder.brand === 'hyper';
                     if (isDouble) {
                       return (
                         <div className="relative pl-6 py-1 space-y-6">
                           {/* Vertical Connecting Line */}
-                          <div className={`absolute left-[7px] top-[14px] bottom-[14px] w-[2px] ${isBolt ? 'bg-[#00ea72]/80' : 'bg-black'}`} />
+                          <div className={`absolute left-[7px] top-[14px] bottom-[14px] w-[2px] ${isHyper ? 'bg-[#00ea72]/80' : 'bg-black'}`} />
 
                           {/* Top pickup locator dot/circle */}
-                          <div className={`absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full border-2 border-white ring-2 ${isBolt ? 'bg-[#00ca72] ring-[#00ff88]/50' : 'bg-black ring-black'}`} />
+                          <div className={`absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full border-2 border-white ring-2 ${isHyper ? 'bg-[#00ca72] ring-[#00ff88]/50' : 'bg-black ring-black'}`} />
 
                           {/* Middle dropoff circle/dot */}
-                          <div className={`absolute left-[3px] top-[100px] w-2.5 h-2.5 rounded-full border-2 border-white ring-1 ${isBolt ? 'bg-[#00ea72] ring-[#00ea72]/50' : 'bg-blue-600 ring-blue-600'}`} />
+                          <div className={`absolute left-[3px] top-[100px] w-2.5 h-2.5 rounded-full border-2 border-white ring-1 ${isHyper ? 'bg-[#00ea72] ring-[#00ea72]/50' : 'bg-blue-600 ring-blue-600'}`} />
 
                           {/* Bottom dropoff square design */}
-                          <div className={`absolute left-[3px] bottom-[15px] w-2.5 h-2.5 ${isBolt ? 'bg-[#00ff88]' : 'bg-indigo-600'}`} />
+                          <div className={`absolute left-[3px] bottom-[15px] w-2.5 h-2.5 ${isHyper ? 'bg-[#00ff88]' : 'bg-indigo-600'}`} />
 
                           {/* Pickup Info */}
                           <div>
-                            <p className={`font-sans text-xs font-bold ${isBolt ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
+                            <p className={`font-sans text-xs font-bold ${isHyper ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
                               3 min (0.5 mi)
                             </p>
-                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isBolt ? 'text-white' : 'text-gray-800'}`}>
+                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isHyper ? 'text-white' : 'text-gray-800'}`}>
                               {pendingOrder.type === 'ride' ? `Pickup Co-riders: ${pendingOrder.customerName.replace(" & Co-rider 👥", "").trim()}` : (pendingOrder.restaurantName || "Pwllmelin Road, Cardiff, CF5 2NQ")}
                             </p>
-                            <p className={`font-sans text-[11px] font-bold ${isBolt ? 'text-gray-400' : 'text-gray-400'}`}>
+                            <p className={`font-sans text-[11px] font-bold ${isHyper ? 'text-gray-400' : 'text-gray-400'}`}>
                               {pendingOrder.type === 'delivery' ? "12 Kingsway, Holborn, London WC2B 6YB" : "Passenger Pickup Location"}
                             </p>
                           </div>
 
                           {/* Dropoff 1 Info */}
                           <div>
-                            <p className={`font-sans text-xs font-bold ${isBolt ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
+                            <p className={`font-sans text-xs font-bold ${isHyper ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
                               {pendingOrder.estimatedTime} mins (approx) • Dropoff 1
                             </p>
-                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isBolt ? 'text-white' : 'text-gray-800'}`}>
+                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isHyper ? 'text-white' : 'text-gray-800'}`}>
                               {pendingOrder.type === 'ride' ? `Dropoff 1: ${pendingOrder.customerName.replace(" & Co-rider 👥", "").trim()}` : pendingOrder.customerName.replace(" + 1 more", "").replace(" (Max+1)", "").trim()}
                             </p>
-                            <p className={`font-sans text-[11px] font-bold ${isBolt ? 'text-gray-400' : 'text-gray-400'}`}>
+                            <p className={`font-sans text-[11px] font-bold ${isHyper ? 'text-gray-400' : 'text-gray-400'}`}>
                               {pendingOrder.type === 'ride' ? "Passenger 1 Destination" : "48 High Holborn, London WC1V 6RL"}
                             </p>
                           </div>
 
                           {/* Dropoff 2 Info */}
                           <div>
-                            <p className={`font-sans text-xs font-bold ${isBolt ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
+                            <p className={`font-sans text-xs font-bold ${isHyper ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
                               +{Math.floor(pendingOrder.estimatedTime * 0.4)} mins • Dropoff 2 (Shared)
                             </p>
-                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isBolt ? 'text-white' : 'text-gray-800'}`}>
+                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isHyper ? 'text-white' : 'text-gray-800'}`}>
                               {pendingOrder.type === 'ride' ? "Dropoff 2: Co-rider 👥" : "Recipient (Part 2)"}
                             </p>
-                            <p className={`font-sans text-[11px] font-bold ${isBolt ? 'text-gray-400' : 'text-gray-400'}`}>
+                            <p className={`font-sans text-[11px] font-bold ${isHyper ? 'text-gray-400' : 'text-gray-400'}`}>
                               {pendingOrder.type === 'ride' ? "Passenger 2 Destination" : "42 Southampton Row, London WC1B 4AR"}
                             </p>
                           </div>
@@ -16754,35 +16719,35 @@ export default function App() {
                       return (
                         <div className="relative pl-6 py-1 space-y-7">
                           {/* Vertical Connecting Line */}
-                          <div className={`absolute left-[7px] top-[14px] bottom-[14px] w-[2px] ${isBolt ? 'bg-[#00ea72]/80' : 'bg-black'}`} />
+                          <div className={`absolute left-[7px] top-[14px] bottom-[14px] w-[2px] ${isHyper ? 'bg-[#00ea72]/80' : 'bg-black'}`} />
 
                           {/* Top pickup locator dot/circle */}
-                          <div className={`absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full border-2 border-white ring-2 ${isBolt ? 'bg-[#00ca72] ring-[#00ff88]/50' : 'bg-black ring-black'}`} />
+                          <div className={`absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full border-2 border-white ring-2 ${isHyper ? 'bg-[#00ca72] ring-[#00ff88]/50' : 'bg-black ring-black'}`} />
 
                           {/* Bottom dropoff square design */}
-                          <div className={`absolute left-[3px] bottom-[15px] w-2.5 h-2.5 ${isBolt ? 'bg-[#00ff88]' : 'bg-black'}`} />
+                          <div className={`absolute left-[3px] bottom-[15px] w-2.5 h-2.5 ${isHyper ? 'bg-[#00ff88]' : 'bg-black'}`} />
 
                           {/* Time & distance metadata headers matching screenshot perfectly */}
                           <div>
-                            <p className={`font-sans text-xs font-bold ${isBolt ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
+                            <p className={`font-sans text-xs font-bold ${isHyper ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
                               3 min (0.5 mi)
                             </p>
-                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isBolt ? 'text-white' : 'text-gray-800'}`}>
+                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isHyper ? 'text-white' : 'text-gray-800'}`}>
                               {pendingOrder.restaurantName || "Pwllmelin Road, Cardiff, CF5 2NQ"}
                             </p>
-                            <p className={`font-sans text-[11px] font-bold ${isBolt ? 'text-gray-400' : 'text-gray-400'}`}>
+                            <p className={`font-sans text-[11px] font-bold ${isHyper ? 'text-gray-400' : 'text-gray-400'}`}>
                               {pendingOrder.type === 'delivery' ? "12 Kingsway, Holborn, London WC2B 6YB" : "Driver Pickup Point"}
                             </p>
                           </div>
 
                           <div>
-                            <p className={`font-sans text-xs font-bold ${isBolt ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
+                            <p className={`font-sans text-xs font-bold ${isHyper ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
                               {pendingOrder.estimatedTime} mins ({pendingOrder.estimatedDistance.toFixed(1)} mi)
                             </p>
-                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isBolt ? 'text-white' : 'text-gray-800'}`}>
+                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isHyper ? 'text-white' : 'text-gray-800'}`}>
                               {pendingOrder.customerName || "45 The Hayes, Cardiff"}
                             </p>
-                            <p className={`font-sans text-[11px] font-bold ${isBolt ? 'text-gray-400' : 'text-gray-400'}`}>
+                            <p className={`font-sans text-[11px] font-bold ${isHyper ? 'text-gray-400' : 'text-gray-400'}`}>
                               {pendingOrder.type === 'delivery' ? "48 High Holborn, London WC1V 6RL" : "Final Destination Address"}
                             </p>
                           </div>
@@ -17048,14 +17013,18 @@ export default function App() {
       </div>
 
       {/* Bottom Nav */}
-      {!['onboarding', 'documents', 'face_verification', 'home'].includes(currentScreen) && !isOffAppSimulated && (
+      {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && !isOffAppSimulated && (
         <div className="h-20 bg-[#0c0c0d] border-t border-white/5 flex items-center justify-around px-2 z-[2000] shrink-0 relative pb-4 shadow-2xl">
           <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={22} />} label="Home" badgeCount={activeOrders.length > 0 ? activeOrders.length : undefined} />
           <NavButton 
             active={isBottomMenuOpen || currentScreen === 'trip_history'} 
             onClick={() => {
-              if (activeOrders.length > 0) setIsBottomMenuOpen(true);
-              else setCurrentScreen('trip_history');
+              if (activeOrders.length > 0) {
+                setCurrentScreen('home');
+                setIsBottomMenuOpen(true);
+              } else {
+                setCurrentScreen('trip_history');
+              }
             }} 
             icon={<List size={22} />} 
             label="Trips" 

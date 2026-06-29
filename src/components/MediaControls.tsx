@@ -47,7 +47,7 @@ export const PLAYLIST: AudioTrack[] = [
     id: 'track-4',
     title: 'Midnight Fuel',
     artist: 'Royalty Free Lounge',
-    album: 'Bolt Driving Mix',
+    album: 'Hyper Driving Mix',
     cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=120&h=120&fit=crop',
     url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
     isSynth: false,

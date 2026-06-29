@@ -106,7 +106,7 @@ export const EarningsDetail = ({
           <div className="text-center">
             <p className="text-gray-500 font-black text-[10px] uppercase tracking-[0.2em] mb-2">{new Date(selectedTrip.timestamp).toLocaleDateString()} • {new Date(selectedTrip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
             <h1 className="text-6xl font-black mb-2 text-white">£{selectedTrip.earnings.toFixed(2)}</h1>
-            <p className="text-[#22c55e] font-black text-xs uppercase tracking-wide">{selectedTrip.type === 'ride' ? 'Bolt Ride' : 'Delivery Route'}</p>
+            <p className="text-[#22c55e] font-black text-xs uppercase tracking-wide">{selectedTrip.type === 'ride' ? 'Hyper Ride' : 'Delivery Route'}</p>
           </div>
 
           <div className="rounded-[32px] overflow-hidden border border-white/5 bg-[#121214] shadow-2xl">
@@ -165,7 +165,7 @@ export const EarningsDetail = ({
                 <div className="absolute bottom-4 left-4 right-4 flex gap-2">
                    <div className="flex-1 p-3 rounded-2xl bg-[#121214]/90 border border-white/5 backdrop-blur-md">
                       <p className="text-[8px] font-black uppercase text-gray-500 leading-tight">Pickup</p>
-                      <p className="text-[10px] font-bold text-white truncate">{selectedTrip.restaurantName || "Bolt Pick-up"}</p>
+                      <p className="text-[10px] font-bold text-white truncate">{selectedTrip.restaurantName || "Hyper Pick-up"}</p>
                    </div>
                    <div className="flex-1 p-3 rounded-2xl bg-[#121214]/90 border border-white/5 backdrop-blur-md">
                       <p className="text-[8px] font-black uppercase text-gray-500 leading-tight">Drop-off</p>
@@ -180,7 +180,7 @@ export const EarningsDetail = ({
                 Issue with this delivery?
              </button>
              <button className="w-full py-4 rounded-2xl font-black text-xs uppercase tracking-wider bg-[#121214] border border-white/5 text-gray-400 hover:text-white transition-all active:scale-95">
-                Contact Bolt Dispatch
+                Contact Hyper Dispatch
              </button>
           </div>
         </div>

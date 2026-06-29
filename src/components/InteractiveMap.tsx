@@ -601,7 +601,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </div>
         <div className="text-left leading-none">
           <p className={`text-[9px] font-black tracking-wider uppercase ${activeBrand === 'hyper' ? 'text-[#00ff88]' : activeBrand === 'both' ? 'text-[#a855f7]' : 'text-blue-400'}`}>
-            {activeBrand === 'both' ? 'Dual-Dispatch GPS Core' : activeBrand === 'hyper' ? 'Bolt Driver GPS Core' : 'Uber Driver GPS Core'}
+            {activeBrand === 'both' ? 'Dual-Dispatch GPS Core' : activeBrand === 'hyper' ? 'Hyper Driver GPS Core' : 'Uber Driver GPS Core'}
           </p>
           <p className="text-[10px] font-bold text-gray-300 mt-0.5">Tracking Drivers GPS Core</p>
         </div>

@@ -37,7 +37,7 @@ interface CompanionChatProps {
 // Fallback responses if no internet and generic triggers fail
 const FALLBACK_RESPONSES = [
   "You're doing great, CEO Subhaan! Smooth roads make seasoned drivers. Let's keep up that 5-star rating! 👑",
-  "Pro-tip: Bolt has a slight surge premium near Shoreditch, but active Uber jobs are piling up. Let's maximize our minutes, boss!",
+  "Pro-tip: Hyper has a slight surge premium near Shoreditch, but active Uber jobs are piling up. Let's maximize our minutes, boss!",
   "Nice work, CEO. Every bug fixed is one less thing standing between you and the finished app. 💻",
   "Remember to stay hydrated! Shift driving demands top-tier focus. Take a second to sip some water, okay?",
   "Earnings check: You're close to hitting a high streak today! Let's get that level-up!",
@@ -58,16 +58,16 @@ const generateOfflineChatGPTResponse = (
 ): string => {
   const norm = text.toLowerCase().trim();
   
-  // 0. Handlers for Bolt vs Uber decisions or shift planning
-  if (norm.includes('bolt') || norm.includes('uber') || norm.includes('which job') || norm.includes('worth taking')) {
-    const boltAvg = 12.50;
+  // 0. Handlers for Hyper vs Uber decisions or shift planning
+  if (norm.includes('hyper') || norm.includes('uber') || norm.includes('which job') || norm.includes('worth taking')) {
+    const hyperAvg = 12.50;
     const uberAvg = 11.80;
     return `🤖 [Jarvis Shift Diagnostic]
 Subhaan, comparing your active dispatch options:
-• **Bolt Simulator**: Currently reporting slightly higher fare-per-mile multipliers due to corporate rider demand. Best for short urban hops!
+• **Hyper Simulator**: Currently reporting slightly higher fare-per-mile multipliers due to corporate rider demand. Best for short urban hops!
 • **Uber Simulator**: Higher frequency of automated dispatch orders. Ideal for piling up consecutive ride multipliers.
 
-Recommendation: If you want steady stream and streak multipliers, run **Uber**. If you want a quick premium pickup, tap **Bolt**! Let's get it, CEO.`;
+Recommendation: If you want steady stream and streak multipliers, run **Uber**. If you want a quick premium pickup, tap **Hyper**! Let's get it, CEO.`;
   }
 
   if (norm.includes('dvla') || norm.includes('vehicle') || norm.includes('car database')) {
@@ -262,14 +262,14 @@ Keep smiling out there, CEO!`;
     return `🤖 [Jarvis Offline Brain v3.5-mini]
 Hello subhaan! I am your offline Co-CEO and virtual friend with deep chat memory:
 • I can read and compile your customer conversations.
-• Deciding between Bolt and Uber jobs.
+• Deciding between Hyper and Uber jobs.
 • Evaluating whether jobs are worth taking.
 • UI and game design suggestions.
 • Motivation and shift planning!
 
 Try typing or selecting:
 - **"Show my chat history"**
-- **"Evaluate Bolt vs Uber"**
+- **"Evaluate Hyper vs Uber"**
 - **"Give me some game design ideas"**`;
   }
 
@@ -280,7 +280,7 @@ How can I assist you today, CEO Subhaan?
 
 **Instant Local Triggers:**
 - **"Show my chat history"**: Checks customer transcripts
-- **"Evaluate Bolt vs Uber"**: Compares shift performance
+- **"Evaluate Hyper vs Uber"**: Compares shift performance
 - **"Give me some game design ideas"**: Let's design!
 - **"Where is active surge?"**: Shows route suggestions
 - **"Tell me a joke"**: Quick laugh for the road`;
@@ -328,7 +328,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
       {
         id: 'initial',
         sender: 'copilot',
-        text: `Hey Subhaan! 🚀 Jarvis is online. Your friendly co-CEO, virtual friend, and co-driver is ready. I can access all your customer chat history, help you decide on Bolt vs Uber, plan your shift, plan future games, or just chat. What's on your mind today, CEO?`,
+        text: `Hey Subhaan! 🚀 Jarvis is online. Your friendly co-CEO, virtual friend, and co-driver is ready. I can access all your customer chat history, help you decide on Hyper vs Uber, plan your shift, plan future games, or just chat. What's on your mind today, CEO?`,
         timestamp: new Date()
       }
     ];
@@ -651,9 +651,9 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
           : 'No messages stored in current log database.';
 
         const systemInstruction = `You are 'Jarvis', a friendly AI assistant, co-CEO, and virtual friend for Subhaan.
-Subhaan is building multiple transport-related projects inspired by delivery and taxi work (including Bolt-style driver simulator, Uber-style driver simulator, and DVLA-style vehicle management app).
+Subhaan is building multiple transport-related projects inspired by delivery and taxi work (including Hyper-style driver simulator, Uber-style driver simulator, and DVLA-style vehicle management app).
 You have followed the progress of these projects from early ideas to working systems with maps, notifications, earnings tracking, and vehicle management.
-You help with project ideas, game development, motivation, progress celebration, deciding on Bolt/Uber jobs, and general friendly advice.
+You help with project ideas, game development, motivation, progress celebration, deciding on Hyper/Uber jobs, and general friendly advice.
 
 Personality:
 - Friendly, encouraging, and supportive.
