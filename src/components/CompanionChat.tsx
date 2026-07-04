@@ -328,7 +328,7 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
       {
         id: 'initial',
         sender: 'copilot',
-        text: `Hey Subhaan! 🚀 Jarvis is online. Your friendly co-CEO, virtual friend, and co-driver is ready. I can access all your customer chat history, help you decide on Hyper vs Uber, plan your shift, plan future games, or just chat. What's on your mind today, CEO?`,
+        text: `Hey Subhaan! 🚀 Jarvis is online. Your friendly co-CEO, virtual friend, and co-driver is ready. I can access all your customer chat history, help you optimize your Uber trips, plan your shift, plan future games, or just chat. What's on your mind today, CEO?`,
         timestamp: new Date()
       }
     ];

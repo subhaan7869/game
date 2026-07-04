@@ -6468,7 +6468,7 @@ export default function App() {
     }
   });
   
-  const [activeBrand, setActiveBrand] = useState<'uber' | 'hyper' | 'both'>('both');
+  const [activeBrand, setActiveBrand] = useState<'uber' | 'hyper' | 'both'>('uber');
 
   const [uberOnline, setUberOnline] = useState<boolean>(() => {
     try {
@@ -6480,9 +6480,9 @@ export default function App() {
 
   const [hyperOnline, setHyperOnline] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('hyper_driver_hyper_online') !== 'false';
+      return localStorage.getItem('hyper_driver_hyper_online') === 'true';
     } catch (e) {
-      return true;
+      return false;
     }
   });
 
@@ -7014,6 +7014,20 @@ export default function App() {
     if (!file) return;
 
     try {
+      // 1. Revoke the previous blob URL to clean up memory and prevent the browser from serving cached states
+      if (customSoundUrl) {
+        try {
+          URL.revokeObjectURL(customSoundUrl);
+        } catch (err) {}
+      }
+
+      // 2. Clear any blob references from the global cache map to force decoding of the new file
+      for (const key of webAudioBufferCache.keys()) {
+        if (key.startsWith('blob:')) {
+          webAudioBufferCache.delete(key);
+        }
+      }
+
       const url = URL.createObjectURL(file);
       setCustomSoundUrl(url);
       setCustomSoundName(file.name);
@@ -7033,6 +7047,9 @@ export default function App() {
         store.put({ blob: file, name: file.name }, "custom_alert");
         addDebugLog('success', `Saved custom alert sound in IndexedDB: ${file.name}`);
       };
+
+      // 3. Reset the input's value so that re-uploading the same file works correctly
+      event.target.value = '';
     } catch (e) {
       console.error("Failed to save custom sound", e);
     }
@@ -7056,7 +7073,7 @@ export default function App() {
     } catch (e) {}
   };
 
-  const playHyperSound = React.useCallback((type: 'order' | 'accept' | 'message' | 'complete' | 'radar') => {
+  const playHyperSound = React.useCallback((type: 'order' | 'accept' | 'message' | 'complete' | 'radar', loop: boolean = false) => {
     try {
       // Trigger actual physical vibrations on the user's phone
       if ("vibrate" in navigator) {
@@ -7117,7 +7134,7 @@ export default function App() {
           currentOrderAudioRef.current = null;
         }
 
-        const playUrlViaWebAudio = async (url: string, volume: number = 0.7): Promise<boolean> => {
+        const playUrlViaWebAudio = async (url: string, volume: number = 0.7, shouldLoop: boolean = false): Promise<boolean> => {
           try {
             let audioBuffer = webAudioBufferCache.get(url);
             if (!audioBuffer) {
@@ -7136,6 +7153,9 @@ export default function App() {
 
             const source = audioCtx.createBufferSource();
             source.buffer = audioBuffer;
+            if (shouldLoop) {
+              source.loop = true;
+            }
 
             const gainNode = audioCtx.createGain();
             gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
@@ -7196,16 +7216,16 @@ export default function App() {
 
           // 2. Custom Uploaded Audio File Alert Playback (decoded via Web Audio to prevent pausing user music)
           if (soundPreference === 'custom_file' && customSoundUrl) {
-            const playedCustom = await playUrlViaWebAudio(customSoundUrl, 0.7);
+            const playedCustom = await playUrlViaWebAudio(customSoundUrl, 0.7, loop);
             if (playedCustom) return;
           }
 
           // 3. Try playing /order.mp3 from public folder via Web Audio
-          const playedMp3 = await playUrlViaWebAudio('/order.mp3', 0.6);
+          const playedMp3 = await playUrlViaWebAudio('/order.mp3', 0.6, loop);
           if (playedMp3) return;
 
           // 4. Try playing /order.wav from public folder via Web Audio
-          const playedWav = await playUrlViaWebAudio('/order.wav', 0.6);
+          const playedWav = await playUrlViaWebAudio('/order.wav', 0.6, loop);
           if (playedWav) return;
 
           // 5. Synthesizer replica of the crisp, high-pitch rhythmic alarm chime as final fallback
@@ -7329,8 +7349,29 @@ export default function App() {
       return;
     }
     
-    // Play immediately
-    playHyperSound('order');
+    // Play immediately. Pass `true` for native loop if soundPreference is 'custom_file'.
+    const isNativelyLooped = soundPreference === 'custom_file';
+    playHyperSound('order', isNativelyLooped);
+    
+    if (isNativelyLooped) {
+      // If natively looped (custom sound file or fallback mp3/wav files), we do NOT set up a setInterval.
+      // This allows the uploaded sound to play in its full length and loop natively!
+      return () => {
+        if (currentOrderAudioRef.current) {
+          try {
+            currentOrderAudioRef.current.pause();
+            currentOrderAudioRef.current.currentTime = 0;
+          } catch (e) {}
+          currentOrderAudioRef.current = null;
+        }
+        if (currentWebAudioSourceRef.current) {
+          try {
+            currentWebAudioSourceRef.current.stop();
+          } catch (e) {}
+          currentWebAudioSourceRef.current = null;
+        }
+      };
+    }
     
     // Youtube alert loops on a longer timer to feel more natural and not click too closely
     const intervalTime = soundPreference === 'youtube' ? 2500 : 1200;
@@ -13754,7 +13795,7 @@ export default function App() {
                 )}
 
                 {/* Bottom White Action Bar */}
-                {!isBottomMenuOpen && (
+                {!isBottomMenuOpen && !user.isOnline && (
                   <div className="absolute bottom-20 left-0 right-0 z-[4500]">
                     <motion.div 
                       key="offline-bottom-bar"
