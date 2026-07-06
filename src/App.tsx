@@ -899,8 +899,8 @@ const NewDashboard = ({
               <div className="text-left">
                 <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none mb-1.5">Today's Earnings</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-black text-white leading-none">£{earnings.toFixed(2)}</span>
-                  <span className="text-[10px] font-bold text-gray-400">0 Deliveries</span>
+                  <span className="text-2xl font-black text-white leading-none">£{stats.daily.toFixed(2)}</span>
+                  <span className="text-[10px] font-bold text-gray-400">{user.deliveriesToday || 0} Deliveries</span>
                 </div>
               </div>
             </div>
@@ -6545,45 +6545,45 @@ export default function App() {
       nationality: "British",
       rating: 5.00,
       tier: 'Blue',
-      points: 0,
-      experience: 0,
-      level: 1,
-      deliveries: 0,
-      deliveriesToday: 0,
-      lifetimeTrips: 0,
+      points: 450,
+      experience: 250,
+      level: 3,
+      deliveries: 1424,
+      deliveriesToday: 3,
+      lifetimeTrips: 1424,
       badges: [],
       compliments: [],
       earningsStats: {
-        daily: 0,
-        weekly: 0,
-        monthly: 0,
-        ytd: 0
+        daily: 45.50,
+        weekly: 385.50,
+        monthly: 1450.00,
+        ytd: 16845.50
       },
-      rides: 0,
+      rides: 852,
       acceptanceRate: 98,
       cancellationRate: 1,
       isOnline: false,
       documentsUploaded: true,
       faceVerified: true,
-      walletBalance: 0.00,
+      walletBalance: 45.50,
       profilePic: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop",
       activeMissions: [
         {
           id: 'm1',
           title: 'Daily Sprinter',
           description: 'Complete 3 deliveries today',
-          progress: 0,
+          progress: 3,
           goal: 3,
           pointsReward: 50,
           cashReward: 10,
-          completed: false,
+          completed: true,
           type: 'delivery_count'
         },
         {
           id: 'm2',
           title: 'Earnings Kickstart',
           description: 'Earn £50 in a single day',
-          progress: 0,
+          progress: 45.50,
           goal: 50,
           pointsReward: 100,
           cashReward: 25,
@@ -6609,6 +6609,19 @@ export default function App() {
       const saved = localStorage.getItem('hyper_driver_eats_user');
       if (saved) {
         const parsed = JSON.parse(saved);
+        // Ensure earningsStats is realistic if it was initialized to zeros or is missing
+        if (!parsed.earningsStats || parsed.earningsStats.weekly === 0) {
+          parsed.earningsStats = {
+            daily: parsed.earningsStats?.daily || 45.50,
+            weekly: parsed.earningsStats?.weekly || 385.50,
+            monthly: parsed.earningsStats?.monthly || 1450.00,
+            ytd: parsed.earningsStats?.ytd || 16845.50
+          };
+          parsed.deliveriesToday = parsed.deliveriesToday !== undefined ? parsed.deliveriesToday : 3;
+          parsed.lifetimeTrips = parsed.lifetimeTrips || 1424;
+          parsed.deliveries = parsed.deliveries || 1424;
+          parsed.walletBalance = parsed.walletBalance !== undefined ? parsed.walletBalance : 45.50;
+        }
         return { ...baseUser, ...parsed, isOnline: false };
       }
     } catch (e) {
@@ -6871,17 +6884,17 @@ export default function App() {
   const [earnings, setEarnings] = useState(() => {
     try {
       const saved = localStorage.getItem('hyper_driver_earnings');
-      return saved ? parseFloat(saved) : 0.00;
+      return saved ? parseFloat(saved) : 45.50;
     } catch (e) {
-      return 0.00;
+      return 45.50;
     }
   });
   const [todayEarningsTotal, setTodayEarningsTotal] = useState(() => {
     try {
       const saved = localStorage.getItem('hyper_driver_today_earnings_total');
-      return saved ? parseFloat(saved) : 0.00;
+      return saved ? parseFloat(saved) : 45.50;
     } catch (e) {
-      return 0.00;
+      return 45.50;
     }
   });
 
@@ -7413,6 +7426,55 @@ export default function App() {
   // Persist today's total earnings
   useEffect(() => {
     localStorage.setItem('hyper_driver_today_earnings_total', todayEarningsTotal.toString());
+  }, [todayEarningsTotal]);
+
+  // Synchronize today's total earnings and update user profile stats dynamically to maintain realistic baselines
+  useEffect(() => {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const dayIndex = (dayOfWeek + 6) % 7; // Monday-start
+
+    const BASELINE_WEEKLY_AMOUNTS = [64.20, 58.50, 72.10, 85.30, 115.00, 142.50, 95.80];
+    const baselineWeekly = BASELINE_WEEKLY_AMOUNTS.slice(0, dayIndex).reduce((sum, val) => sum + val, 0);
+
+    const todayDateNum = today.getDate();
+    const getDailyAmountForDay = (dayNum: number) => {
+      const base = 65;
+      const variance = Math.sin(dayNum * 1.7) * 25 + Math.cos(dayNum * 0.9) * 15;
+      return Math.max(35, Number((base + variance).toFixed(2)));
+    };
+    const baselineMonthly = Array.from({ length: todayDateNum - 1 })
+      .map((_, i) => getDailyAmountForDay(i + 1))
+      .reduce((sum, val) => sum + val, 0);
+
+    const currentMonthIndex = today.getMonth();
+    const BASELINE_MONTHLY_AMOUNTS = [1980.50, 1850.20, 2120.40, 2250.80, 2410.50, 2350.20, 2580.00, 2420.00, 2390.00, 2450.00, 2600.00, 2850.00];
+    const baselineYtd = BASELINE_MONTHLY_AMOUNTS.slice(0, currentMonthIndex).reduce((sum, val) => sum + val, 0);
+
+    setUser(u => {
+      const daily = todayEarningsTotal;
+      const weekly = Number((baselineWeekly + todayEarningsTotal).toFixed(2));
+      const monthly = Number((baselineMonthly + todayEarningsTotal).toFixed(2));
+      const ytd = Number((baselineYtd + baselineMonthly + todayEarningsTotal).toFixed(2));
+      const calculatedDeliveriesToday = todayEarningsTotal > 0 ? Math.max(1, Math.round(todayEarningsTotal / 15.1)) : 0;
+
+      // Check if anything has changed to prevent infinite loops
+      if (
+        u.earningsStats?.daily === daily &&
+        u.earningsStats?.weekly === weekly &&
+        u.earningsStats?.monthly === monthly &&
+        u.earningsStats?.ytd === ytd &&
+        u.deliveriesToday === calculatedDeliveriesToday
+      ) {
+        return u;
+      }
+
+      return {
+        ...u,
+        deliveriesToday: calculatedDeliveriesToday,
+        earningsStats: { daily, weekly, monthly, ytd }
+      };
+    });
   }, [todayEarningsTotal]);
 
   const [topBarMode, setTopBarMode] = useState<'today' | 'last_trip' | 'hyper_driver_pro'>('today');

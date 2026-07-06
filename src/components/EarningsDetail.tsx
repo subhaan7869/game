@@ -38,25 +38,104 @@ export const EarningsDetail = ({
   const [isCashOutLoading, setIsCashOutLoading] = useState(false);
   const pages = ['Day', 'Week', 'Month', 'Year'];
 
-  // Mock data for the chart
-  const weeklyData = [
-    { day: 'Mon', amount: 45.20 },
-    { day: 'Tue', amount: 52.80 },
-    { day: 'Wed', amount: 38.50 },
-    { day: 'Thu', amount: 65.40 },
-    { day: 'Fri', amount: 89.20 },
-    { day: 'Sat', amount: 120.50 },
-    { day: 'Sun', amount: 95.10 },
-  ];
+  const stats = user.earningsStats || { daily: 45.50, weekly: 385.50, monthly: 1450.00, ytd: 16845.50 };
 
-  const monthlyData = Array.from({ length: 30 }).map((_, i) => ({
-    date: i + 1,
-    amount: Math.random() * 100 + 20
-  }));
+  // Dynamic date calculations for absolute consistency
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const dayIndex = (dayOfWeek + 6) % 7; // Monday = 0, ..., Sunday = 6
+  
+  const BASELINE_WEEKLY_AMOUNTS = [64.20, 58.50, 72.10, 85.30, 115.00, 142.50, 95.80];
 
-  const stats = user.earningsStats || { daily: 0, weekly: 0, monthly: 0, ytd: 0 };
+  const todayDateNum = today.getDate();
+  const getDailyAmountForDay = (dayNum: number) => {
+    const base = 65;
+    const variance = Math.sin(dayNum * 1.7) * 25 + Math.cos(dayNum * 0.9) * 15;
+    return Math.max(35, Number((base + variance).toFixed(2)));
+  };
 
-  const currentDisplayAmount = page === 0 ? earnings : 
+  // 1. Dynamic Weekly Chart Data (Mon to Sun, matching baseline + today)
+  const weeklyData = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((dayName, idx) => {
+    let amount = 0;
+    if (idx < dayIndex) {
+      amount = BASELINE_WEEKLY_AMOUNTS[idx];
+    } else if (idx === dayIndex) {
+      amount = stats.daily;
+    } else {
+      amount = 0;
+    }
+    return { day: dayName, amount };
+  });
+
+  // 2. Dynamic Monthly Chart Data (Days 1 to 30, matching baseline + today)
+  const monthlyData = Array.from({ length: 30 }).map((_, i) => {
+    const d = i + 1;
+    let amount = 0;
+    if (d < todayDateNum) {
+      amount = getDailyAmountForDay(d);
+    } else if (d === todayDateNum) {
+      amount = stats.daily;
+    } else {
+      amount = 0;
+    }
+    return { date: d, amount };
+  });
+
+  // Trips calculation
+  let displayTrips = user.deliveriesToday;
+  if (page === 1) { // Week
+    let weekTrips = 0;
+    for (let i = 0; i < 7; i++) {
+      if (i < dayIndex) {
+        weekTrips += Math.round(BASELINE_WEEKLY_AMOUNTS[i] / 12.50);
+      } else if (i === dayIndex) {
+        weekTrips += user.deliveriesToday;
+      }
+    }
+    displayTrips = weekTrips;
+  } else if (page === 2) { // Month
+    let monthTrips = 0;
+    for (let d = 1; d <= 30; d++) {
+      if (d < todayDateNum) {
+        monthTrips += Math.max(1, Math.round(getDailyAmountForDay(d) / 12.50));
+      } else if (d === todayDateNum) {
+        monthTrips += user.deliveriesToday;
+      }
+    }
+    displayTrips = monthTrips;
+  } else if (page === 3) { // Year
+    displayTrips = user.lifetimeTrips || 1424;
+  }
+
+  // Hours calculation
+  let displayHours = Math.max(0.5, Number((stats.daily / 18.50).toFixed(1)));
+  if (stats.daily === 0) displayHours = 0;
+  
+  if (page === 1) { // Week
+    let weekHours = 0;
+    for (let i = 0; i < 7; i++) {
+      if (i < dayIndex) {
+        weekHours += BASELINE_WEEKLY_AMOUNTS[i] / 18.50;
+      } else if (i === dayIndex) {
+        weekHours += stats.daily / 18.50;
+      }
+    }
+    displayHours = Number(weekHours.toFixed(1));
+  } else if (page === 2) { // Month
+    let monthHours = 0;
+    for (let d = 1; d <= 30; d++) {
+      if (d < todayDateNum) {
+        monthHours += getDailyAmountForDay(d) / 18.50;
+      } else if (d === todayDateNum) {
+        monthHours += stats.daily / 18.50;
+      }
+    }
+    displayHours = Number(monthHours.toFixed(1));
+  } else if (page === 3) { // Year
+    displayHours = Number(((user.lifetimeTrips || 1424) * 0.42).toFixed(1)); // Realistic cumulative hours for all time
+  }
+
+  const currentDisplayAmount = page === 0 ? stats.daily : 
                                page === 1 ? stats.weekly : 
                                page === 2 ? stats.monthly : stats.ytd;
 
@@ -73,10 +152,7 @@ export const EarningsDetail = ({
       setUser(u => ({
         ...u,
         walletBalance: 0,
-        earningsStats: {
-          ...u.earningsStats!,
-          daily: 0
-        }
+        // Preserve historical stats on cashout so today's daily progression stays visible!
       }));
       setIsCashOutLoading(false);
       sendNotification("Instant Pay Received", `£${amount.toFixed(2)} has been transferred to your bank ending in ...4421`);
@@ -253,7 +329,7 @@ export const EarningsDetail = ({
                        <Tooltip contentStyle={{ backgroundColor: '#121214', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px' }} itemStyle={{ color: '#22c55e', fontWeight: 900 }} cursor={{ fill: 'transparent' }} />
                        <Bar dataKey="amount" radius={[6, 6, 0, 0]} fill="url(#colorEarnings)">
                           {weeklyData.map((entry, index) => (
-                             <Cell key={`cell-${index}`} fill={index === 5 ? '#22c55e' : 'rgba(255,255,255,0.1)'} />
+                             <Cell key={`cell-${index}`} fill={index === dayIndex ? '#22c55e' : 'rgba(255,255,255,0.1)'} />
                           ))}
                        </Bar>
                     </BarChart>
@@ -275,12 +351,12 @@ export const EarningsDetail = ({
             <div className="grid grid-cols-3 gap-3 mb-8">
               <div className="p-4 rounded-2xl border border-white/5 bg-[#121214] text-center">
                 <div className="text-[#22c55e] mb-1.5 flex justify-center"><Briefcase size={16} /></div>
-                <p className="text-xl font-black text-white">{page === 0 ? user.deliveriesToday : 24 + page * 12}</p>
+                <p className="text-xl font-black text-white">{displayTrips}</p>
                 <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest leading-none mt-1">Trips</p>
               </div>
               <div className="p-4 rounded-2xl border border-white/5 bg-[#121214] text-center">
                 <div className="text-amber-500 mb-1.5 flex justify-center"><Clock size={16} /></div>
-                <p className="text-xl font-black text-white">{(4.5 + page * 6.2).toFixed(1)}</p>
+                <p className="text-xl font-black text-white">{displayHours}</p>
                 <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest leading-none mt-1">Hours</p>
               </div>
               <div className="p-4 rounded-2xl border border-white/5 bg-[#121214] text-center">
