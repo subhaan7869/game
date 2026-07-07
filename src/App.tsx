@@ -6793,6 +6793,14 @@ export default function App() {
   });
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
 
+  // Interactive iOS native system integration mock states at top level
+  const [iosCoreLocationPerm, setIosCoreLocationPerm] = useState<'always' | 'denied'>('always');
+  const [iosActivityKitState, setIosActivityKitState] = useState<'compact' | 'expanded' | 'inactive'>('compact');
+  const [iosMapKitEngine, setIosMapKitEngine] = useState<'rendered' | 'suspended'>('rendered');
+  const [iosWidgetKitTimeline, setIosWidgetKitTimeline] = useState(3);
+  const [iosBackgroundModes, setIosBackgroundModes] = useState(true);
+  const [iosApnsHandshake, setIosApnsHandshake] = useState(true);
+
   // Standby Auto Pause / Resume Multi-App engine
   useEffect(() => {
     if (!autoPauseSecondApp) return;
@@ -11772,6 +11780,12 @@ export default function App() {
                 orderExpiryTimer={orderExpiryTimer}
                 addToast={addToast}
                 addDebugLog={addDebugLog}
+                iosCoreLocationPerm={iosCoreLocationPerm}
+                iosActivityKitState={iosActivityKitState}
+                iosMapKitEngine={iosMapKitEngine}
+                iosWidgetKitTimeline={iosWidgetKitTimeline}
+                iosBackgroundModes={iosBackgroundModes}
+                iosApnsHandshake={iosApnsHandshake}
               />
             ) : currentScreen === 'onboarding' && (
               <OnboardingFlow 
@@ -17515,6 +17529,18 @@ app.post('/api/cashout', async (req, res) => {
               triggerFiveSecondBackgroundTest={triggerFiveSecondBackgroundTest}
               fcmToken={fcmToken}
               fetchAndSaveFCMToken={fetchAndSaveFCMToken}
+              iosCoreLocationPerm={iosCoreLocationPerm}
+              setIosCoreLocationPerm={setIosCoreLocationPerm}
+              iosActivityKitState={iosActivityKitState}
+              setIosActivityKitState={setIosActivityKitState}
+              iosMapKitEngine={iosMapKitEngine}
+              setIosMapKitEngine={setIosMapKitEngine}
+              iosWidgetKitTimeline={iosWidgetKitTimeline}
+              setIosWidgetKitTimeline={setIosWidgetKitTimeline}
+              iosBackgroundModes={iosBackgroundModes}
+              setIosBackgroundModes={setIosBackgroundModes}
+              iosApnsHandshake={iosApnsHandshake}
+              setIosApnsHandshake={setIosApnsHandshake}
             />
           </motion.div>
         )}
@@ -17567,7 +17593,19 @@ const DebugMonitorView = ({
   backgroundTicks,
   triggerFiveSecondBackgroundTest,
   fcmToken,
-  fetchAndSaveFCMToken
+  fetchAndSaveFCMToken,
+  iosCoreLocationPerm,
+  setIosCoreLocationPerm,
+  iosActivityKitState,
+  setIosActivityKitState,
+  iosMapKitEngine,
+  setIosMapKitEngine,
+  iosWidgetKitTimeline,
+  setIosWidgetKitTimeline,
+  iosBackgroundModes,
+  setIosBackgroundModes,
+  iosApnsHandshake,
+  setIosApnsHandshake
 }: any) => {
   const [activeTab, setActiveTab] = React.useState<'logs' | 'telemetry' | 'background' | 'glitchbox' | 'rescue'>('logs');
   const [logFilter, setLogFilter] = React.useState<'all' | 'info' | 'warn' | 'error' | 'success'>('all');
@@ -18223,6 +18261,259 @@ const DebugMonitorView = ({
                   >
                     CALIBRATE LIVE TEST (5s)
                   </button>
+                </div>
+              </div>
+
+              {/* iOS Native Integration & Diagnostics Panel */}
+              <div className="p-6 bg-gradient-to-tr from-slate-950 to-slate-900 border border-white/5 rounded-3xl mt-4 space-y-5">
+                <div>
+                  <h4 className="font-extrabold text-white text-sm uppercase tracking-wide flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse" />
+                    iOS Native Systems Architecture & Integration Dashboard
+                  </h4>
+                  <p className="text-[11px] text-slate-400 leading-normal mt-1">
+                    Simulation and testing panel for Apple iOS native modules required for real-time background location, navigation maps, and Lock Screen Live Activities.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {/* Card 1: Core Location */}
+                  <div className="p-4 bg-black/40 border border-white/5 rounded-2xl flex flex-col justify-between space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Core Location</span>
+                        <span className={`text-[8.5px] px-2 py-0.5 rounded font-black font-mono ${iosCoreLocationPerm === 'always' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                          {iosCoreLocationPerm === 'always' ? 'Always Authorized' : 'Access Denied'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Continuous background location updates and geofencing scans to fetch dispatches near hotspots.
+                      </p>
+                      <div className="bg-slate-950 p-2 rounded-xl text-[9px] font-mono text-slate-400 space-y-1">
+                        <div>GPS LINK: <span className="text-cyan-400 font-bold">STABLE (1Hz)</span></div>
+                        <div className="truncate">COORDS: {location ? `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}` : '51.507400, -0.127800'}</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          const nextPerm = iosCoreLocationPerm === 'always' ? 'denied' : 'always';
+                          setIosCoreLocationPerm(nextPerm);
+                          if (nextPerm === 'denied') {
+                            addDebugLog('warn', 'Core Location: CLAuthorizationStatus updated to kCLAuthorizationStatusDenied. Background location updates suspended.');
+                            addToast("Location Suspended", "Core Location background permissions set to Denied.", "alert");
+                          } else {
+                            addDebugLog('success', 'Core Location: CLAuthorizationStatus updated to kCLAuthorizationStatusAuthorizedAlways. Continuous 1Hz geofence scans resumed.');
+                            addToast("Location Authorized", "Core Location background permission set to Always.", "success");
+                          }
+                        }}
+                        className="flex-1 py-1.5 bg-white/5 hover:bg-white/10 text-slate-200 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer"
+                      >
+                        Toggle Access
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if (iosCoreLocationPerm === 'denied') {
+                            addToast("Access Denied", "Enable Core Location permissions to trigger a GPS background tick.", "alert");
+                            return;
+                          }
+                          const randomShiftLat = (Math.random() - 0.5) * 0.001;
+                          const randomShiftLng = (Math.random() - 0.5) * 0.001;
+                          if (location) {
+                            setLocation({
+                              latitude: location.latitude + randomShiftLat,
+                              longitude: location.longitude + randomShiftLng
+                            });
+                          }
+                          addDebugLog('success', `Core Location: Continuous background GPS tick received. Accuracy: ±3.1m. Lat/Lng updated dynamically.`);
+                          addToast("GPS Tick Success", "Continuous background location updated in standard iOS sandbox.", "success");
+                        }}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer"
+                      >
+                        GPS Tick
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card 2: MapKit */}
+                  <div className="p-4 bg-black/40 border border-white/5 rounded-2xl flex flex-col justify-between space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">MapKit Engine</span>
+                        <span className={`text-[8.5px] px-2 py-0.5 rounded font-black font-mono ${iosMapKitEngine === 'rendered' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
+                          {iosMapKitEngine === 'rendered' ? 'Active Render' : 'Suspended'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Vector rendering engine for Map overlay routing, turn indicators, and live distance tracking.
+                      </p>
+                      <div className="bg-slate-950 p-2 rounded-xl text-[9px] font-mono text-slate-400 space-y-1">
+                        <div>TILE MEM: <span className="text-cyan-400 font-bold">14.2 MB (Cached)</span></div>
+                        <div>SPLINE SPLITS: <span className="text-slate-300">12 Waypoints</span></div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          const nextState = iosMapKitEngine === 'rendered' ? 'suspended' : 'rendered';
+                          setIosMapKitEngine(nextState);
+                          addDebugLog('info', `MapKit: Rendering context updated to ${nextState.toUpperCase()}.`);
+                        }}
+                        className="flex-1 py-1.5 bg-white/5 hover:bg-white/10 text-slate-200 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer"
+                      >
+                        Toggle Render
+                      </button>
+                      <button 
+                        onClick={() => {
+                          addDebugLog('info', `MapKit: Recalculating route line spline intersections. Route geometry cached: 8.4 miles total range.`);
+                          addToast("Route Re-computed", "MapKit successfully optimized current navigation line splits.", "info");
+                        }}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer"
+                      >
+                        Re-route
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card 3: ActivityKit */}
+                  <div className="p-4 bg-black/40 border border-white/5 rounded-2xl flex flex-col justify-between space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">ActivityKit</span>
+                        <span className={`text-[8.5px] px-2 py-0.5 rounded font-black font-mono ${iosActivityKitState !== 'inactive' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
+                          {iosActivityKitState === 'compact' ? 'Dynamic Island: Compact' : iosActivityKitState === 'expanded' ? 'Dynamic Island: Expanded' : 'Inactive'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Deploys Lock Screen Live Activities and Dynamic Island compact/expanded presentation layers.
+                      </p>
+                      <div className="bg-slate-950 p-2 rounded-xl text-[9px] font-mono text-slate-400 space-y-1">
+                        <div>SESSION ID: <span className="text-indigo-400 font-bold truncate block">act_982_cc91_88af</span></div>
+                        <div>PRESENTATION: <span className="text-slate-300 uppercase">{iosActivityKitState}</span></div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          const nextState = iosActivityKitState === 'compact' ? 'expanded' : iosActivityKitState === 'expanded' ? 'inactive' : 'compact';
+                          setIosActivityKitState(nextState);
+                          addDebugLog('success', `ActivityKit: Live Activity state changed to ${nextState.toUpperCase()}. Lock screen presentation refreshed.`);
+                        }}
+                        className="flex-1 py-1.5 bg-white/5 hover:bg-white/10 text-slate-200 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer"
+                      >
+                        Cycle Present
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card 4: WidgetKit */}
+                  <div className="p-4 bg-black/40 border border-white/5 rounded-2xl flex flex-col justify-between space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">WidgetKit</span>
+                        <span className="text-[8.5px] px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded font-black font-mono">
+                          TIMELINE OK
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Controls the Home Screen standby Widget timelines and renders Lock Screen static/animated widgets.
+                      </p>
+                      <div className="bg-slate-950 p-2 rounded-xl text-[9px] font-mono text-slate-400 space-y-1">
+                        <div>REFRESH CYCLE: <span className="text-amber-400 font-bold">{iosWidgetKitTimeline} cycles ticked</span></div>
+                        <div>BUDGET STATUS: <span className="text-slate-300">Timeline valid for 2 hours</span></div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          setIosWidgetKitTimeline(prev => prev + 1);
+                          addDebugLog('info', 'WidgetKit: Reloading widget extension timeline budgets. Rerendering Home Screen widget timeline.');
+                          addToast("WidgetKit Refreshed", "Home Screen timeline refreshed with latest dispatch parameters.", "success");
+                        }}
+                        className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer"
+                      >
+                        Force Timeline Reload
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card 5: Background Modes */}
+                  <div className="p-4 bg-black/40 border border-white/5 rounded-2xl flex flex-col justify-between space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Background Modes</span>
+                        <span className={`text-[8.5px] px-2 py-0.5 rounded font-black font-mono ${iosBackgroundModes ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
+                          {iosBackgroundModes ? 'Entitlements Active' : 'Suspended'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Permits background execution for GPS location polling, low-latency audio stay-alive, and push handshakes.
+                      </p>
+                      <div className="bg-slate-950 p-2 rounded-xl text-[9px] font-mono text-slate-400 space-y-1">
+                        <div>LOCATION MODE: <span className="text-emerald-400 font-bold">ENROLLED</span></div>
+                        <div>AUDIO STAY-ALIVE: <span className="text-slate-300">{isKeepAliveActive ? "ACTIVE" : "MUTED"}</span></div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          const nextState = !iosBackgroundModes;
+                          setIosBackgroundModes(nextState);
+                          if (nextState) {
+                            addDebugLog('success', 'Background Modes: Location Updates and Audio/AirPlay background modes authorized in App plist.');
+                          } else {
+                            addDebugLog('warn', 'Background Modes: Entitlements suspended. Operating system thread scheduling will freeze the app on lock.');
+                          }
+                        }}
+                        className="flex-1 py-1.5 bg-white/5 hover:bg-white/10 text-slate-200 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer"
+                      >
+                        {iosBackgroundModes ? 'Deauthorize Plist' : 'Authorize Plist'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card 6: APNs push */}
+                  <div className="p-4 bg-black/40 border border-white/5 rounded-2xl flex flex-col justify-between space-y-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">APNs Integration</span>
+                        <span className={`text-[8.5px] px-2 py-0.5 rounded font-black font-mono ${iosApnsHandshake ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
+                          {iosApnsHandshake ? 'Secure Handshake OK' : 'Disconnected'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Apple Push Notification service. Drives remote Live Activity updates and priority offer alerts directly.
+                      </p>
+                      <div className="bg-slate-950 p-2 rounded-xl text-[9px] font-mono text-slate-400 space-y-1">
+                        <div>DEVICE TOKEN: <span className="text-slate-300 truncate block">dev_apns_88291_77a9</span></div>
+                        <div>FEED CHANNELS: <span className="text-slate-300">Dispatch Offer (Direct)</span></div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          setIosApnsHandshake(prev => !prev);
+                          addDebugLog('info', `APNs: Handshake status toggled.`);
+                        }}
+                        className="flex-1 py-1.5 bg-white/5 hover:bg-white/10 text-slate-200 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer"
+                      >
+                        {iosApnsHandshake ? 'Reset Socket' : 'Establish Socket'}
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if (!iosApnsHandshake) {
+                            addToast("APNs Disconnected", "Establish secure handshake socket before dispatching test.", "alert");
+                            return;
+                          }
+                          addDebugLog('success', 'APNs: Transmitting remote Live Activity priority update push. JSON payload delivered to kAPNsPriorityHigh.');
+                          addToast("Remote Live Activity Push", "APNs transmitted updated trip ETA to WidgetKit lock screen extension.", "success");
+                        }}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer"
+                      >
+                        Push Update
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 

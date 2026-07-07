@@ -32,6 +32,12 @@ interface SimulatedHomeScreenProps {
   orderExpiryTimer: number;
   addToast: (title: string, message: string, type?: 'info' | 'success' | 'alert' | 'message') => void;
   addDebugLog: (type: 'info' | 'warn' | 'error' | 'success', message: string) => void;
+  iosCoreLocationPerm?: 'always' | 'denied';
+  iosActivityKitState?: 'compact' | 'expanded' | 'inactive';
+  iosMapKitEngine?: 'rendered' | 'suspended';
+  iosWidgetKitTimeline?: number;
+  iosBackgroundModes?: boolean;
+  iosApnsHandshake?: boolean;
 }
 
 export default function SimulatedHomeScreen({
@@ -44,7 +50,13 @@ export default function SimulatedHomeScreen({
   onRejectOrder,
   orderExpiryTimer,
   addToast,
-  addDebugLog
+  addDebugLog,
+  iosCoreLocationPerm = 'always',
+  iosActivityKitState = 'compact',
+  iosMapKitEngine = 'rendered',
+  iosWidgetKitTimeline = 3,
+  iosBackgroundModes = true,
+  iosApnsHandshake = true
 }: SimulatedHomeScreenProps) {
   const [timeStr, setTimeStr] = useState('12:00');
   const [dateStr, setDateStr] = useState('Sunday, 24 May');
@@ -126,6 +138,194 @@ export default function SimulatedHomeScreen({
             </span>
           </div>
         </div>
+
+        {/* iOS Lock Screen / Dynamic Island WidgetKit & ActivityKit Simulation */}
+        {isOnline && iosActivityKitState !== 'inactive' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ 
+              opacity: 1, 
+              y: 0,
+              scale: iosActivityKitState === 'expanded' ? 1.02 : 1,
+            }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            className={`w-full max-w-sm mx-auto bg-slate-950/90 backdrop-blur-2xl border rounded-[28px] p-4 shadow-2xl mb-8 relative overflow-hidden text-left hover:border-blue-500/25 transition-all duration-300 group ${
+              iosActivityKitState === 'expanded' ? 'border-blue-500/35 ring-1 ring-blue-500/10' : 'border-white/10'
+            }`}
+          >
+            {/* Ambient Background Glow matching trip type and permissions status */}
+            <div className={`absolute -inset-10 opacity-10 bg-gradient-to-tr ${
+              iosCoreLocationPerm === 'denied' ? 'from-rose-500 to-amber-500' :
+              !iosBackgroundModes ? 'from-amber-600 to-rose-700' :
+              navSimulation.active ? 'from-blue-500 to-indigo-500' : 'from-emerald-500 to-teal-500'
+            } blur-[40px] pointer-events-none`} />
+
+            {/* Header: App Brand, ActivityKit Service details */}
+            <div className="flex items-center justify-between mb-3 relative z-10 border-b border-white/5 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-md flex items-center justify-center">
+                  <Compass size={11} className="text-white animate-spin-slow" />
+                </div>
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-300">Dual Dispatch</span>
+                <span className={`text-[7.5px] px-1.5 py-0.5 border rounded font-black font-mono tracking-wider uppercase ${
+                  iosActivityKitState === 'expanded' ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30 animate-pulse' :
+                  navSimulation.active ? 'bg-blue-500/15 text-blue-400 border-blue-500/20' : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+                }`}>
+                  {iosActivityKitState === 'expanded' ? 'ActivityKit Expanded' : navSimulation.active ? 'ActivityKit Live' : 'WidgetKit Active'}
+                </span>
+                {iosWidgetKitTimeline > 3 && (
+                  <span className="text-[7px] px-1 py-0.2 bg-amber-500/10 border border-amber-500/20 text-amber-400 font-mono font-bold rounded">
+                    T-{iosWidgetKitTimeline}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${iosApnsHandshake ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                <span className="text-[8px] font-mono font-black tracking-wider text-slate-500 uppercase">
+                  {iosApnsHandshake ? 'APNs: STANDBY' : 'APNs: OFFLINE'}
+                </span>
+              </div>
+            </div>
+
+            {/* Core Location Lockout Warning Banner */}
+            {iosCoreLocationPerm === 'denied' && (
+              <div className="mb-3 p-2 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-2 text-[9.5px] font-mono text-rose-400 relative z-10 animate-bounce">
+                <AlertCircle size={12} className="shrink-0" />
+                <span className="font-extrabold uppercase tracking-wider">Core Location Permission Denied: GPS Updates Halted</span>
+              </div>
+            )}
+
+            {/* Plist Entitlements Warning Banner */}
+            {!iosBackgroundModes && (
+              <div className="mb-3 p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2 text-[9.5px] font-mono text-amber-400 relative z-10">
+                <AlertCircle size={12} className="shrink-0" />
+                <span className="font-extrabold uppercase tracking-wider">Plist Suspended: Threads freeze on lock</span>
+              </div>
+            )}
+
+            {/* Body content based on Active Navigation or Standby dispatch offering */}
+            {navSimulation.active ? (
+              <div className="space-y-3.5 relative z-10">
+                {/* Route Segment, ETA countdown */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-500/10 border border-blue-500/15 rounded-2xl text-blue-400 shrink-0">
+                      <NavIcon size={18} className="rotate-45 animate-pulse" />
+                    </div>
+                    <div>
+                      <h4 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+                        {iosMapKitEngine === 'suspended' ? 'Navigation Suspended' :
+                         navSimulation.type === 'pickup' ? 'Heading to Merchant / Pickup' : 
+                         navSimulation.type === 'dropoff' ? 'Delivering to Customer' : 'Driving to Demand Hotspot'}
+                      </h4>
+                      <p className="text-lg font-black text-white tracking-tight mt-0.5 leading-none">
+                        {iosMapKitEngine === 'suspended' ? (
+                          <span className="text-slate-500">Maps Frozen</span>
+                        ) : (
+                          <>Arriving in <span className="text-blue-400 font-mono">{navSimulation.eta.toFixed(0)}</span> mins</>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block font-mono">MAPKIT RANGE</span>
+                    <span className="text-sm font-mono font-black text-slate-200">
+                      {iosMapKitEngine === 'suspended' ? 'FREEZE' : `${navSimulation.distanceRemaining.toFixed(1)} mi`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress bar tracking the Web Driver geofence progress */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[8.5px] font-mono font-bold text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <MapPin size={9} className="text-blue-500" /> Start
+                    </span>
+                    <span className="text-blue-400 bg-blue-500/10 px-1 py-0.5 rounded text-[8px] font-black tracking-wide">
+                      SPEED: {iosCoreLocationPerm === 'denied' || iosMapKitEngine === 'suspended' ? '0' : navSimulation.speed.toFixed(0)} MPH
+                    </span>
+                    <span>Destination</span>
+                  </div>
+                  <div className="w-full h-2 bg-white/5 border border-white/5 rounded-full overflow-hidden p-[1px]">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${iosCoreLocationPerm === 'denied' ? 0 : navSimulation.progress * 100}%` }}
+                      transition={{ duration: 1, ease: 'easeOut' }}
+                      className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400 rounded-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Expanded mode additional details */}
+                {iosActivityKitState === 'expanded' && (
+                  <div className="pt-2 border-t border-white/5 grid grid-cols-2 gap-3 text-[10px] text-slate-400">
+                    <div>
+                      <span className="block text-[8px] font-mono font-extrabold uppercase text-slate-500 tracking-wider">ACTIVITY ENGINE</span>
+                      <span className="text-indigo-400 font-bold font-mono">Live Session: active_run</span>
+                    </div>
+                    <div>
+                      <span className="block text-[8px] font-mono font-extrabold uppercase text-slate-500 tracking-wider">MAP TILE STATUS</span>
+                      <span className={iosMapKitEngine === 'rendered' ? "text-emerald-400 font-bold font-mono" : "text-amber-400 font-bold font-mono"}>
+                        {iosMapKitEngine === 'rendered' ? "Vector Engine Hot" : "Tile Render Suspended"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Core Location system details strip */}
+                <div className="flex items-center justify-between bg-black/40 border border-white/5 rounded-xl px-2.5 py-1.5 text-[8px] font-mono text-slate-400">
+                  <span className="flex items-center gap-1 uppercase tracking-wide">
+                    <span className={`w-1 h-1 rounded-full ${iosCoreLocationPerm === 'always' ? 'bg-cyan-400 animate-ping' : 'bg-rose-500'} inline-block`} />
+                    {iosCoreLocationPerm === 'always' ? 'Core Location GPS Mode Active' : 'Core Location Access Denied'}
+                  </span>
+                  <span className="text-slate-300 font-bold font-mono">
+                    {iosCoreLocationPerm === 'denied' ? 'BLOCKED' : navSimulation.currentPos ? `${navSimulation.currentPos.lat.toFixed(5)}, ${navSimulation.currentPos.lng.toFixed(5)}` : 'RE-INDEXING'}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 relative z-10">
+                {/* Standby Widget */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                      <span className="relative flex h-2 w-2">
+                        <span className={`absolute inline-flex h-full w-full rounded-full ${iosCoreLocationPerm === 'always' ? 'animate-ping bg-emerald-400 opacity-75' : 'bg-rose-500 opacity-20'}`}></span>
+                        <span className={`relative inline-flex rounded-full h-2 w-2 ${iosCoreLocationPerm === 'always' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">WidgetKit Dispatch Radar</h4>
+                      <p className="text-xs font-bold text-slate-200 mt-0.5">
+                        {iosCoreLocationPerm === 'denied' ? 'Background scanner blocked' : 'Core Location scanning hotspots in background...'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Simulated Geofencing status */}
+                <div className="bg-black/30 border border-white/5 rounded-xl px-2.5 py-1.5 text-[8.5px] font-mono text-slate-500 flex justify-between items-center">
+                  <span className="uppercase font-bold tracking-wider text-slate-400">Enrolled Background Modes:</span>
+                  <span className={`font-black uppercase ${iosBackgroundModes ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {iosBackgroundModes ? 'Location, Audio, Alerts' : 'SUSPENDED'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {isOnline && iosActivityKitState === 'inactive' && (
+          <div className="w-full max-w-sm mx-auto bg-slate-900/40 border border-white/5 rounded-[24px] p-4 text-center mb-8 relative z-10">
+            <p className="text-[11px] font-mono font-black text-slate-500 uppercase tracking-widest">
+              ActivityKit Live Activity Inactive
+            </p>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Enable "Live Activity" states from the iOS Native Dashboard inside the app to project Lock Screen widgets.
+            </p>
+          </div>
+        )}
 
         {/* Dynamic Interactive Slide-Down Notification Banner */}
         <AnimatePresence>
