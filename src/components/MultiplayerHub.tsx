@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, Order, AppScreen } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { calculatePayRate } from '../utils/payRate';
 
 export interface OtherDriver {
   uid: string;
@@ -368,6 +369,16 @@ export const MultiplayerHub: React.FC<MultiplayerHubProps> = ({
                             <p className="text-[10px] text-gray-500 font-bold tracking-wide mt-0.5">
                               {order.estimatedDistance.toFixed(1)} miles away • {order.items?.slice(0, 2).join(', ') || 'Courier Job'}
                             </p>
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              {(() => {
+                                const payRate = calculatePayRate(order.estimatedPay, order.estimatedDistance);
+                                return (
+                                  <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border ${payRate.color}`}>
+                                    {payRate.icon} Rate: {payRate.label}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                           </div>
                           <div className="text-right">
                             <span className="text-base font-black text-green-400">
@@ -699,9 +710,9 @@ export const MultiplayerHub: React.FC<MultiplayerHubProps> = ({
               </span>
             </div>
 
-            {activeSurgeAreas.map((area) => (
+            {activeSurgeAreas.map((area, idx) => (
               <div 
-                key={`surge-lounge-${area.id}`} 
+                key={`surge-lounge-${area.id}-${idx}`} 
                 className={`p-5 rounded-3xl border relative text-left ${
                   isDark ? 'bg-white/5 border-white/5' : 'bg-white border-gray-200 shadow-sm'
                 }`}

@@ -119,6 +119,7 @@ import { CommandCentreScreen } from './components/CommandCentreScreen';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { calculatePayRate, PayRateInfo } from './utils/payRate';
 
 // Global cache for decoded audio buffers to prevent background music interruption
 const webAudioBufferCache = new Map<string, AudioBuffer>();
@@ -6686,6 +6687,37 @@ export default function App() {
 
   // Location & Orders
   const [location, setLocation] = useState<Location | null>({ latitude: 51.5074, longitude: -0.1278 }); // Default to London
+  const [selectedServices, setSelectedServices] = useState<JobType[]>(() => {
+    try {
+      const saved = localStorage.getItem('hyper_driver_selected_services');
+      return saved ? JSON.parse(saved) : ['delivery', 'ride'];
+    } catch (e) {
+      return ['delivery', 'ride'];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('hyper_driver_selected_services', JSON.stringify(selectedServices));
+  }, [selectedServices]);
+
+  const [stableHeatmapCenter, setStableHeatmapCenter] = useState<Location | null>(null);
+
+  useEffect(() => {
+    if (location) {
+      if (!stableHeatmapCenter) {
+        setStableHeatmapCenter({ latitude: location.latitude, longitude: location.longitude });
+      } else {
+        const dist = Math.sqrt(
+          Math.pow(location.latitude - stableHeatmapCenter.latitude, 2) + 
+          Math.pow(location.longitude - stableHeatmapCenter.longitude, 2)
+        );
+        // Recenter if moved significantly (approx 1.5km) to keep the simulation focused around the neighborhood
+        if (dist > 0.015) {
+          setStableHeatmapCenter({ latitude: location.latitude, longitude: location.longitude });
+        }
+      }
+    }
+  }, [location, stableHeatmapCenter]);
   const [mapOffset, setMapOffset] = useState({ x: 0, y: 0 });
   const [useRealGPS, setUseRealGPS] = useState(true);
   const [zoom, setZoom] = useState(1);
@@ -8227,20 +8259,30 @@ export default function App() {
   }, [location]);
 
   const activeCityKey = useMemo(() => {
-    if (!currentCity || currentCity === "United Kingdom") return "London";
+    if (!currentCity || currentCity === "United Kingdom") {
+      return "Current Location";
+    }
     return currentCity;
   }, [currentCity]);
 
   const activeCityCenter = useMemo(() => {
-    if ((!currentCity || currentCity === "United Kingdom") && location) {
+    if (useRealGPS && location) {
       return {
-        latitude: Math.round(location.latitude * 100) / 100,
-        longitude: Math.round(location.longitude * 100) / 100
+        latitude: location.latitude,
+        longitude: location.longitude
       };
     }
     const info = CITY_DATABASES[activeCityKey];
-    return info ? info.center : { latitude: 51.5074, longitude: -0.1278 };
-  }, [activeCityKey, currentCity, location]);
+    if (info) return info.center;
+    const refLoc = stableHeatmapCenter || location;
+    if (refLoc) {
+      return {
+        latitude: refLoc.latitude,
+        longitude: refLoc.longitude
+      };
+    }
+    return { latitude: 51.5074, longitude: -0.1278 };
+  }, [useRealGPS, location, activeCityKey, stableHeatmapCenter]);
 
   const [activeRestaurants, setActiveRestaurants] = useState<{
     name: string;
@@ -8528,34 +8570,40 @@ export default function App() {
         const period = getCurrentPeriodDetails();
         const hCount = isLowPerformance ? 6 : 18;
         
-        // Let's establish dynamic cluster centers depending on the current simulated period
+        // Establish dynamic cluster centers depending on current active services and period
         let centers: { lat: number, lng: number, weight: number }[] = [];
-        
-        if (period.id === 'breakfast') {
-          // Commuter/station and breakfast hubs cluster (e.g. King's Cross offset: +0.012 lat, -0.005 lng)
+        const hasRide = selectedServices.includes('ride');
+        const hasDelivery = selectedServices.includes('delivery');
+
+        if (hasDelivery && !hasRide) {
+          // Eats-centric hotspots: cluster around local active restaurants
+          if (activeRestaurants && activeRestaurants.length > 0) {
+            centers = activeRestaurants.map(r => ({
+              lat: activeCityCenter.latitude + r.offset.lat,
+              lng: activeCityCenter.longitude + r.offset.lng,
+              weight: r.busyness === 'High' ? 0.95 : r.busyness === 'Medium' ? 0.75 : 0.55
+            }));
+          } else {
+            centers = [
+              { lat: activeCityCenter.latitude + 0.005, lng: activeCityCenter.longitude + 0.005, weight: 0.9 },
+              { lat: activeCityCenter.latitude - 0.005, lng: activeCityCenter.longitude - 0.008, weight: 0.8 },
+              { lat: activeCityCenter.latitude + 0.012, lng: activeCityCenter.longitude + 0.012, weight: 0.75 }
+            ];
+          }
+        } else if (hasRide && !hasDelivery) {
+          // Taxi-centric hotspots: cluster around stations, terminals, central districts
           centers = [
-            { lat: activeCityCenter.latitude + 0.011, lng: activeCityCenter.longitude - 0.005, weight: 0.9 }, // Station node
-            { lat: activeCityCenter.latitude + 0.002, lng: activeCityCenter.longitude + 0.002, weight: 0.75 }, // Mid-High coffee joint
-            { lat: activeCityCenter.latitude - 0.003, lng: activeCityCenter.longitude + 0.004, weight: 0.6 }
-          ];
-        } else if (period.id === 'lunch') {
-          // Office districts, High Streets, Soho (e.g. Soho offset: -0.005 lat, -0.008 lng)
-          centers = [
-            { lat: activeCityCenter.latitude - 0.004, lng: activeCityCenter.longitude - 0.007, weight: 0.95 }, // Central Soho
-            { lat: activeCityCenter.latitude + 0.001, lng: activeCityCenter.longitude - 0.003, weight: 0.8 }, // Regent Office strip
-            { lat: activeCityCenter.latitude + 0.015, lng: activeCityCenter.longitude + 0.012, weight: 0.7 }  // Commercial Hub
-          ];
-        } else if (period.id === 'dinner') {
-          // Food streets & entertainment hubs: Soho (-0.005, -0.008) and Shoreditch (+0.005, +0.005)
-          centers = [
-            { lat: activeCityCenter.latitude + 0.005, lng: activeCityCenter.longitude + 0.005, weight: 0.95 }, // Shoreditch Nightlife
-            { lat: activeCityCenter.latitude - 0.005, lng: activeCityCenter.longitude - 0.008, weight: 0.9 },  // Soho Dining
-            { lat: activeCityCenter.latitude + 0.015, lng: activeCityCenter.longitude + 0.012, weight: 0.85 } // Piccadilly epicenter
+            { lat: activeCityCenter.latitude + 0.006, lng: activeCityCenter.longitude - 0.004, weight: 0.95 }, // Central Station
+            { lat: activeCityCenter.latitude - 0.004, lng: activeCityCenter.longitude + 0.008, weight: 0.85 }, // Business Towers
+            { lat: activeCityCenter.latitude - 0.008, lng: activeCityCenter.longitude - 0.006, weight: 0.9 },  // Downtown Clubs
+            { lat: activeCityCenter.latitude + 0.012, lng: activeCityCenter.longitude + 0.014, weight: 0.8 }   // Terminal Line
           ];
         } else {
-          // Off-peak: dispersed dimmer spots, few primary central hubs
+          // Blended or default
           centers = [
-            { lat: activeCityCenter.latitude, lng: activeCityCenter.longitude, weight: 0.45 }
+            { lat: activeCityCenter.latitude + 0.005, lng: activeCityCenter.longitude + 0.005, weight: 0.95 }, // Shoreditch Nightlife/Food
+            { lat: activeCityCenter.latitude - 0.005, lng: activeCityCenter.longitude - 0.008, weight: 0.9 },  // Soho Dining
+            { lat: activeCityCenter.latitude + 0.006, lng: activeCityCenter.longitude - 0.004, weight: 0.85 } // Central Hub
           ];
         }
 
@@ -8594,7 +8642,7 @@ export default function App() {
       const interval = setInterval(generateHotspots, 20000); // Refresh every 20s
       return () => clearInterval(interval);
     }
-  }, [location, activeCityCenter, selectedTimePeriod, getCurrentPeriodDetails]);
+  }, [location, activeCityCenter, selectedTimePeriod, getCurrentPeriodDetails, selectedServices, activeRestaurants]);
 
   // MULTIPLAYER LIVE GPS COORDINATES & PRESENCE SYNCHRONIZATION EFFECT
   useEffect(() => {
@@ -8661,19 +8709,6 @@ export default function App() {
     return () => unsubscribe();
   }, [firebaseUser?.uid, user.isOnline, db]);
   
-  const [selectedServices, setSelectedServices] = useState<JobType[]>(() => {
-    try {
-      const saved = localStorage.getItem('hyper_driver_selected_services');
-      return saved ? JSON.parse(saved) : ['delivery', 'ride'];
-    } catch (e) {
-      return ['delivery', 'ride'];
-    }
-  });
-
-  useEffect(() => {
-    localStorage.setItem('hyper_driver_selected_services', JSON.stringify(selectedServices));
-  }, [selectedServices]);
-
   const watchId = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const expiryInterval = useRef<NodeJS.Timeout | null>(null);
@@ -9482,7 +9517,11 @@ export default function App() {
             longitude: lng,
           });
         },
-        (error) => console.error("Error tracking location:", error),
+        (error) => {
+          console.warn("Real GPS tracking unavailable/denied, falling back to simulated GPS:", error.message);
+          setUseRealGPS(false);
+          addToast("GPS Mode", "Real-time location unavailable. Switched to simulated city center GPS.", "info");
+        },
         { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
       );
     }
@@ -9733,89 +9772,99 @@ export default function App() {
     { id: 'fake_busy_area', name: "Piccadilly Hub (Fake Hotspot)", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising', demand: 'High' }
   ]);
 
-  // Synchronously update active surge areas parameters on peak periods simulation changes
+  // Synchronously update active surge areas parameters on peak periods simulation and service preference changes
   useEffect(() => {
     const period = getCurrentPeriodDetails();
-    
-    setActiveSurgeAreas(prev => {
-      return prev.map(area => {
-        let demand: 'Low' | 'Medium' | 'High' = area.demand;
-        let baseMultiplier = 1.0;
-        
-        if (period.id === 'breakfast') {
-          if (area.name.includes("King's Cross")) {
-            demand = 'High';
-            baseMultiplier = 2.4;
-          } else if (area.name.includes("Shoreditch")) {
-            demand = 'Medium';
-            baseMultiplier = 1.8;
-          } else if (area.name.includes("Soho")) {
-            demand = 'Low';
-            baseMultiplier = 1.2;
-          } else if (area.name.includes("Piccadilly")) {
-            demand = 'High';
-            baseMultiplier = 2.9;
-          }
-        } else if (period.id === 'lunch') {
-          if (area.name.includes("Soho")) {
-            demand = 'High';
-            baseMultiplier = 2.6;
-          } else if (area.name.includes("Shoreditch")) {
-            demand = 'Medium';
-            baseMultiplier = 1.9;
-          } else if (area.name.includes("King's Cross")) {
-            demand = 'Medium';
-            baseMultiplier = 1.6;
-          } else if (area.name.includes("Piccadilly")) {
-            demand = 'High';
-            baseMultiplier = 3.2;
-          }
-        } else if (period.id === 'dinner') {
-          if (area.name.includes("Shoreditch")) {
-            demand = 'High';
-            baseMultiplier = 2.8;
-          } else if (area.name.includes("Soho")) {
-            demand = 'High';
-            baseMultiplier = 2.7;
-          } else if (area.name.includes("King's Cross")) {
-            demand = 'Low';
-            baseMultiplier = 1.3;
-          } else if (area.name.includes("Piccadilly")) {
-            demand = 'High';
-            baseMultiplier = 3.9;
-          }
+    const hasRide = selectedServices.includes('ride');
+    const hasDelivery = selectedServices.includes('delivery');
+
+    let areas = [];
+    if (hasRide && !hasDelivery) {
+      // Taxi (Rideshare) only hotspots
+      areas = [
+        { id: '1', name: "Central Station Hub", lat: 0.006, lng: -0.004, radius: 0.008, multiplier: 2.1, trend: 'stable' as const, demand: 'High' as const },
+        { id: '2', name: "Financial District & Hotels", lat: -0.004, lng: 0.008, radius: 0.007, multiplier: 1.8, trend: 'rising' as const, demand: 'High' as const },
+        { id: '3', name: "Downtown Clubbing & Bar District", lat: -0.008, lng: -0.006, radius: 0.009, multiplier: 2.5, trend: 'stable' as const, demand: 'High' as const },
+        { id: 'fake_busy_area', name: "Airport Express Terminal", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising' as const, demand: 'High' as const }
+      ];
+    } else if (hasDelivery && !hasRide) {
+      // Eats (Courier / Delivery) only hotspots
+      areas = [
+        { id: '1', name: "High Street Food Quarter", lat: 0.005, lng: 0.005, radius: 0.008, multiplier: 2.0, trend: 'stable' as const, demand: 'High' as const },
+        { id: '2', name: "Soho Restaurant Row", lat: -0.005, lng: -0.008, radius: 0.006, multiplier: 1.7, trend: 'rising' as const, demand: 'Medium' as const },
+        { id: '3', name: "Local Dessert & Pizza Zone", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.3, trend: 'stable' as const, demand: 'Low' as const },
+        { id: 'fake_busy_area', name: "Bento & Sushi Food Court", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising' as const, demand: 'High' as const }
+      ];
+    } else {
+      // Blended Both or default
+      areas = [
+        { id: '1', name: "Central Station & Dining Plaza", lat: 0.006, lng: -0.004, radius: 0.008, multiplier: 2.2, trend: 'stable' as const, demand: 'High' as const },
+        { id: '2', name: "High Street Food & Retail Zone", lat: 0.005, lng: 0.005, radius: 0.007, multiplier: 1.9, trend: 'rising' as const, demand: 'Medium' as const },
+        { id: '3', name: "Downtown Clubbing & Bar District", lat: -0.008, lng: -0.006, radius: 0.009, multiplier: 2.4, trend: 'stable' as const, demand: 'High' as const },
+        { id: 'fake_busy_area', name: "Airport & Local Business Hub", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising' as const, demand: 'High' as const }
+      ];
+    }
+
+    const updatedAreas = areas.map(area => {
+      let demand = area.demand;
+      let baseMultiplier = area.multiplier;
+      
+      if (period.id === 'breakfast') {
+        if (area.name.includes("Station") || area.name.includes("Terminal")) {
+          demand = 'High';
+          baseMultiplier = 2.4;
+        } else if (area.name.includes("Food") || area.name.includes("Restaurant")) {
+          demand = 'Medium';
+          baseMultiplier = 1.8;
         } else {
-          // Off-peak
-          if (area.name.includes("Shoreditch")) {
-            demand = 'Low';
-            baseMultiplier = 1.1;
-          } else if (area.name.includes("Soho")) {
-            demand = 'Low';
-            baseMultiplier = 1.2;
-          } else if (area.name.includes("King's Cross")) {
-            demand = 'Low';
-            baseMultiplier = 1.0;
-          } else if (area.name.includes("Piccadilly")) {
-            demand = 'Low';
-            baseMultiplier = 1.3;
-          }
+          demand = 'Low';
+          baseMultiplier = 1.2;
         }
-        
-        return {
-          ...area,
-          demand,
-          multiplier: baseMultiplier,
-          trend: (period.isPeak ? 'rising' : 'stable') as any,
-          periodId: period.id
-        };
-      });
+      } else if (period.id === 'lunch') {
+        if (area.name.includes("Restaurant") || area.name.includes("Food") || area.name.includes("Row") || area.name.includes("Zone")) {
+          demand = 'High';
+          baseMultiplier = 2.6;
+        } else if (area.name.includes("Station") || area.name.includes("Terminal")) {
+          demand = 'Medium';
+          baseMultiplier = 1.6;
+        } else {
+          demand = 'Low';
+          baseMultiplier = 1.2;
+        }
+      } else if (period.id === 'dinner') {
+        if (area.name.includes("Clubbing") || area.name.includes("Bar") || area.name.includes("Dining") || area.name.includes("Restaurant") || area.name.includes("Row")) {
+          demand = 'High';
+          baseMultiplier = 3.9;
+        } else if (area.name.includes("Station") || area.name.includes("Terminal")) {
+          demand = 'Low';
+          baseMultiplier = 1.3;
+        } else {
+          demand = 'Medium';
+          baseMultiplier = 1.8;
+        }
+      } else {
+        // Off-peak
+        demand = 'Low';
+        baseMultiplier = 1.1;
+      }
+      
+      return {
+        ...area,
+        demand,
+        multiplier: baseMultiplier,
+        trend: (period.isPeak ? 'rising' : 'stable') as any,
+        periodId: period.id
+      };
     });
+
+    setActiveSurgeAreas(updatedAreas);
     
     if (user.isOnline) {
-      addToast(`${period.label} Simulated`, `Hotspot demand scales recalibrated for ${period.label}.`, "success");
-      addDebugLog('info', `Simulating active hotspot demand peaks: ${period.label}.`);
+      const serviceLabel = (hasRide && !hasDelivery) ? "Taxi" : (hasDelivery && !hasRide) ? "Eats" : "Combined";
+      addToast(`${period.label} Simulated`, `Hotspots updated for active ${serviceLabel} services.`, "success");
+      addDebugLog('info', `Simulating active ${serviceLabel} hotspot demand peaks: ${period.label}.`);
     }
-  }, [selectedTimePeriod, getCurrentPeriodDetails, user.isOnline]);
+  }, [selectedTimePeriod, getCurrentPeriodDetails, user.isOnline, selectedServices]);
 
   const [surgeMultiplier, setSurgeMultiplier] = useState(1.0);
   const [lastDetectedAreaName, setLastDetectedAreaName] = useState<string>('Shoreditch');
@@ -11984,6 +12033,7 @@ export default function App() {
                     routeWaypoints={routeWaypoints}
                     zoom={zoom}
                     setZoom={setZoom}
+                    iosMapKitEngine={iosMapKitEngine}
                     onNavigateToSurgeArea={(area) => {
                       if (activeOrders.length > 0) {
                         addToast("Busy Area Locked", "Complete your current active orders first before navigating to a surge zone.", "alert");
@@ -12481,7 +12531,17 @@ export default function App() {
                                     {order.type === 'ride' ? <User size={24} /> : <Coffee size={24} />}
                                   </div>
                                   <div>
-                                    <p className="text-2xl font-black">£{order.estimatedPay.toFixed(2)}</p>
+                                    <div className="flex items-center gap-1.5">
+                                      <p className="text-2xl font-black">£{order.estimatedPay.toFixed(2)}</p>
+                                      {(() => {
+                                        const payRate = calculatePayRate(order.estimatedPay, order.estimatedDistance);
+                                        return (
+                                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border ${payRate.color}`}>
+                                            {payRate.label}
+                                          </span>
+                                        );
+                                      })()}
+                                    </div>
                                     <p className="text-[10px] font-black opacity-30 uppercase tracking-widest leading-none">{order.estimatedDistance.toFixed(1)} mi • {order.estimatedTime} min</p>
                                   </div>
                                 </div>
@@ -15336,8 +15396,8 @@ export default function App() {
                   )}
                 </div>
 
-                {activeSurgeAreas.map((area) => (
-                  <div key={area.id} className={`p-6 rounded-3xl border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-blue-50 border-blue-100'}`}>
+                {activeSurgeAreas.map((area, idx) => (
+                  <div key={`surge-area-detail-${area.id}-${idx}`} className={`p-6 rounded-3xl border-2 ${theme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-blue-50 border-blue-100'}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3 text-blue-600">
                         <TrendingUp size={20} />
@@ -16754,11 +16814,22 @@ export default function App() {
 
                   {/* Premium display payout & rating */}
                   <div className="flex flex-col gap-1">
-                    <h2 className={`font-sans text-[48px] font-black tracking-tight leading-none ${
-                      pendingOrder.brand === 'hyper' ? 'text-white' : 'text-gray-900'
-                    }`}>
-                      £{pendingOrder.estimatedPay % 1 === 0 ? pendingOrder.estimatedPay.toFixed(0) : pendingOrder.estimatedPay.toFixed(2)}
-                    </h2>
+                    <div className="flex items-center justify-between">
+                      <h2 className={`font-sans text-[48px] font-black tracking-tight leading-none ${
+                        pendingOrder.brand === 'hyper' ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        £{pendingOrder.estimatedPay % 1 === 0 ? pendingOrder.estimatedPay.toFixed(0) : pendingOrder.estimatedPay.toFixed(2)}
+                      </h2>
+                      {(() => {
+                        const payRate = calculatePayRate(pendingOrder.estimatedPay, pendingOrder.estimatedDistance);
+                        return (
+                          <div className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 font-black text-[10px] uppercase tracking-wider border shadow-sm ${payRate.color}`}>
+                            <span>{payRate.icon}</span>
+                            <span>Rate: {payRate.label}</span>
+                          </div>
+                        );
+                      })()}
+                    </div>
                     
                     <div className={`flex items-center gap-1 mt-1 border w-fit px-2 py-0.5 rounded-md ${
                       pendingOrder.brand === 'hyper'
@@ -16961,9 +17032,20 @@ export default function App() {
 
                   {/* Main payout and details */}
                   <div className="px-6 py-2 shrink-0">
-                    <h2 className="font-sans text-[48px] font-black text-gray-900 tracking-tight leading-none">
-                      +£{pendingOrder.estimatedPay.toFixed(2)}
-                    </h2>
+                    <div className="flex items-center justify-between">
+                      <h2 className="font-sans text-[48px] font-black text-gray-900 tracking-tight leading-none">
+                        +£{pendingOrder.estimatedPay.toFixed(2)}
+                      </h2>
+                      {(() => {
+                        const payRate = calculatePayRate(pendingOrder.estimatedPay, pendingOrder.estimatedDistance);
+                        return (
+                          <div className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 font-black text-[10px] uppercase tracking-wider border shadow-sm ${payRate.color}`}>
+                            <span>{payRate.icon}</span>
+                            <span>Rate: {payRate.label}</span>
+                          </div>
+                        );
+                      })()}
+                    </div>
                     
                     <div className="flex items-center gap-2 mt-2.5 text-gray-700 font-bold text-sm">
                       <span className="text-base">⏱️</span>
@@ -17541,6 +17623,10 @@ app.post('/api/cashout', async (req, res) => {
               setIosBackgroundModes={setIosBackgroundModes}
               iosApnsHandshake={iosApnsHandshake}
               setIosApnsHandshake={setIosApnsHandshake}
+              useRealGPS={useRealGPS}
+              setUseRealGPS={setUseRealGPS}
+              navSimulation={navSimulation}
+              sendNotification={sendNotification}
             />
           </motion.div>
         )}
@@ -17605,7 +17691,11 @@ const DebugMonitorView = ({
   iosBackgroundModes,
   setIosBackgroundModes,
   iosApnsHandshake,
-  setIosApnsHandshake
+  setIosApnsHandshake,
+  useRealGPS,
+  setUseRealGPS,
+  navSimulation,
+  sendNotification
 }: any) => {
   const [activeTab, setActiveTab] = React.useState<'logs' | 'telemetry' | 'background' | 'glitchbox' | 'rescue'>('logs');
   const [logFilter, setLogFilter] = React.useState<'all' | 'info' | 'warn' | 'error' | 'success'>('all');
@@ -18300,9 +18390,11 @@ const DebugMonitorView = ({
                           const nextPerm = iosCoreLocationPerm === 'always' ? 'denied' : 'always';
                           setIosCoreLocationPerm(nextPerm);
                           if (nextPerm === 'denied') {
+                            setUseRealGPS(false);
                             addDebugLog('warn', 'Core Location: CLAuthorizationStatus updated to kCLAuthorizationStatusDenied. Background location updates suspended.');
                             addToast("Location Suspended", "Core Location background permissions set to Denied.", "alert");
                           } else {
+                            setUseRealGPS(true);
                             addDebugLog('success', 'Core Location: CLAuthorizationStatus updated to kCLAuthorizationStatusAuthorizedAlways. Continuous 1Hz geofence scans resumed.');
                             addToast("Location Authorized", "Core Location background permission set to Always.", "success");
                           }
@@ -18506,6 +18598,16 @@ const DebugMonitorView = ({
                             return;
                           }
                           addDebugLog('success', 'APNs: Transmitting remote Live Activity priority update push. JSON payload delivered to kAPNsPriorityHigh.');
+                          
+                          // Trigger real system notification matching the ETA remaining or active state
+                          const remainingDist = navSimulation?.distanceRemaining?.toFixed(1) || "2.1";
+                          const etaMins = navSimulation?.eta?.toFixed(0) || "5";
+                          sendNotification(
+                            "APNs Live Activity Push", 
+                            `Trip updated remotely. Destination is ${remainingDist} miles away (${etaMins} mins remaining).`, 
+                            "success"
+                          );
+                          
                           addToast("Remote Live Activity Push", "APNs transmitted updated trip ETA to WidgetKit lock screen extension.", "success");
                         }}
                         className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer"

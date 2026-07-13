@@ -89,6 +89,194 @@ export default function SimulatedHomeScreen({
     onRejectOrder();
   };
 
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const [isPipAvailable, setIsPipAvailable] = useState(false);
+  const [isPipActive, setIsPipActive] = useState(false);
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      setIsPipAvailable('pictureInPictureEnabled' in document);
+    }
+  }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleLeavePip = () => {
+      setIsPipActive(false);
+      addDebugLog('info', 'ActivityKit: Picture-in-Picture Live Activity window closed.');
+    };
+
+    video.addEventListener('leavepictureinpicture', handleLeavePip);
+    return () => {
+      video.removeEventListener('leavepictureinpicture', handleLeavePip);
+    };
+  }, [addDebugLog]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId: number;
+
+    const renderFrame = () => {
+      // 1. Clear background with dark iOS-like gradient
+      const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      grad.addColorStop(0, '#020617'); // slate-950
+      grad.addColorStop(1, '#090d16'); // deep dark
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 2. High-contrast accent border
+      ctx.strokeStyle = '#2563eb'; // blue-600
+      ctx.lineWidth = 4;
+      ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+      // 3. Render Header Text
+      ctx.fillStyle = '#60a5fa'; // blue-400
+      ctx.font = '900 13px system-ui, -apple-system, sans-serif';
+      ctx.fillText('⚡ DUAL DISPATCH', 16, 28);
+
+      ctx.fillStyle = '#64748b'; // slate-500
+      ctx.font = 'bold 9px monospace';
+      ctx.fillText('REALTIME CORE-LOCATION', 215, 26);
+
+      // 4. Render Primary State Visualizer
+      if (iosCoreLocationPerm === 'denied') {
+        ctx.fillStyle = '#f87171'; // rose-400
+        ctx.font = '900 16px system-ui, -apple-system, sans-serif';
+        ctx.fillText('GPS ACCESS DENIED', 16, 64);
+        
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '11px system-ui, -apple-system, sans-serif';
+        ctx.fillText('Please restore Core Location permissions to resume tracking.', 16, 84);
+      } else if (iosMapKitEngine === 'suspended') {
+        ctx.fillStyle = '#fbbf24'; // amber-400
+        ctx.font = '900 16px system-ui, -apple-system, sans-serif';
+        ctx.fillText('MAP ENGINE SUSPENDED', 16, 64);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '11px system-ui, -apple-system, sans-serif';
+        ctx.fillText('MapKit background threads frozen at 0Hz.', 16, 84);
+      } else if (navSimulation.active) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 20px system-ui, -apple-system, sans-serif';
+        ctx.fillText(`Arriving in ${navSimulation.eta.toFixed(0)} mins`, 16, 60);
+
+        ctx.fillStyle = '#94a3b8'; // slate-400
+        ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+        const tripTypeLabel = navSimulation.type === 'pickup' 
+          ? 'Route Segment: Heading to Merchant Pickup' 
+          : 'Route Segment: Delivering to Customer';
+        ctx.fillText(tripTypeLabel, 16, 80);
+
+        // Target miles text
+        ctx.fillStyle = '#60a5fa'; // blue-400
+        ctx.font = '900 20px monospace';
+        ctx.fillText(`${navSimulation.distanceRemaining.toFixed(1)} mi`, 265, 60);
+
+        ctx.fillStyle = '#475569';
+        ctx.font = 'bold 8px monospace';
+        ctx.fillText('TRIP REMAINING', 265, 75);
+      } else {
+        ctx.fillStyle = '#10b981'; // emerald-500
+        ctx.font = '900 16px system-ui, -apple-system, sans-serif';
+        ctx.fillText('DISPATCH RADAR SCANNING', 16, 64);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '11px system-ui, -apple-system, sans-serif';
+        ctx.fillText('Listening for live geofence beacons...', 16, 84);
+      }
+
+      // 5. Progress slider indicator
+      if (navSimulation.active && iosCoreLocationPerm !== 'denied') {
+        const pX = 16;
+        const pY = 96;
+        const pW = canvas.width - 32;
+        const pH = 8;
+
+        ctx.fillStyle = '#1e293b'; // slate-800
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(pX, pY, pW, pH, 4) : ctx.rect(pX, pY, pW, pH);
+        ctx.fill();
+
+        const progW = Math.max(0, Math.min(1, navSimulation.progress)) * pW;
+        if (progW > 0) {
+          const pGrad = ctx.createLinearGradient(pX, pY, pX + progW, pY);
+          pGrad.addColorStop(0, '#3b82f6'); // blue
+          pGrad.addColorStop(1, '#10b981'); // emerald
+          ctx.fillStyle = pGrad;
+          ctx.beginPath();
+          ctx.roundRect ? ctx.roundRect(pX, pY, progW, pH, 4) : ctx.rect(pX, pY, progW, pH);
+          ctx.fill();
+        }
+      }
+
+      // 6. Footer coordinates metadata
+      ctx.fillStyle = '#475569'; // slate-600
+      ctx.font = '900 8.5px monospace';
+      const fSpeed = `SPEED: ${iosCoreLocationPerm === 'denied' || iosMapKitEngine === 'suspended' ? '0' : navSimulation.speed.toFixed(0)} MPH`;
+      ctx.fillText(fSpeed, 16, 128);
+
+      const fCoord = iosCoreLocationPerm === 'denied' 
+        ? 'GPS: ACCESS_BLOCKED' 
+        : navSimulation.currentPos 
+          ? `LAT/LNG: ${navSimulation.currentPos.lat.toFixed(5)}, ${navSimulation.currentPos.lng.toFixed(5)}` 
+          : 'LAT/LNG: WAITING';
+      ctx.fillText(fCoord, 125, 128);
+
+      const fPlist = !iosBackgroundModes ? 'PLIST: BLOCK' : 'PLIST: RUN';
+      ctx.fillText(fPlist, 290, 128);
+
+      animId = requestAnimationFrame(renderFrame);
+    };
+
+    renderFrame();
+
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [navSimulation, iosCoreLocationPerm, iosMapKitEngine, iosBackgroundModes]);
+
+  const handleTogglePip = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (isPipActive) {
+      if (document.exitPictureInPicture) {
+        try {
+          await document.exitPictureInPicture();
+          setIsPipActive(false);
+        } catch (err) {}
+      }
+    } else {
+      try {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const stream = (canvas as any).captureStream ? (canvas as any).captureStream(10) : null;
+        if (!stream) {
+          addToast("Unsupported Stream", "Your browser does not support canvas element streams.", "alert");
+          return;
+        }
+
+        video.srcObject = stream;
+        await video.play();
+        await video.requestPictureInPicture();
+        setIsPipActive(true);
+        addDebugLog('success', 'ActivityKit: Picture-in-Picture floating Live Activity successfully spawned.');
+        addToast("Floating Widget Launched", "A real floating iOS Live Activity is now active on your system screen!", "success");
+      } catch (err: any) {
+        console.error("Picture-in-Picture activation error:", err);
+        addToast("Launch Failed", "Interact with the application first, then trigger Floating widgets.", "alert");
+      }
+    }
+  };
+
   return (
     <div className="absolute inset-0 bg-gradient-to-b from-indigo-950 via-slate-900 to-black text-white flex flex-col justify-between overflow-hidden relative font-sans select-none">
       
@@ -283,6 +471,21 @@ export default function SimulatedHomeScreen({
                     {iosCoreLocationPerm === 'denied' ? 'BLOCKED' : navSimulation.currentPos ? `${navSimulation.currentPos.lat.toFixed(5)}, ${navSimulation.currentPos.lng.toFixed(5)}` : 'RE-INDEXING'}
                   </span>
                 </div>
+
+                {/* Real Picture-in-Picture Live Activity System Launcher */}
+                {isPipAvailable && (
+                  <button
+                    onClick={handleTogglePip}
+                    className={`w-full mt-1.5 py-2 px-3 border rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer ${
+                      isPipActive
+                        ? 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500/30'
+                    }`}
+                  >
+                    <Compass size={12} className={isPipActive ? 'animate-spin' : ''} />
+                    {isPipActive ? 'Close Floating Live Activity (PiP)' : 'Launch Floating Live Activity (PiP)'}
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-3 relative z-10">
@@ -542,6 +745,23 @@ export default function SimulatedHomeScreen({
           title="Return to application"
         />
       </div>
+
+      {/* Hidden Picture-in-Picture Native Stream Capture Canvas/Video Assets */}
+      <canvas 
+        ref={canvasRef} 
+        width={360} 
+        height={150} 
+        className="hidden pointer-events-none absolute w-[360px] h-[150px] top-[-1000px] left-[-1000px]" 
+        style={{ display: 'none', visibility: 'hidden' }}
+      />
+      <video 
+        ref={videoRef} 
+        autoPlay 
+        playsInline 
+        muted 
+        className="hidden pointer-events-none absolute w-1 h-1 top-[-1000px] left-[-1000px]" 
+        style={{ display: 'none', visibility: 'hidden' }}
+      />
 
     </div>
   );

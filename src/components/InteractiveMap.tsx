@@ -45,6 +45,7 @@ export interface InteractiveMapProps {
   routeWaypoints?: Location[];
   zoom?: number;
   setZoom?: (zoom: number) => void;
+  iosMapKitEngine?: 'rendered' | 'suspended';
 }
 
 // 1. Custom Driver Icon Constructor using the highly realistic green car design
@@ -244,7 +245,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onNavigateToSurgeArea,
   routeWaypoints,
   zoom,
-  setZoom
+  setZoom,
+  iosMapKitEngine = 'rendered'
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -334,6 +336,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !location) return;
+    if (iosMapKitEngine === 'suspended') {
+      // Keep driver marker but freeze updates
+      return;
+    }
 
     const driverLatLng = L.latLng(location.latitude, location.longitude);
 
@@ -535,7 +541,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     pendingOrder, 
     activeSurgeAreas, 
     activeBrand,
-    routeWaypoints
+    routeWaypoints,
+    iosMapKitEngine
   ]);
 
   return (
@@ -619,6 +626,22 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       >
         <div ref={mapContainerRef} className="w-full h-full" style={{ width: '100%', height: '100%', outline: 'none' }} />
       </div>
+
+      {/* iOS Apple MapKit Suspended Overlay */}
+      {iosMapKitEngine === 'suspended' && (
+        <div className="absolute inset-0 z-[6000] bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fade-in">
+          <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-white/10 flex items-center justify-center text-amber-500 shadow-2xl mb-4">
+            <Compass size={32} className="animate-pulse" />
+          </div>
+          <h3 className="text-sm font-black uppercase tracking-widest text-white">Apple MapKit Context Suspended</h3>
+          <p className="text-xs text-slate-400 max-w-xs mt-1.5 leading-relaxed">
+            Vector tiles and route intersection lines are frozen in cache memory. Re-enable render state in the iOS systems panel to hot-reload maps.
+          </p>
+          <div className="mt-4 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-[9px] font-mono font-extrabold uppercase tracking-widest text-amber-400">
+            Thread Suspended (0Hz Tick)
+          </div>
+        </div>
+      )}
 
     </div>
   );
