@@ -7043,17 +7043,24 @@ export default function App() {
         const getFile = store.get("custom_alert");
         getFile.onsuccess = () => {
           if (getFile.result) {
-            const blob = getFile.result.blob;
             const name = getFile.result.name;
-            const url = URL.createObjectURL(blob);
-            setCustomSoundUrl(url);
-            setCustomSoundName(name);
-            // Only force custom file option if previous preference was custom_file
-            const savedPref = localStorage.getItem('hyper_driver_sound_pref');
-            if (savedPref === 'custom_file') {
-              setSoundPreference('custom_file');
+            let url = "";
+            if (getFile.result.dataUrl) {
+              url = getFile.result.dataUrl;
+            } else if (getFile.result.blob) {
+              url = URL.createObjectURL(getFile.result.blob);
             }
-            addDebugLog('success', `Loaded custom sound file: ${name}`);
+            
+            if (url) {
+              setCustomSoundUrl(url);
+              setCustomSoundName(name);
+              // Only force custom file option if previous preference was custom_file
+              const savedPref = localStorage.getItem('hyper_driver_sound_pref');
+              if (savedPref === 'custom_file') {
+                setSoundPreference('custom_file');
+              }
+              addDebugLog('success', `Loaded custom sound file: ${name}`);
+            }
           }
         };
       };
@@ -7076,30 +7083,34 @@ export default function App() {
 
       // 2. Clear any blob references from the global cache map to force decoding of the new file
       for (const key of webAudioBufferCache.keys()) {
-        if (key.startsWith('blob:')) {
+        if (key.startsWith('blob:') || key.startsWith('data:')) {
           webAudioBufferCache.delete(key);
         }
       }
 
-      const url = URL.createObjectURL(file);
-      setCustomSoundUrl(url);
-      setCustomSoundName(file.name);
-      setSoundPreference('custom_file');
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setCustomSoundUrl(dataUrl);
+        setCustomSoundName(file.name);
+        setSoundPreference('custom_file');
 
-      const request = indexedDB.open("hyper_driver_audio_db", 1);
-      request.onupgradeneeded = (e: any) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains("audio_store")) {
-          db.createObjectStore("audio_store");
-        }
+        const request = indexedDB.open("hyper_driver_audio_db", 1);
+        request.onupgradeneeded = (e: any) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains("audio_store")) {
+            db.createObjectStore("audio_store");
+          }
+        };
+        request.onsuccess = (e: any) => {
+          const db = e.target.result;
+          const transaction = db.transaction("audio_store", "readwrite");
+          const store = transaction.objectStore("audio_store");
+          store.put({ dataUrl: dataUrl, name: file.name }, "custom_alert");
+          addDebugLog('success', `Saved custom alert sound in IndexedDB: ${file.name}`);
+        };
       };
-      request.onsuccess = (e: any) => {
-        const db = e.target.result;
-        const transaction = db.transaction("audio_store", "readwrite");
-        const store = transaction.objectStore("audio_store");
-        store.put({ blob: file, name: file.name }, "custom_alert");
-        addDebugLog('success', `Saved custom alert sound in IndexedDB: ${file.name}`);
-      };
+      reader.readAsDataURL(file);
 
       // 3. Reset the input's value so that re-uploading the same file works correctly
       event.target.value = '';
@@ -7963,6 +7974,7 @@ export default function App() {
   const [isDestFilterOpen, setIsDestFilterOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
+  const [jobTimerRemaining, setJobTimerRemaining] = useState<number | null>(null);
   const [isNightMode, setIsNightMode] = useState<boolean>(() => theme === 'dark');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerifyingToOnline, setIsVerifyingToOnline] = useState(false);
@@ -10304,31 +10316,33 @@ export default function App() {
     }
   }, [location, playHyperSound, sendNotification, addToast, setPendingOrder, setOrderExpiryTimer]);
 
+  useEffect(() => {
+    if (!user.isOnline || jobTimerRemaining === null || jobTimerRemaining <= 0) return;
+
+    const interval = setInterval(() => {
+      setJobTimerRemaining(prev => {
+        if (prev === null) return null;
+        if (prev <= 1) return 0;
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [user.isOnline, jobTimerRemaining]);
   // Simulating incoming orders when online
   useEffect(() => {
     if (!user.isOnline) return;
-
+    
     let timer: NodeJS.Timeout;
     const scheduleNextOrder = () => {
-      // Adjusted wait time based on busyness mode
-      if (!user.isOnline || isOnBreak) return;
-
-      let baseWait = 1500;
-      let randomRange = 2500;
-
-      if (busynessMode === 'Low') {
-        baseWait = 45000;
-        randomRange = 75000; // 45s to 120s (2 minutes)
-      } else if (busynessMode === 'Medium') {
-        baseWait = 5000;
-        randomRange = 10000; // 5s to 15s
-      } else {
-        // High
-        baseWait = 1500;
-        randomRange = 2500; // 1.5s to 4s
+      if (!user.isOnline || isOnBreak) {
+        setJobTimerRemaining(null);
+        return;
       }
 
-      const waitTime = baseWait + Math.random() * randomRange;
+      // 1 to 10 minutes wait time
+      const waitTime = Math.floor(60000 + Math.random() * 540000);
+      setJobTimerRemaining(Math.floor(waitTime / 1000));
 
       timer = setTimeout(() => {
         // Block normal trips if Trip Radar has active matches (radarOrders.length > 0)
@@ -10341,39 +10355,93 @@ export default function App() {
 
         const services = selectedServices.length > 0 ? selectedServices : ['delivery', 'ride'] as JobType[];
 
-        let newOrder = generateSmartOrder();
+        // Determine if we should generate a Radar order or a Normal order
+        const isRadar = Math.random() > 0.5;
 
-        // Apply final job preference filter and target price filter
-        if (newOrder) {
-          const isMatchPref = jobTypePreference === 'both' || 
-            (jobTypePreference === 'matching' && newOrder.isMatching) || 
-            (jobTypePreference === 'normal' && !newOrder.isMatching);
+        if (isRadar) {
+          const countToGen = Math.random() > 0.6 ? 2 : 1;
+          const generated: Order[] = [];
+          
+          for (let i = 0; i < countToGen; i++) {
+            if (radarOrders.length + generated.length < 3) {
+              const newOrder = generateSmartOrder();
+              if (newOrder) {
+                newOrder.isMatching = true;
+                const priceModifier = 0.8 + Math.random() * 0.5;
+                newOrder.estimatedPay = Number((newOrder.estimatedPay * priceModifier).toFixed(2));
+                newOrder.estimatedDistance = Number((newOrder.estimatedDistance * (0.85 + Math.random() * 0.3)).toFixed(1));
+                newOrder.restaurantLocation = {
+                  latitude: newOrder.restaurantLocation.latitude + (Math.random() - 0.5) * 0.004,
+                  longitude: newOrder.restaurantLocation.longitude + (Math.random() - 0.5) * 0.004
+                };
+                
+                // Check target price
+                if (newOrder.estimatedPay >= targetPrice) {
+                  generated.push(newOrder);
+                }
+              }
+            }
+          }
+          
+          if (generated.length > 0) {
+            setRadarOrders(prev => {
+              const finalOrders = [...prev];
+              generated.forEach(item => {
+                if (finalOrders.length < 4 && !finalOrders.some(o => o.id === item.id)) {
+                  finalOrders.push(item);
+                  setTimeout(() => {
+                    setRadarOrders(curr => curr.filter(o => o.id !== item.id));
+                  }, 25000);
+                }
+              });
+              return finalOrders;
+            });
+            playHyperSound('radar');
+            scheduleNextOrder();
+          } else {
+            scheduleNextOrder();
+          }
+        } else {
+          // Normal Order
+          let newOrder = generateSmartOrder();
 
-          const meetsTargetPrice = newOrder.estimatedPay >= targetPrice;
+          // Apply final job preference filter and target price filter
+          if (newOrder) {
+            const isMatchPref = jobTypePreference === 'both' || 
+              (jobTypePreference === 'matching' && newOrder.isMatching) || 
+              (jobTypePreference === 'normal' && !newOrder.isMatching);
 
-          if (isMatchPref) {
-            if (meetsTargetPrice) {
-              setPendingOrder(newOrder);
-              setOrderExpiryTimer(18); // Give 18 seconds to decide
-              const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
-              const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
-              sendNotification(prefix + "High Priority" + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "HyperX"}`);
+            const meetsTargetPrice = newOrder.estimatedPay >= targetPrice;
+
+            if (isMatchPref) {
+              if (meetsTargetPrice) {
+                setPendingOrder(newOrder);
+                setOrderExpiryTimer(18); // Give 18 seconds to decide
+                const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
+                const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
+                sendNotification(prefix + "High Priority" + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "HyperX"}`);
+                // Timer is paused while pending order is active.
+                // It will be restarted once pendingOrder becomes null.
+              } else {
+                // Auto-skipped/declined!
+                sendNotification("Auto-Skip Filter", `Skipped £${newOrder.estimatedPay.toFixed(2)} trip - below £${targetPrice.toFixed(2)} target price.`);
+                scheduleNextOrder();
+              }
             } else {
-              // Auto-skipped/declined!
-              sendNotification("Auto-Skip Filter", `Skipped £${newOrder.estimatedPay.toFixed(2)} trip - below £${targetPrice.toFixed(2)} target price.`);
               scheduleNextOrder();
             }
           } else {
             scheduleNextOrder();
           }
-        } else {
-          scheduleNextOrder();
         }
       }, waitTime);
     };
 
     scheduleNextOrder();
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      setJobTimerRemaining(null);
+    };
   }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference, targetPrice, busynessMode, isOnBreak, radarOrders.length, dispatchScheduledOrder]);
 
   // Hyper-X Back-to-Back Queueing Simulator:
@@ -10440,100 +10508,7 @@ export default function App() {
       }
     }
   }, [user.isOnline, isOnBreak, pendingOrder === null, activeOrders.length, busynessMode, jobTypePreference, targetPrice, generateSmartOrder, sendNotification, playHyperSound, addDebugLog, joinedAirportId]);
-  // Generate Radar Orders periodically when idle
-  useEffect(() => {
-    if (!user.isOnline || isNavigating || activeOrders.length >= 4 || pendingOrder || radarDisplayMode === 'none') {
-      if (radarOrders.length > 0) {
-        setRadarOrders([]);
-      }
-      return;
-    }
-
-    let timeoutId: NodeJS.Timeout;
-    
-    const scheduleNextRadarOrder = () => {
-      let baseWait = 5000;
-      let randomRange = 10000;
-      if (busynessMode === 'Low') {
-        baseWait = 40000; randomRange = 60000;
-      } else if (busynessMode === 'High') {
-        baseWait = 3000; randomRange = 5000;
-      }
-
-      const waitTime = baseWait + Math.random() * randomRange;
-
-      timeoutId = setTimeout(() => {
-        if (radarOrders.length >= 3 || isOnBreak) {
-          scheduleNextRadarOrder();
-          return;
-        }
-
-        if (Math.random() > 0.3) {
-          const countToGen = Math.random() > 0.6 ? 2 : 1;
-          const generated: Order[] = [];
-          
-          for (let i = 0; i < countToGen; i++) {
-            if (radarOrders.length + generated.length < 3) {
-              const newOrder = generateSmartOrder();
-              if (newOrder) {
-                newOrder.isMatching = true;
-                const priceModifier = 0.8 + Math.random() * 0.5;
-                newOrder.estimatedPay = Number((newOrder.estimatedPay * priceModifier).toFixed(2));
-                newOrder.estimatedDistance = Number((newOrder.estimatedDistance * (0.85 + Math.random() * 0.3)).toFixed(1));
-                newOrder.restaurantLocation = {
-                  latitude: newOrder.restaurantLocation.latitude + (Math.random() - 0.5) * 0.004,
-                  longitude: newOrder.restaurantLocation.longitude + (Math.random() - 0.5) * 0.004
-                };
-                generated.push(newOrder);
-              }
-            }
-          }
-          
-          if (generated.length > 0) {
-            if (!pendingOrder) {
-              setPendingOrder(generated[0]);
-              setOrderExpiryTimer(15);
-              playHyperSound('order');
-              if (generated.length > 1) {
-                setRadarOrders(prev => {
-                  const finalOrders = [...prev];
-                  generated.slice(1).forEach(item => {
-                    if (finalOrders.length < 4 && !finalOrders.some(o => o.id === item.id)) {
-                      finalOrders.push(item);
-                      setTimeout(() => {
-                        setRadarOrders(curr => curr.filter(o => o.id !== item.id));
-                      }, 25000);
-                    }
-                  });
-                  return finalOrders;
-                });
-              }
-            } else {
-              setRadarOrders(prev => {
-                const finalOrders = [...prev];
-                generated.forEach(item => {
-                  if (finalOrders.length < 4 && !finalOrders.some(o => o.id === item.id)) {
-                    finalOrders.push(item);
-                    setTimeout(() => {
-                      setRadarOrders(curr => curr.filter(o => o.id !== item.id));
-                    }, 25000);
-                  }
-                });
-                return finalOrders;
-              });
-              playHyperSound('radar');
-            }
-          }
-        }
-        
-        scheduleNextRadarOrder();
-      }, waitTime);
-    };
-
-    scheduleNextRadarOrder();
-
-    return () => clearTimeout(timeoutId);
-  }, [user.isOnline, isNavigating, activeOrders.length, pendingOrder, isOnBreak, radarOrders.length, radarDisplayMode, playHyperSound, busynessMode, generateSmartOrder]);
+  // Generate Radar Orders periodically when idle (Disabled, now handled by main scheduler)
 
 
   const generateAirportOrder = React.useCallback(() => {
@@ -13714,6 +13689,11 @@ export default function App() {
                     </motion.div>
 
                     <div className="flex items-center gap-2">
+                      {user.isOnline && jobTimerRemaining !== null && jobTimerRemaining > 0 && (
+                        <div className="px-2 py-1 bg-black/60 backdrop-blur-md rounded border border-white/10 text-white font-mono text-[10px] font-bold shadow-lg">
+                          {Math.floor(jobTimerRemaining / 60)}:{(jobTimerRemaining % 60).toString().padStart(2, '0')}
+                        </div>
+                      )}
                       {user.isOnline && (
                         <button 
                           onClick={() => {
