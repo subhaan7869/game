@@ -7194,8 +7194,22 @@ export default function App() {
               const response = await fetch(url);
               if (!response.ok) throw new Error(`HTTP status ${response.status}`);
               const arrayBuffer = await response.arrayBuffer();
-              audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-              webAudioBufferCache.set(url, audioBuffer);
+              
+              // Use Promise with callback fallback for older Safari
+              audioBuffer = await new Promise((resolve, reject) => {
+                const decodePromise = audioCtx.decodeAudioData(
+                  arrayBuffer,
+                  (buffer) => resolve(buffer),
+                  (err) => reject(err)
+                );
+                if (decodePromise) {
+                  decodePromise.catch(reject);
+                }
+              });
+              
+              if (audioBuffer) {
+                webAudioBufferCache.set(url, audioBuffer);
+              }
             }
 
             // Prevent state overlap
@@ -7227,7 +7241,17 @@ export default function App() {
             return true;
           } catch (err) {
             console.warn(`Web Audio API playback for ${url} failed`, err);
-            return false;
+            try {
+              const audioFallback = new Audio(url);
+              audioFallback.volume = volume;
+              audioFallback.loop = shouldLoop;
+              await audioFallback.play();
+              currentOrderAudioRef.current = audioFallback;
+              return true;
+            } catch (fallbackErr) {
+              console.warn(`HTMLAudioElement fallback for ${url} failed`, fallbackErr);
+              return false;
+            }
           }
         };
         
