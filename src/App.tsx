@@ -10339,9 +10339,17 @@ export default function App() {
       }
     };
 
+    const updateRemaining = () => {
+      if (nextOrderTargetTimestampRef.current === null) return;
+      const remainingMs = nextOrderTargetTimestampRef.current - Date.now();
+      const remainingSecs = Math.max(0, Math.ceil(remainingMs / 1000));
+      setJobTimerRemaining(remainingSecs);
+    };
+
     if (nextOrderTargetTimestampRef.current === null) {
       nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
     }
+    updateRemaining();
 
     const interval = setInterval(() => {
       if (nextOrderTargetTimestampRef.current === null) return;
@@ -10351,12 +10359,10 @@ export default function App() {
       setJobTimerRemaining(remainingSecs);
 
       if (remainingMs <= 0) {
-        nextOrderTargetTimestampRef.current = null;
-        setJobTimerRemaining(null);
-
         const canReceive = user.isOnline && !isOnBreak && activeOrders.length < 3 && !pendingOrder && location;
         if (!canReceive) {
           nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
+          updateRemaining();
           return;
         }
 
@@ -10402,6 +10408,7 @@ export default function App() {
             playHyperSound('radar');
           }
           nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
+          updateRemaining();
         } else {
           // Normal Order
           let newOrder = generateSmartOrder();
@@ -10423,12 +10430,15 @@ export default function App() {
               } else {
                 sendNotification("Auto-Skip Filter", `Skipped £${newOrder.estimatedPay.toFixed(2)} trip - below £${targetPrice.toFixed(2)} target price.`);
                 nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
+                updateRemaining();
               }
             } else {
               nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
+              updateRemaining();
             }
           } else {
             nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
+            updateRemaining();
           }
         }
       }
@@ -13682,10 +13692,18 @@ export default function App() {
                     </motion.div>
 
                     <div className="flex items-center gap-2">
-                      {user.isOnline && jobTimerRemaining !== null && jobTimerRemaining > 0 && (
-                        <div className="px-2 py-1 bg-black/60 backdrop-blur-md rounded border border-white/10 text-white font-mono text-[10px] font-bold shadow-lg">
-                          {Math.floor(jobTimerRemaining / 60)}:{(jobTimerRemaining % 60).toString().padStart(2, '0')}
-                        </div>
+                      {user.isOnline && (
+                        pendingOrder ? (
+                          <div className="px-2.5 py-1 bg-amber-500/20 backdrop-blur-md rounded-full border border-amber-500/40 text-amber-400 font-mono text-[10px] font-bold shadow-lg flex items-center gap-1 animate-pulse">
+                            <Clock size={11} className="text-amber-400" />
+                            <span>{orderExpiryTimer}s</span>
+                          </div>
+                        ) : jobTimerRemaining !== null && jobTimerRemaining >= 0 ? (
+                          <div className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-white font-mono text-[10px] font-bold shadow-lg flex items-center gap-1">
+                            <Clock size={11} className="text-[#00ff88]" />
+                            <span>{Math.floor(jobTimerRemaining / 60)}:{(jobTimerRemaining % 60).toString().padStart(2, '0')}</span>
+                          </div>
+                        ) : null
                       )}
                       {user.isOnline && (
                         <button 
