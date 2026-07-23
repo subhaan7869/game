@@ -8693,20 +8693,25 @@ export default function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const expiryInterval = useRef<NodeJS.Timeout | null>(null);
 
+  const nextOrderTargetTimestampRef = useRef<number | null>(null);
+
   // Order Expiry Timer
   useEffect(() => {
-    if (pendingOrder && orderExpiryTimer > 0) {
-      expiryInterval.current = setInterval(() => {
-        setOrderExpiryTimer(prev => prev - 1);
-      }, 1000);
-    } else if (orderExpiryTimer === 0) {
-      handleDeclineOrder();
-    }
+    if (!pendingOrder) return;
 
-    return () => {
-      if (expiryInterval.current) clearInterval(expiryInterval.current);
-    };
-  }, [pendingOrder, orderExpiryTimer]);
+    const interval = setInterval(() => {
+      setOrderExpiryTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          handleDeclineOrder();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [pendingOrder]);
 
   const [isBackgrounded, setIsBackgrounded] = useState(false);
 
@@ -10316,46 +10321,45 @@ export default function App() {
     }
   }, [location, playHyperSound, sendNotification, addToast, setPendingOrder, setOrderExpiryTimer]);
 
+  // Unified Order Scheduling & Countdown Effect
   useEffect(() => {
-    if (!user.isOnline || jobTimerRemaining === null || jobTimerRemaining <= 0) return;
+    if (!user.isOnline || isOnBreak || pendingOrder !== null || activeOrders.length >= 3) {
+      nextOrderTargetTimestampRef.current = null;
+      setJobTimerRemaining(null);
+      return;
+    }
+
+    const getNextWaitTime = () => {
+      if (busynessMode === 'High') {
+        return Math.floor(15000 + Math.random() * 30000); // 15s to 45s
+      } else if (busynessMode === 'Low') {
+        return Math.floor(90000 + Math.random() * 210000); // 1.5m to 5m
+      } else {
+        return Math.floor(30000 + Math.random() * 90000); // 30s to 2m
+      }
+    };
+
+    if (nextOrderTargetTimestampRef.current === null) {
+      nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
+    }
 
     const interval = setInterval(() => {
-      setJobTimerRemaining(prev => {
-        if (prev === null) return null;
-        if (prev <= 1) return 0;
-        return prev - 1;
-      });
-    }, 1000);
+      if (nextOrderTargetTimestampRef.current === null) return;
 
-    return () => clearInterval(interval);
-  }, [user.isOnline, jobTimerRemaining]);
-  // Simulating incoming orders when online
-  useEffect(() => {
-    if (!user.isOnline) return;
-    
-    let timer: NodeJS.Timeout;
-    const scheduleNextOrder = () => {
-      if (!user.isOnline || isOnBreak) {
+      const remainingMs = nextOrderTargetTimestampRef.current - Date.now();
+      const remainingSecs = Math.max(0, Math.ceil(remainingMs / 1000));
+      setJobTimerRemaining(remainingSecs);
+
+      if (remainingMs <= 0) {
+        nextOrderTargetTimestampRef.current = null;
         setJobTimerRemaining(null);
-        return;
-      }
 
-      // 1 to 10 minutes wait time
-      const waitTime = Math.floor(60000 + Math.random() * 540000);
-      setJobTimerRemaining(Math.floor(waitTime / 1000));
-
-      timer = setTimeout(() => {
-        // Block normal trips if Trip Radar has active matches (radarOrders.length > 0)
-        const canReceive = user.isOnline && !isOnBreak && activeOrders.length < 3 && !pendingOrder && location && radarOrders.length === 0;
-        
+        const canReceive = user.isOnline && !isOnBreak && activeOrders.length < 3 && !pendingOrder && location;
         if (!canReceive) {
-          if (user.isOnline && !isOnBreak) scheduleNextOrder();
+          nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
           return;
         }
 
-        const services = selectedServices.length > 0 ? selectedServices : ['delivery', 'ride'] as JobType[];
-
-        // Determine if we should generate a Radar order or a Normal order
         const isRadar = Math.random() > 0.5;
 
         if (isRadar) {
@@ -10375,7 +10379,6 @@ export default function App() {
                   longitude: newOrder.restaurantLocation.longitude + (Math.random() - 0.5) * 0.004
                 };
                 
-                // Check target price
                 if (newOrder.estimatedPay >= targetPrice) {
                   generated.push(newOrder);
                 }
@@ -10397,15 +10400,12 @@ export default function App() {
               return finalOrders;
             });
             playHyperSound('radar');
-            scheduleNextOrder();
-          } else {
-            scheduleNextOrder();
           }
+          nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
         } else {
           // Normal Order
           let newOrder = generateSmartOrder();
 
-          // Apply final job preference filter and target price filter
           if (newOrder) {
             const isMatchPref = jobTypePreference === 'both' || 
               (jobTypePreference === 'matching' && newOrder.isMatching) || 
@@ -10416,33 +10416,26 @@ export default function App() {
             if (isMatchPref) {
               if (meetsTargetPrice) {
                 setPendingOrder(newOrder);
-                setOrderExpiryTimer(18); // Give 18 seconds to decide
+                setOrderExpiryTimer(18);
                 const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
                 const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
                 sendNotification(prefix + "High Priority" + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "HyperX"}`);
-                // Timer is paused while pending order is active.
-                // It will be restarted once pendingOrder becomes null.
               } else {
-                // Auto-skipped/declined!
                 sendNotification("Auto-Skip Filter", `Skipped £${newOrder.estimatedPay.toFixed(2)} trip - below £${targetPrice.toFixed(2)} target price.`);
-                scheduleNextOrder();
+                nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
               }
             } else {
-              scheduleNextOrder();
+              nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
             }
           } else {
-            scheduleNextOrder();
+            nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
           }
         }
-      }, waitTime);
-    };
+      }
+    }, 1000);
 
-    scheduleNextOrder();
-    return () => {
-      clearTimeout(timer);
-      setJobTimerRemaining(null);
-    };
-  }, [user.isOnline, activeOrders.length, pendingOrder === null, location === null, jobTypePreference, targetPrice, busynessMode, isOnBreak, radarOrders.length, dispatchScheduledOrder]);
+    return () => clearInterval(interval);
+  }, [user.isOnline, isOnBreak, pendingOrder === null, activeOrders.length, busynessMode, jobTypePreference, targetPrice, generateSmartOrder, location, playHyperSound, radarOrders.length, sendNotification]);
 
   // Hyper-X Back-to-Back Queueing Simulator:
   // Decides to offer a queued, back-to-back request when a driver is delivering and nearing their drop-off point.
