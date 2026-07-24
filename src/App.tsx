@@ -6374,6 +6374,7 @@ export default function App() {
   const currentWebAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const currentWebAudioGainRef = useRef<GainNode | null>(null);
   const isAcceptingRef = useRef<boolean>(false);
+  const handleAcceptOrderRef = useRef<() => void>(() => {});
   const [backgroundTicks, setBackgroundTicks] = useState(0);
 
   const startEngineKeepAlive = React.useCallback(() => {
@@ -8826,7 +8827,7 @@ export default function App() {
         if (prev <= 1) {
           clearInterval(interval);
           isAcceptingRef.current = true;
-          handleAcceptOrder();
+          handleAcceptOrderRef.current();
           return 0;
         }
         return prev - 1;
@@ -8834,7 +8835,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [pendingOrder, handleAcceptOrder]);
+  }, [pendingOrder]);
 
   const [isBackgrounded, setIsBackgrounded] = useState(false);
 
@@ -11001,6 +11002,7 @@ export default function App() {
       processOrder();
     }
   };
+  handleAcceptOrderRef.current = handleAcceptOrder;
 
   const handleAcceptBothRadarOrders = () => {
     if (radarOrders.length < 2) return;
