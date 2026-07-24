@@ -8825,7 +8825,8 @@ export default function App() {
       setOrderExpiryTimer(prev => {
         if (prev <= 1) {
           clearInterval(interval);
-          handleDeclineOrder();
+          isAcceptingRef.current = true;
+          handleAcceptOrder();
           return 0;
         }
         return prev - 1;
@@ -8833,7 +8834,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [pendingOrder]);
+  }, [pendingOrder, handleAcceptOrder]);
 
   const [isBackgrounded, setIsBackgrounded] = useState(false);
 
@@ -10488,81 +10489,17 @@ export default function App() {
           return;
         }
 
-        const isRadar = Math.random() > 0.5;
-
-        if (isRadar) {
-          const countToGen = Math.random() > 0.6 ? 2 : 1;
-          const generated: Order[] = [];
-          
-          for (let i = 0; i < countToGen; i++) {
-            if (radarOrders.length + generated.length < 3) {
-              const newOrder = generateSmartOrder();
-              if (newOrder) {
-                newOrder.isMatching = true;
-                const priceModifier = 0.8 + Math.random() * 0.5;
-                newOrder.estimatedPay = Number((newOrder.estimatedPay * priceModifier).toFixed(2));
-                newOrder.estimatedDistance = Number((newOrder.estimatedDistance * (0.85 + Math.random() * 0.3)).toFixed(1));
-                newOrder.restaurantLocation = {
-                  latitude: newOrder.restaurantLocation.latitude + (Math.random() - 0.5) * 0.004,
-                  longitude: newOrder.restaurantLocation.longitude + (Math.random() - 0.5) * 0.004
-                };
-                
-                if (newOrder.estimatedPay >= targetPrice) {
-                  generated.push(newOrder);
-                }
-              }
-            }
-          }
-          
-          if (generated.length > 0) {
-            setRadarOrders(prev => {
-              const finalOrders = [...prev];
-              generated.forEach(item => {
-                if (finalOrders.length < 4 && !finalOrders.some(o => o.id === item.id)) {
-                  finalOrders.push(item);
-                  setTimeout(() => {
-                    setRadarOrders(curr => curr.filter(o => o.id !== item.id));
-                  }, 25000);
-                }
-              });
-              return finalOrders;
-            });
-            playHyperSound('radar');
-          }
-          nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
-          updateRemaining();
-        } else {
-          // Normal Order
-          let newOrder = generateSmartOrder();
-
-          if (newOrder) {
-            const isMatchPref = jobTypePreference === 'both' || 
-              (jobTypePreference === 'matching' && newOrder.isMatching) || 
-              (jobTypePreference === 'normal' && !newOrder.isMatching);
-
-            const meetsTargetPrice = newOrder.estimatedPay >= targetPrice;
-
-            if (isMatchPref) {
-              if (meetsTargetPrice) {
-                setPendingOrder(newOrder);
-                setOrderExpiryTimer(18);
-                const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
-                const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
-                sendNotification(prefix + "High Priority" + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "HyperX"}`);
-              } else {
-                sendNotification("Auto-Skip Filter", `Skipped £${newOrder.estimatedPay.toFixed(2)} trip - below £${targetPrice.toFixed(2)} target price.`);
-                nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
-                updateRemaining();
-              }
-            } else {
-              nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
-              updateRemaining();
-            }
-          } else {
-            nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
-            updateRemaining();
-          }
+        // Timer ended: immediately give job to driver
+        let newOrder = generateSmartOrder();
+        if (newOrder) {
+          setPendingOrder(newOrder);
+          setOrderExpiryTimer(18);
+          const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
+          const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
+          sendNotification(prefix + "Immediate Dispatch" + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "HyperX"}`);
         }
+        nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
+        updateRemaining();
       }
     }, 1000);
 
@@ -12221,100 +12158,6 @@ export default function App() {
               {/* Check for online status starts here */}
               {user.isOnline ? (
                 <div className="h-full w-full absolute inset-0 overflow-hidden bg-transparent pointer-events-none z-[3550]">
-
-
-
-                  {/* Dynamic Simulated Peak Times Controller Panel */}
-                  <div className="absolute top-40 left-4 z-[3550] flex flex-col gap-1 bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 shadow-2xl pointer-events-auto w-36 font-sans">
-                    <div className="flex items-center justify-between px-1.5 py-1 border-b border-white/5 mb-1 select-none">
-                      <span className="text-[8px] font-black uppercase text-gray-400 tracking-wider">Simulate Peak</span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-pulse" />
-                    </div>
-                    
-                    <button
-                      onClick={() => setSelectedTimePeriod('realtime')}
-                      className={`px-2 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider text-left transition-all duration-300 flex items-center justify-between ${
-                        selectedTimePeriod === 'realtime'
-                          ? 'bg-blue-600/90 text-white shadow-md shadow-blue-600/30 ring-1 ring-blue-400/30 font-extrabold'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5 font-semibold'
-                      }`}
-                    >
-                      <span>🕒 Real-Time</span>
-                      <span className="text-[7.5px] font-mono tracking-tight opacity-70">{new Date().getHours()}:00</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => setSelectedTimePeriod('breakfast')}
-                      className={`px-2 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider text-left transition-all duration-300 flex items-center justify-between ${
-                        selectedTimePeriod === 'breakfast'
-                          ? 'bg-amber-500 text-black shadow-md shadow-amber-500/20 ring-1 ring-amber-400/30 font-black'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5 font-semibold'
-                      }`}
-                    >
-                      <span>🌅 Breakfast</span>
-                      <span className="text-[7.5px] font-mono opacity-70">08:00</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => setSelectedTimePeriod('lunch')}
-                      className={`px-2 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider text-left transition-all duration-300 flex items-center justify-between ${
-                        selectedTimePeriod === 'lunch'
-                          ? 'bg-orange-500 text-white shadow-md shadow-orange-500/30 ring-1 ring-orange-400/30 font-black'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5 font-semibold'
-                      }`}
-                    >
-                      <span>🍟 Lunch Loop</span>
-                      <span className="text-[7.5px] font-mono opacity-70">12:30</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => setSelectedTimePeriod('dinner')}
-                      className={`px-2 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider text-left transition-all duration-300 flex items-center justify-between ${
-                        selectedTimePeriod === 'dinner'
-                          ? 'bg-red-600 text-white shadow-md shadow-red-600/30 ring-1 ring-red-400/30 font-black'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5 font-semibold'
-                      }`}
-                    >
-                      <span>🍕 Dinner Rush</span>
-                      <span className="text-[7.5px] font-mono opacity-70">19:00</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => setSelectedTimePeriod('offpeak')}
-                      className={`px-2 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider text-left transition-all duration-300 flex items-center justify-between ${
-                        selectedTimePeriod === 'offpeak'
-                          ? 'bg-[#1a1a1e] text-zinc-300 shadow-inner'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5 font-semibold'
-                      }`}
-                    >
-                      <span>💤 Off-Peak</span>
-                      <span className="text-[7.5px] font-mono opacity-70">15:00</span>
-                    </button>
-                  </div>
-
-                  {/* Target Price Float indicator */}
-                  <div 
-                    onClick={() => setCurrentScreen('trip_preferences')}
-                    className="absolute top-28 right-4 z-[3550] flex items-center gap-2 bg-black/90 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2 shadow-2xl pointer-events-auto cursor-pointer active:scale-95 hover:border-white/20 transition-all font-sans"
-                  >
-                    <Target size={12} className="text-blue-500" />
-                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Target Pay:</span>
-                    <span className="text-xs font-black text-green-400">≥£{targetPrice.toFixed(2)}</span>
-                  </div>
-
-                  {/* Floating Competitive Lobby Node */}
-                  <div 
-                    onClick={() => setCurrentScreen('multiplayer_hub')}
-                    className="absolute top-40 right-4 z-[3550] flex items-center gap-2.5 bg-gradient-to-r from-neutral-900 to-[#121215] backdrop-blur-md border border-amber-500/15 hover:border-amber-500/35 rounded-2xl px-4 py-2 shadow-2xl pointer-events-auto cursor-pointer active:scale-95 hover:brightness-110 transition-all text-left font-sans"
-                  >
-                    <Users size={12} className="text-amber-500 animate-pulse shrink-0" />
-                    <div>
-                      <span className="text-[8px] font-black uppercase tracking-widest text-gray-500 block leading-tight">Rival Pool</span>
-                      <span className="text-[10px] font-black text-amber-500 flex items-center gap-1 mt-0.5 leading-none">
-                        Active League • Rank #{otherOnlineDrivers.length + 1}
-                      </span>
-                    </div>
-                  </div>
                   
                   {!location && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center z-50 bg-[#0c0c0d]/80 backdrop-blur-sm">
@@ -14007,10 +13850,8 @@ export default function App() {
                                   >
                                     {isOnBreak 
                                       ? "On Break" 
-                                      : activeBrand === 'both' 
-                                      ? "Duo-Scanning Active" 
-                                      : activeBrand === 'hyper' 
-                                      ? "Hyper scanning live" 
+                                      : onlineStatusLoopText === 'finding_trips'
+                                      ? "Finding trips"
                                       : "You're online"}
                                   </motion.span>
                                 )}
@@ -14039,11 +13880,9 @@ export default function App() {
                                   >
                                     {isOnBreak 
                                       ? "Taking a pause from offers" 
-                                      : activeBrand === 'both' 
-                                      ? "Monitoring Uber & Hyper dispatch" 
-                                      : activeBrand === 'hyper'
-                                      ? "Finding opportunities near you"
-                                      : "Searching for trips"}
+                                      : onlineStatusLoopText === 'finding_trips'
+                                      ? "Finding trips"
+                                      : "You're online"}
                                   </motion.span>
                                 )}
                               </AnimatePresence>
@@ -16241,16 +16080,6 @@ export default function App() {
                     sendNotification("Signed Out", "Session cleared.");
                   } }] : []),
                   { icon: <SlidersHorizontal />, label: "Trip Preferences", action: () => setCurrentScreen('trip_preferences') },
-                  ...((auth.currentUser?.email === 'hassennabeel9@gmail.com' || user?.email === 'hassennabeel9@gmail.com') ? [
-                    { icon: <Bug size={18} className="text-blue-500" />, label: "System Glitch Diagnostics (Telemetry)", action: () => setShowDebugMonitor(true) }
-                  ] : []),
-                  { icon: <ShieldAlert />, label: "Simulate Bug Scan", action: () => {
-                    setIsScanning(true);
-                    setTimeout(() => {
-                      setIsScanning(false);
-                      setIsUnderMaintenance(true);
-                    }, 2000);
-                  }},
                   { icon: <Zap />, label: "Test All Features", action: async () => {
                     sendNotification("Test Mode", "Starting automated feature test...");
                     setUser(u => ({ ...u, isOnline: true }));
@@ -17659,141 +17488,9 @@ app.post('/api/cashout', async (req, res) => {
         )}
       </AnimatePresence>
 
-      {/* System Diagnostic Floating Trigger Button */}
-      {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && (auth.currentUser?.email === 'hassennabeel9@gmail.com' || user?.email === 'hassennabeel9@gmail.com') && (
-        <div className="fixed bottom-24 right-4 z-[4000] pointer-events-auto">
-          <button 
-            id="dev-diagnostic-floating-btn"
-            onClick={() => setShowDebugMonitor(true)}
-            className="w-12 h-12 bg-slate-900 border border-slate-850 text-blue-400 hover:text-blue-300 rounded-full flex items-center justify-center shadow-2xl active:scale-90 transition-transform relative group border-2 border-blue-500/30 shadow-blue-500/10"
-            title="Open Diagnostic Glitch System Monitor"
-          >
-            <Bug size={18} className="text-blue-400 animate-pulse" />
-            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-slate-900 flex items-center justify-center">
-              <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping"></span>
-            </span>
-            <span className="absolute right-14 bg-slate-900 text-[10px] text-blue-400 border border-slate-800 font-mono tracking-widest px-3 py-1.5 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none uppercase font-black">
-              Telemetry Debug
-            </span>
-          </button>
-        </div>
-      )}
 
-      {/* Glitch and System Diagnostic Monitor Overlay */}
-      <AnimatePresence>
-        {showDebugMonitor && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[5000] bg-slate-950/95 backdrop-blur-xl text-slate-100 flex flex-col font-sans overflow-hidden"
-          >
-            {/* Header */}
-            <div className="p-6 border-b border-white/5 bg-slate-900/40 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                  <Terminal size={20} className="animate-pulse" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black tracking-wider uppercase font-mono">GLITCH & SYSTEM DIAGNOSTICS</h2>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest text-emerald-400 font-extrabold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ONLINE
-                    </span>
-                    <span className="text-[9px] font-mono uppercase tracking-widest text-[#a855f7] font-extrabold bg-[#a855f7]/10 px-2 py-0.5 rounded border border-[#a855f7]/20">
-                      SANDBOX MODE
-                    </span>
-                  </div>
-                </div>
-              </div>
 
-              <button 
-                onClick={() => setShowDebugMonitor(false)}
-                className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors active:scale-95"
-              >
-                <X size={20} />
-              </button>
-            </div>
 
-            {/* Diagnostic Metrics Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-6 border-b border-white/5 bg-slate-950/80">
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 font-mono">Simulated Speed</p>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className="text-xl font-black font-mono text-blue-400">{navSimulation.active ? navSimulation.speed.toFixed(1) : '0.0'}</span>
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">MPH</span>
-                </div>
-              </div>
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 font-mono">Active Deliveries</p>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className="text-xl font-black font-mono text-amber-500">{activeOrders.length}</span>
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">/ 3 Max</span>
-                </div>
-              </div>
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 font-mono">Trip Radar Size</p>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className="text-xl font-black font-mono text-cyan-400">{radarOrders.length}</span>
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">Offers</span>
-                </div>
-              </div>
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 font-mono">Logged Anomalies</p>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className="text-xl font-black font-mono text-rose-500">{debugLogs.filter(l => l.type === 'error').length}</span>
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">Errors</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Dashboard Content split */}
-            <DebugMonitorView 
-              debugLogs={debugLogs} 
-              setDebugLogs={setDebugLogs}
-              currentScreen={currentScreen} 
-              setCurrentScreen={setCurrentScreen}
-              location={location}
-              setLocation={setLocation}
-              activeOrders={activeOrders} 
-              setActiveOrders={setActiveOrders}
-              pendingOrder={pendingOrder} 
-              setPendingOrder={setPendingOrder}
-              radarOrders={radarOrders}
-              setRadarOrders={setRadarOrders}
-              addDebugLog={addDebugLog}
-              addToast={addToast}
-              user={user}
-              setUser={setUser}
-              theme={theme}
-              isOffAppSimulated={isOffAppSimulated}
-              setIsOffAppSimulated={setIsOffAppSimulated}
-              isKeepAliveActive={isKeepAliveActive}
-              setIsKeepAliveActive={setIsKeepAliveActive}
-              backgroundTicks={backgroundTicks}
-              triggerFiveSecondBackgroundTest={triggerFiveSecondBackgroundTest}
-              fcmToken={fcmToken}
-              fetchAndSaveFCMToken={fetchAndSaveFCMToken}
-              iosCoreLocationPerm={iosCoreLocationPerm}
-              setIosCoreLocationPerm={setIosCoreLocationPerm}
-              iosActivityKitState={iosActivityKitState}
-              setIosActivityKitState={setIosActivityKitState}
-              iosMapKitEngine={iosMapKitEngine}
-              setIosMapKitEngine={setIosMapKitEngine}
-              iosWidgetKitTimeline={iosWidgetKitTimeline}
-              setIosWidgetKitTimeline={setIosWidgetKitTimeline}
-              iosBackgroundModes={iosBackgroundModes}
-              setIosBackgroundModes={setIosBackgroundModes}
-              iosApnsHandshake={iosApnsHandshake}
-              setIosApnsHandshake={setIosApnsHandshake}
-              useRealGPS={useRealGPS}
-              setUseRealGPS={setUseRealGPS}
-              navSimulation={navSimulation}
-              sendNotification={sendNotification}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {showWebAnalytics && (
