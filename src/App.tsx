@@ -6372,6 +6372,8 @@ export default function App() {
   const nextBackgroundCheckTicksRef = useRef<number>(75 + Math.floor(Math.random() * 75));
   const currentOrderAudioRef = useRef<HTMLAudioElement | null>(null);
   const currentWebAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const currentWebAudioGainRef = useRef<GainNode | null>(null);
+  const isAcceptingRef = useRef<boolean>(false);
   const [backgroundTicks, setBackgroundTicks] = useState(0);
 
   const startEngineKeepAlive = React.useCallback(() => {
@@ -7242,11 +7244,13 @@ export default function App() {
             gainNode.connect(audioCtx.destination);
 
             currentWebAudioSourceRef.current = source;
+            currentWebAudioGainRef.current = gainNode;
             source.start(0);
 
             source.onended = () => {
               if (currentWebAudioSourceRef.current === source) {
                 currentWebAudioSourceRef.current = null;
+                currentWebAudioGainRef.current = null;
               }
             };
             return true;
@@ -7389,9 +7393,38 @@ export default function App() {
         playRadarPing(3951, now + 0.10, 0.30, 0.10);
       } else if (type === 'accept') {
         const now = audioCtx.currentTime;
-        playTone(554.37, now, 0.08, 'sine', 0.08);
-        playTone(659.25, now + 0.06, 0.08, 'sine', 0.08);
-        playTone(880.00, now + 0.12, 0.18, 'sine', 0.08);
+        // High-fidelity, rich celebratory job-accepted tone (Harmonized Ascending Chime C5-E5-G5-C6)
+        const playAcceptTone = (freq: number, triggerTime: number, duration: number, vol = 0.22) => {
+          const osc = audioCtx.createOscillator();
+          const oscSub = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+
+          osc.type = 'sine';
+          oscSub.type = 'triangle';
+
+          osc.frequency.setValueAtTime(freq, triggerTime);
+          osc.frequency.exponentialRampToValueAtTime(freq * 1.01, triggerTime + duration);
+
+          oscSub.frequency.setValueAtTime(freq * 0.5, triggerTime);
+
+          gain.gain.setValueAtTime(0.001, triggerTime);
+          gain.gain.linearRampToValueAtTime(vol, triggerTime + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.001, triggerTime + duration);
+
+          osc.connect(gain);
+          oscSub.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc.start(triggerTime);
+          oscSub.start(triggerTime);
+          osc.stop(triggerTime + duration);
+          oscSub.stop(triggerTime + duration);
+        };
+
+        playAcceptTone(523.25, now, 0.25, 0.24);        // C5
+        playAcceptTone(659.25, now + 0.08, 0.25, 0.24); // E5
+        playAcceptTone(783.99, now + 0.16, 0.32, 0.24); // G5
+        playAcceptTone(1046.50, now + 0.24, 0.55, 0.28);// C6 High Chime
       } else if (type === 'message') {
         playTone(523.25, audioCtx.currentTime, 0.1, 'sine', 0.1);
         playTone(523.25, audioCtx.currentTime + 0.15, 0.1, 'sine', 0.1);
@@ -7408,43 +7441,64 @@ export default function App() {
 
   // Loop high-fidelity order sound while pending order is open
   useEffect(() => {
-    if (!pendingOrder) {
-      if (currentOrderAudioRef.current) {
-        try {
-          currentOrderAudioRef.current.pause();
-          currentOrderAudioRef.current.currentTime = 0;
-        } catch (e) {}
-        currentOrderAudioRef.current = null;
-      }
-      if (currentWebAudioSourceRef.current) {
-        try {
-          currentWebAudioSourceRef.current.stop();
-        } catch (e) {}
-        currentWebAudioSourceRef.current = null;
-      }
-      if (soundPreference === 'youtube') {
-        const iframe = document.getElementById('youtube-alert-player') as HTMLIFrameElement;
-        if (iframe && iframe.contentWindow) {
+    const handleStopOrderAudio = (isAccepting: boolean) => {
+      if (isAccepting) {
+        // Leave the job sound playing smoothly while fading out over 1.8 seconds alongside acceptance tone
+        if (currentWebAudioSourceRef.current) {
+          const src = currentWebAudioSourceRef.current;
+          const gain = currentWebAudioGainRef.current;
+          currentWebAudioSourceRef.current = null;
+          currentWebAudioGainRef.current = null;
           try {
-            iframe.contentWindow.postMessage(JSON.stringify({
-              event: 'command',
-              func: 'pauseVideo',
-              args: []
-            }), '*');
-          } catch (e) {}
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            const ctx = (window as any).__sharedAudioCtx || (AudioContextClass ? new AudioContextClass() : null);
+            if (ctx && gain) {
+              gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.8);
+            }
+            setTimeout(() => {
+              try { src.stop(); } catch (e) {}
+            }, 1800);
+          } catch (e) {
+            try { src.stop(); } catch (e) {}
+          }
         }
-      }
-      return;
-    }
-    
-    // Play immediately. Pass `true` for native loop if soundPreference is 'custom_file'.
-    const isNativelyLooped = soundPreference === 'custom_file';
-    playHyperSound('order', isNativelyLooped);
-    
-    if (isNativelyLooped) {
-      // If natively looped (custom sound file or fallback mp3/wav files), we do NOT set up a setInterval.
-      // This allows the uploaded sound to play in its full length and loop natively!
-      return () => {
+
+        if (currentOrderAudioRef.current) {
+          const audio = currentOrderAudioRef.current;
+          currentOrderAudioRef.current = null;
+          let fadeStep = 0;
+          const initialVol = audio.volume;
+          const fadeInterval = setInterval(() => {
+            fadeStep++;
+            if (fadeStep >= 15 || audio.volume <= 0.02) {
+              clearInterval(fadeInterval);
+              try {
+                audio.pause();
+                audio.currentTime = 0;
+              } catch (e) {}
+            } else {
+              audio.volume = Math.max(0, initialVol * (1 - fadeStep / 15));
+            }
+          }, 120);
+        }
+
+        if (soundPreference === 'youtube') {
+          setTimeout(() => {
+            const iframe = document.getElementById('youtube-alert-player') as HTMLIFrameElement;
+            if (iframe && iframe.contentWindow) {
+              try {
+                iframe.contentWindow.postMessage(JSON.stringify({
+                  event: 'command',
+                  func: 'pauseVideo',
+                  args: []
+                }), '*');
+              } catch (e) {}
+            }
+          }, 1800);
+        }
+      } else {
+        // Immediate cleanup when declined or expired
         if (currentOrderAudioRef.current) {
           try {
             currentOrderAudioRef.current.pause();
@@ -7457,7 +7511,41 @@ export default function App() {
             currentWebAudioSourceRef.current.stop();
           } catch (e) {}
           currentWebAudioSourceRef.current = null;
+          currentWebAudioGainRef.current = null;
         }
+        if (soundPreference === 'youtube') {
+          const iframe = document.getElementById('youtube-alert-player') as HTMLIFrameElement;
+          if (iframe && iframe.contentWindow) {
+            try {
+              iframe.contentWindow.postMessage(JSON.stringify({
+                event: 'command',
+                func: 'pauseVideo',
+                args: []
+              }), '*');
+            } catch (e) {}
+          }
+        }
+      }
+    };
+
+    if (!pendingOrder) {
+      const isAccepting = isAcceptingRef.current;
+      isAcceptingRef.current = false;
+      handleStopOrderAudio(isAccepting);
+      return;
+    }
+    
+    // Play immediately. Pass `true` for native loop if soundPreference is 'custom_file'.
+    const isNativelyLooped = soundPreference === 'custom_file';
+    playHyperSound('order', isNativelyLooped);
+    
+    if (isNativelyLooped) {
+      // If natively looped (custom sound file or fallback mp3/wav files), we do NOT set up a setInterval.
+      // This allows the uploaded sound to play in its full length and loop natively!
+      return () => {
+        const isAccepting = isAcceptingRef.current;
+        isAcceptingRef.current = false;
+        handleStopOrderAudio(isAccepting);
       };
     }
     
@@ -7470,31 +7558,9 @@ export default function App() {
     
     return () => {
       clearInterval(interval);
-      if (currentOrderAudioRef.current) {
-        try {
-          currentOrderAudioRef.current.pause();
-          currentOrderAudioRef.current.currentTime = 0;
-        } catch (e) {}
-        currentOrderAudioRef.current = null;
-      }
-      if (currentWebAudioSourceRef.current) {
-        try {
-          currentWebAudioSourceRef.current.stop();
-        } catch (e) {}
-        currentWebAudioSourceRef.current = null;
-      }
-      if (soundPreference === 'youtube') {
-        const iframe = document.getElementById('youtube-alert-player') as HTMLIFrameElement;
-        if (iframe && iframe.contentWindow) {
-          try {
-            iframe.contentWindow.postMessage(JSON.stringify({
-              event: 'command',
-              func: 'pauseVideo',
-              args: []
-            }), '*');
-          } catch (e) {}
-        }
-      }
+      const isAccepting = isAcceptingRef.current;
+      isAcceptingRef.current = false;
+      handleStopOrderAudio(isAccepting);
     };
   }, [pendingOrder, playHyperSound, soundPreference]);
 
@@ -7553,6 +7619,62 @@ export default function App() {
   }, [todayEarningsTotal]);
 
   const [topBarMode, setTopBarMode] = useState<'today' | 'last_trip' | 'hyper_driver_pro'>('today');
+  const [isEarningsHidden, setIsEarningsHidden] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('hyper_driver_hide_earnings') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('hyper_driver_hide_earnings', String(isEarningsHidden));
+    } catch (e) {}
+  }, [isEarningsHidden]);
+
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressRef = useRef<boolean>(false);
+
+  const handleEarningsPressStart = () => {
+    isLongPressRef.current = false;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      setIsEarningsHidden(prev => {
+        const next = !prev;
+        addToast(
+          next ? "Privacy Mode Enabled" : "Privacy Mode Disabled",
+          next ? "Total earnings are now hidden. Press & hold again to unhide." : "Total earnings are now visible.",
+          "info"
+        );
+        return next;
+      });
+      if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+        window.navigator.vibrate(60);
+      }
+    }, 600);
+  };
+
+  const handleEarningsPressEnd = (onShortClick?: () => void) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    if (!isLongPressRef.current) {
+      if (onShortClick) onShortClick();
+    }
+    setTimeout(() => {
+      isLongPressRef.current = false;
+    }, 150);
+  };
+
+  const handleEarningsPressCancel = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
   const [bankBalance, setBankBalance] = useState(() => {
     try {
@@ -10865,6 +10987,7 @@ export default function App() {
         addToast("Airport Navigating ✈️", "Depart holding area. Proceeding to terminal pickup points.", "success");
       }
 
+      isAcceptingRef.current = true;
       setPendingOrder(null);
       setOrderExpiryTimer(10);
       setIsNavigating(true);
@@ -13611,14 +13734,33 @@ export default function App() {
                       <Search size={22} strokeWidth={3} className="text-black" />
                     </button>
                     
-                    <div className="flex flex-col items-center">
+                    <div 
+                      onMouseDown={handleEarningsPressStart}
+                      onMouseUp={() => handleEarningsPressEnd()}
+                      onMouseLeave={handleEarningsPressCancel}
+                      onTouchStart={handleEarningsPressStart}
+                      onTouchEnd={() => handleEarningsPressEnd()}
+                      onTouchCancel={handleEarningsPressCancel}
+                      className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform select-none"
+                      title="Hold to hide/show total earnings"
+                    >
                       <div className="px-5 py-2 bg-black border-[2px] border-white rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.2)] flex items-center justify-center min-w-[130px] h-[46px]">
-                        <span className="font-sans text-lg font-black tracking-tight text-white flex items-center gap-0.5">
-                          <span className="text-emerald-400 font-bold">£</span>
-                          {todayEarningsTotal.toFixed(2)}
+                        <span className="font-sans text-lg font-black tracking-tight text-white flex items-center gap-1">
+                          {isEarningsHidden ? (
+                            <span className="flex items-center gap-1 text-gray-400 font-mono tracking-widest text-base">
+                              <EyeOff size={16} className="text-emerald-400" />
+                              ••••••
+                            </span>
+                          ) : (
+                            <>
+                              <span className="text-emerald-400 font-bold">£</span>
+                              {todayEarningsTotal.toFixed(2)}
+                            </>
+                          )}
                         </span>
                       </div>
-                      <div className="mt-[-8px] px-2.5 py-0.5 bg-white border border-gray-200 rounded text-[9px] font-black uppercase tracking-wider text-black shadow-md z-10 font-sans font-bold">
+                      <div className="mt-[-8px] px-2.5 py-0.5 bg-white border border-gray-200 rounded text-[9px] font-black uppercase tracking-wider text-black shadow-md z-10 font-sans font-bold flex items-center gap-1">
+                        {isEarningsHidden && <EyeOff size={10} className="text-amber-500" />}
                         TODAY
                       </div>
                     </div>
@@ -13660,15 +13802,28 @@ export default function App() {
                           ? 'bg-gradient-to-r from-blue-950/95 to-[#1a0c2e]/95 text-white border-purple-500/35 shadow-[0_0_20px_rgba(124,58,237,0.2)]'
                           : 'bg-[#0c0d10] text-[#22c55e] border-white/10'
                       }`}
-                      onClick={() => {
+                      onMouseDown={handleEarningsPressStart}
+                      onMouseUp={() => handleEarningsPressEnd(() => {
                         setTopBarMode(prev => {
                           if (prev === 'today') return 'last_trip';
                           if (prev === 'last_trip') return 'hyper_driver_pro';
                           return 'today';
                         });
-                      }}
+                      })}
+                      onMouseLeave={handleEarningsPressCancel}
+                      onTouchStart={handleEarningsPressStart}
+                      onTouchEnd={() => handleEarningsPressEnd(() => {
+                        setTopBarMode(prev => {
+                          if (prev === 'today') return 'last_trip';
+                          if (prev === 'last_trip') return 'hyper_driver_pro';
+                          return 'today';
+                        });
+                      })}
+                      onTouchCancel={handleEarningsPressCancel}
+                      title="Hold to hide/show earnings"
                     >
-                      <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none">
+                      <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none flex items-center gap-1">
+                        {isEarningsHidden && <EyeOff size={9} className="text-amber-400" />}
                         {topBarMode === 'today' && "Today's Earnings"}
                         {topBarMode === 'last_trip' && "Last Trip Payout"}
                         {topBarMode === 'hyper_driver_pro' && `Hyper Pro - ${user.tier || 'Diamond'}`}
@@ -13678,9 +13833,17 @@ export default function App() {
                         <span className={`font-display text-base font-black tracking-tight select-none ${
                           activeBrand === 'hyper' ? 'text-[#00ff88]' : 'text-white'
                         }`}>
-                          {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
-                          {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
-                          {topBarMode === 'hyper_driver_pro' && `${user.points || 350} XP`}
+                          {isEarningsHidden && (topBarMode === 'today' || topBarMode === 'last_trip') ? (
+                            <span className="text-gray-400 tracking-widest font-mono text-sm flex items-center gap-1">
+                              ••••••
+                            </span>
+                          ) : (
+                            <>
+                              {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
+                              {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
+                              {topBarMode === 'hyper_driver_pro' && `${user.points || 350} XP`}
+                            </>
+                          )}
                         </span>
                       </div>
 
@@ -13704,24 +13867,6 @@ export default function App() {
                             <span>{Math.floor(jobTimerRemaining / 60)}:{(jobTimerRemaining % 60).toString().padStart(2, '0')}</span>
                           </div>
                         ) : null
-                      )}
-                      {user.isOnline && (
-                        <button 
-                          onClick={() => {
-                            setIsOffAppSimulated(true);
-                            addToast("Off-App Mode", "Simulating background execution. Tap the floating dot/notification overlay to restore.", "info");
-                          }}
-                          className={`w-11 h-11 border rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-all text-sm uppercase font-black shrink-0 ${
-                            activeBrand === 'hyper'
-                              ? 'bg-[#090e0c]/90 text-[#00ff88] border-[#00ca72]/30 shadow-[0_0_10px_rgba(0,234,114,0.15)]'
-                              : activeBrand === 'both'
-                              ? 'bg-[#0d091a]/95 text-indigo-400 border-purple-500/30'
-                              : 'bg-slate-950 text-blue-400 border-white/10'
-                          }`}
-                          title="Simulate Minimize (Go Off-App)"
-                        >
-                          <Smartphone size={20} className={`${activeBrand === 'hyper' ? 'text-[#c084fc]' : activeBrand === 'both' ? 'text-purple-400' : 'text-blue-400'} animate-pulse`} />
-                        </button>
                       )}
                       <button 
                         onClick={() => setIsSearchOpen(true)}
