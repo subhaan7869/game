@@ -1482,43 +1482,44 @@ const ScheduledOrdersScreen = ({
 
   // Handle Accept/Claim Offer
   const handleClaimOffer = async (offer: any) => {
-    if (!firebaseUser) {
-      if (addToast) addToast("Auth Required", "Please sign in to book pre-bookings.", "alert");
-      return;
+    const newClaimedOrder: ScheduledOrder = {
+      id: offer.id || `sch_${Date.now()}`,
+      driverUid: firebaseUser?.uid || 'guest_driver',
+      restaurantName: `${offer.restaurantName} (Claimed Pre-booking)`,
+      scheduledTime: offer.scheduledTimestamp,
+      status: 'pending',
+      estimatedPay: offer.estimatedPay,
+      distanceMiles: offer.distanceMiles,
+      durationMinutes: offer.durationMinutes,
+      brand: offer.brand,
+      vehicleClass: offer.vehicleClass,
+      destinationName: offer.destinationName,
+      notes: offer.notes,
+      type: offer.type || 'ride'
+    };
+
+    if (firebaseUser) {
+      try {
+        const docRef = await addDoc(collection(db, 'scheduled_orders'), newClaimedOrder);
+        newClaimedOrder.id = docRef.id;
+      } catch (error) {
+        console.error("Error saving scheduled order to Firestore:", error);
+      }
     }
+
+    setScheduledOrders(prev => [newClaimedOrder, ...prev.filter(o => o.id !== newClaimedOrder.id)]);
+
+    // Remove from available local state and update cache
+    const updated = availableOffers.filter(o => o.id !== offer.id);
+    setAvailableOffers(updated);
+    localStorage.setItem('hyper_driver_available_prebookings', JSON.stringify(updated));
+
+    sendNotification("Pre-booking Claimed!", `Claimed high-paying ${offer.brand === 'uber' ? 'Uber' : 'Hyper'} pre-booking for ${offer.scheduledTime}!`);
+    if (addToast) addToast("Booking Confirmed! 🎉", `Added successfully. Payout: £${offer.estimatedPay.toFixed(2)}`, "success");
     
-    try {
-      const dbEntry = {
-        driverUid: firebaseUser.uid,
-        restaurantName: `${offer.restaurantName} (Claimed Pre-booking)`,
-        scheduledTime: offer.scheduledTimestamp,
-        status: 'pending',
-        estimatedPay: offer.estimatedPay,
-        distanceMiles: offer.distanceMiles,
-        durationMinutes: offer.durationMinutes,
-        brand: offer.brand,
-        vehicleClass: offer.vehicleClass,
-        destinationName: offer.destinationName,
-        notes: offer.notes,
-        type: offer.type || 'ride'
-      };
-
-      await addDoc(collection(db, 'scheduled_orders'), dbEntry);
-
-      // Remove from available local state and update cache
-      const updated = availableOffers.filter(o => o.id !== offer.id);
-      setAvailableOffers(updated);
-      localStorage.setItem('hyper_driver_available_prebookings', JSON.stringify(updated));
-
-      sendNotification("Pre-booking Claimed!", `Claimed high-paying ${offer.brand === 'uber' ? 'Uber' : 'Hyper'} pre-booking for ${offer.scheduledTime}!`);
-      if (addToast) addToast("Booking Confirmed! 🎉", `Added successfully. Payout: £${offer.estimatedPay.toFixed(2)}`, "success");
-      
-      // Navigate to claimed tab and reset detail screen
-      setSelectedOffer(null);
-      setActiveTab('claimed');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'scheduled_orders');
-    }
+    // Navigate to claimed tab and reset detail screen
+    setSelectedOffer(null);
+    setActiveTab('claimed');
   };
 
   // Keep legacy manual scheduling capability
@@ -10386,11 +10387,16 @@ export default function App() {
   // Pre-booking exact-time dispatcher helper
   const dispatchScheduledOrder = React.useCallback(async (sch: ScheduledOrder) => {
     try {
-      await deleteDoc(doc(db, 'scheduled_orders', sch.id));
+      if (firebaseUser && db) {
+        await deleteDoc(doc(db, 'scheduled_orders', sch.id));
+      }
     } catch (e) {
       console.error("Error consuming scheduled order:", e);
     }
     
+    // Remove from local scheduledOrders array so it won't be re-triggered
+    setScheduledOrders(prev => prev.filter(o => o.id !== sch.id));
+
     const restLoc = location ? { 
       latitude: location.latitude + (Math.random() - 0.5) * 0.01, 
       longitude: location.longitude + (Math.random() - 0.5) * 0.01 
@@ -10443,7 +10449,7 @@ export default function App() {
         : `Your scheduled ride (£${finalPay.toFixed(2)}) is now due!`;
       addToast("Pre-booking Dispatch! ⏰", toastMsg, "alert");
     }
-  }, [location, playHyperSound, sendNotification, addToast, setPendingOrder, setOrderExpiryTimer]);
+  }, [location, playHyperSound, sendNotification, addToast, setPendingOrder, setOrderExpiryTimer, firebaseUser]);
 
   // Unified Order Scheduling & Countdown Effect
   useEffect(() => {
@@ -10483,7 +10489,7 @@ export default function App() {
       setJobTimerRemaining(remainingSecs);
 
       if (remainingMs <= 0) {
-        const canReceive = user.isOnline && !isOnBreak && activeOrders.length < 3 && !pendingOrder && location;
+        const canReceive = user.isOnline && !isOnBreak && activeOrders.length < 3 && !pendingOrder;
         if (!canReceive) {
           nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
           updateRemaining();
@@ -10495,6 +10501,7 @@ export default function App() {
         if (newOrder) {
           setPendingOrder(newOrder);
           setOrderExpiryTimer(18);
+          playHyperSound('order');
           const prefix = newOrder.isMatching ? "MATCH: " : "TRIP: ";
           const surgeText = newOrder.surge ? ` (${newOrder.surge}x Surge!)` : "";
           sendNotification(prefix + "Immediate Dispatch" + surgeText, `£${newOrder.estimatedPay.toFixed(2)} • ${newOrder.estimatedDistance.toFixed(1)} mi • ${newOrder.restaurantName || "HyperX"}`);
@@ -10728,7 +10735,7 @@ export default function App() {
 
   // Background check effect for scheduled pre-bookings due time
   useEffect(() => {
-    if (!firebaseUser || !user.isOnline) return;
+    if (!user.isOnline) return;
 
     const interval = setInterval(() => {
       const now = new Date();
@@ -10737,11 +10744,11 @@ export default function App() {
 
         let scheduledDate: Date | null = null;
         if (order.scheduledTime) {
-          if (typeof order.scheduledTime.toDate === 'function') {
-            scheduledDate = order.scheduledTime.toDate();
+          if (typeof (order.scheduledTime as any).toDate === 'function') {
+            scheduledDate = (order.scheduledTime as any).toDate();
           } else {
             try {
-              scheduledDate = new Date(order.scheduledTime);
+              scheduledDate = new Date(order.scheduledTime as string | number);
             } catch (err) {
               scheduledDate = null;
             }
@@ -10750,16 +10757,16 @@ export default function App() {
 
         if (!scheduledDate || isNaN(scheduledDate.getTime())) continue;
 
-        // Dispatch if the scheduled time is reached (or within 15 seconds)
-        if (scheduledDate.getTime() <= now.getTime() + 15000) {
+        // Dispatch precisely when the scheduled time is reached (or slightly past due)
+        if (now.getTime() >= scheduledDate.getTime() - 1000) {
           dispatchScheduledOrder(order);
           break; // Trigger one at a time
         }
       }
-    }, 3000); // Check every 3 seconds for immediate response
+    }, 1000); // Check every 1 second for exact time dispatch
 
     return () => clearInterval(interval);
-  }, [firebaseUser, user.isOnline, scheduledOrders, dispatchScheduledOrder]);
+  }, [user.isOnline, scheduledOrders, dispatchScheduledOrder]);
 
   const triggerFiveSecondBackgroundTest = React.useCallback(() => {
     addToast("Testing Real Alerts", "Close this browser tab or minimize your screen NOW. You will receive a real system push alert in 5 seconds!", "info");
