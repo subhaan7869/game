@@ -10509,7 +10509,7 @@ export default function App() {
         nextOrderTargetTimestampRef.current = Date.now() + getNextWaitTime();
         updateRemaining();
       }
-    }, 1000);
+    }, 100);
 
     return () => clearInterval(interval);
   }, [user.isOnline, isOnBreak, pendingOrder === null, activeOrders.length, busynessMode, jobTypePreference, targetPrice, generateSmartOrder, location, playHyperSound, radarOrders.length, sendNotification]);
@@ -10757,13 +10757,13 @@ export default function App() {
 
         if (!scheduledDate || isNaN(scheduledDate.getTime())) continue;
 
-        // Dispatch precisely when the scheduled time is reached (or slightly past due)
-        if (now.getTime() >= scheduledDate.getTime() - 1000) {
+        // Dispatch precisely when the scheduled time is reached
+        if (now.getTime() >= scheduledDate.getTime()) {
           dispatchScheduledOrder(order);
           break; // Trigger one at a time
         }
       }
-    }, 1000); // Check every 1 second for exact time dispatch
+    }, 100); // Check every 100ms for exact time dispatch
 
     return () => clearInterval(interval);
   }, [user.isOnline, scheduledOrders, dispatchScheduledOrder]);
