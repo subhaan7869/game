@@ -12,6 +12,8 @@ import {
   Mail, 
   User, 
   MapPin, 
+  Map as MapIcon,
+  ArrowLeft,
   Clock, 
   DollarSign, 
   ChevronUp, 
@@ -12704,11 +12706,16 @@ export default function App() {
                               <p className="font-display text-2xl font-black leading-tight">£{activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}</p>
                               <p className="text-[8px] font-black text-blue-500 tracking-[0.2em] uppercase">Real-Time Pay</p>
                            </div>
-                           <button onClick={() => setMapCoreMode('google')} className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg active:scale-90 transition-transform">
+                           <button onClick={() => setMapCoreMode('google')} className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg active:scale-90 transition-transform" title="Toggle Map Provider">
                              <MapPin size={18} />
                            </button>
-                           <button onClick={() => setIsNavigating(false)} className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-gray-200 active:scale-90 transition-transform">
-                             <X size={20} />
+                           <button 
+                             onClick={() => setIsNavigating(false)} 
+                             className="px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-full flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all cursor-pointer"
+                             title="Exit Navigation & Return to Normal Map"
+                           >
+                             <ArrowLeft size={14} />
+                             <span className="hidden sm:inline">Normal Map</span>
                            </button>
                         </div>
                       </motion.div>
@@ -12764,6 +12771,27 @@ export default function App() {
                          </motion.div>
                       </div>
                     </div>
+                  )}
+                </AnimatePresence>
+
+                {/* Floating "Back to Normal Map" button during turn-by-turn navigation */}
+                <AnimatePresence>
+                  {isNavigating && (
+                    <motion.div 
+                      key="back-to-normal-map-btn-wrapper"
+                      initial={{ y: 30, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: 30, opacity: 0 }}
+                      className="absolute bottom-28 left-1/2 -translate-x-1/2 z-[3550] pointer-events-auto"
+                    >
+                      <button
+                        onClick={() => setIsNavigating(false)}
+                        className="px-5 py-2.5 bg-slate-900/95 hover:bg-slate-800 text-white border border-blue-500/50 rounded-full text-xs font-black uppercase tracking-wider shadow-2xl flex items-center gap-2.5 backdrop-blur-md active:scale-95 transition-all cursor-pointer hover:border-blue-400"
+                      >
+                        <MapIcon size={15} className="text-blue-400 animate-pulse" />
+                        <span>Back to Normal Map</span>
+                      </button>
+                    </motion.div>
                   )}
                 </AnimatePresence>
 
@@ -14446,6 +14474,14 @@ export default function App() {
                                 title="Chat with Customer"
                               >
                                 <MessageSquare size={14} />
+                              </button>
+                              <button 
+                                onClick={() => setIsNavigating(true)} 
+                                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-black text-[9px] uppercase tracking-wider flex items-center gap-1 shadow-md active:scale-95 transition-all cursor-pointer"
+                                title="Start Turn-by-Turn Navigation Map"
+                              >
+                                <Navigation size={11} />
+                                <span>Nav</span>
                               </button>
                               {preparingOrders[order.id] && preparingOrders[order.id] > 0 ? (
                                 <button 
