@@ -10149,17 +10149,19 @@ export default function App() {
 
   // Improved Order Matching Algorithm with Surge
   const generateSmartOrder = () => {
-    if (!location) return null;
+    const driverLoc = location || activeCityCenter || { latitude: 51.5074, longitude: -0.1278 };
 
     // Filter services based on vehicle type
-    const availableServices = selectedServices.filter(service => {
+    let availableServices = selectedServices.filter(service => {
       if (vehicleType === 'Bike' || vehicleType === 'Scooter') {
         return service === 'delivery';
       }
       return true; // Car can do both
     });
 
-    if (availableServices.length === 0) return null;
+    if (availableServices.length === 0) {
+      availableServices = ['delivery', 'ride'];
+    }
 
     const getJobType = () => {
       const pool: JobType[] = [];
@@ -10246,8 +10248,8 @@ export default function App() {
       const chosenRestaurant = restaurantsPool[Math.floor(Math.random() * restaurantsPool.length)];
       const restOffset = chosenRestaurant?.offset || { lat: 0.002, lng: 0.002 };
       
-      const pickupLat = location.latitude + restOffset.lat;
-      const pickupLng = location.longitude + restOffset.lng;
+      const pickupLat = driverLoc.latitude + restOffset.lat;
+      const pickupLng = driverLoc.longitude + restOffset.lng;
       
       let customEstDist = 0;
       let pickupOffsetLat = (Math.random() - 0.5) * 0.02;
@@ -10262,7 +10264,7 @@ export default function App() {
       const custLat = pickupLat + pickupOffsetLat;
       const custLng = pickupLng + pickupOffsetLng;
 
-      const distToPickup = Math.sqrt(Math.pow(pickupLat - location.latitude, 2) + Math.pow(pickupLng - location.longitude, 2)) * MILES_PER_DEGREE;
+      const distToPickup = Math.sqrt(Math.pow(pickupLat - driverLoc.latitude, 2) + Math.pow(pickupLng - driverLoc.longitude, 2)) * MILES_PER_DEGREE;
       const tripDist = Math.sqrt(Math.pow(custLat - pickupLat, 2) + Math.pow(custLng - pickupLng, 2)) * MILES_PER_DEGREE;
       
       // Use whichever surge is higher: area-based or global demand-based
@@ -10385,22 +10387,20 @@ export default function App() {
   };
 
   // Pre-booking exact-time dispatcher helper
-  const dispatchScheduledOrder = React.useCallback(async (sch: ScheduledOrder) => {
-    try {
-      if (firebaseUser && db) {
-        await deleteDoc(doc(db, 'scheduled_orders', sch.id));
-      }
-    } catch (e) {
-      console.error("Error consuming scheduled order:", e);
-    }
-    
-    // Remove from local scheduledOrders array so it won't be re-triggered
+  const dispatchScheduledOrder = React.useCallback((sch: ScheduledOrder) => {
+    // Remove from local scheduledOrders array immediately
     setScheduledOrders(prev => prev.filter(o => o.id !== sch.id));
+
+    if (firebaseUser && db) {
+      deleteDoc(doc(db, 'scheduled_orders', sch.id)).catch(e => {
+        console.error("Error consuming scheduled order:", e);
+      });
+    }
 
     const restLoc = location ? { 
       latitude: location.latitude + (Math.random() - 0.5) * 0.01, 
       longitude: location.longitude + (Math.random() - 0.5) * 0.01 
-    } : { latitude: 51.5074, longitude: -0.1278 };
+    } : (activeCityCenter || { latitude: 51.5074, longitude: -0.1278 });
 
     const brand = sch.brand || (Math.random() < 0.5 ? 'uber' : 'hyper');
     const finalPay = sch.estimatedPay || 15.00;
@@ -14344,9 +14344,9 @@ export default function App() {
               )}
             </AnimatePresence>
 
-              {/* Bottom Cards */}
-              {!isBottomMenuOpen && !pendingOrder && !activeChatOrderId && (
-                <div className="absolute bottom-24 left-0 right-0 p-4 space-y-2 pointer-events-none z-[3550]">
+              {/* Bottom Cards - Only visible when not navigating so turn-by-turn map stays clean */}
+              {!isBottomMenuOpen && !pendingOrder && !activeChatOrderId && !isNavigating && (
+                <div className="absolute bottom-24 left-0 right-0 px-3 sm:px-4 space-y-2 pointer-events-none z-[3550] max-w-sm sm:max-w-md mx-auto">
                   <AnimatePresence>
                     {(() => {
                       const baseList = activeOrders.filter(o => orderStatusFilter === 'all' || o.status === orderStatusFilter);
@@ -14384,46 +14384,50 @@ export default function App() {
                     })().map((order, idx) => (
                     <motion.div 
                       key={`interactive-bottom-card-${order.id}-${idx}`} 
-                      initial={{ y: 100 }} 
-                      animate={{ y: 0 }} 
-                      exit={{ y: 100 }}
-                      className={`bg-white text-black rounded-xl shadow-xl overflow-hidden mb-2 cursor-pointer active:scale-[0.98] transition-transform pointer-events-auto border-2 ${order.id === currentOrder?.id ? 'border-blue-500 shadow-blue-500/20' : 'border-transparent'}`}
+                      initial={{ y: 50, opacity: 0 }} 
+                      animate={{ y: 0, opacity: 1 }} 
+                      exit={{ y: 50, opacity: 0 }}
+                      className={`bg-slate-900/95 text-white rounded-2xl shadow-2xl p-2.5 sm:p-3 mb-1.5 cursor-pointer active:scale-[0.98] transition-transform pointer-events-auto border border-blue-500/30 backdrop-blur-md ${order.id === currentOrder?.id ? 'ring-2 ring-blue-500/50' : ''}`}
                       onClick={() => setViewingOrderDetailsId(order.id)}
                     >
-                      {order.id === currentOrder?.id && (
-                        <div className="bg-blue-600 text-white text-[8px] font-black uppercase tracking-widest text-center py-0.5">
-                          Current Priority Task
+                      {/* Compact Header Badge */}
+                      <div className="flex items-center justify-between gap-2 mb-1.5 px-0.5">
+                        <div className="flex items-center gap-1.5">
+                          {order.id === currentOrder?.id && (
+                            <span className="px-2 py-0.5 bg-blue-600 text-white rounded-full text-[8px] font-black uppercase tracking-wider">
+                              Task {idx + 1}
+                            </span>
+                          )}
+                          <span className="text-[10px] font-black uppercase text-blue-400 tracking-wider flex items-center gap-1">
+                            <Navigation size={10} />
+                            {order.status === 'accepted' ? `Pickup: ${order.restaurantName}` : `Dropoff: ${order.customerName}`}
+                          </span>
                         </div>
-                      )}
-                      <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-blue-50">
-                        <div className="flex items-center gap-2 text-blue-600 font-bold">
-                          <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-[9px] font-black">
-                            {idx + 1}
-                          </div>
-                          <Navigation size={14} />
-                          <span className="text-xs">{order.status === 'accepted' ? `Pickup: ${order.restaurantName}` : `Dropoff: ${order.customerName}`}</span>
-                        </div>
-                        <div className="text-[10px] font-bold text-gray-400">{distanceToTarget(order)} mi</div>
+                        <span className="text-[10px] font-bold text-gray-400">{distanceToTarget(order)} mi</span>
                       </div>
                       
-                      <div className="p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                            {order.status === 'accepted' ? <Coffee size={20} /> : <User size={20} />}
+                      {/* Compact Content Row */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
+                            {order.status === 'accepted' ? <Coffee size={16} /> : <User size={16} />}
                           </div>
-                          <div>
-                            <h3 className="font-bold text-sm leading-tight">{order.status === 'accepted' ? order.restaurantName : order.customerName}</h3>
-                            <p className="text-[10px] text-gray-500">{(order.items?.length || 0)} items • £{order.estimatedPay.toFixed(2)}</p>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-extrabold text-xs truncate leading-tight text-white">{order.status === 'accepted' ? order.restaurantName : order.customerName}</h3>
+                            <p className="text-[10px] text-gray-400 truncate font-medium">
+                              {(order.items?.length || 0)} items • <span className="text-emerald-400 font-extrabold">£{order.estimatedPay.toFixed(2)}</span>
+                            </p>
                           </div>
                         </div>
-                        <div className="flex gap-1.5 items-center" onClick={(e) => e.stopPropagation()}>
+
+                        <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                           {order.status === 'returning_to_restaurant' ? (
                             <button 
                               onClick={() => {
                                 setActiveOrders(prev => prev.filter(o => o.id !== order.id));
                                 sendNotification("Order Returned", `Order from ${order.restaurantName} returned successfully.`);
                               }}
-                              className="px-4 py-2 bg-red-600 text-white rounded-xl font-black text-[10px] active:scale-95 transition-transform"
+                              className="px-2.5 py-1 bg-red-600 text-white rounded-lg font-black text-[9px] uppercase tracking-wider active:scale-95 transition-transform"
                             >
                               RETURNED
                             </button>
@@ -14431,17 +14435,22 @@ export default function App() {
                             <>
                               <button 
                                 onClick={() => setCancellingOrderId(order.id)} 
-                                className={`w-10 h-10 rounded-full flex items-center justify-center border ${theme === 'dark' ? 'bg-white/5 border-white/10 text-red-500' : 'bg-gray-50 border-gray-100 text-red-600'}`}
+                                className="w-7 h-7 rounded-full flex items-center justify-center bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 active:scale-95 transition-all"
+                                title="Cancel Order"
                               >
-                                <X size={20} />
+                                <X size={14} />
                               </button>
-                              <button onClick={() => { setActiveChatOrderId(order.id); setCurrentScreen('chat'); }} className={`w-10 h-10 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-white/5 text-white' : 'bg-gray-100 text-black'}`}>
-                                <MessageSquare size={20} />
+                              <button 
+                                onClick={() => { setActiveChatOrderId(order.id); setCurrentScreen('chat'); }} 
+                                className="w-7 h-7 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-white border border-white/10 active:scale-95 transition-all"
+                                title="Chat with Customer"
+                              >
+                                <MessageSquare size={14} />
                               </button>
                               {preparingOrders[order.id] && preparingOrders[order.id] > 0 ? (
                                 <button 
                                   disabled
-                                  className="px-4 py-2 bg-orange-600 border border-orange-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest animate-pulse flex items-center gap-1 select-none"
+                                  className="px-2.5 py-1 bg-orange-600 border border-orange-500 text-white rounded-lg font-black text-[9px] uppercase tracking-wider animate-pulse flex items-center gap-1 select-none"
                                 >
                                   <span>⏳</span>
                                   <span>Prep: {preparingOrders[order.id]}s</span>
@@ -14449,14 +14458,13 @@ export default function App() {
                               ) : isActionAllowed(order.id) ? (
                                 (() => {
                                   const distVal = parseFloat(distanceToTarget(order));
-                                  // threshold of 0.15 miles so actual testing is highly responsive and smooth
                                   const isNearby = distVal <= 0.15;
                                   
                                   if (!isNearby) {
                                     return (
                                       <button 
                                         disabled
-                                        className="px-3 py-2 rounded-xl font-black text-[9px] uppercase tracking-tight bg-orange-500/10 border border-orange-500/20 text-orange-500 cursor-not-allowed select-none opacity-90 max-w-[140px] truncate"
+                                        className="px-2 py-1 rounded-lg font-black text-[8px] uppercase tracking-tight bg-amber-500/10 border border-amber-500/30 text-amber-400 cursor-not-allowed select-none opacity-90 max-w-[110px] truncate"
                                         title={`You must arrive at the destination to complete this. Current distance: ${distVal.toFixed(2)} mi`}
                                       >
                                         Locked ({distVal.toFixed(1)}mi)
@@ -14467,16 +14475,16 @@ export default function App() {
                                   return (
                                     <button 
                                       onClick={() => handleNextStep(order.id)} 
-                                      className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white text-black' : 'bg-black text-white'}`}
+                                      className="px-2.5 py-1 rounded-lg font-black text-[9px] uppercase tracking-wider bg-blue-600 text-white shadow-md active:scale-95 transition-transform hover:bg-blue-500"
                                     >
-                                      {order.status === 'accepted' ? 'Confirm Pickup' : 'Complete Delivery'}
+                                      {order.status === 'accepted' ? 'Confirm Pickup' : 'Complete'}
                                     </button>
                                   );
                                 })()
                               ) : (
                                 <button 
                                   disabled
-                                  className="px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest bg-gray-500/10 text-gray-500/50 cursor-not-allowed border border-white/5"
+                                  className="px-2 py-1 rounded-lg font-black text-[8px] uppercase tracking-wider bg-white/5 text-gray-400 cursor-not-allowed border border-white/10"
                                 >
                                   {order.status === 'accepted' ? 'Pickup Locked' : 'Delivery Locked'}
                                 </button>
