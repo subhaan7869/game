@@ -9360,7 +9360,11 @@ export default function App() {
                     handleNextStep(order.id);
                     lastTargetRef.current = null;
                   } else if (order.status === 'picked_up') {
-                    setVerifyingDeliveryId(order.id);
+                    if (order.type === 'ride' || order.verificationMethod === 'none') {
+                      handleCompleteDelivery(order.id);
+                    } else {
+                      setVerifyingDeliveryId(order.id);
+                    }
                     setIsNavigating(false);
                     lastTargetRef.current = null;
                   }
@@ -9373,7 +9377,7 @@ export default function App() {
               }
 
               // PIN Simulation: Customer sends PIN when driver is close to drop-off
-              if (order && order.status === 'picked_up' && order.pin) {
+              if (order && order.type !== 'ride' && order.status === 'picked_up' && order.pin) {
                 const distToCustomer = Math.sqrt(
                   Math.pow(target.latitude - prev.latitude, 2) + 
                   Math.pow(target.longitude - prev.longitude, 2)
@@ -10344,7 +10348,7 @@ export default function App() {
       const petTipBoost = variant.includes('Pet') ? (1.25) : 1;
       const pay = (finalBasePay + (Math.random() * 2)) * activeSurge * (isStacked ? 1.7 : 1) * petTipBoost;
 
-      const verificationMethod = (['pin', 'photo', 'none'] as const)[Math.floor(Math.random() * 3)];
+      const verificationMethod = type === 'ride' ? 'none' : (['pin', 'photo', 'none'] as const)[Math.floor(Math.random() * 3)];
       const receiptRequired = type === 'delivery' && Math.random() < 0.7;
 
       return {
@@ -10366,7 +10370,7 @@ export default function App() {
         estimatedTime: Math.floor(((customEstDist) * 5 + 4) * (isStacked ? 1.5 : 1)),
         status: 'pending' as const,
         items: type === 'delivery' ? getDynamicItemsForPeriod(getCurrentPeriodDetails().id, variant) : undefined,
-        pin: Math.floor(1000 + Math.random() * 9000).toString(),
+        pin: type === 'ride' ? undefined : Math.floor(1000 + Math.random() * 9000).toString(),
         isMatching: activeOrders.length > 0 || Math.random() < 0.25,
         surge: activeSurge > 1.0 ? activeSurge : undefined,
         riderRating: type === 'ride' ? Number((4.6 + Math.random() * 0.4).toFixed(2)) : undefined,
