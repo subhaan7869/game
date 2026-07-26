@@ -590,7 +590,7 @@ export const WebAnalyticsDashboard: React.FC<WebAnalyticsDashboardProps> = ({
 
                   <div className="space-y-2">
                     {customEvents.map((item, idx) => (
-                      <div key={item.id} className="p-3 rounded-xl bg-[#12141f]/60 border border-white/5 flex items-center justify-between text-xs">
+                      <div key={`cust-event-${item.id || idx}-${idx}`} className="p-3 rounded-xl bg-[#12141f]/60 border border-white/5 flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="w-2.5 h-2.5 bg-[#10b981] rounded-full animate-pulse" />
                           <code className="text-gray-100 font-mono font-black text-[11px] bg-black/60 px-2 py-1 rounded border border-white/5">{item.name}</code>

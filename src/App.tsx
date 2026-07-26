@@ -94,7 +94,8 @@ import {
   Gauge,
   Layers,
   CloudRain,
-  Calendar
+  Calendar,
+  CalendarX
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -979,7 +980,10 @@ const SideMenu = ({
   activeBrand,
   setActiveBrand,
   setShowAppLauncher,
-  scheduledOrders = []
+  scheduledOrders = [],
+  isOnBreak = false,
+  setIsOnBreak,
+  addToast
 }: { 
   user: UserProfile, 
   setIsSideMenuOpen: (val: boolean) => void,
@@ -1000,7 +1004,10 @@ const SideMenu = ({
   activeBrand: 'uber' | 'hyper' | 'both',
   setActiveBrand: (val: 'uber' | 'hyper' | 'both') => void,
   setShowAppLauncher: (val: boolean) => void,
-  scheduledOrders?: ScheduledOrder[]
+  scheduledOrders?: ScheduledOrder[],
+  isOnBreak?: boolean,
+  setIsOnBreak?: (val: boolean) => void,
+  addToast?: (title: string, body: string, type?: 'info' | 'success' | 'alert' | 'message') => void
 }) => {
   return (
     <motion.div 
@@ -1188,17 +1195,40 @@ const SideMenu = ({
           </button>
         </div>
 
-        {/* GO OFFLINE Action Button - dynamically displayed if currently Online */}
+        {/* Driver Action Buttons: Break & Go Offline */}
         {user.isOnline && (
-          <button 
-            onClick={() => {
-              endShift();
-              setIsSideMenuOpen(false);
-            }}
-            className="w-full mt-auto mb-4 py-4 bg-red-600/10 border border-red-500/20 hover:bg-red-600 hover:text-white text-red-400 rounded-2xl font-black text-xs uppercase tracking-widest text-center transition-all active:scale-[0.98]"
-          >
-            Go Offline
-          </button>
+          <div className="w-full mt-auto mb-4 flex flex-col gap-2.5">
+            <button 
+              onClick={() => {
+                if (setIsOnBreak) {
+                  const nextBreak = !isOnBreak;
+                  setIsOnBreak(nextBreak);
+                  if (addToast) {
+                    addToast(nextBreak ? "Taking a Break ☕" : "Back Online ⚡", nextBreak ? "New offers paused while on break." : "Finding trips in your area now.", "info");
+                  }
+                }
+                setIsSideMenuOpen(false);
+              }}
+              className={`w-full py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] border ${
+                isOnBreak 
+                  ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]' 
+                  : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/20'
+              }`}
+            >
+              <Coffee size={16} />
+              <span>{isOnBreak ? 'End Break (Resume)' : 'Take a Break'}</span>
+            </button>
+
+            <button 
+              onClick={() => {
+                endShift();
+                setIsSideMenuOpen(false);
+              }}
+              className="w-full py-3.5 px-4 bg-red-600/10 border border-red-500/20 hover:bg-red-600 hover:text-white text-red-400 rounded-2xl font-black text-xs uppercase tracking-widest text-center transition-all active:scale-[0.98]"
+            >
+              Go Offline
+            </button>
+          </div>
         )}
       </div>
 
@@ -1249,9 +1279,56 @@ const ScheduledOrdersScreen = ({
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [newOrder, setNewOrder] = useState({ restaurantName: '', time: '' });
   const [countdown, setCountdown] = useState(60);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.currentTarget.scrollTop === 0) {
+      setTouchStartY(e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY !== null && e.currentTarget.scrollTop === 0) {
+      const currentY = e.touches[0].clientY;
+      const dist = Math.max(0, currentY - touchStartY);
+      if (dist < 120) {
+        setPullDistance(dist);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullDistance > 50) {
+      handleManualRefresh();
+    }
+    setPullDistance(0);
+    setTouchStartY(null);
+  };
+
+  const handleManualRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      // 35% chance of empty state or random 2-5 offers
+      const shouldBeEmpty = Math.random() < 0.35;
+      triggerFreshOffers(shouldBeEmpty);
+      setIsRefreshing(false);
+      if (addToast) {
+        addToast(shouldBeEmpty ? "No Pre-bookings Available" : "Marketplace Refreshed 🔄", shouldBeEmpty ? "No advance pre-bookings found right now. Check back soon!" : `Updated pre-bookings list for ${activeCityKey}.`, "info");
+      }
+    }, 600);
+  };
 
   // Generate a premium offer
-  const triggerFreshOffers = () => {
+  const triggerFreshOffers = (allowEmpty = false) => {
+    if (allowEmpty) {
+      setAvailableOffers([]);
+      localStorage.setItem('hyper_driver_available_prebookings', JSON.stringify([]));
+      setCountdown(60);
+      return;
+    }
+
     const city = activeCityKey && CITY_DATABASES[activeCityKey] ? activeCityKey : "London";
     const database = CITY_DATABASES[city];
     
@@ -1763,7 +1840,24 @@ const ScheduledOrdersScreen = ({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-4 pb-28">
+          <div 
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            className="flex-1 overflow-y-auto p-6 space-y-4 pb-28 relative"
+          >
+            {/* Pull down to refresh indicator */}
+            {pullDistance > 0 && (
+              <div 
+                style={{ height: `${pullDistance}px` }} 
+                className="w-full flex items-center justify-center text-emerald-400 font-extrabold text-xs uppercase tracking-wider overflow-hidden bg-emerald-500/10 border-b border-emerald-500/20 transition-all rounded-2xl mb-2"
+              >
+                <div className="flex items-center gap-2">
+                  <RefreshCw size={16} className={pullDistance > 50 ? "animate-spin" : ""} />
+                  <span>{pullDistance > 50 ? "Release to refresh marketplace..." : "Pull down to refresh..."}</span>
+                </div>
+              </div>
+            )}
             
             {/* TAB: Available Offers Marketplace */}
             {activeTab === 'available' && (
@@ -1775,20 +1869,35 @@ const ScheduledOrdersScreen = ({
                     <span>Next marketplace refresh in: <strong>{countdown}s</strong></span>
                   </div>
                   <button 
-                    onClick={triggerFreshOffers} 
+                    onClick={handleManualRefresh} 
+                    disabled={isRefreshing}
                     className="flex items-center gap-1.5 px-2.5 py-1 bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[10px] uppercase font-black tracking-wider rounded-lg active:scale-90 transition-transform"
                     title="Force refresh offer pool"
                   >
-                    <RefreshCw size={10} />
-                    <span>Reload</span>
+                    <RefreshCw size={10} className={isRefreshing ? "animate-spin" : ""} />
+                    <span>{isRefreshing ? "Refreshing..." : "Reload"}</span>
                   </button>
                 </div>
 
                 {availableOffers.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-64 text-gray-500 text-center">
-                    <RefreshCw size={44} className="mb-4 opacity-10 animate-spin" />
-                    <p className="font-bold">Locating high-paying premium dispatches...</p>
-                    <p className="text-[10px] text-gray-600 mt-1 max-w-xs uppercase leading-relaxed">Scanning local grids and premium corporate accounts...</p>
+                  <div className="flex flex-col items-center justify-center p-10 bg-white/5 border border-white/5 rounded-3xl text-gray-400 text-center my-6 space-y-4">
+                    <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mx-auto">
+                      <CalendarX size={32} />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base text-white">No Pre-bookings Right Now</h3>
+                      <p className="text-xs text-gray-400 mt-1 max-w-xs leading-relaxed font-bold">
+                        Pre-bookings in {activeCityKey} update dynamically. Pull down or tap below to check for new rider reservations!
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleManualRefresh}
+                      disabled={isRefreshing}
+                      className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-black font-extrabold text-xs uppercase tracking-wider rounded-xl flex items-center gap-2 transition-all shadow-lg"
+                    >
+                      <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+                      <span>{isRefreshing ? "Checking Marketplace..." : "Refresh Marketplace"}</span>
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -4082,7 +4191,7 @@ const VehicleDetailsScreen = ({
             <div className="grid md:grid-cols-2 gap-4">
               {vehiclesList.map((item, idx) => {
                 const isActive = activePlate.toUpperCase() === item.plate.toUpperCase();
-                const uniqueKey = item.id || `veh-${item.plate}-${idx}`;
+                const uniqueKey = `veh-${item.id || 'v'}-${item.plate || idx}-${idx}`;
                 return (
                   <div 
                     key={uniqueKey}
@@ -4743,7 +4852,7 @@ const PaymentMethodsScreen = ({
                       <div className="grid grid-cols-3 gap-2 py-2 overflow-y-auto max-h-[40vh]">
                         {REAL_BANKS.map((b, i) => (
                           <button 
-                            key={i} 
+                            key={`bank-${b.name || i}-${i}`} 
                             onClick={() => startOpenBankingLink(b)}
                             className="p-4 bg-slate-50 hover:bg-slate-100 rounded-2xl font-black text-xs text-center border border-slate-100 hover:border-slate-200 transition-all flex flex-col justify-between items-center h-24"
                           >
@@ -8099,6 +8208,8 @@ export default function App() {
   const [heading, setHeading] = useState(0);
   const [isDestFilterOpen, setIsDestFilterOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchCategory, setSearchCategory] = useState<'all' | 'airports' | 'surge' | 'food'>('all');
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [jobTimerRemaining, setJobTimerRemaining] = useState<number | null>(null);
   const [isNightMode, setIsNightMode] = useState<boolean>(() => theme === 'dark');
@@ -11923,6 +12034,9 @@ export default function App() {
                 setActiveBrand={setActiveBrand}
                 setShowAppLauncher={setShowAppLauncher}
                 scheduledOrders={scheduledOrders}
+                isOnBreak={isOnBreak}
+                setIsOnBreak={setIsOnBreak}
+                addToast={addToast}
               />
             </>
           )}
@@ -13362,89 +13476,190 @@ export default function App() {
                 </>
               )}
 
-                {/* Map Action Buttons */}
-                {user.isOnline && (
-                  <div className="absolute bottom-32 left-4 right-4 flex flex-col gap-4 items-end pointer-events-none z-[4550]">
-                    <div className="flex flex-col gap-2 pointer-events-auto">
+                {/* Map Action Buttons - Clean organized docks */}
+                {user.isOnline && !pendingOrder && (
+                  <>
+                    {/* Right Side Map Dock */}
+                    <div className="absolute bottom-36 right-4 flex flex-col gap-2.5 pointer-events-auto z-[4550]">
                       <button 
                         onClick={() => setZoom(prev => Math.min(prev + 0.2, 3))}
-                        className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 active:scale-95 transition-transform"
+                        className="w-11 h-11 bg-slate-900/90 text-white rounded-full shadow-xl flex items-center justify-center border border-white/10 active:scale-95 transition-transform backdrop-blur-md"
+                        title="Zoom In"
                       >
-                        <Plus size={24} />
+                        <Plus size={20} />
                       </button>
                       <button 
                         onClick={() => setZoom(prev => Math.max(prev - 0.2, 0.4))}
-                        className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 active:scale-95 transition-transform"
+                        className="w-11 h-11 bg-slate-900/90 text-white rounded-full shadow-xl flex items-center justify-center border border-white/10 active:scale-95 transition-transform backdrop-blur-md"
+                        title="Zoom Out"
                       >
-                        <Minus size={24} />
+                        <Minus size={20} />
+                      </button>
+                      <button 
+                        onClick={() => setIsNightMode(!isNightMode)}
+                        className="w-11 h-11 bg-slate-900/90 text-amber-400 rounded-full shadow-xl flex items-center justify-center border border-white/10 active:scale-90 transition-transform backdrop-blur-md"
+                        title="Toggle Night/Day Mode"
+                      >
+                        {isNightMode ? <Sun size={20} /> : <Moon size={20} className="text-blue-300" />}
+                      </button>
+                      <button 
+                        onClick={() => setIsInboxOpen(true)}
+                        className="w-11 h-11 bg-slate-900/90 text-blue-400 rounded-full shadow-xl flex items-center justify-center border border-white/10 active:scale-90 transition-transform backdrop-blur-md relative"
+                        title="Inbox Messages"
+                      >
+                        <Bell size={20} />
+                        {notifications.length > 0 && (
+                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border border-black">
+                            {notifications.length}
+                          </span>
+                        )}
                       </button>
                     </div>
-                    <button 
-                      onClick={() => setIsNightMode(!isNightMode)}
-                      className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 pointer-events-auto active:scale-90 transition-transform"
-                    >
-                      {isNightMode ? <Sun size={24} /> : <Moon size={24} />}
-                    </button>
-                    <div className="flex justify-between items-center w-full">
-                      <div className="flex gap-2 pointer-events-auto">
-                        <button 
-                          onClick={() => setIsSafetyToolkitOpen(true)}
-                          className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 active:scale-90 transition-transform"
-                        >
-                          <Shield size={24} />
-                        </button>
-                        <button 
-                          onClick={() => setIsVehicleSettingsOpen(true)}
-                          className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-black border border-gray-100 active:scale-90 transition-transform relative"
-                        >
-                          <Settings2 size={24} />
-                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center border-2 border-white">
-                            <div className="w-1 h-1 bg-white rounded-full" />
-                          </div>
-                        </button>
-                      </div>
-                      <div className="flex gap-2 pointer-events-auto">
-                        <button 
-                          onClick={() => setIsInboxOpen(true)}
-                          className="w-12 h-12 bg-white rounded-full shadow-2xl flex items-center justify-center text-blue-600 border border-gray-100 active:scale-90 transition-transform"
-                        >
-                          <Bell size={24} />
-                          {notifications.length > 0 && (
-                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white">
-                              {notifications.length}
-                            </span>
-                          )}
-                        </button>
-                      </div>
+
+                    {/* Left Side Safety & Vehicle Dock */}
+                    <div className="absolute bottom-36 left-4 flex items-center gap-2 pointer-events-auto z-[4550]">
+                      <button 
+                        onClick={() => setIsSafetyToolkitOpen(true)}
+                        className="w-11 h-11 bg-slate-900/90 text-blue-400 rounded-full shadow-xl flex items-center justify-center border border-white/10 active:scale-90 transition-transform backdrop-blur-md"
+                        title="Safety Toolkit"
+                      >
+                        <Shield size={20} />
+                      </button>
+                      <button 
+                        onClick={() => setIsVehicleSettingsOpen(true)}
+                        className="w-11 h-11 bg-slate-900/90 text-white rounded-full shadow-xl flex items-center justify-center border border-white/10 active:scale-90 transition-transform backdrop-blur-md relative"
+                        title="Vehicle Settings"
+                      >
+                        <Settings2 size={20} />
+                      </button>
                     </div>
-                  </div>
+                  </>
                 )}
               </motion.div>
 
               {/* Search Modal */}
               <AnimatePresence>
                 {isSearchOpen && (
-                  <div className="absolute inset-0 z-[500] flex items-start justify-center p-6">
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSearchOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-                    <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -50, opacity: 0 }} className={`w-full max-w-md rounded-3xl p-6 shadow-2xl relative z-10 ${theme === 'dark' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black'}`}>
-                      <div className="flex items-center gap-4 mb-6">
-                        <Search className="text-gray-400" />
+                  <div className="absolute inset-0 z-[5200] flex items-start justify-center p-4 pt-12">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSearchOpen(false)} className="absolute inset-0 bg-black/70 backdrop-blur-md" />
+                    <motion.div initial={{ y: -30, opacity: 0, scale: 0.95 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: -30, opacity: 0, scale: 0.95 }} className={`w-full max-w-lg rounded-[32px] p-6 shadow-2xl relative z-10 border border-white/10 flex flex-col max-h-[82vh] overflow-hidden ${theme === 'dark' ? 'bg-[#121316] text-white' : 'bg-white text-black'}`}>
+                      {/* Search Header Bar */}
+                      <div className="flex items-center gap-3 p-3 bg-black/20 dark:bg-white/5 border border-white/10 rounded-2xl mb-4">
+                        <Search className="text-blue-400 shrink-0" size={20} />
                         <input 
                           autoFocus
                           type="text" 
-                          placeholder="Search for restaurants or areas..." 
-                          className="flex-1 bg-transparent border-none outline-none font-bold text-lg"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Search hotspots, airports, streets..." 
+                          className="flex-1 bg-transparent border-none outline-none font-extrabold text-base text-white placeholder-gray-400"
                         />
-                        <button onClick={() => setIsSearchOpen(false)} className="p-2 bg-gray-100 dark:bg-white/5 rounded-full"><X size={20} /></button>
+                        {searchQuery && (
+                          <button onClick={() => setSearchQuery('')} className="p-1 text-gray-400 hover:text-white">
+                            <X size={16} />
+                          </button>
+                        )}
+                        <button onClick={() => setIsSearchOpen(false)} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-transform active:scale-95 shrink-0">
+                          <X size={18} />
+                        </button>
                       </div>
-                      <div className="space-y-4">
-                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Recent Searches</p>
-                        {['Shoreditch', 'Westfield Stratford', 'Soho'].map(item => (
-                          <button key={item} className="w-full flex items-center gap-4 p-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors">
-                            <Clock size={16} className="text-gray-400" />
-                            <span className="font-bold">{item}</span>
+
+                      {/* Category Chips */}
+                      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-2 custom-scrollbar shrink-0">
+                        {[
+                          { id: 'all', label: 'All Hotspots' },
+                          { id: 'airports', label: '✈️ Airports & Rails' },
+                          { id: 'surge', label: '🔥 High Surge' },
+                          { id: 'food', label: '🍔 Dining & Clubs' }
+                        ].map((cat) => (
+                          <button
+                            key={cat.id}
+                            onClick={() => setSearchCategory(cat.id as any)}
+                            className={`px-3 py-1.5 rounded-xl font-black text-xs whitespace-nowrap transition-all border ${
+                              searchCategory === cat.id
+                                ? 'bg-blue-600 text-white border-blue-400 shadow-md'
+                                : 'bg-white/5 text-gray-300 border-white/5 hover:bg-white/10'
+                            }`}
+                          >
+                            {cat.label}
                           </button>
                         ))}
+                      </div>
+
+                      {/* Filtered Search Results */}
+                      <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar pr-1">
+                        {(() => {
+                          const ALL_HOTSPOTS = [
+                            { id: 'lhr-t5', name: 'Heathrow Terminal 5 VIP Arrivals', category: 'airports', city: 'London', type: 'Airport', surge: '2.1x', dist: '3.4 mi', coords: { latitude: 51.4700, longitude: -0.4543 } },
+                            { id: 'lgw-south', name: 'Gatwick South Taxi Express Rank', category: 'airports', city: 'London', type: 'Airport', surge: '1.8x', dist: '8.1 mi', coords: { latitude: 51.1537, longitude: -0.1821 } },
+                            { id: 'stpancras', name: 'St Pancras Eurostar Taxi Portico', category: 'airports', city: 'London', type: 'Train Station', surge: '1.5x', dist: '1.2 mi', coords: { latitude: 51.5314, longitude: -0.1261 } },
+                            { id: 'shoreditch', name: 'Shoreditch High Street Nightlife Hub', category: 'surge', city: 'London', type: 'Hotspot', surge: '2.4x', dist: '0.8 mi', coords: { latitude: 51.5246, longitude: -0.0781 } },
+                            { id: 'soho-mayfair', name: 'Soho Square & Mayfair Members Clubs', category: 'food', city: 'London', type: 'Executive Ranks', surge: '1.9x', dist: '1.1 mi', coords: { latitude: 51.5152, longitude: -0.1321 } },
+                            { id: 'westfield-stratford', name: 'Westfield Stratford Taxi Plaza', category: 'food', city: 'London', type: 'Shopping', surge: '1.4x', dist: '2.9 mi', coords: { latitude: 51.5435, longitude: -0.0072 } },
+                            { id: 'cardiff-bay', name: 'Cardiff Bay VIP Marina Plaza', category: 'surge', city: 'Cardiff', type: 'Hotspot', surge: '1.7x', dist: '1.5 mi', coords: { latitude: 51.4646, longitude: -3.1652 } },
+                            { id: 'cardiff-central', name: 'Cardiff Central Station Taxi Loop', category: 'airports', city: 'Cardiff', type: 'Train Station', surge: '1.6x', dist: '0.6 mi', coords: { latitude: 51.4769, longitude: -3.1791 } },
+                            { id: 'nottingham-station', name: 'Nottingham Station Carriage Drive', category: 'airports', city: 'Nottingham', type: 'Train Station', surge: '1.8x', dist: '0.9 mi', coords: { latitude: 52.9472, longitude: -1.1465 } },
+                            { id: 'lace-market', name: 'Lace Market Dining & Penthouse Hub', category: 'food', city: 'Nottingham', type: 'Hotspot', surge: '2.0x', dist: '1.1 mi', coords: { latitude: 52.9515, longitude: -1.1432 } }
+                          ];
+
+                          const filtered = ALL_HOTSPOTS.filter(spot => {
+                            const matchQuery = !searchQuery || 
+                              spot.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                              spot.city.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                              spot.type.toLowerCase().includes(searchQuery.toLowerCase());
+                            
+                            const matchCategory = searchCategory === 'all' || spot.category === searchCategory;
+                            return matchQuery && matchCategory;
+                          });
+
+                          if (filtered.length === 0) {
+                            return (
+                              <div className="flex flex-col items-center justify-center py-10 text-center text-gray-400">
+                                <Search size={36} className="mb-2 opacity-30 text-white" />
+                                <p className="font-extrabold text-sm text-white">No hotspots found</p>
+                                <p className="text-xs text-gray-500 mt-1">Try searching for "Heathrow", "Station", "Shoreditch" or "Cardiff"</p>
+                              </div>
+                            );
+                          }
+
+                          return filtered.map(spot => (
+                            <button
+                              key={spot.id}
+                              onClick={() => {
+                                // Navigate location to spot
+                                if (spot.coords) {
+                                  setLocation(spot.coords);
+                                }
+                                setIsSearchOpen(false);
+                                if (addToast) {
+                                  addToast(`Routing to ${spot.name} 🚀`, `High demand active (${spot.surge} Surge multiplier). Navigating now!`, 'success');
+                                }
+                              }}
+                              className="w-full flex items-center justify-between p-3.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-2xl transition-all active:scale-[0.98] text-left group"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                                  <MapPin size={20} />
+                                </div>
+                                <div>
+                                  <h4 className="font-extrabold text-sm text-white leading-tight">{spot.name}</h4>
+                                  <p className="text-[11px] text-gray-400 font-bold mt-0.5">
+                                    {spot.city} • <span className="text-blue-400">{spot.type}</span> ({spot.dist})
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col items-end gap-1 shrink-0">
+                                <span className="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/30 text-amber-400 font-mono font-black text-[10px]">
+                                  {spot.surge}
+                                </span>
+                                <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                                  Tap to route →
+                                </span>
+                              </div>
+                            </button>
+                          ));
+                        })()}
                       </div>
                     </motion.div>
                   </div>
@@ -13609,163 +13824,161 @@ export default function App() {
               </AnimatePresence>
 
               {/* Top Controls Overlay */}
-              {!isNavigating && (
-                <div className="absolute top-0 left-0 right-0 z-[4500] pointer-events-none">
-                  {!user.isOnline ? (
-                    /* High Fidelity Offline Header matching the reference image perfectly */
-                    <div className="p-4 pt-6 flex justify-between items-center pointer-events-auto">
+              <div className="absolute top-0 left-0 right-0 z-[4500] pointer-events-none">
+                {!user.isOnline ? (
+                  /* High Fidelity Offline Header matching the reference image perfectly */
+                  <div className="p-4 pt-6 flex justify-between items-center pointer-events-auto">
+                    <button 
+                      onClick={() => setIsSearchOpen(true)}
+                      className="w-12 h-12 bg-white text-black rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center active:scale-90 transition-transform shrink-0"
+                    >
+                      <Search size={22} strokeWidth={3} className="text-black" />
+                    </button>
+                    
+                    <div 
+                      onMouseDown={handleEarningsPressStart}
+                      onMouseUp={() => handleEarningsPressEnd()}
+                      onMouseLeave={handleEarningsPressCancel}
+                      onTouchStart={handleEarningsPressStart}
+                      onTouchEnd={() => handleEarningsPressEnd()}
+                      onTouchCancel={handleEarningsPressCancel}
+                      className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform select-none"
+                      title="Hold to hide/show total earnings"
+                    >
+                      <div className="px-5 py-2 bg-black border-[2px] border-white rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.2)] flex items-center justify-center min-w-[130px] h-[46px]">
+                        <span className="font-sans text-lg font-black tracking-tight text-white flex items-center gap-1">
+                          {isEarningsHidden ? (
+                            <span className="flex items-center gap-1 text-gray-400 font-mono tracking-widest text-base">
+                              <EyeOff size={16} className="text-emerald-400" />
+                              ••••••
+                            </span>
+                          ) : (
+                            <>
+                              <span className="text-emerald-400 font-bold">£</span>
+                              {todayEarningsTotal.toFixed(2)}
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      <div className="mt-[-8px] px-2.5 py-0.5 bg-white border border-gray-200 rounded text-[9px] font-black uppercase tracking-wider text-black shadow-md z-10 font-sans font-bold flex items-center gap-1">
+                        {isEarningsHidden && <EyeOff size={10} className="text-amber-500" />}
+                        TODAY
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
+                      className="w-12 h-12 rounded-full border-[2px] border-white shadow-[0_6px_20px_rgba(0,0,0,0.12)] overflow-hidden active:scale-90 transition-transform shrink-0"
+                    >
+                      <img 
+                        src={user.profilePic || "https://picsum.photos/seed/driver/100/100"} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover" 
+                      />
+                    </button>
+                  </div>
+                ) : (
+                  /* Standard Online Header */
+                  <div className="p-4 flex justify-between items-center pointer-events-auto">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
+                      className={`w-11 h-11 backdrop-blur-md rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 border ${
+                        activeBrand === 'hyper' 
+                          ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
+                          : activeBrand === 'both'
+                          ? 'bg-[#0d091a]/95 text-purple-300 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
+                          : 'bg-neutral-900/90 text-white border-white/10'
+                      }`}
+                    >
+                      <Menu size={20} />
+                    </button>
+                    
+                    <motion.div 
+                      initial={{ y: -50, scale: 0.9 }}
+                      animate={{ y: 0, scale: 1 }}
+                      className={`px-5 py-1.5 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 cursor-pointer select-none min-w-[150px] max-w-[210px] min-h-[44px] transition-all relative border ${
+                        activeBrand === 'hyper' 
+                          ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]' 
+                          : activeBrand === 'both'
+                          ? 'bg-gradient-to-r from-blue-950/95 to-[#1a0c2e]/95 text-white border-purple-500/35 shadow-[0_0_20px_rgba(124,58,237,0.2)]'
+                          : 'bg-[#0c0d10] text-[#22c55e] border-white/10'
+                      }`}
+                      onMouseDown={handleEarningsPressStart}
+                      onMouseUp={() => handleEarningsPressEnd(() => {
+                        setTopBarMode(prev => {
+                          if (prev === 'today') return 'last_trip';
+                          if (prev === 'last_trip') return 'hyper_driver_pro';
+                          return 'today';
+                        });
+                      })}
+                      onMouseLeave={handleEarningsPressCancel}
+                      onTouchStart={handleEarningsPressStart}
+                      onTouchEnd={() => handleEarningsPressEnd(() => {
+                        setTopBarMode(prev => {
+                          if (prev === 'today') return 'last_trip';
+                          if (prev === 'last_trip') return 'hyper_driver_pro';
+                          return 'today';
+                        });
+                      })}
+                      onTouchCancel={handleEarningsPressCancel}
+                      title="Hold to hide/show earnings"
+                    >
+                      <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none flex items-center gap-1">
+                        {isEarningsHidden && <EyeOff size={9} className="text-amber-400" />}
+                        {topBarMode === 'today' && "Today's Earnings"}
+                        {topBarMode === 'last_trip' && "Last Trip Payout"}
+                        {topBarMode === 'hyper_driver_pro' && `Hyper Pro - ${user.tier || 'Diamond'}`}
+                      </span>
+
+                      <div className="flex items-center gap-1.5 justify-center leading-none">
+                        <span className={`font-display text-base font-black tracking-tight select-none ${
+                          activeBrand === 'hyper' ? 'text-[#00ff88]' : 'text-white'
+                        }`}>
+                          {isEarningsHidden && (topBarMode === 'today' || topBarMode === 'last_trip') ? (
+                            <span className="text-gray-400 tracking-widest font-mono text-sm flex items-center gap-1">
+                              ••••••
+                            </span>
+                          ) : (
+                            <>
+                              {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
+                              {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
+                              {topBarMode === 'hyper_driver_pro' && `${user.points || 350} XP`}
+                            </>
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="flex gap-1 mt-1 justify-center select-none">
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                      </div>
+                    </motion.div>
+
+                    <div className="flex items-center gap-2">
+                      {user.isOnline && (
+                        pendingOrder ? (
+                          <div className="px-2.5 py-1 bg-amber-500/20 backdrop-blur-md rounded-full border border-amber-500/40 text-amber-400 font-mono text-[10px] font-bold shadow-lg flex items-center gap-1 animate-pulse">
+                            <Clock size={11} className="text-amber-400" />
+                            <span>{orderExpiryTimer}s</span>
+                          </div>
+                        ) : jobTimerRemaining !== null && jobTimerRemaining >= 0 ? (
+                          <div className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-white font-mono text-[10px] font-bold shadow-lg flex items-center gap-1">
+                            <Clock size={11} className="text-[#00ff88]" />
+                            <span>{Math.floor(jobTimerRemaining / 60)}:{(jobTimerRemaining % 60).toString().padStart(2, '0')}</span>
+                          </div>
+                        ) : null
+                      )}
                       <button 
                         onClick={() => setIsSearchOpen(true)}
-                        className="w-12 h-12 bg-white text-black rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center active:scale-90 transition-transform shrink-0"
+                        className="w-11 h-11 bg-slate-950 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0"
                       >
-                        <Search size={22} strokeWidth={3} className="text-black" />
-                      </button>
-                      
-                      <div 
-                        onMouseDown={handleEarningsPressStart}
-                        onMouseUp={() => handleEarningsPressEnd()}
-                        onMouseLeave={handleEarningsPressCancel}
-                        onTouchStart={handleEarningsPressStart}
-                        onTouchEnd={() => handleEarningsPressEnd()}
-                        onTouchCancel={handleEarningsPressCancel}
-                        className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform select-none"
-                        title="Hold to hide/show total earnings"
-                      >
-                        <div className="px-5 py-2 bg-black border-[2px] border-white rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.2)] flex items-center justify-center min-w-[130px] h-[46px]">
-                          <span className="font-sans text-lg font-black tracking-tight text-white flex items-center gap-1">
-                            {isEarningsHidden ? (
-                              <span className="flex items-center gap-1 text-gray-400 font-mono tracking-widest text-base">
-                                <EyeOff size={16} className="text-emerald-400" />
-                                ••••••
-                              </span>
-                            ) : (
-                              <>
-                                <span className="text-emerald-400 font-bold">£</span>
-                                {todayEarningsTotal.toFixed(2)}
-                              </>
-                            )}
-                          </span>
-                        </div>
-                        <div className="mt-[-8px] px-2.5 py-0.5 bg-white border border-gray-200 rounded text-[9px] font-black uppercase tracking-wider text-black shadow-md z-10 font-sans font-bold flex items-center gap-1">
-                          {isEarningsHidden && <EyeOff size={10} className="text-amber-500" />}
-                          TODAY
-                        </div>
-                      </div>
-
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
-                        className="w-12 h-12 rounded-full border-[2px] border-white shadow-[0_6px_20px_rgba(0,0,0,0.12)] overflow-hidden active:scale-90 transition-transform shrink-0"
-                      >
-                        <img 
-                          src={user.profilePic || "https://picsum.photos/seed/driver/100/100"} 
-                          alt="Profile" 
-                          className="w-full h-full object-cover" 
-                        />
+                        <Search size={20} />
                       </button>
                     </div>
-                  ) : (
-                    /* Standard Online Header */
-                    <div className="p-4 flex justify-between items-center pointer-events-auto">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
-                        className={`w-11 h-11 backdrop-blur-md rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 border ${
-                          activeBrand === 'hyper' 
-                            ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
-                            : activeBrand === 'both'
-                            ? 'bg-[#0d091a]/95 text-purple-300 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
-                            : 'bg-neutral-900/90 text-white border-white/10'
-                        }`}
-                      >
-                        <Menu size={20} />
-                      </button>
-                      
-                      <motion.div 
-                        initial={{ y: -50, scale: 0.9 }}
-                        animate={{ y: 0, scale: 1 }}
-                        className={`px-5 py-1.5 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 cursor-pointer select-none min-w-[150px] max-w-[210px] min-h-[44px] transition-all relative border ${
-                          activeBrand === 'hyper' 
-                            ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]' 
-                            : activeBrand === 'both'
-                            ? 'bg-gradient-to-r from-blue-950/95 to-[#1a0c2e]/95 text-white border-purple-500/35 shadow-[0_0_20px_rgba(124,58,237,0.2)]'
-                            : 'bg-[#0c0d10] text-[#22c55e] border-white/10'
-                        }`}
-                        onMouseDown={handleEarningsPressStart}
-                        onMouseUp={() => handleEarningsPressEnd(() => {
-                          setTopBarMode(prev => {
-                            if (prev === 'today') return 'last_trip';
-                            if (prev === 'last_trip') return 'hyper_driver_pro';
-                            return 'today';
-                          });
-                        })}
-                        onMouseLeave={handleEarningsPressCancel}
-                        onTouchStart={handleEarningsPressStart}
-                        onTouchEnd={() => handleEarningsPressEnd(() => {
-                          setTopBarMode(prev => {
-                            if (prev === 'today') return 'last_trip';
-                            if (prev === 'last_trip') return 'hyper_driver_pro';
-                            return 'today';
-                          });
-                        })}
-                        onTouchCancel={handleEarningsPressCancel}
-                        title="Hold to hide/show earnings"
-                      >
-                        <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none flex items-center gap-1">
-                          {isEarningsHidden && <EyeOff size={9} className="text-amber-400" />}
-                          {topBarMode === 'today' && "Today's Earnings"}
-                          {topBarMode === 'last_trip' && "Last Trip Payout"}
-                          {topBarMode === 'hyper_driver_pro' && `Hyper Pro - ${user.tier || 'Diamond'}`}
-                        </span>
-
-                        <div className="flex items-center gap-1.5 justify-center leading-none">
-                          <span className={`font-display text-base font-black tracking-tight select-none ${
-                            activeBrand === 'hyper' ? 'text-[#00ff88]' : 'text-white'
-                          }`}>
-                            {isEarningsHidden && (topBarMode === 'today' || topBarMode === 'last_trip') ? (
-                              <span className="text-gray-400 tracking-widest font-mono text-sm flex items-center gap-1">
-                                ••••••
-                              </span>
-                            ) : (
-                              <>
-                                {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
-                                {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
-                                {topBarMode === 'hyper_driver_pro' && `${user.points || 350} XP`}
-                              </>
-                            )}
-                          </span>
-                        </div>
-
-                        <div className="flex gap-1 mt-1 justify-center select-none">
-                          <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
-                          <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
-                          <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
-                        </div>
-                      </motion.div>
-
-                      <div className="flex items-center gap-2">
-                        {user.isOnline && (
-                          pendingOrder ? (
-                            <div className="px-2.5 py-1 bg-amber-500/20 backdrop-blur-md rounded-full border border-amber-500/40 text-amber-400 font-mono text-[10px] font-bold shadow-lg flex items-center gap-1 animate-pulse">
-                              <Clock size={11} className="text-amber-400" />
-                              <span>{orderExpiryTimer}s</span>
-                            </div>
-                          ) : jobTimerRemaining !== null && jobTimerRemaining >= 0 ? (
-                            <div className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-white font-mono text-[10px] font-bold shadow-lg flex items-center gap-1">
-                              <Clock size={11} className="text-[#00ff88]" />
-                              <span>{Math.floor(jobTimerRemaining / 60)}:{(jobTimerRemaining % 60).toString().padStart(2, '0')}</span>
-                            </div>
-                          ) : null
-                        )}
-                        <button 
-                          onClick={() => setIsSearchOpen(true)}
-                          className="w-11 h-11 bg-slate-950 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0"
-                        >
-                          <Search size={20} />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
 
               {/* Bottom Menu Toggle Button / Map Status Bar */}
               {user.isOnline && !pendingOrder && !isBottomMenuOpen && (
@@ -14380,8 +14593,8 @@ export default function App() {
               )}
             </AnimatePresence>
 
-              {/* Bottom Cards - Only visible when not navigating so turn-by-turn map stays clean */}
-              {!isBottomMenuOpen && !pendingOrder && !activeChatOrderId && !isNavigating && (
+              {/* Bottom Cards - Visible when order is active so driver can see job details */}
+              {!isBottomMenuOpen && !pendingOrder && !activeChatOrderId && (
                 <div className="absolute bottom-24 left-0 right-0 px-3 sm:px-4 space-y-2 pointer-events-none z-[3550] max-w-sm sm:max-w-md mx-auto">
                   <AnimatePresence>
                     {(() => {
@@ -14484,12 +14697,12 @@ export default function App() {
                                 <MessageSquare size={14} />
                               </button>
                               <button 
-                                onClick={() => setIsNavigating(true)} 
-                                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-black text-[9px] uppercase tracking-wider flex items-center gap-1 shadow-md active:scale-95 transition-all cursor-pointer"
-                                title="Start Turn-by-Turn Navigation Map"
+                                onClick={() => setIsNavigating(!isNavigating)} 
+                                className={`px-2.5 py-1 ${isNavigating ? 'bg-purple-600 hover:bg-purple-500' : 'bg-blue-600 hover:bg-blue-500'} text-white rounded-lg font-black text-[9px] uppercase tracking-wider flex items-center gap-1 shadow-md active:scale-95 transition-all cursor-pointer`}
+                                title={isNavigating ? "Exit Turn-by-Turn Mode" : "Start Turn-by-Turn Navigation"}
                               >
-                                <Navigation size={11} />
-                                <span>Nav</span>
+                                <Navigation size={11} className={isNavigating ? "animate-pulse" : ""} />
+                                <span>{isNavigating ? 'Nav On' : 'Nav'}</span>
                               </button>
                               {preparingOrders[order.id] && preparingOrders[order.id] > 0 ? (
                                 <button 
@@ -15288,7 +15501,7 @@ export default function App() {
                   },
                 ].map((reward, i) => (
                   <motion.div 
-                    key={i} 
+                    key={`reward-pro-${reward.title || i}-${i}`} 
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.1 }}
@@ -15741,10 +15954,10 @@ export default function App() {
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {quests.filter(q => q.type === 'daily').map((quest) => {
+                    {quests.filter(q => q.type === 'daily').map((quest, idx) => {
                       const progress = Math.min(100, (quest.progress / quest.target) * 100);
                       return (
-                        <div key={quest.id} className={`p-6 rounded-[24px] border transition-all ${quest.completed ? 'bg-emerald-950/25 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.05)]' : 'bg-neutral-900/50 border-white/5 hover:border-white/10'}`}>
+                        <div key={`quest-daily-${quest.id || idx}-${idx}`} className={`p-6 rounded-[24px] border transition-all ${quest.completed ? 'bg-emerald-950/25 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.05)]' : 'bg-neutral-900/50 border-white/5 hover:border-white/10'}`}>
                           <div className="flex justify-between items-start gap-4 mb-3">
                             <div>
                               <h4 className={`font-black text-lg ${quest.completed ? 'text-emerald-400 line-through' : 'text-white'}`}>{quest.title}</h4>
@@ -15789,10 +16002,10 @@ export default function App() {
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {quests.filter(q => q.type === 'weekly').map((quest) => {
+                    {quests.filter(q => q.type === 'weekly').map((quest, idx) => {
                       const progress = Math.min(100, (quest.progress / quest.target) * 100);
                       return (
-                        <div key={quest.id} className={`p-6 rounded-[24px] border transition-all ${quest.completed ? 'bg-emerald-950/25 border-emerald-500/30' : 'bg-neutral-900/50 border-white/5 hover:border-white/10'}`}>
+                        <div key={`quest-weekly-${quest.id || idx}-${idx}`} className={`p-6 rounded-[24px] border transition-all ${quest.completed ? 'bg-emerald-950/25 border-emerald-500/30' : 'bg-neutral-900/50 border-white/5 hover:border-white/10'}`}>
                           <div className="flex justify-between items-start gap-4 mb-3">
                             <div>
                               <h4 className={`font-black text-lg ${quest.completed ? 'text-emerald-400 line-through' : 'text-white'}`}>{quest.title}</h4>
@@ -15831,7 +16044,7 @@ export default function App() {
                     {rewards.map((reward, i) => {
                       const progress = Math.min(100, (reward.completed / reward.target) * 100);
                       return (
-                        <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-neutral-900/40 border border-white/5 hover:border-white/10 rounded-2xl transition-all">
+                        <div key={`milestone-${reward.reward || i}-${i}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-neutral-900/40 border border-white/5 hover:border-white/10 rounded-2xl transition-all">
                           <div>
                             <span className="text-sm font-black text-white">{reward.reward}</span>
                             <span className="text-xs text-gray-400 block font-medium">Earned upon hitting {reward.target} total career orders.</span>
@@ -16997,12 +17210,19 @@ export default function App() {
                     }
                   })()}
 
-                  {/* Large Charcoal/Black Accept Match Button */}
-                  <div className="pt-2 shrink-0">
+                  {/* Large Charcoal/Black Accept Match Button with Decline option */}
+                  <div className="pt-2 shrink-0 flex gap-3 items-center">
+                    <button 
+                      onClick={handleDeclineOrder}
+                      className="py-4 px-5 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 active:scale-95 transition-all min-h-[58px]"
+                    >
+                      <X size={18} />
+                      <span>Decline</span>
+                    </button>
                     <button 
                       onClick={handleAcceptOrder}
                       disabled={isMatchingLoading || isMatchFailed}
-                      className={`relative w-full py-4 active:scale-[0.98] transition-all rounded-2xl font-black text-lg shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden flex items-center justify-center min-h-[58px] ${
+                      className={`relative flex-1 py-4 active:scale-[0.98] transition-all rounded-2xl font-black text-lg shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden flex items-center justify-center min-h-[58px] ${
                         pendingOrder.brand === 'hyper' 
                           ? 'bg-purple-600 hover:bg-purple-700 text-white hover:text-white' 
                           : 'bg-[#1a1a1a] hover:bg-black text-white hover:text-white'
@@ -17213,12 +17433,19 @@ export default function App() {
                     })()}
                   </div>
 
-                  {/* Accept Trigger Button section */}
-                  <div className="p-6 pt-2 shrink-0">
+                  {/* Accept / Decline Trigger Button section */}
+                  <div className="p-6 pt-2 shrink-0 flex gap-3 items-center">
+                    <button 
+                      onClick={handleDeclineOrder}
+                      className="py-5 px-6 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-2xl font-black text-base uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 active:scale-95 transition-all min-h-[64px]"
+                    >
+                      <X size={20} />
+                      <span>Decline</span>
+                    </button>
                     <button 
                       onClick={handleAcceptOrder}
                       disabled={isMatchingLoading || isMatchFailed}
-                      className={`relative w-full py-5 active:scale-[0.98] transition-all rounded-2xl font-black text-xl overflow-hidden flex items-center justify-center min-h-[64px] ${
+                      className={`relative flex-1 py-5 active:scale-[0.98] transition-all rounded-2xl font-black text-xl overflow-hidden flex items-center justify-center min-h-[64px] ${
                         pendingOrder.brand === 'hyper'
                           ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-[0_12px_36px_rgba(168,85,247,0.32)] shadow-purple-500/30'
                           : 'bg-[#1a1a1a] hover:bg-black text-white shadow-[0_12px_36px_rgba(0,0,0,0.3)]'
@@ -17265,7 +17492,7 @@ export default function App() {
       </div>
 
       {/* Bottom Nav */}
-      {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && !isOffAppSimulated && (
+      {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && !isOffAppSimulated && !pendingOrder && (
         <div className="h-20 bg-[#0c0c0d] border-t border-white/5 flex items-center justify-around px-2 z-[2000] shrink-0 relative pb-4 shadow-2xl">
           <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={22} />} label="Home" badgeCount={activeOrders.length > 0 ? activeOrders.length : undefined} />
           <NavButton 
