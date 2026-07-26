@@ -321,6 +321,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     }
   }, [zoom]);
 
+  // Zoom to turn-by-turn view level when starting navigation
+  useEffect(() => {
+    if (isNavigating && mapRef.current && location) {
+      const driverLatLng = L.latLng(location.latitude, location.longitude);
+      mapRef.current.setView(driverLatLng, 17.5, { animate: true });
+    }
+  }, [isNavigating]);
+
   // Update Tile Layer URL source dynamically when theme toggles
   useEffect(() => {
     if (!mapRef.current || !tileLayerRef.current) return;
@@ -349,6 +357,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     } else {
       driverMarkerRef.current.setLatLng(driverLatLng);
       driverMarkerRef.current.setIcon(getDriverIcon(heading, isOnline));
+    }
+
+    // Smoothly pan camera during active turn-by-turn navigation
+    if (isNavigating) {
+      map.panTo(driverLatLng, { animate: true, duration: 0.15 });
     }
 
     // 2. Sync rival drivers

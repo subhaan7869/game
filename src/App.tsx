@@ -8305,7 +8305,7 @@ export default function App() {
   // Navigation Speed & Progress Simulation
   useEffect(() => {
     let interval: any;
-    if (isNavigating && activeOrders.length > 0) {
+    if (isNavigating) {
       interval = setInterval(() => {
         // Randomly simulate speed around the speed limit
         const targetSpeed = currentSpeedLimit + (Math.random() * 10 - 4); 
@@ -9292,26 +9292,27 @@ export default function App() {
     setTrafficSegments(generateTraffic(start));
   };
 
-  // Geolocation tracking & Navigation Simulation
+  // Geolocation tracking & Navigation Simulation (Real-time 100ms smooth simulation loop)
   useEffect(() => {
     let angle = 0;
-    let deviationChance = 0.01; // 1% chance to deviate each second
+    let deviationChance = 0.002; // deviation chance per tick
 
     if (isSimulatingMovement || isNavigating) {
       const interval = setInterval(() => {
         setLocation(prev => {
           if (!prev) return { latitude: activeCityCenter.latitude, longitude: activeCityCenter.longitude };
           
-          if (isNavigating && activeOrders.length > 0) {
+          if (isNavigating && (activeOrders.length > 0 || busyAreaTarget)) {
             const order = activeOrders[0];
-            const target = order.status === 'accepted' 
+            const currentTargetStop = currentStops[0]?.location;
+            const target = currentTargetStop || (order ? (order.status === 'accepted' 
               ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
-              : order.customerLocation;
+              : order.customerLocation) : busyAreaTarget?.location);
             
             if (!target) return prev;
             
             // Reset route if target changed
-            if (!lastTargetRef.current || lastTargetRef.current.latitude !== target.latitude || lastTargetRef.current.longitude !== target.longitude) {
+            if (!lastTargetRef.current || Math.abs(lastTargetRef.current.latitude - target.latitude) > 0.0001 || Math.abs(lastTargetRef.current.longitude - target.longitude) > 0.0001) {
               updateRouteWaypointsAsync(prev, target);
               lastTargetRef.current = target;
             }
@@ -9328,7 +9329,7 @@ export default function App() {
               setTimeout(() => {
                 updateRouteWaypointsAsync(prev, target);
                 setIsRecalculating(false);
-              }, 1500);
+              }, 1200);
               return prev;
             }
 
@@ -9339,25 +9340,40 @@ export default function App() {
             const dLat = nextWaypoint.latitude - prev.latitude;
             const dLng = nextWaypoint.longitude - prev.longitude;
             const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+
+            // Calculate direction bearing angle so car icon and map rotate seamlessly
+            if (dist > 0.00001) {
+              const currentBearing = Math.atan2(dLng, dLat) * (180 / Math.PI);
+              setHeading(currentBearing);
+            }
             
-            if (dist < 0.0005) {
-              // Arrived at waypoint
+            // Arrived at waypoint
+            if (dist < 0.0002) {
               if (routeRef.current.length > 0) {
                 const updatedRoute = routeRef.current.slice(1);
                 routeRef.current = updatedRoute;
                 setRouteWaypoints(updatedRoute);
               } else {
-                // Arrived at final destination
-                if (order.status === 'accepted') {
-                  handleNextStep(order.id);
-                } else if (order.status === 'picked_up') {
-                  setVerifyingDeliveryId(order.id);
+                // Arrived at destination
+                if (order) {
+                  if (order.status === 'accepted') {
+                    handleNextStep(order.id);
+                    lastTargetRef.current = null;
+                  } else if (order.status === 'picked_up') {
+                    setVerifyingDeliveryId(order.id);
+                    setIsNavigating(false);
+                    lastTargetRef.current = null;
+                  }
+                } else if (busyAreaTarget) {
+                  setBusyAreaTarget(null);
                   setIsNavigating(false);
+                  sendNotification("Arrived", `Arrived at busy region`, "success");
+                  lastTargetRef.current = null;
                 }
               }
 
               // PIN Simulation: Customer sends PIN when driver is close to drop-off
-              if (order.status === 'picked_up' && order.pin) {
+              if (order && order.status === 'picked_up' && order.pin) {
                 const distToCustomer = Math.sqrt(
                   Math.pow(target.latitude - prev.latitude, 2) + 
                   Math.pow(target.longitude - prev.longitude, 2)
@@ -9382,11 +9398,11 @@ export default function App() {
               return prev;
             }
             
-            // Speed remapping
+            // Smooth speed step per 100ms
             const speedRemapped = purchasedUpgrades.includes('engine_remap'); 
-            let step = speedRemapped ? 0.00045 : 0.0003; // Remap gives +50% speed boost!
+            let step = speedRemapped ? 0.000045 : 0.00003; 
             
-            // Intercity routes cover huge distances, so we cross them 4x faster!
+            // Intercity routes cover huge distances, so cross them 4x faster
             const isIntercity = order && (order.restaurantName === 'Intercity Route' || order.restaurantName?.includes('Intercity'));
             if (isIntercity) {
               step = step * 4;
@@ -9394,37 +9410,26 @@ export default function App() {
             
             // Freeze movement if out of fuel or broken down
             if (fuel <= 0 || vehicleHealth <= 0) {
-              step = 0.00000;
+              step = 0;
+              setUserSpeed(0);
               return prev;
             }
 
-            // Decrement fuel & vehicle damage:
+            // Calculate real-time simulated MPH for Tactical HUD
+            const simulatedMph = Math.min(85, Math.max(18, Math.round((step * 10 * MILES_PER_DEGREE * 3600) * (0.85 + Math.random() * 0.3))));
+            setUserSpeed(simulatedMph);
+
+            // Decrement fuel & vehicle health per tick
             const isHybrid = purchasedUpgrades.includes('hybrid_eco');
-            // Night weather costs slightly more fuel due to heaters/lights
             const weatherMultiplier = weatherState === 'night' ? 1.35 : weatherState === 'rainy' ? 1.15 : 1.0;
-            const fuelDecline = (isHybrid ? 0.07 : 0.16) * weatherMultiplier;
+            const fuelDecline = ((isHybrid ? 0.07 : 0.16) * weatherMultiplier) / 10;
             
             const isSuspension = purchasedUpgrades.includes('alloy_suspension');
-            // Rainy day pothole wear increases wear!
             const rainWearMultiplier = weatherState === 'rainy' ? 1.45 : 1.0;
-            const healthDecline = (isSuspension ? 0.05 : 0.13) * rainWearMultiplier;
+            const healthDecline = ((isSuspension ? 0.05 : 0.13) * rainWearMultiplier) / 10;
             
-            setTimeout(() => {
-              setFuel(f => {
-                const nextFuel = Math.max(0, f - fuelDecline);
-                if (nextFuel <= 10 && f > 10) {
-                  addToast("Low Fuel Alarm", "Your vehicle is running out of fuel! Tap 'Refuel Fully' or go to My Vehicles.", "alert");
-                }
-                return nextFuel;
-              });
-              setVehicleHealth(h => {
-                const nextHealth = Math.max(0, h - healthDecline);
-                if (nextHealth <= 10 && h > 10) {
-                  addToast("Critical Wear and Tear", "Your vehicle is about to break down! Tap 'Repair' or go to My Vehicles.", "alert");
-                }
-                return nextHealth;
-              });
-            }, 0);
+            setFuel(f => Math.max(0, f - fuelDecline));
+            setVehicleHealth(h => Math.max(0, h - healthDecline));
 
             return {
               latitude: prev.latitude + (dLat / dist) * step,
@@ -9440,7 +9445,7 @@ export default function App() {
 
           // Circular movement if simulating but not navigating
           if (isSimulatingMovement) {
-            angle += 0.05;
+            angle += 0.02;
             const radius = 0.001;
             return {
               latitude: activeCityCenter.latitude + Math.sin(angle) * radius,
@@ -9448,17 +9453,13 @@ export default function App() {
             };
           }
 
-          // Random drift if not navigating
-          return {
-            latitude: prev.latitude + (Math.random() - 0.5) * 0.0001,
-            longitude: prev.longitude + (Math.random() - 0.5) * 0.0001,
-          };
+          return prev;
         });
 
         // Random occurrences when actively navigating
         if (isNavigating && activeOrders.length > 0 && !activeMemeEvent) {
           const roll = Math.random();
-          if (roll < 0.012) { // 1.2% chance per second of a street obstacle!
+          if (roll < 0.002) { // Random street obstacle chance per tick
             const eventTypeRoll = Math.random();
             if (eventTypeRoll < 0.25) {
               setActiveMemeEvent({
@@ -9577,10 +9578,11 @@ export default function App() {
             }
           }
         }
-      }, 1000);
+      }, 100);
+
       return () => clearInterval(interval);
     }
-  }, [isSimulatingMovement, isNavigating, activeOrders, activeCityCenter, purchasedUpgrades, fuel, vehicleHealth, weatherState, activeMemeEvent, speakNav]);
+  }, [isSimulatingMovement, isNavigating, activeOrders, activeCityCenter, purchasedUpgrades, fuel, vehicleHealth, weatherState, activeMemeEvent, speakNav, currentStops, busyAreaTarget]);
 
   useEffect(() => {
     if (!useRealGPS) {
@@ -12293,7 +12295,7 @@ export default function App() {
               ))}
 
               {/* Speedometer Overlay */}
-              {user.isOnline && !pendingOrder && (
+              {user.isOnline && !pendingOrder && !isNavigating && (
                 <div className="absolute left-6 bottom-48 z-[3550] flex flex-col items-center">
                   <div className="w-20 h-20 bg-black/80 text-white rounded-full flex flex-col items-center justify-center shadow-2xl border border-white/10 backdrop-blur-md">
                     <span className="text-3xl font-black leading-none">
@@ -12721,7 +12723,7 @@ export default function App() {
                       </motion.div>
 
                       {/* Tactical HUD: Speed & Lane Assistance */}
-                      <div className="flex gap-2.5">
+                      <div className="flex gap-2.5 overflow-x-auto no-scrollbar max-w-full pb-1 pointer-events-auto">
                          {/* Dynamic Speedometer */}
                          <motion.div 
                            initial={{ x: -30, opacity: 0 }}
@@ -12782,7 +12784,7 @@ export default function App() {
                       initial={{ y: 30, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
                       exit={{ y: 30, opacity: 0 }}
-                      className="absolute bottom-28 left-1/2 -translate-x-1/2 z-[3550] pointer-events-auto"
+                      className="absolute bottom-48 sm:bottom-40 left-1/2 -translate-x-1/2 z-[3550] pointer-events-auto"
                     >
                       <button
                         onClick={() => setIsNavigating(false)}
@@ -13603,161 +13605,163 @@ export default function App() {
               </AnimatePresence>
 
               {/* Top Controls Overlay */}
-              <div className="absolute top-0 left-0 right-0 z-[4500] pointer-events-none">
-                {!user.isOnline ? (
-                  /* High Fidelity Offline Header matching the reference image perfectly */
-                  <div className="p-4 pt-6 flex justify-between items-center pointer-events-auto">
-                    <button 
-                      onClick={() => setIsSearchOpen(true)}
-                      className="w-12 h-12 bg-white text-black rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center active:scale-90 transition-transform shrink-0"
-                    >
-                      <Search size={22} strokeWidth={3} className="text-black" />
-                    </button>
-                    
-                    <div 
-                      onMouseDown={handleEarningsPressStart}
-                      onMouseUp={() => handleEarningsPressEnd()}
-                      onMouseLeave={handleEarningsPressCancel}
-                      onTouchStart={handleEarningsPressStart}
-                      onTouchEnd={() => handleEarningsPressEnd()}
-                      onTouchCancel={handleEarningsPressCancel}
-                      className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform select-none"
-                      title="Hold to hide/show total earnings"
-                    >
-                      <div className="px-5 py-2 bg-black border-[2px] border-white rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.2)] flex items-center justify-center min-w-[130px] h-[46px]">
-                        <span className="font-sans text-lg font-black tracking-tight text-white flex items-center gap-1">
-                          {isEarningsHidden ? (
-                            <span className="flex items-center gap-1 text-gray-400 font-mono tracking-widest text-base">
-                              <EyeOff size={16} className="text-emerald-400" />
-                              ••••••
-                            </span>
-                          ) : (
-                            <>
-                              <span className="text-emerald-400 font-bold">£</span>
-                              {todayEarningsTotal.toFixed(2)}
-                            </>
-                          )}
-                        </span>
-                      </div>
-                      <div className="mt-[-8px] px-2.5 py-0.5 bg-white border border-gray-200 rounded text-[9px] font-black uppercase tracking-wider text-black shadow-md z-10 font-sans font-bold flex items-center gap-1">
-                        {isEarningsHidden && <EyeOff size={10} className="text-amber-500" />}
-                        TODAY
-                      </div>
-                    </div>
-
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
-                      className="w-12 h-12 rounded-full border-[2px] border-white shadow-[0_6px_20px_rgba(0,0,0,0.12)] overflow-hidden active:scale-90 transition-transform shrink-0"
-                    >
-                      <img 
-                        src={user.profilePic || "https://picsum.photos/seed/driver/100/100"} 
-                        alt="Profile" 
-                        className="w-full h-full object-cover" 
-                      />
-                    </button>
-                  </div>
-                ) : (
-                  /* Standard Online Header */
-                  <div className="p-4 flex justify-between items-center pointer-events-auto">
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
-                      className={`w-11 h-11 backdrop-blur-md rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 border ${
-                        activeBrand === 'hyper' 
-                          ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
-                          : activeBrand === 'both'
-                          ? 'bg-[#0d091a]/95 text-purple-300 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
-                          : 'bg-neutral-900/90 text-white border-white/10'
-                      }`}
-                    >
-                      <Menu size={20} />
-                    </button>
-                    
-                    <motion.div 
-                      initial={{ y: -50, scale: 0.9 }}
-                      animate={{ y: 0, scale: 1 }}
-                      className={`px-5 py-1.5 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 cursor-pointer select-none min-w-[150px] max-w-[210px] min-h-[44px] transition-all relative border ${
-                        activeBrand === 'hyper' 
-                          ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]' 
-                          : activeBrand === 'both'
-                          ? 'bg-gradient-to-r from-blue-950/95 to-[#1a0c2e]/95 text-white border-purple-500/35 shadow-[0_0_20px_rgba(124,58,237,0.2)]'
-                          : 'bg-[#0c0d10] text-[#22c55e] border-white/10'
-                      }`}
-                      onMouseDown={handleEarningsPressStart}
-                      onMouseUp={() => handleEarningsPressEnd(() => {
-                        setTopBarMode(prev => {
-                          if (prev === 'today') return 'last_trip';
-                          if (prev === 'last_trip') return 'hyper_driver_pro';
-                          return 'today';
-                        });
-                      })}
-                      onMouseLeave={handleEarningsPressCancel}
-                      onTouchStart={handleEarningsPressStart}
-                      onTouchEnd={() => handleEarningsPressEnd(() => {
-                        setTopBarMode(prev => {
-                          if (prev === 'today') return 'last_trip';
-                          if (prev === 'last_trip') return 'hyper_driver_pro';
-                          return 'today';
-                        });
-                      })}
-                      onTouchCancel={handleEarningsPressCancel}
-                      title="Hold to hide/show earnings"
-                    >
-                      <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none flex items-center gap-1">
-                        {isEarningsHidden && <EyeOff size={9} className="text-amber-400" />}
-                        {topBarMode === 'today' && "Today's Earnings"}
-                        {topBarMode === 'last_trip' && "Last Trip Payout"}
-                        {topBarMode === 'hyper_driver_pro' && `Hyper Pro - ${user.tier || 'Diamond'}`}
-                      </span>
-
-                      <div className="flex items-center gap-1.5 justify-center leading-none">
-                        <span className={`font-display text-base font-black tracking-tight select-none ${
-                          activeBrand === 'hyper' ? 'text-[#00ff88]' : 'text-white'
-                        }`}>
-                          {isEarningsHidden && (topBarMode === 'today' || topBarMode === 'last_trip') ? (
-                            <span className="text-gray-400 tracking-widest font-mono text-sm flex items-center gap-1">
-                              ••••••
-                            </span>
-                          ) : (
-                            <>
-                              {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
-                              {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
-                              {topBarMode === 'hyper_driver_pro' && `${user.points || 350} XP`}
-                            </>
-                          )}
-                        </span>
-                      </div>
-
-                      <div className="flex gap-1 mt-1 justify-center select-none">
-                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
-                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
-                        <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
-                      </div>
-                    </motion.div>
-
-                    <div className="flex items-center gap-2">
-                      {user.isOnline && (
-                        pendingOrder ? (
-                          <div className="px-2.5 py-1 bg-amber-500/20 backdrop-blur-md rounded-full border border-amber-500/40 text-amber-400 font-mono text-[10px] font-bold shadow-lg flex items-center gap-1 animate-pulse">
-                            <Clock size={11} className="text-amber-400" />
-                            <span>{orderExpiryTimer}s</span>
-                          </div>
-                        ) : jobTimerRemaining !== null && jobTimerRemaining >= 0 ? (
-                          <div className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-white font-mono text-[10px] font-bold shadow-lg flex items-center gap-1">
-                            <Clock size={11} className="text-[#00ff88]" />
-                            <span>{Math.floor(jobTimerRemaining / 60)}:{(jobTimerRemaining % 60).toString().padStart(2, '0')}</span>
-                          </div>
-                        ) : null
-                      )}
+              {!isNavigating && (
+                <div className="absolute top-0 left-0 right-0 z-[4500] pointer-events-none">
+                  {!user.isOnline ? (
+                    /* High Fidelity Offline Header matching the reference image perfectly */
+                    <div className="p-4 pt-6 flex justify-between items-center pointer-events-auto">
                       <button 
                         onClick={() => setIsSearchOpen(true)}
-                        className="w-11 h-11 bg-slate-950 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0"
+                        className="w-12 h-12 bg-white text-black rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center active:scale-90 transition-transform shrink-0"
                       >
-                        <Search size={20} />
+                        <Search size={22} strokeWidth={3} className="text-black" />
+                      </button>
+                      
+                      <div 
+                        onMouseDown={handleEarningsPressStart}
+                        onMouseUp={() => handleEarningsPressEnd()}
+                        onMouseLeave={handleEarningsPressCancel}
+                        onTouchStart={handleEarningsPressStart}
+                        onTouchEnd={() => handleEarningsPressEnd()}
+                        onTouchCancel={handleEarningsPressCancel}
+                        className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform select-none"
+                        title="Hold to hide/show total earnings"
+                      >
+                        <div className="px-5 py-2 bg-black border-[2px] border-white rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.2)] flex items-center justify-center min-w-[130px] h-[46px]">
+                          <span className="font-sans text-lg font-black tracking-tight text-white flex items-center gap-1">
+                            {isEarningsHidden ? (
+                              <span className="flex items-center gap-1 text-gray-400 font-mono tracking-widest text-base">
+                                <EyeOff size={16} className="text-emerald-400" />
+                                ••••••
+                              </span>
+                            ) : (
+                              <>
+                                <span className="text-emerald-400 font-bold">£</span>
+                                {todayEarningsTotal.toFixed(2)}
+                              </>
+                            )}
+                          </span>
+                        </div>
+                        <div className="mt-[-8px] px-2.5 py-0.5 bg-white border border-gray-200 rounded text-[9px] font-black uppercase tracking-wider text-black shadow-md z-10 font-sans font-bold flex items-center gap-1">
+                          {isEarningsHidden && <EyeOff size={10} className="text-amber-500" />}
+                          TODAY
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
+                        className="w-12 h-12 rounded-full border-[2px] border-white shadow-[0_6px_20px_rgba(0,0,0,0.12)] overflow-hidden active:scale-90 transition-transform shrink-0"
+                      >
+                        <img 
+                          src={user.profilePic || "https://picsum.photos/seed/driver/100/100"} 
+                          alt="Profile" 
+                          className="w-full h-full object-cover" 
+                        />
                       </button>
                     </div>
-                  </div>
-                )}
-              </div>
+                  ) : (
+                    /* Standard Online Header */
+                    <div className="p-4 flex justify-between items-center pointer-events-auto">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
+                        className={`w-11 h-11 backdrop-blur-md rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 border ${
+                          activeBrand === 'hyper' 
+                            ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
+                            : activeBrand === 'both'
+                            ? 'bg-[#0d091a]/95 text-purple-300 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
+                            : 'bg-neutral-900/90 text-white border-white/10'
+                        }`}
+                      >
+                        <Menu size={20} />
+                      </button>
+                      
+                      <motion.div 
+                        initial={{ y: -50, scale: 0.9 }}
+                        animate={{ y: 0, scale: 1 }}
+                        className={`px-5 py-1.5 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 cursor-pointer select-none min-w-[150px] max-w-[210px] min-h-[44px] transition-all relative border ${
+                          activeBrand === 'hyper' 
+                            ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]' 
+                            : activeBrand === 'both'
+                            ? 'bg-gradient-to-r from-blue-950/95 to-[#1a0c2e]/95 text-white border-purple-500/35 shadow-[0_0_20px_rgba(124,58,237,0.2)]'
+                            : 'bg-[#0c0d10] text-[#22c55e] border-white/10'
+                        }`}
+                        onMouseDown={handleEarningsPressStart}
+                        onMouseUp={() => handleEarningsPressEnd(() => {
+                          setTopBarMode(prev => {
+                            if (prev === 'today') return 'last_trip';
+                            if (prev === 'last_trip') return 'hyper_driver_pro';
+                            return 'today';
+                          });
+                        })}
+                        onMouseLeave={handleEarningsPressCancel}
+                        onTouchStart={handleEarningsPressStart}
+                        onTouchEnd={() => handleEarningsPressEnd(() => {
+                          setTopBarMode(prev => {
+                            if (prev === 'today') return 'last_trip';
+                            if (prev === 'last_trip') return 'hyper_driver_pro';
+                            return 'today';
+                          });
+                        })}
+                        onTouchCancel={handleEarningsPressCancel}
+                        title="Hold to hide/show earnings"
+                      >
+                        <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none flex items-center gap-1">
+                          {isEarningsHidden && <EyeOff size={9} className="text-amber-400" />}
+                          {topBarMode === 'today' && "Today's Earnings"}
+                          {topBarMode === 'last_trip' && "Last Trip Payout"}
+                          {topBarMode === 'hyper_driver_pro' && `Hyper Pro - ${user.tier || 'Diamond'}`}
+                        </span>
+
+                        <div className="flex items-center gap-1.5 justify-center leading-none">
+                          <span className={`font-display text-base font-black tracking-tight select-none ${
+                            activeBrand === 'hyper' ? 'text-[#00ff88]' : 'text-white'
+                          }`}>
+                            {isEarningsHidden && (topBarMode === 'today' || topBarMode === 'last_trip') ? (
+                              <span className="text-gray-400 tracking-widest font-mono text-sm flex items-center gap-1">
+                                ••••••
+                              </span>
+                            ) : (
+                              <>
+                                {topBarMode === 'today' && `£${todayEarningsTotal.toFixed(2)}`}
+                                {topBarMode === 'last_trip' && `£${(completedTrips[0]?.earnings || 14.50).toFixed(2)}`}
+                                {topBarMode === 'hyper_driver_pro' && `${user.points || 350} XP`}
+                              </>
+                            )}
+                          </span>
+                        </div>
+
+                        <div className="flex gap-1 mt-1 justify-center select-none">
+                          <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                          <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                          <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
+                        </div>
+                      </motion.div>
+
+                      <div className="flex items-center gap-2">
+                        {user.isOnline && (
+                          pendingOrder ? (
+                            <div className="px-2.5 py-1 bg-amber-500/20 backdrop-blur-md rounded-full border border-amber-500/40 text-amber-400 font-mono text-[10px] font-bold shadow-lg flex items-center gap-1 animate-pulse">
+                              <Clock size={11} className="text-amber-400" />
+                              <span>{orderExpiryTimer}s</span>
+                            </div>
+                          ) : jobTimerRemaining !== null && jobTimerRemaining >= 0 ? (
+                            <div className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-white font-mono text-[10px] font-bold shadow-lg flex items-center gap-1">
+                              <Clock size={11} className="text-[#00ff88]" />
+                              <span>{Math.floor(jobTimerRemaining / 60)}:{(jobTimerRemaining % 60).toString().padStart(2, '0')}</span>
+                            </div>
+                          ) : null
+                        )}
+                        <button 
+                          onClick={() => setIsSearchOpen(true)}
+                          className="w-11 h-11 bg-slate-950 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0"
+                        >
+                          <Search size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Bottom Menu Toggle Button / Map Status Bar */}
               {user.isOnline && !pendingOrder && !isBottomMenuOpen && (
