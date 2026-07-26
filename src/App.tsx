@@ -979,9 +979,7 @@ const SideMenu = ({
   activeBrand,
   setActiveBrand,
   setShowAppLauncher,
-  scheduledOrders = [],
-  isOnBreak = false,
-  setIsOnBreak
+  scheduledOrders = []
 }: { 
   user: UserProfile, 
   setIsSideMenuOpen: (val: boolean) => void,
@@ -1002,9 +1000,7 @@ const SideMenu = ({
   activeBrand: 'uber' | 'hyper' | 'both',
   setActiveBrand: (val: 'uber' | 'hyper' | 'both') => void,
   setShowAppLauncher: (val: boolean) => void,
-  scheduledOrders?: ScheduledOrder[],
-  isOnBreak?: boolean,
-  setIsOnBreak?: (val: boolean) => void
+  scheduledOrders?: ScheduledOrder[]
 }) => {
   return (
     <motion.div 
@@ -1192,34 +1188,17 @@ const SideMenu = ({
           </button>
         </div>
 
-        {/* Break & GO OFFLINE Action Buttons - dynamically displayed if currently Online */}
+        {/* GO OFFLINE Action Button - dynamically displayed if currently Online */}
         {user.isOnline && (
-          <div className="flex gap-2.5 mt-auto mb-4 shrink-0">
-            {setIsOnBreak && (
-              <button 
-                onClick={() => {
-                  setIsOnBreak(!isOnBreak);
-                }}
-                className={`flex-1 py-3.5 px-3 border rounded-2xl font-black text-xs uppercase tracking-wider text-center transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
-                  isOnBreak 
-                    ? 'bg-orange-500 text-white border-orange-400 shadow-lg shadow-orange-500/20' 
-                    : 'bg-orange-500/10 border-orange-500/20 text-orange-400 hover:bg-orange-500 hover:text-white'
-                }`}
-              >
-                <Coffee size={16} />
-                <span>{isOnBreak ? 'End Break' : 'Break'}</span>
-              </button>
-            )}
-            <button 
-              onClick={() => {
-                endShift();
-                setIsSideMenuOpen(false);
-              }}
-              className="flex-1 py-3.5 px-3 bg-red-600/10 border border-red-500/20 hover:bg-red-600 hover:text-white text-red-400 rounded-2xl font-black text-xs uppercase tracking-wider text-center transition-all active:scale-[0.98]"
-            >
-              Go Offline
-            </button>
-          </div>
+          <button 
+            onClick={() => {
+              endShift();
+              setIsSideMenuOpen(false);
+            }}
+            className="w-full mt-auto mb-4 py-4 bg-red-600/10 border border-red-500/20 hover:bg-red-600 hover:text-white text-red-400 rounded-2xl font-black text-xs uppercase tracking-widest text-center transition-all active:scale-[0.98]"
+          >
+            Go Offline
+          </button>
         )}
       </div>
 
@@ -8120,7 +8099,6 @@ export default function App() {
   const [heading, setHeading] = useState(0);
   const [isDestFilterOpen, setIsDestFilterOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [jobTimerRemaining, setJobTimerRemaining] = useState<number | null>(null);
   const [isNightMode, setIsNightMode] = useState<boolean>(() => theme === 'dark');
@@ -8876,12 +8854,10 @@ export default function App() {
   // Simulated Map Movement
   useEffect(() => {
     const hasJob = activeOrders.length > 0;
-    const busyTarget = busyAreaTarget;
-    const targetStop = currentStop;
-    const hasTarget = (hasJob && !!targetStop) || (!hasJob && !!busyTarget);
+    const isNavBusy = !hasJob && !!busyAreaTarget;
     
-    if (!isNavigating || !user.isOnline || !hasTarget || !location || useRealGPS) {
-      if (isNavigating && !hasTarget) {
+    if (!isNavigating || !user.isOnline || hasJob || !isNavBusy || !location || useRealGPS) {
+      if (isNavigating && !hasJob && !isNavBusy) {
         setIsNavigating(false);
       }
       return;
@@ -8955,7 +8931,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(moveInterval);
-  }, [isNavigating, user.isOnline, activeOrders.length > 0, !!busyAreaTarget, !!currentStop, location === null, useRealGPS]);
+  }, [isNavigating, user.isOnline, activeOrders.length > 0, !!busyAreaTarget, location === null, useRealGPS]);
 
   // Synchronize Nav Simulation with current active stop or busyAreaTarget
   useEffect(() => {
@@ -11947,8 +11923,6 @@ export default function App() {
                 setActiveBrand={setActiveBrand}
                 setShowAppLauncher={setShowAppLauncher}
                 scheduledOrders={scheduledOrders}
-                isOnBreak={isOnBreak}
-                setIsOnBreak={setIsOnBreak}
               />
             </>
           )}
@@ -12806,6 +12780,26 @@ export default function App() {
                   )}
                 </AnimatePresence>
 
+                {/* Floating "Back to Normal Map" button during turn-by-turn navigation */}
+                <AnimatePresence>
+                  {isNavigating && (
+                    <motion.div 
+                      key="back-to-normal-map-btn-wrapper"
+                      initial={{ y: 30, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: 30, opacity: 0 }}
+                      className="absolute bottom-48 sm:bottom-40 left-1/2 -translate-x-1/2 z-[3550] pointer-events-auto"
+                    >
+                      <button
+                        onClick={() => setIsNavigating(false)}
+                        className="px-5 py-2.5 bg-slate-900/95 hover:bg-slate-800 text-white border border-blue-500/50 rounded-full text-xs font-black uppercase tracking-wider shadow-2xl flex items-center gap-2.5 backdrop-blur-md active:scale-95 transition-all cursor-pointer hover:border-blue-400"
+                      >
+                        <MapIcon size={15} className="text-blue-400 animate-pulse" />
+                        <span>Back to Normal Map</span>
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Parks/Green areas */}
                 {mapCoreMode === 'cyber' && (
@@ -13369,7 +13363,7 @@ export default function App() {
               )}
 
                 {/* Map Action Buttons */}
-                {user.isOnline && !isNavigating && (
+                {user.isOnline && (
                   <div className="absolute bottom-32 left-4 right-4 flex flex-col gap-4 items-end pointer-events-none z-[4550]">
                     <div className="flex flex-col gap-2 pointer-events-auto">
                       <button 
@@ -13430,108 +13424,27 @@ export default function App() {
               {/* Search Modal */}
               <AnimatePresence>
                 {isSearchOpen && (
-                  <div className="absolute inset-0 z-[5000] flex items-start justify-center p-6 pointer-events-auto">
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSearchOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm cursor-pointer" />
+                  <div className="absolute inset-0 z-[500] flex items-start justify-center p-6">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSearchOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
                     <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -50, opacity: 0 }} className={`w-full max-w-md rounded-3xl p-6 shadow-2xl relative z-10 ${theme === 'dark' ? 'bg-[#1a1a1a] text-white' : 'bg-white text-black'}`}>
-                      <div className="flex items-center gap-3 mb-4 bg-gray-100 dark:bg-white/5 px-4 py-3 rounded-2xl border border-black/5 dark:border-white/10">
-                        <Search size={20} className="text-gray-400 shrink-0" />
+                      <div className="flex items-center gap-4 mb-6">
+                        <Search className="text-gray-400" />
                         <input 
                           autoFocus
                           type="text" 
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="Search restaurants, areas, or landmarks..." 
-                          className="flex-1 bg-transparent border-none outline-none font-bold text-base text-gray-900 dark:text-white placeholder-gray-400"
+                          placeholder="Search for restaurants or areas..." 
+                          className="flex-1 bg-transparent border-none outline-none font-bold text-lg"
                         />
-                        {searchQuery && (
-                          <button onClick={() => setSearchQuery("")} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-white">
-                            <X size={16} />
-                          </button>
-                        )}
-                        <button onClick={() => setIsSearchOpen(false)} className="p-1.5 bg-gray-200 dark:bg-white/10 rounded-full hover:bg-gray-300 dark:hover:bg-white/20 transition-colors">
-                          <X size={18} />
-                        </button>
+                        <button onClick={() => setIsSearchOpen(false)} className="p-2 bg-gray-100 dark:bg-white/5 rounded-full"><X size={20} /></button>
                       </div>
-
-                      <div className="max-h-[320px] overflow-y-auto space-y-2 custom-scrollbar pr-1">
-                        {!searchQuery ? (
-                          <div className="space-y-3">
-                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Popular Destinations</p>
-                            {[
-                              { name: 'Shoreditch', type: 'Surge Zone', lat: 51.5245, lng: -0.0781, icon: <Zap size={16} className="text-orange-500" /> },
-                              { name: 'Westfield Stratford', type: 'Shopping Mall', lat: 51.5432, lng: -0.0072, icon: <MapPin size={16} className="text-blue-500" /> },
-                              { name: 'Soho & Covent Garden', type: 'High Demand', lat: 51.5137, lng: -0.1312, icon: <Zap size={16} className="text-yellow-500" /> },
-                              { name: 'Greggs Holborn', type: 'Popular Pickup', lat: 51.5175, lng: -0.1200, icon: <Utensils size={16} className="text-green-500" /> },
-                              { name: 'Heathrow Terminal 5', type: 'Airport Pickups', lat: 51.4700, lng: -0.4543, icon: <MapPin size={16} className="text-purple-500" /> },
-                            ].map(item => (
-                              <button 
-                                key={item.name} 
-                                onClick={() => {
-                                  const targetLoc = { latitude: item.lat, longitude: item.lng };
-                                  setLocation(targetLoc);
-                                  setMapOffset({ x: 0, y: 0 });
-                                  setBusyAreaTarget({ id: item.name, name: item.name, location: targetLoc });
-                                  setIsNavigating(true);
-                                  setIsSearchOpen(false);
-                                  addToast("Navigation Started", `Route set to ${item.name}`, "success");
-                                  sendNotification("Navigation Started", `Driving towards ${item.name}`, "success");
-                                }}
-                                className="w-full flex items-center justify-between p-3 hover:bg-gray-100 dark:hover:bg-white/5 rounded-2xl transition-all group text-left border border-transparent hover:border-blue-500/20"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/5 flex items-center justify-center shrink-0">
-                                    {item.icon}
-                                  </div>
-                                  <div>
-                                    <p className="font-bold text-sm leading-snug text-gray-900 dark:text-white group-hover:text-blue-500 transition-colors">{item.name}</p>
-                                    <p className="text-[10px] font-bold text-gray-400">{item.type}</p>
-                                  </div>
-                                </div>
-                                <Navigation size={16} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Search Results</p>
-                            {[
-                              { name: 'Shoreditch High St', type: 'Hotspot Area', lat: 51.5245, lng: -0.0781, icon: <Zap size={16} className="text-orange-500" /> },
-                              { name: 'Westfield Stratford', type: 'Shopping & Dining', lat: 51.5432, lng: -0.0072, icon: <MapPin size={16} className="text-blue-500" /> },
-                              { name: 'Soho Square', type: 'Entertainment Hub', lat: 51.5137, lng: -0.1312, icon: <Zap size={16} className="text-yellow-500" /> },
-                              { name: 'Greggs Holborn', type: 'Bakery & Food', lat: 51.5175, lng: -0.1200, icon: <Utensils size={16} className="text-green-500" /> },
-                              { name: 'Pizza Express Holborn', type: 'Restaurant', lat: 51.5180, lng: -0.1190, icon: <Utensils size={16} className="text-red-500" /> },
-                              { name: 'London Victoria Station', type: 'Transit Hub', lat: 51.4952, lng: -0.1439, icon: <MapPin size={16} className="text-purple-500" /> },
-                              { name: 'Camden Market', type: 'Food & Shops', lat: 51.5415, lng: -0.1456, icon: <MapPin size={16} className="text-emerald-500" /> },
-                            ].filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.type.toLowerCase().includes(searchQuery.toLowerCase())).map(item => (
-                              <button 
-                                key={item.name} 
-                                onClick={() => {
-                                  const targetLoc = { latitude: item.lat, longitude: item.lng };
-                                  setLocation(targetLoc);
-                                  setMapOffset({ x: 0, y: 0 });
-                                  setBusyAreaTarget({ id: item.name, name: item.name, location: targetLoc });
-                                  setIsNavigating(true);
-                                  setIsSearchOpen(false);
-                                  setSearchQuery("");
-                                  addToast("Navigation Started", `Route set to ${item.name}`, "success");
-                                  sendNotification("Navigation Started", `Driving towards ${item.name}`, "success");
-                                }}
-                                className="w-full flex items-center justify-between p-3 hover:bg-gray-100 dark:hover:bg-white/5 rounded-2xl transition-all group text-left border border-transparent hover:border-blue-500/20"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/5 flex items-center justify-center shrink-0">
-                                    {item.icon}
-                                  </div>
-                                  <div>
-                                    <p className="font-bold text-sm leading-snug text-gray-900 dark:text-white group-hover:text-blue-500 transition-colors">{item.name}</p>
-                                    <p className="text-[10px] font-bold text-gray-400">{item.type}</p>
-                                  </div>
-                                </div>
-                                <Navigation size={16} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                      <div className="space-y-4">
+                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Recent Searches</p>
+                        {['Shoreditch', 'Westfield Stratford', 'Soho'].map(item => (
+                          <button key={item} className="w-full flex items-center gap-4 p-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors">
+                            <Clock size={16} className="text-gray-400" />
+                            <span className="font-bold">{item}</span>
+                          </button>
+                        ))}
                       </div>
                     </motion.div>
                   </div>
@@ -17084,19 +16997,12 @@ export default function App() {
                     }
                   })()}
 
-                  {/* Decline & Accept Match Action Buttons */}
-                  <div className="pt-2 shrink-0 flex items-center gap-3">
-                    <button 
-                      onClick={handleDeclineOrder}
-                      className="px-5 py-4 bg-red-600/10 hover:bg-red-600 border border-red-500/30 text-red-500 hover:text-white rounded-2xl font-black text-sm uppercase tracking-wider transition-all active:scale-95 shrink-0 min-h-[58px] flex items-center justify-center gap-1.5"
-                    >
-                      <X size={18} />
-                      <span>Decline</span>
-                    </button>
+                  {/* Large Charcoal/Black Accept Match Button */}
+                  <div className="pt-2 shrink-0">
                     <button 
                       onClick={handleAcceptOrder}
                       disabled={isMatchingLoading || isMatchFailed}
-                      className={`relative flex-1 py-4 active:scale-[0.98] transition-all rounded-2xl font-black text-lg shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden flex items-center justify-center min-h-[58px] ${
+                      className={`relative w-full py-4 active:scale-[0.98] transition-all rounded-2xl font-black text-lg shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden flex items-center justify-center min-h-[58px] ${
                         pendingOrder.brand === 'hyper' 
                           ? 'bg-purple-600 hover:bg-purple-700 text-white hover:text-white' 
                           : 'bg-[#1a1a1a] hover:bg-black text-white hover:text-white'
@@ -17307,19 +17213,12 @@ export default function App() {
                     })()}
                   </div>
 
-                  {/* Decline & Accept Action Buttons section */}
-                  <div className="p-6 pt-2 shrink-0 flex items-center gap-3">
-                    <button 
-                      onClick={handleDeclineOrder}
-                      className="px-6 py-5 bg-red-600/10 hover:bg-red-600 border border-red-500/30 text-red-500 hover:text-white rounded-2xl font-black text-base uppercase tracking-wider transition-all active:scale-95 shrink-0 min-h-[64px] flex items-center justify-center gap-2"
-                    >
-                      <X size={20} />
-                      <span>Decline</span>
-                    </button>
+                  {/* Accept Trigger Button section */}
+                  <div className="p-6 pt-2 shrink-0">
                     <button 
                       onClick={handleAcceptOrder}
                       disabled={isMatchingLoading || isMatchFailed}
-                      className={`relative flex-1 py-5 active:scale-[0.98] transition-all rounded-2xl font-black text-xl overflow-hidden flex items-center justify-center min-h-[64px] ${
+                      className={`relative w-full py-5 active:scale-[0.98] transition-all rounded-2xl font-black text-xl overflow-hidden flex items-center justify-center min-h-[64px] ${
                         pendingOrder.brand === 'hyper'
                           ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-[0_12px_36px_rgba(168,85,247,0.32)] shadow-purple-500/30'
                           : 'bg-[#1a1a1a] hover:bg-black text-white shadow-[0_12px_36px_rgba(0,0,0,0.3)]'
