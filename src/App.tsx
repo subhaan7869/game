@@ -1322,7 +1322,9 @@ const ScheduledOrdersScreen = ({
 
   // Generate a premium offer
   const triggerFreshOffers = (allowEmpty = false) => {
-    if (allowEmpty) {
+    // 40% chance of empty state so prebookings marketplace is dynamic
+    const shouldBeEmpty = allowEmpty || Math.random() < 0.40;
+    if (shouldBeEmpty) {
       setAvailableOffers([]);
       localStorage.setItem('hyper_driver_available_prebookings', JSON.stringify([]));
       setCountdown(60);
@@ -1885,9 +1887,9 @@ const ScheduledOrdersScreen = ({
                       <CalendarX size={32} />
                     </div>
                     <div>
-                      <h3 className="font-extrabold text-base text-white">No Pre-bookings Right Now</h3>
+                      <h3 className="font-black text-lg text-white">Nothing to see here</h3>
                       <p className="text-xs text-gray-400 mt-1 max-w-xs leading-relaxed font-bold">
-                        Pre-bookings in {activeCityKey} update dynamically. Pull down or tap below to check for new rider reservations!
+                        No pre-bookings available right now. Check back soon or pull down to refresh!
                       </p>
                     </div>
                     <button
@@ -1975,10 +1977,10 @@ const ScheduledOrdersScreen = ({
               <div className="space-y-4">
                 {scheduledOrders.length === 0 ? (
                   <div className="flex flex-col items-center justify-center p-12 text-center text-gray-500">
-                    <Calendar size={48} className="mb-4 opacity-20 text-white" />
-                    <p className="font-extrabold text-white">No confirmed pre-bookings yet</p>
-                    <p className="text-xs text-gray-500 mt-1 max-w-xs uppercase leading-relaxed font-bold">
-                      Claim active rider offers on the "Available jobs" marketplace tab to schedule your shifts in advance!
+                    <Calendar size={48} className="mb-4 opacity-20 text-white mx-auto" />
+                    <h3 className="font-black text-lg text-white">Nothing to see here</h3>
+                    <p className="text-xs text-gray-400 mt-1 max-w-xs leading-relaxed font-bold">
+                      You have no claimed pre-bookings right now.
                     </p>
                   </div>
                 ) : (
@@ -8565,10 +8567,7 @@ export default function App() {
   const wakeLockRef = useRef<any>(null);
   const [activeTopTab, setActiveTopTab] = useState<'status' | 'browse' | 'earnings'>('status');
   const [showLastTripCard, setShowLastTripCard] = useState(false);
-  const [scheduledOrders, setScheduledOrders] = useState<ScheduledOrder[]>([
-    { id: 'sch_1', driverUid: 'mock', restaurantName: 'Pizza Express', scheduledTime: new Date(Date.now() + 3600000).toISOString(), status: 'pending', estimatedPay: 12.50 },
-    { id: 'sch_2', driverUid: 'mock', restaurantName: 'Burger King', scheduledTime: new Date(Date.now() + 7200000).toISOString(), status: 'pending', estimatedPay: 8.75 },
-  ]);
+  const [scheduledOrders, setScheduledOrders] = useState<ScheduledOrder[]>([]);
   const [isNewUserFormOpen, setIsNewUserFormOpen] = useState(false);
   const [isPersonalDetailsOpen, setIsPersonalDetailsOpen] = useState(false);
   const [newUserDetails, setNewUserDetails] = useState({ 
@@ -12425,7 +12424,7 @@ export default function App() {
               )}
 
               {/* Floating Music/Radio Controller Overlay */}
-              {user.isOnline && !pendingOrder && (
+              {user.isOnline && !pendingOrder && !isNavigating && (
                 <div className="absolute right-6 bottom-64 z-[2100] flex flex-col items-end gap-3 pointer-events-auto">
                   <AnimatePresence>
                     {isRadioExpanded && (
@@ -12464,7 +12463,7 @@ export default function App() {
               )}
 
               {/* Safety Toolkit Button */}
-              {user.isOnline && !pendingOrder && (
+              {user.isOnline && !pendingOrder && !isNavigating && (
                 <div className="absolute right-6 bottom-48 z-[3550] pointer-events-auto">
                   <button 
                     onClick={() => sendNotification("Safety Toolkit", "Emergency assistance and safety features are active.")}
@@ -12785,7 +12784,7 @@ export default function App() {
                 {/* Navigation Overlay */}
                 <AnimatePresence>
                   {isNavigating && activeOrders.length > 0 && (
-                    <div className="absolute top-0 left-0 right-0 z-[150] flex flex-col gap-3 p-4 pt-12 pointer-events-none">
+                    <div className="absolute top-0 left-0 right-0 z-[150] flex flex-col gap-3 p-3 sm:p-4 pointer-events-none">
                       <motion.div 
                         initial={{ y: -50, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
@@ -12891,27 +12890,6 @@ export default function App() {
                          </motion.div>
                       </div>
                     </div>
-                  )}
-                </AnimatePresence>
-
-                {/* Floating "Back to Normal Map" button during turn-by-turn navigation */}
-                <AnimatePresence>
-                  {isNavigating && (
-                    <motion.div 
-                      key="back-to-normal-map-btn-wrapper"
-                      initial={{ y: 30, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      exit={{ y: 30, opacity: 0 }}
-                      className="absolute bottom-48 sm:bottom-40 left-1/2 -translate-x-1/2 z-[3550] pointer-events-auto"
-                    >
-                      <button
-                        onClick={() => setIsNavigating(false)}
-                        className="px-5 py-2.5 bg-slate-900/95 hover:bg-slate-800 text-white border border-blue-500/50 rounded-full text-xs font-black uppercase tracking-wider shadow-2xl flex items-center gap-2.5 backdrop-blur-md active:scale-95 transition-all cursor-pointer hover:border-blue-400"
-                      >
-                        <MapIcon size={15} className="text-blue-400 animate-pulse" />
-                        <span>Back to Normal Map</span>
-                      </button>
-                    </motion.div>
                   )}
                 </AnimatePresence>
 
