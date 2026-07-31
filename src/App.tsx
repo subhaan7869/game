@@ -26,6 +26,7 @@ import {
   Music,
   ShieldCheck,
   Zap,
+  Flame,
   Star,
   Coffee,
   Camera,
@@ -119,6 +120,7 @@ import SimulatedHomeScreen from './components/SimulatedHomeScreen';
 import { CompanionChat } from './components/CompanionChat';
 import { MultiplayerHub, OtherDriver } from './components/MultiplayerHub';
 import { CommandCentreScreen } from './components/CommandCentreScreen';
+import { OfflineHomeScreen } from './components/OfflineHomeScreen';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
@@ -599,7 +601,7 @@ const Heatmap = ({
  
            return (
              <div 
-               key={`heatmap-glow-${idx}`}
+               key={`heatmap-glow-${area.id || idx}-${idx}`}
                className="absolute pointer-events-none"
                style={{
                  width: size,
@@ -2229,9 +2231,9 @@ const TripPreferencesModal = ({
                 { type: 'Car', icon: <CarIcon size={20} />, label: "Hyper Ride / Eats" },
                 { type: 'Bike', icon: <BikeIcon size={20} />, label: "Eats Only" },
                 { type: 'Scooter', icon: <Zap size={20} />, label: "Eats Only" }
-              ].map(v => (
+              ].map((v, vIdx) => (
                 <button 
-                  key={v.type}
+                  key={`vtype-${v.type}-${vIdx}`}
                   onClick={() => setVehicleType(v.type as any)}
                   className={`p-4 rounded-[32px] flex flex-col items-center gap-2 border-2 transition-all ${vehicleType === v.type ? 'border-blue-500 bg-blue-500/10 text-blue-500 shadow-lg shadow-blue-500/10' : 'border-transparent bg-gray-50 dark:bg-white/5 text-gray-400'}`}
                 >
@@ -2249,8 +2251,8 @@ const TripPreferencesModal = ({
           <div>
             <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Earning Method</p>
             <div className="space-y-4">
-              {services.map(s => (
-                <div key={s.id} className="relative">
+              {services.map((s, sIdx) => (
+                <div key={`svc-select-${s.id}-${sIdx}`} className="relative">
                   <button 
                     disabled={s.disabled}
                     onClick={() => toggleService(s.id as JobType)}
@@ -2349,11 +2351,11 @@ const TripPreferencesModal = ({
                   badgeColor: 'bg-red-600/10 text-red-500 border border-red-600/20',
                   icon: <ShieldCheck size={16} className="text-red-500" />
                 }
-              ].map(srv => {
+              ].map((srv, srvIdx) => {
                 const isEnabled = enabledServices.includes(srv.id);
                 return (
                   <div 
-                    key={srv.id}
+                    key={`srv-setting-${srv.id}-${srvIdx}`}
                     className={`p-4 rounded-[24px] border transition-all flex items-center justify-between gap-3 ${
                       isEnabled 
                         ? theme === 'dark' ? 'bg-blue-600/10 border-blue-600/30' : 'bg-blue-50/50 border-blue-100'
@@ -4143,11 +4145,11 @@ const VehicleDetailsScreen = ({
                   price: 450,
                   icon: <ShieldCheck size={22} className="text-purple-500" />
                 }
-              ].map(tuning => {
+              ].map((tuning, tIdx) => {
                 const isBought = purchasedUpgrades.includes(tuning.id);
                 return (
                   <div 
-                    key={tuning.id} 
+                    key={`tuning-item-${tuning.id}-${tIdx}`} 
                     className={`p-6 rounded-[28px] border-2 flex flex-col justify-between ${
                       isBought 
                         ? (theme === 'dark' ? 'bg-blue-600/10 border-blue-600/30' : 'bg-blue-50/50 border-blue-400')
@@ -4623,8 +4625,8 @@ const PaymentMethodsScreen = ({
               { id: 'tx-2', date: 'Yesterday', amount: 45.20, type: 'earnings', title: 'Dual Dispatch Driver Earnings Settled', ref: 'FPS-831902-DRV', bank: 'Monzo' },
               { id: 'tx-1', date: '3 days ago', amount: -65.00, type: 'payout', title: 'Faster Payments Payout', ref: 'FPS-491932-DRV', bank: 'Barclays' },
               { id: 'tx-3', date: '5 days ago', amount: 38.50, type: 'earnings', title: 'Dual Dispatch Driver Earnings Settled', ref: 'FPS-193021-DRV', bank: 'Monzo' },
-            ].map(tx => (
-              <div key={tx.id} className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+            ].map((tx, txIdx) => (
+              <div key={`payout-statement-${tx.id}-${txIdx}`} className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                 <div>
                   <p className="font-bold text-sm text-gray-900">{tx.title}</p>
                   <p className="text-[10px] text-gray-400 font-bold mt-0.5">{tx.date} • Ref: {tx.ref} • {tx.bank}</p>
@@ -5064,9 +5066,9 @@ const InsuranceScreen = ({
         <section>
           <h3 className="font-black text-xs uppercase tracking-[0.2em] mb-4 text-gray-400 px-2">Choose Protection Type</h3>
           <div className="space-y-3">
-            {plans.map(plan => (
+            {plans.map((plan, pIdx) => (
               <button 
-                key={plan.id}
+                key={`plan-option-${plan.id}-${pIdx}`}
                 onClick={() => setSelectedPlan(plan.id as any)}
                 className={`w-full p-6 rounded-[32px] border-4 text-left transition-all flex items-center justify-between ${selectedPlan === plan.id ? 'border-blue-600 bg-blue-50' : 'border-white bg-white shadow-sm'}`}
               >
@@ -5797,12 +5799,12 @@ const AirportQueuesScreen = ({
 
       {/* Airport Chips row */}
       <div className="flex gap-2 mb-6 overflow-x-auto py-1 scrollbar-none">
-        {airports.map((airport) => {
+        {airports.map((airport, aIdx) => {
           const isActive = selectedAirportId === airport.id;
           const isUserInThis = joinedAirportId === airport.id;
           return (
             <button
-              key={airport.id}
+              key={`airport-chip-${airport.id}-${aIdx}`}
               onClick={() => setSelectedAirportId(airport.id)}
               className={`px-4 py-3 rounded-2xl flex items-center gap-2 font-black text-xs uppercase tracking-widest whitespace-nowrap transition-all border shrink-0 ${
                 isActive 
@@ -8207,6 +8209,7 @@ export default function App() {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   
   const [isBottomMenuOpen, setIsBottomMenuOpen] = useState(false);
+  const [isOfflineHomeSheetOpen, setIsOfflineHomeSheetOpen] = useState(false);
   const [heading, setHeading] = useState(0);
   const [isDestFilterOpen, setIsDestFilterOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -11967,9 +11970,9 @@ export default function App() {
         {/* In-App Toasts */}
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-[400px] px-4 pointer-events-none flex flex-col items-center gap-3">
           <AnimatePresence>
-            {toasts.map(toast => (
+            {toasts.map((toast, tIdx) => (
               <motion.div 
-                key={toast.id}
+                key={`toast-${toast.id || tIdx}-${tIdx}`}
                 layout
                 initial={{ y: -80, opacity: 0, scale: 0.8 }}
                 animate={{ y: 0, opacity: 1, scale: 1 }}
@@ -12926,7 +12929,7 @@ export default function App() {
 
                   return (
                     <motion.div
-                      key={`surge-zone-${i}`}
+                      key={`surge-zone-${area.id || i}-${i}`}
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ 
                         opacity: [0.1, 0.2, 0.1],
@@ -12974,6 +12977,82 @@ export default function App() {
                     />
                   );
                 })}
+
+                {/* Map Wait-Time Badges and Airport Queue Pill Overlay */}
+                {mapCoreMode === 'cyber' && location && (
+                  <>
+                    {[
+                      { id: 'wt-1', label: '1–13 min', area: 'Central Zone', latOff: 0.012, lngOff: -0.018, type: 'red' },
+                      { id: 'wt-2', label: '3–18 min', area: 'Business District', latOff: 0.022, lngOff: 0.032, type: 'red' },
+                      { id: 'wt-3', label: '2–21 min', area: 'West End', latOff: -0.015, lngOff: -0.025, type: 'orange' },
+                      { id: 'wt-4', label: '1–20 min', area: 'Mayfair', latOff: -0.028, lngOff: 0.012, type: 'orange' },
+                      { id: 'wt-5', label: '1–9 min', area: 'Kensington', latOff: 0.035, lngOff: -0.042, type: 'red' },
+                      { id: 'wt-6', label: '1–12 min', area: 'Civic Center', latOff: 0.005, lngOff: -0.005, type: 'red' },
+                      { id: 'wt-7', label: '1–17 min', area: 'Bayside / South', latOff: -0.038, lngOff: -0.048, type: 'red' },
+                      { id: 'wt-8', label: '1–14 min', area: 'East Dock', latOff: -0.042, lngOff: 0.025, type: 'red' },
+                    ].map((item) => {
+                      const pinLat = location.latitude + item.latOff;
+                      const pinLng = location.longitude + item.lngOff;
+                      const x = (pinLng - location.longitude) * MAP_SCALE + mapOffset.x;
+                      const y = (location.latitude - pinLat) * MAP_SCALE + mapOffset.y;
+                      const bgClass = item.type === 'red' ? 'bg-red-600 text-white' : 'bg-orange-500 text-white';
+
+                      return (
+                        <motion.div
+                          key={`map-waittime-badge-${item.id}`}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sendNotification("Demand Zone", `${item.area}: Estimated waiting time ${item.label}`);
+                          }}
+                          className={`absolute cursor-pointer pointer-events-auto z-[250] ${bgClass} px-2.5 py-1 rounded-full text-[10px] font-black shadow-lg flex items-center gap-1 border border-white/80 active:scale-90 transition-transform`}
+                          style={{
+                            left: '50%',
+                            top: '50%',
+                            transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`
+                          }}
+                        >
+                          <Flame size={10} className="fill-white shrink-0" />
+                          <span className="whitespace-nowrap">{item.label}</span>
+                        </motion.div>
+                      );
+                    })}
+
+                    {/* Airport Queue Pill Badge on Map */}
+                    {(() => {
+                      const airportName = (activeCityKey as string) === 'Los Angeles' ? 'BUR Airport Queue' : 'LHR Airport Queue';
+                      const pinLat = location.latitude + 0.045;
+                      const pinLng = location.longitude - 0.055;
+                      const x = (pinLng - location.longitude) * MAP_SCALE + mapOffset.x;
+                      const y = (location.latitude - pinLat) * MAP_SCALE + mapOffset.y;
+
+                      return (
+                        <motion.div
+                          key="airport-queue-map-badge"
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCurrentScreen('airport_queues');
+                          }}
+                          className="absolute cursor-pointer pointer-events-auto z-[260] bg-[#1f52e3] text-white px-3 py-1.5 rounded-full text-xs font-black shadow-xl flex items-center gap-1.5 border-[2px] border-white active:scale-95 transition-transform"
+                          style={{
+                            left: '50%',
+                            top: '50%',
+                            transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`
+                          }}
+                        >
+                          <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center font-bold text-[9px]">P</div>
+                          <span className="whitespace-nowrap font-black">{airportName}</span>
+                          <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full font-mono font-bold">32</span>
+                        </motion.div>
+                      );
+                    })()}
+                  </>
+                )}
 
                 {/* Mock Restaurants (Busy Map) */}
                 {mapCoreMode === 'cyber' && location && activeRestaurants.map((rest, i) => {
@@ -13095,13 +13174,13 @@ export default function App() {
                 {mapCoreMode === 'cyber' && (
                   <>
                     {/* Markers for other Online Drivers */}
-                    {location && otherOnlineDrivers && otherOnlineDrivers.map((dr) => {
+                    {location && otherOnlineDrivers && otherOnlineDrivers.map((dr, drIdx) => {
                       if (!dr.latitude || !dr.longitude) return null;
                       const x = (dr.longitude - location.longitude) * MAP_SCALE + (mapOffset.x || 0);
                       const y = (location.latitude - dr.latitude) * MAP_SCALE + (mapOffset.y || 0);
                       return (
                         <motion.div 
-                          key={`cyber-rival-${dr.uid}`}
+                          key={`cyber-rival-${dr.uid || drIdx}-${drIdx}`}
                           className="absolute z-[215]"
                           animate={{ 
                             left: (centerX || window.innerWidth/2) + x,
@@ -13234,7 +13313,7 @@ export default function App() {
                           const y = (location.latitude - pin.loc.latitude) * MAP_SCALE + (mapOffset.y || 0);
                           return (
                             <motion.div
-                              key={`pending-pin-${pidx}`}
+                              key={`pending-pin-${pendingOrder.id || 'ord'}-${pidx}`}
                               initial={{ scale: 0, opacity: 0 }}
                               animate={{ scale: 1, opacity: 1 }}
                               className="absolute flex flex-col items-center"
@@ -13432,7 +13511,7 @@ export default function App() {
                             const y = (location.latitude - target.latitude) * MAP_SCALE + mapOffset.y;
                             return (
                               <motion.div 
-                                key={`pending-${i}`}
+                                key={`pending-marker-${pendingOrder.id || 'ord'}-${i}`}
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
                                 className="absolute transition-transform duration-1000 pointer-events-none" 
@@ -13549,9 +13628,9 @@ export default function App() {
                           { id: 'airports', label: '✈️ Airports & Rails' },
                           { id: 'surge', label: '🔥 High Surge' },
                           { id: 'food', label: '🍔 Dining & Clubs' }
-                        ].map((cat) => (
+                        ].map((cat, cIdx) => (
                           <button
-                            key={cat.id}
+                            key={`cat-chip-${cat.id}-${cIdx}`}
                             onClick={() => setSearchCategory(cat.id as any)}
                             className={`px-3 py-1.5 rounded-xl font-black text-xs whitespace-nowrap transition-all border ${
                               searchCategory === cat.id
@@ -13600,9 +13679,9 @@ export default function App() {
                             );
                           }
 
-                          return filtered.map(spot => (
+                          return filtered.map((spot, sIdx) => (
                             <button
-                              key={spot.id}
+                              key={`hotspot-res-${spot.id}-${sIdx}`}
                               onClick={() => {
                                 // Navigate location to spot
                                 if (spot.coords) {
@@ -14177,7 +14256,7 @@ export default function App() {
                       animate={{ y: 0 }}
                       className="w-full bg-white border-t border-gray-100 shadow-[0_-10px_40px_rgba(0,0,0,0.12)] rounded-t-[32px] py-6 px-8 flex items-center justify-between pointer-events-auto cursor-pointer"
                       onClick={() => {
-                        setCurrentScreen('trip_preferences');
+                        setIsOfflineHomeSheetOpen(true);
                       }}
                     >
                       <button className="p-1.5 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center">
@@ -14190,12 +14269,70 @@ export default function App() {
                         </p>
                       </div>
                       
-                      <button className="p-1.5 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentScreen('trip_preferences');
+                        }}
+                        className="p-1.5 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center"
+                      >
                         <List size={24} strokeWidth={3} className="text-black" />
                       </button>
                     </motion.div>
                   </div>
                 )}
+
+                {/* Offline Home Sheet Drawer Overlay */}
+                <AnimatePresence>
+                  {!user.isOnline && isOfflineHomeSheetOpen && (
+                    <div className="absolute inset-0 z-[4800] pointer-events-auto flex flex-col justify-end bg-black/40 backdrop-blur-xs">
+                      <motion.div
+                        initial={{ y: "100%" }}
+                        animate={{ y: 0 }}
+                        exit={{ y: "100%" }}
+                        transition={{ type: "spring", damping: 28, stiffness: 280 }}
+                        className="w-full h-[92%] bg-white rounded-t-[36px] overflow-hidden flex flex-col relative shadow-2xl"
+                      >
+                        {/* Close bar / Handle */}
+                        <div 
+                          onClick={() => setIsOfflineHomeSheetOpen(false)}
+                          className="w-full py-2.5 flex justify-center items-center cursor-pointer bg-white shrink-0 border-b border-gray-100"
+                        >
+                          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
+                        </div>
+
+                        {/* Offline Home Screen Content */}
+                        <div className="flex-1 overflow-hidden">
+                          <OfflineHomeScreen
+                            user={user}
+                            activeCityKey={activeCityKey}
+                            onGoOnline={() => {
+                              setIsOfflineHomeSheetOpen(false);
+                              handleGoOnline();
+                            }}
+                            onOpenPreferences={() => {
+                              setIsOfflineHomeSheetOpen(false);
+                              setCurrentScreen('trip_preferences');
+                            }}
+                            onOpenOpportunities={() => {
+                              setIsOfflineHomeSheetOpen(false);
+                              setCurrentScreen('opportunities');
+                            }}
+                            onOpenSafetyToolkit={() => {
+                              setIsOfflineHomeSheetOpen(false);
+                              setIsSafetyToolkitOpen(true);
+                            }}
+                            onOpenSearch={() => {
+                              setIsOfflineHomeSheetOpen(false);
+                              setIsSearchOpen(true);
+                            }}
+                            theme={theme}
+                          />
+                        </div>
+                      </motion.div>
+                    </div>
+                  )}
+                </AnimatePresence>
               </>
             )}
 
@@ -14431,9 +14568,9 @@ export default function App() {
                                 <div className="flex items-center justify-between mb-4 px-2">
                                   <h2 className="text-2xl font-black tracking-tighter uppercase italic">Active Operations</h2>
                                   <div className={`flex p-1 rounded-xl ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'}`}>
-                                    {(['all', 'accepted', 'picked_up'] as const).map((f) => (
+                                    {(['all', 'accepted', 'picked_up'] as const).map((f, fIdx) => (
                                       <button
-                                        key={f}
+                                        key={`active-filter-${f}-${fIdx}`}
                                         onClick={(e) => { e.stopPropagation(); setOrderStatusFilter(f); }}
                                         className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
                                           orderStatusFilter === f 
@@ -14932,7 +15069,7 @@ export default function App() {
 
                   return (
                     <motion.div 
-                      key={msg.id || `msg-${i}`} 
+                      key={`chat-msg-${msg.id || i}-${i}`} 
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       className={`flex ${msg.sender === 'driver' ? 'justify-end' : 'justify-start'}`}
@@ -15060,9 +15197,9 @@ export default function App() {
                       { id: 'both', label: 'All Jobs', desc: 'Matching & Normal deliveries' },
                       { id: 'matching', label: 'Matching Only', desc: 'Only high-value matching jobs' },
                       { id: 'normal', label: 'Normal Only', desc: 'Standard delivery requests' }
-                    ].map(pref => (
+                    ].map((pref, pIdx) => (
                       <button
-                        key={pref.id}
+                        key={`pref-trip-${pref.id}-${pIdx}`}
                         onClick={() => {
                           setJobTypePreference(pref.id as any);
                           localStorage.setItem('hyper_driver_job_preference', pref.id);
@@ -15116,9 +15253,9 @@ export default function App() {
                         { label: '£5.00', val: 5.00 },
                         { label: '£10.00', val: 10.00 },
                         { label: '£15.00', val: 15.00 }
-                      ].map(preset => (
+                      ].map((preset, pIdx) => (
                         <button
-                          key={preset.val}
+                          key={`preset-val-${preset.val}-${pIdx}`}
                           onClick={() => {
                             setTargetPrice(preset.val);
                             sendNotification("Target Price Updated", `Minimum order limit set to £${preset.val.toFixed(2)}`);
@@ -15239,11 +15376,11 @@ export default function App() {
                         badgeColor: 'bg-red-600/10 text-red-500 border border-red-600/20',
                         icon: <ShieldCheck size={18} className="text-red-500" />
                       }
-                    ].map(srv => {
+                    ].map((srv, sIdx) => {
                       const isEnabled = enabledServices.includes(srv.id);
                       return (
                         <div 
-                          key={srv.id}
+                          key={`pro-srv-${srv.id}-${sIdx}`}
                           className={`p-4 rounded-2xl border transition-all flex items-start justify-between gap-3 ${
                             isEnabled 
                               ? theme === 'dark' ? 'bg-blue-600/10 border-blue-600/40 text-white' : 'bg-blue-50/50 border-blue-100 text-blue-900'
@@ -16174,10 +16311,10 @@ export default function App() {
                     { id: 'ebike', name: 'Electric Delivery Bike', price: 1200.00, icon: <Zap /> },
                     { id: 'iphone', name: 'iPhone 15 Pro', price: 999.00, icon: <Smartphone /> },
                     { id: 'tesla', name: 'Tesla Model 3', price: 35000.00, icon: <Zap /> },
-                  ].map((item) => {
+                  ].map((item, iIdx) => {
                     const isOwned = purchasedItems.includes(item.id);
                     return (
-                      <div key={item.id} className="bg-white p-4 rounded-3xl shadow-sm flex items-center justify-between">
+                      <div key={`shop-item-${item.id}-${iIdx}`} className="bg-white p-4 rounded-3xl shadow-sm flex items-center justify-between">
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-blue-600">
                             {item.icon}
@@ -16574,9 +16711,9 @@ export default function App() {
                       { id: 'both', label: 'All Jobs', desc: 'Normal & Matching' },
                       { id: 'normal', label: 'Normal Only', desc: 'No stacked orders' },
                       { id: 'matching', label: 'Matching Only', desc: 'Only stacked orders' }
-                    ].map((pref) => (
+                    ].map((pref, pIdx) => (
                       <button
-                        key={pref.id}
+                        key={`pref-acc-${pref.id}-${pIdx}`}
                         onClick={() => {
                           setJobTypePreference(pref.id as any);
                           sendNotification("Preference Updated", `Now receiving ${pref.label}`);
@@ -17965,9 +18102,9 @@ const DebugMonitorView = ({
             {/* Log filter bar */}
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-between mb-4 pb-4 border-b border-white/5">
               <div className="flex items-center gap-1.5 flex-wrap">
-                {['all', 'info', 'warn', 'error', 'success'].map((f: any) => (
+                {['all', 'info', 'warn', 'error', 'success'].map((f: any, fIdx: number) => (
                   <button
-                    key={f}
+                    key={`log-filter-${f}-${fIdx}`}
                     onClick={() => setLogFilter(f)}
                     className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest font-mono border outline-none ${
                       logFilter === f 
@@ -18000,14 +18137,14 @@ const DebugMonitorView = ({
                   <p className="text-[10px] lowercase mt-1 text-gray-500">Wait for actions or tap mock log buttons to inspect events</p>
                 </div>
               ) : (
-                filteredLogs.map((log: any) => {
+                filteredLogs.map((log: any, lIdx: number) => {
                   let colorClass = 'text-cyan-400/90';
                   if (log.type === 'warn') colorClass = 'text-amber-400';
                   if (log.type === 'error') colorClass = 'text-rose-500 font-bold';
                   if (log.type === 'success') colorClass = 'text-emerald-400';
                   
                   return (
-                    <div key={log.id} className="border-b border-white/5 pb-1.5 flex items-start gap-2.5">
+                    <div key={`debug-log-${log.id || lIdx}-${lIdx}`} className="border-b border-white/5 pb-1.5 flex items-start gap-2.5">
                       <span className="text-gray-605 shrink-0 select-none text-slate-500">[{log.timestamp.toLocaleTimeString()}]</span>
                       <span className={`uppercase font-extrabold tracking-widest text-[9px] px-1.5 py-0.5 rounded shrink-0 ${
                         log.type === 'error' ? 'bg-rose-500/10 text-rose-500' :
@@ -19331,7 +19468,7 @@ export const InsuranceRenewalChat = ({
 
         {renewalMessages.map((msg, idx) => (
           <motion.div 
-            key={msg.id || `renewal-${idx}`} 
+            key={`renewal-msg-${msg.id || idx}-${idx}`} 
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             className={`flex ${msg.sender === 'driver' ? 'justify-end' : 'justify-start'} mb-4`}

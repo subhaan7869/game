@@ -621,7 +621,7 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
         <div className="flex gap-2 p-1.5 bg-black/40 rounded-2xl overflow-x-auto select-none no-scrollbar">
           {PLAYLIST.map((item, idx) => (
             <button
-              key={item.id}
+              key={`media-track-${item.id || idx}-${idx}`}
               onClick={() => setCurrentTrackIndex(idx)}
               className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider shrink-0 transition-all ${
                 idx === currentTrackIndex 

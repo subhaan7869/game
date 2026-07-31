@@ -841,9 +841,9 @@ export const CommandCentreScreen: React.FC<CommandCentreScreenProps> = ({
               </form>
             ) : (
               <div className="space-y-2 text-left max-h-[195px] overflow-y-auto no-scrollbar">
-                {incidents.map((inc) => (
+                {incidents.map((inc, idx) => (
                   <div 
-                    key={inc.id}
+                    key={`inc-${inc.id || idx}-${idx}`}
                     className="p-3 bg-neutral-950 border border-neutral-850 rounded-xl flex items-start gap-3"
                   >
                     <div className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
