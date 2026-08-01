@@ -28,6 +28,7 @@ interface OfflineHomeScreenProps {
   onOpenSafetyToolkit: () => void;
   onOpenSearch: () => void;
   onOpenLayers?: () => void;
+  onOpenMap?: () => void;
   activeSurgeAreas?: any[];
   theme?: 'light' | 'dark';
 }
@@ -41,6 +42,7 @@ export const OfflineHomeScreen: React.FC<OfflineHomeScreenProps> = ({
   onOpenSafetyToolkit,
   onOpenSearch,
   onOpenLayers,
+  onOpenMap,
   activeSurgeAreas = [],
   theme = 'light'
 }) => {
@@ -105,7 +107,13 @@ export const OfflineHomeScreen: React.FC<OfflineHomeScreenProps> = ({
         </div>
 
         {/* 2. Mini Map Preview Card */}
-        <div className="relative w-full rounded-3xl overflow-hidden border border-gray-200 shadow-md bg-neutral-900 min-h-[220px] flex flex-col justify-between p-4 group">
+        <div 
+          onClick={() => {
+            if (onOpenMap) onOpenMap();
+            else onGoOnline();
+          }}
+          className="relative w-full rounded-3xl overflow-hidden border border-gray-200 shadow-md bg-neutral-900 min-h-[220px] flex flex-col justify-between p-4 group cursor-pointer hover:shadow-lg transition-all active:scale-[0.99]"
+        >
           {/* Simulated Map Background Canvas styling */}
           <div className="absolute inset-0 bg-[#e5e3df] opacity-95">
             {/* Grid street outlines */}

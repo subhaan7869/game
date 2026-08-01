@@ -8210,6 +8210,7 @@ export default function App() {
   
   const [isBottomMenuOpen, setIsBottomMenuOpen] = useState(false);
   const [isOfflineHomeSheetOpen, setIsOfflineHomeSheetOpen] = useState(false);
+  const [showFullMap, setShowFullMap] = useState(false);
   const [heading, setHeading] = useState(0);
   const [isDestFilterOpen, setIsDestFilterOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -11222,6 +11223,7 @@ export default function App() {
 
   const startShift = () => {
     setUser(u => ({ ...u, isOnline: true }));
+    setShowFullMap(true);
     setUberOnline(true);
     setHyperOnline(true);
     setIsOnBreak(false);
@@ -11252,6 +11254,7 @@ export default function App() {
 
   const endShift = () => {
     setUser(u => ({ ...u, isOnline: false }));
+    setShowFullMap(false);
     setUberOnline(false);
     setHyperOnline(false);
     setIsOnBreak(false);
@@ -12241,8 +12244,29 @@ export default function App() {
           )}
 
           {currentScreen === 'home' && (
-            <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
-              {/* Main Map Backdrop */}
+            <div className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
+              {!user.isOnline && !showFullMap ? (
+                <motion.div key="offline-home-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-white">
+                  <OfflineHomeScreen
+                    user={user}
+                    activeCityKey={activeCityKey}
+                    onGoOnline={() => {
+                      handleGoOnline();
+                      setShowFullMap(true);
+                    }}
+                    onOpenPreferences={() => setCurrentScreen('trip_preferences')}
+                    onOpenOpportunities={() => setCurrentScreen('opportunities')}
+                    onOpenSafetyToolkit={() => setIsSafetyToolkitOpen(true)}
+                    onOpenSearch={() => setIsSearchOpen(true)}
+                    onOpenLayers={() => setCurrentScreen('trip_preferences')}
+                    onOpenMap={() => setShowFullMap(true)}
+                    theme={theme}
+                    activeSurgeAreas={activeSurgeAreas}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
+                  {/* Main Map Backdrop */}
               <div className="h-full w-full absolute inset-0 transition-all duration-500">
                 {mapCoreMode === 'google' ? (
                   <InteractiveMap
@@ -14221,10 +14245,9 @@ export default function App() {
                   </motion.div>
                 </div>
               )}
-
-              </div>
-            ) : (
-              <>
+            </div>
+          ) : (
+            <>
                 {/* Center Floating GO Button */}
                 {!isBottomMenuOpen && (
                   <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-[4500] pointer-events-auto flex flex-col items-center">
@@ -14256,11 +14279,18 @@ export default function App() {
                       animate={{ y: 0 }}
                       className="w-full bg-white border-t border-gray-100 shadow-[0_-10px_40px_rgba(0,0,0,0.12)] rounded-t-[32px] py-6 px-8 flex items-center justify-between pointer-events-auto cursor-pointer"
                       onClick={() => {
-                        setIsOfflineHomeSheetOpen(true);
+                        setShowFullMap(false);
                       }}
                     >
-                      <button className="p-1.5 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center">
-                        <ChevronUp size={24} strokeWidth={3} className="text-black" />
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowFullMap(false);
+                        }}
+                        className="p-1.5 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center"
+                        title="Back to main screen"
+                      >
+                        <ChevronUp size={24} strokeWidth={3} className="text-black rotate-180" />
                       </button>
                       
                       <div className="text-center flex-1">
@@ -14281,58 +14311,6 @@ export default function App() {
                     </motion.div>
                   </div>
                 )}
-
-                {/* Offline Home Sheet Drawer Overlay */}
-                <AnimatePresence>
-                  {!user.isOnline && isOfflineHomeSheetOpen && (
-                    <div className="absolute inset-0 z-[4800] pointer-events-auto flex flex-col justify-end bg-black/40 backdrop-blur-xs">
-                      <motion.div
-                        initial={{ y: "100%" }}
-                        animate={{ y: 0 }}
-                        exit={{ y: "100%" }}
-                        transition={{ type: "spring", damping: 28, stiffness: 280 }}
-                        className="w-full h-[92%] bg-white rounded-t-[36px] overflow-hidden flex flex-col relative shadow-2xl"
-                      >
-                        {/* Close bar / Handle */}
-                        <div 
-                          onClick={() => setIsOfflineHomeSheetOpen(false)}
-                          className="w-full py-2.5 flex justify-center items-center cursor-pointer bg-white shrink-0 border-b border-gray-100"
-                        >
-                          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
-                        </div>
-
-                        {/* Offline Home Screen Content */}
-                        <div className="flex-1 overflow-hidden">
-                          <OfflineHomeScreen
-                            user={user}
-                            activeCityKey={activeCityKey}
-                            onGoOnline={() => {
-                              setIsOfflineHomeSheetOpen(false);
-                              handleGoOnline();
-                            }}
-                            onOpenPreferences={() => {
-                              setIsOfflineHomeSheetOpen(false);
-                              setCurrentScreen('trip_preferences');
-                            }}
-                            onOpenOpportunities={() => {
-                              setIsOfflineHomeSheetOpen(false);
-                              setCurrentScreen('opportunities');
-                            }}
-                            onOpenSafetyToolkit={() => {
-                              setIsOfflineHomeSheetOpen(false);
-                              setIsSafetyToolkitOpen(true);
-                            }}
-                            onOpenSearch={() => {
-                              setIsOfflineHomeSheetOpen(false);
-                              setIsSearchOpen(true);
-                            }}
-                            theme={theme}
-                          />
-                        </div>
-                      </motion.div>
-                    </div>
-                  )}
-                </AnimatePresence>
               </>
             )}
 
@@ -15004,6 +14982,8 @@ export default function App() {
               </AnimatePresence>
             </motion.div>
           )}
+        </div>
+      )}
 
           <AnimatePresence>
             {currentScreen === 'multiplayer_hub' && (
@@ -17609,7 +17589,18 @@ export default function App() {
       {/* Bottom Nav */}
       {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && !isOffAppSimulated && !pendingOrder && (
         <div className="h-20 bg-[#0c0c0d] border-t border-white/5 flex items-center justify-around px-2 z-[2000] shrink-0 relative pb-4 shadow-2xl">
-          <NavButton active={currentScreen === 'home'} onClick={() => setCurrentScreen('home')} icon={<Navigation size={22} />} label="Home" badgeCount={activeOrders.length > 0 ? activeOrders.length : undefined} />
+          <NavButton 
+            active={currentScreen === 'home'} 
+            onClick={() => {
+              setCurrentScreen('home');
+              if (!user.isOnline) {
+                setShowFullMap(false);
+              }
+            }} 
+            icon={<Navigation size={22} />} 
+            label="Home" 
+            badgeCount={activeOrders.length > 0 ? activeOrders.length : undefined} 
+          />
           <NavButton 
             active={isBottomMenuOpen || currentScreen === 'trip_history'} 
             onClick={() => {
