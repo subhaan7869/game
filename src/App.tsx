@@ -7924,6 +7924,9 @@ export default function App() {
   }, []);
 
   const [mapCoreMode, setMapCoreMode] = useState<'cyber' | 'google'>('cyber');
+  const [navigationApp, setNavigationApp] = useState<'google' | 'waze' | 'apple' | 'cyber'>('google');
+  const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
+  const [isSpeechEnabled, setIsSpeechEnabled] = useState(true);
 
   const insuranceExpiry = user.documentExpiries?.["Vehicle Insurance"];
   const insuranceDaysLeft = useMemo(() => {
@@ -9759,12 +9762,31 @@ export default function App() {
 
   const [toasts, setToasts] = useState<{ id: string, title: string, body: string, type?: 'info' | 'success' | 'alert' | 'message' }[]>([]);
 
+  const speakNotification = (text: string) => {
+    if (!isSpeechEnabled) return;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+        const cleanText = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.rate = 1.05;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn("Speech synthesis error:", e);
+      }
+    }
+  };
+
   const addToast = (title: string, body: string, type: 'info' | 'success' | 'alert' | 'message' = 'info') => {
     const id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
     setToasts(prev => [{ id, title, body, type }, ...prev.slice(0, 3)]); // Keep max 4
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 5000);
+
+    speakNotification(`${title}. ${body}`);
   };
 
   const lastNoteRef = useRef<{ title: string, body: string, time: number } | null>(null);
@@ -9983,10 +10005,10 @@ export default function App() {
     demand: 'Low' | 'Medium' | 'High';
     periodId?: string;
   }[]>([
-    { id: '1', name: "Shoreditch", lat: 0.005, lng: 0.005, radius: 0.008, multiplier: 2.1, trend: 'stable', demand: 'High' },
-    { id: '2', name: "Soho", lat: -0.005, lng: -0.008, radius: 0.006, multiplier: 1.5, trend: 'rising', demand: 'Medium' },
-    { id: '3', name: "King's Cross", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.1, trend: 'falling', demand: 'Low' },
-    { id: 'fake_busy_area', name: "Piccadilly Hub (Fake Hotspot)", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising', demand: 'High' }
+    { id: 'shoreditch', name: "Shoreditch", lat: 0.005, lng: 0.005, radius: 0.008, multiplier: 2.1, trend: 'stable', demand: 'High' },
+    { id: 'soho', name: "Soho", lat: -0.005, lng: -0.008, radius: 0.006, multiplier: 1.5, trend: 'rising', demand: 'Medium' },
+    { id: 'kings_cross', name: "King's Cross", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.1, trend: 'falling', demand: 'Low' },
+    { id: 'piccadilly_hotspot', name: "Piccadilly Hub (Fake Hotspot)", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising', demand: 'High' }
   ]);
 
   // Synchronously update active surge areas parameters on peak periods simulation and service preference changes
@@ -9999,26 +10021,26 @@ export default function App() {
     if (hasRide && !hasDelivery) {
       // Taxi (Rideshare) only hotspots
       areas = [
-        { id: '1', name: "Central Station Hub", lat: 0.006, lng: -0.004, radius: 0.008, multiplier: 2.1, trend: 'stable' as const, demand: 'High' as const },
-        { id: '2', name: "Financial District & Hotels", lat: -0.004, lng: 0.008, radius: 0.007, multiplier: 1.8, trend: 'rising' as const, demand: 'High' as const },
-        { id: '3', name: "Downtown Clubbing & Bar District", lat: -0.008, lng: -0.006, radius: 0.009, multiplier: 2.5, trend: 'stable' as const, demand: 'High' as const },
-        { id: 'fake_busy_area', name: "Airport Express Terminal", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising' as const, demand: 'High' as const }
+        { id: 'taxi_central', name: "Central Station Hub", lat: 0.006, lng: -0.004, radius: 0.008, multiplier: 2.1, trend: 'stable' as const, demand: 'High' as const },
+        { id: 'taxi_financial', name: "Financial District & Hotels", lat: -0.004, lng: 0.008, radius: 0.007, multiplier: 1.8, trend: 'rising' as const, demand: 'High' as const },
+        { id: 'taxi_downtown', name: "Downtown Clubbing & Bar District", lat: -0.008, lng: -0.006, radius: 0.009, multiplier: 2.5, trend: 'stable' as const, demand: 'High' as const },
+        { id: 'taxi_airport', name: "Airport Express Terminal", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising' as const, demand: 'High' as const }
       ];
     } else if (hasDelivery && !hasRide) {
       // Eats (Courier / Delivery) only hotspots
       areas = [
-        { id: '1', name: "High Street Food Quarter", lat: 0.005, lng: 0.005, radius: 0.008, multiplier: 2.0, trend: 'stable' as const, demand: 'High' as const },
-        { id: '2', name: "Soho Restaurant Row", lat: -0.005, lng: -0.008, radius: 0.006, multiplier: 1.7, trend: 'rising' as const, demand: 'Medium' as const },
-        { id: '3', name: "Local Dessert & Pizza Zone", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.3, trend: 'stable' as const, demand: 'Low' as const },
-        { id: 'fake_busy_area', name: "Bento & Sushi Food Court", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising' as const, demand: 'High' as const }
+        { id: 'del_highst', name: "High Street Food Quarter", lat: 0.005, lng: 0.005, radius: 0.008, multiplier: 2.0, trend: 'stable' as const, demand: 'High' as const },
+        { id: 'del_soho', name: "Soho Restaurant Row", lat: -0.005, lng: -0.008, radius: 0.006, multiplier: 1.7, trend: 'rising' as const, demand: 'Medium' as const },
+        { id: 'del_pizza', name: "Local Dessert & Pizza Zone", lat: 0.01, lng: -0.005, radius: 0.007, multiplier: 1.3, trend: 'stable' as const, demand: 'Low' as const },
+        { id: 'del_bento', name: "Bento & Sushi Food Court", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising' as const, demand: 'High' as const }
       ];
     } else {
       // Blended Both or default
       areas = [
-        { id: '1', name: "Central Station & Dining Plaza", lat: 0.006, lng: -0.004, radius: 0.008, multiplier: 2.2, trend: 'stable' as const, demand: 'High' as const },
-        { id: '2', name: "High Street Food & Retail Zone", lat: 0.005, lng: 0.005, radius: 0.007, multiplier: 1.9, trend: 'rising' as const, demand: 'Medium' as const },
-        { id: '3', name: "Downtown Clubbing & Bar District", lat: -0.008, lng: -0.006, radius: 0.009, multiplier: 2.4, trend: 'stable' as const, demand: 'High' as const },
-        { id: 'fake_busy_area', name: "Airport & Local Business Hub", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising' as const, demand: 'High' as const }
+        { id: 'both_central', name: "Central Station & Dining Plaza", lat: 0.006, lng: -0.004, radius: 0.008, multiplier: 2.2, trend: 'stable' as const, demand: 'High' as const },
+        { id: 'both_highst', name: "High Street Food & Retail Zone", lat: 0.005, lng: 0.005, radius: 0.007, multiplier: 1.9, trend: 'rising' as const, demand: 'Medium' as const },
+        { id: 'both_downtown', name: "Downtown Clubbing & Bar District", lat: -0.008, lng: -0.006, radius: 0.009, multiplier: 2.4, trend: 'stable' as const, demand: 'High' as const },
+        { id: 'both_airport', name: "Airport & Local Business Hub", lat: 0.015, lng: 0.012, radius: 0.012, multiplier: 3.5, trend: 'rising' as const, demand: 'High' as const }
       ];
     }
 
@@ -11998,8 +12020,15 @@ export default function App() {
                   <p className="text-xs text-gray-500 dark:text-gray-400 font-bold truncate">{toast.body}</p>
                 </div>
                 <button 
+                  onClick={() => speakNotification(`${toast.title}. ${toast.body}`)}
+                  className="p-2 text-blue-500 hover:text-blue-400 active:scale-90 transition-transform cursor-pointer"
+                  title="Speak alert out loud"
+                >
+                  <Volume2 size={18} />
+                </button>
+                <button 
                   onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-                  className="p-2 text-gray-300 dark:text-gray-500 hover:text-gray-500"
+                  className="p-2 text-gray-300 dark:text-gray-500 hover:text-gray-500 cursor-pointer"
                 >
                   <X size={16} />
                 </button>
@@ -13457,13 +13486,20 @@ export default function App() {
                           <motion.button 
                             whileTap={{ scale: 0.95 }}
                             onClick={() => {
-                              sendNotification("Surge Alert", "Surge is active in your current area. Earn an extra £2 per delivery!");
-                              setIsSafetyToolkitOpen(true);
+                              const apps: Array<'google' | 'waze' | 'apple' | 'cyber'> = ['google', 'waze', 'apple', 'cyber'];
+                              const nextIdx = (apps.indexOf(navigationApp) + 1) % apps.length;
+                              const nextApp = apps[nextIdx];
+                              setNavigationApp(nextApp);
+                              if (nextApp === 'google' || nextApp === 'cyber') setMapCoreMode(nextApp === 'google' ? 'google' : 'cyber');
+                              const appNames = { google: 'Google Maps', waze: 'Waze Navigation', apple: 'Apple Maps', cyber: 'Cyber 3D' };
+                              sendNotification("Navigation Switched 🧭", `Active provider set to ${appNames[nextApp]}.`, "success");
+                              speakNotification(`Navigation provider switched to ${appNames[nextApp]}.`);
                             }}
-                            className="absolute top-40 right-4 bg-blue-600 text-white px-3 py-2 rounded-xl font-black shadow-xl flex items-center gap-2 pointer-events-auto z-40"
+                            className="absolute top-40 right-4 bg-blue-600 hover:bg-blue-500 border border-blue-400 text-white px-3.5 py-2 rounded-2xl font-black shadow-2xl flex items-center gap-2 pointer-events-auto z-40 cursor-pointer active:scale-95 transition-all"
+                            title="Switch Navigation Provider"
                           >
-                            <ArrowUp size={14} />
-                            <span className="text-xs">More...</span>
+                            <Navigation size={16} className="fill-white" />
+                            <span className="text-xs font-black uppercase tracking-wider">{navigationApp === 'google' ? 'Google Maps' : navigationApp === 'waze' ? 'Waze' : navigationApp === 'apple' ? 'Apple Maps' : 'Cyber 3D'}</span>
                           </motion.button>
                         </>
                       )}
@@ -13624,6 +13660,24 @@ export default function App() {
                   <div className="absolute inset-0 z-[5200] flex items-start justify-center p-4 pt-12">
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSearchOpen(false)} className="absolute inset-0 bg-black/70 backdrop-blur-md" />
                     <motion.div initial={{ y: -30, opacity: 0, scale: 0.95 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: -30, opacity: 0, scale: 0.95 }} className={`w-full max-w-lg rounded-[32px] p-6 shadow-2xl relative z-10 border border-white/10 flex flex-col max-h-[82vh] overflow-hidden ${theme === 'dark' ? 'bg-[#121316] text-white' : 'bg-white text-black'}`}>
+                      {/* Top Go Back Row */}
+                      <div className="flex items-center justify-between gap-3 mb-3 pb-2 border-b border-white/10">
+                        <button 
+                          onClick={() => { setIsSearchOpen(false); setCurrentScreen('home'); }} 
+                          className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 shadow-md cursor-pointer"
+                        >
+                          <ArrowLeft size={16} />
+                          <span>Go Back to Map</span>
+                        </button>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Hotspots & Search</span>
+                        <button 
+                          onClick={() => setIsSearchOpen(false)} 
+                          className="p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-transform active:scale-95 shrink-0 cursor-pointer"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+
                       {/* Search Header Bar */}
                       <div className="flex items-center gap-3 p-3 bg-black/20 dark:bg-white/5 border border-white/10 rounded-2xl mb-4">
                         <Search className="text-blue-400 shrink-0" size={20} />
@@ -13640,9 +13694,6 @@ export default function App() {
                             <X size={16} />
                           </button>
                         )}
-                        <button onClick={() => setIsSearchOpen(false)} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-transform active:scale-95 shrink-0">
-                          <X size={18} />
-                        </button>
                       </div>
 
                       {/* Category Chips */}
@@ -13707,14 +13758,14 @@ export default function App() {
                             <button
                               key={`hotspot-res-${spot.id}-${sIdx}`}
                               onClick={() => {
-                                // Navigate location to spot
                                 if (spot.coords) {
                                   setLocation(spot.coords);
                                 }
                                 setIsSearchOpen(false);
-                                if (addToast) {
-                                  addToast(`Routing to ${spot.name} 🚀`, `High demand active (${spot.surge} Surge multiplier). Navigating now!`, 'success');
-                                }
+                                setCurrentScreen('home');
+                                setIsNavigating(true);
+                                sendNotification(`Routing to ${spot.name} 🚀`, `High demand active (${spot.surge} Surge multiplier). Navigating now!`, 'success');
+                                speakNotification(`Navigating to ${spot.name}. High demand area active.`);
                               }}
                               className="w-full flex items-center justify-between p-3.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-2xl transition-all active:scale-[0.98] text-left group"
                             >
@@ -14051,8 +14102,42 @@ export default function App() {
                         ) : null
                       )}
                       <button 
+                        onClick={() => {
+                          const apps: Array<'google' | 'waze' | 'apple' | 'cyber'> = ['google', 'waze', 'apple', 'cyber'];
+                          const nextIdx = (apps.indexOf(navigationApp) + 1) % apps.length;
+                          const nextApp = apps[nextIdx];
+                          setNavigationApp(nextApp);
+                          if (nextApp === 'google' || nextApp === 'cyber') setMapCoreMode(nextApp === 'google' ? 'google' : 'cyber');
+                          const appNames = { google: 'Google Maps', waze: 'Waze Navigation', apple: 'Apple Maps', cyber: 'Cyber 3D' };
+                          sendNotification("Navigation App Switched 🧭", `Primary turn-by-turn routing provider set to ${appNames[nextApp]}.`, "success");
+                          speakNotification(`Navigation provider switched to ${appNames[nextApp]}.`);
+                        }}
+                        className="h-11 px-3.5 bg-blue-600 hover:bg-blue-500 border border-blue-400 text-white rounded-full shadow-2xl flex items-center gap-1.5 active:scale-95 transition-transform shrink-0 cursor-pointer"
+                        title="Switch Navigation Provider (Google Maps, Waze, Apple Maps, Cyber 3D)"
+                      >
+                        <Navigation size={16} className="fill-white" />
+                        <span className="text-[10px] font-black uppercase tracking-wider">{navigationApp === 'google' ? 'Google' : navigationApp === 'waze' ? 'Waze' : navigationApp === 'apple' ? 'Apple' : 'Cyber 3D'}</span>
+                      </button>
+
+                      <button 
+                        onClick={() => {
+                          const next = !isSpeechEnabled;
+                          setIsSpeechEnabled(next);
+                          sendNotification(next ? "Voice Alerts On 🔊" : "Voice Alerts Muted 🔇", next ? "All notifications will be spoken aloud." : "Voice notifications muted.");
+                          if (next) speakNotification("Voice notifications enabled.");
+                        }}
+                        className={`w-11 h-11 border rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 cursor-pointer ${
+                          isSpeechEnabled ? 'bg-blue-600/20 text-blue-400 border-blue-500/40' : 'bg-neutral-900/90 text-gray-400 border-white/10'
+                        }`}
+                        title={isSpeechEnabled ? "Voice Alerts Enabled (Click to Mute)" : "Voice Alerts Muted (Click to Unmute)"}
+                      >
+                        {isSpeechEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                      </button>
+
+                      <button 
                         onClick={() => setIsSearchOpen(true)}
-                        className="w-11 h-11 bg-slate-950 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0"
+                        className="w-11 h-11 bg-slate-950 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 cursor-pointer"
+                        title="Search Hotspots"
                       >
                         <Search size={20} />
                       </button>

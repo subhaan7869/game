@@ -480,7 +480,7 @@ export const WebAnalyticsDashboard: React.FC<WebAnalyticsDashboardProps> = ({
                   
                   <div className="space-y-2">
                     {INITIAL_REFERRERS.map((item, idx) => (
-                      <div key={item.name} className="relative p-3 rounded-xl bg-[#12141f]/40 border border-white/5 overflow-hidden">
+                      <div key={`ref-${item.name}-${idx}`} className="relative p-3 rounded-xl bg-[#12141f]/40 border border-white/5 overflow-hidden">
                         <div 
                           className="absolute inset-y-0 left-0 bg-[#10b981]/5"
                           style={{ width: `${item.percent}%` }}
@@ -510,7 +510,7 @@ export const WebAnalyticsDashboard: React.FC<WebAnalyticsDashboardProps> = ({
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {INITIAL_COUNTRIES.map((item, idx) => (
-                      <div key={item.name} className="relative p-3 rounded-xl bg-[#12141f]/40 border border-white/5 overflow-hidden flex items-center justify-between">
+                      <div key={`country-${item.code}-${idx}`} className="relative p-3 rounded-xl bg-[#12141f]/40 border border-white/5 overflow-hidden flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-base">{item.code === 'GB' ? '🇬🇧' : item.code === 'US' ? '🇺🇸' : item.code === 'DE' ? '🇩🇪' : item.code === 'FR' ? '🇫🇷' : item.code === 'JP' ? '🇯🇵' : '🇨🇦'}</span>
                           <span className="text-xs font-bold text-gray-200">{item.name}</span>
@@ -533,8 +533,8 @@ export const WebAnalyticsDashboard: React.FC<WebAnalyticsDashboardProps> = ({
                   <div>
                     <h4 className="text-xs font-black uppercase text-gray-400 tracking-wider mb-2">Device Typologies</h4>
                     <div className="space-y-2">
-                      {INITIAL_DEVICES.map(item => (
-                        <div key={item.name} className="flex justify-between items-center text-xs">
+                      {INITIAL_DEVICES.map((item, idx) => (
+                        <div key={`device-${item.name}-${idx}`} className="flex justify-between items-center text-xs">
                           <span className="text-gray-300 font-bold">{item.name}</span>
                           <div className="flex items-center gap-3">
                             <span className="font-mono text-gray-400">{item.visitors}</span>
@@ -551,8 +551,8 @@ export const WebAnalyticsDashboard: React.FC<WebAnalyticsDashboardProps> = ({
                     <div>
                       <h4 className="text-xs font-black uppercase text-gray-400 tracking-wider mb-2">Browsers</h4>
                       <div className="space-y-2">
-                        {INITIAL_BROWSERS.map(item => (
-                          <div key={item.name} className="flex justify-between items-center text-xs">
+                        {INITIAL_BROWSERS.map((item, idx) => (
+                          <div key={`browser-${item.name}-${idx}`} className="flex justify-between items-center text-xs">
                             <span className="text-gray-300 font-bold">{item.name}</span>
                             <span className="font-mono font-black text-emerald-400">{item.percent}%</span>
                           </div>
@@ -563,8 +563,8 @@ export const WebAnalyticsDashboard: React.FC<WebAnalyticsDashboardProps> = ({
                     <div>
                       <h4 className="text-xs font-black uppercase text-gray-400 tracking-wider mb-2">Operating Systems</h4>
                       <div className="space-y-2">
-                        {INITIAL_OS.map(item => (
-                          <div key={item.name} className="flex justify-between items-center text-xs">
+                        {INITIAL_OS.map((item, idx) => (
+                          <div key={`os-${item.name}-${idx}`} className="flex justify-between items-center text-xs">
                             <span className="text-gray-300 font-bold">{item.name}</span>
                             <span className="font-mono font-black text-amber-500">{item.percent}%</span>
                           </div>

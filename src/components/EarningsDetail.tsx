@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, History, Briefcase, Clock, Star, DollarSign, MapPin, Zap, 
-  User, Utensils, Landmark, ArrowRight, RefreshCw, ChevronRight,
+  User, Utensils, Landmark, ArrowRight, ArrowLeft, RefreshCw, ChevronRight,
   TrendingUp
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
@@ -273,8 +273,9 @@ export const EarningsDetail = ({
     >
       <div className="p-6 pt-12 shrink-0 bg-[#0a0a0c]">
         <div className="flex items-center justify-between mb-8">
-          <button onClick={() => setCurrentScreen('home')} className="w-10 h-10 bg-white/5 border border-white/5 hover:bg-white/10 rounded-full flex items-center justify-center active:scale-95 transition-transform text-white">
-            <X size={20} />
+          <button onClick={() => setCurrentScreen('home')} className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-xs font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all cursor-pointer">
+            <ArrowLeft size={16} />
+            <span>Go Back to Map</span>
           </button>
           <h2 className="text-xl font-black tracking-tight uppercase italic">Live Stats</h2>
           <div className="w-10 h-10" />
