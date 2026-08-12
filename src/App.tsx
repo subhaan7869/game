@@ -9772,6 +9772,20 @@ export default function App() {
         utterance.rate = 1.05;
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
+
+        const music = (window as any).__globalMusicController;
+        if (music && music.isPlaying) {
+          music.duckVolume();
+          const restoreMusicVolume = () => {
+            if (music && music.unduckVolume) {
+              music.unduckVolume();
+            }
+          };
+          utterance.onend = restoreMusicVolume;
+          utterance.onerror = restoreMusicVolume;
+          setTimeout(restoreMusicVolume, 7000);
+        }
+
         window.speechSynthesis.speak(utterance);
       } catch (e) {
         console.warn("Speech synthesis error:", e);
