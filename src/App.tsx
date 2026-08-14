@@ -7651,6 +7651,11 @@ export default function App() {
       handleStopOrderAudio(isAccepting);
       return;
     }
+
+    const music = (window as any).__globalMusicController;
+    if (music && music.isPlaying) {
+      music.duckVolume();
+    }
     
     // Play immediately. Pass `true` for native loop if soundPreference is 'custom_file'.
     const isNativelyLooped = soundPreference === 'custom_file';
@@ -7660,6 +7665,7 @@ export default function App() {
       // If natively looped (custom sound file or fallback mp3/wav files), we do NOT set up a setInterval.
       // This allows the uploaded sound to play in its full length and loop natively!
       return () => {
+        if (music) music.unduckVolume();
         const isAccepting = isAcceptingRef.current;
         isAcceptingRef.current = false;
         handleStopOrderAudio(isAccepting);
@@ -7675,6 +7681,7 @@ export default function App() {
     
     return () => {
       clearInterval(interval);
+      if (music) music.unduckVolume();
       const isAccepting = isAcceptingRef.current;
       isAcceptingRef.current = false;
       handleStopOrderAudio(isAccepting);
@@ -9766,29 +9773,49 @@ export default function App() {
     if (!isSpeechEnabled) return;
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
-        window.speechSynthesis.cancel();
+        const music = (window as any).__globalMusicController;
+        if (music && music.isPlaying) {
+          music.duckVolume();
+        }
+
         const cleanText = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
         const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.rate = 1.05;
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
 
-        const music = (window as any).__globalMusicController;
-        if (music && music.isPlaying) {
-          music.duckVolume();
-          const restoreMusicVolume = () => {
-            if (music && music.unduckVolume) {
+        let hasCleanedUp = false;
+        const restoreMusicVolume = () => {
+          if (hasCleanedUp) return;
+          hasCleanedUp = true;
+          if (music) {
+            if (music.activeUtterances) {
+              music.activeUtterances.delete(utterance);
+            }
+            if (music.unduckVolume) {
               music.unduckVolume();
             }
-          };
-          utterance.onend = restoreMusicVolume;
-          utterance.onerror = restoreMusicVolume;
-          setTimeout(restoreMusicVolume, 7000);
+          }
+        };
+
+        utterance.onend = restoreMusicVolume;
+        utterance.onerror = restoreMusicVolume;
+
+        if (music && music.activeUtterances) {
+          music.activeUtterances.add(utterance);
         }
+
+        // Safety fallback timer dynamically calculated from length: ~12 chars/sec + 2s padding
+        const maxDurationMs = Math.max(3000, (cleanText.length / 12) * 1000 + 2000);
+        setTimeout(restoreMusicVolume, maxDurationMs);
 
         window.speechSynthesis.speak(utterance);
       } catch (e) {
         console.warn("Speech synthesis error:", e);
+        const music = (window as any).__globalMusicController;
+        if (music && music.unduckVolume) {
+          music.unduckVolume();
+        }
       }
     }
   };

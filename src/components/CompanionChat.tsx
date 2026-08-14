@@ -481,8 +481,11 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
   const speakText = (text: string) => {
     if (!isVoiceOutputEnabled || !('speechSynthesis' in window)) return;
     try {
-      window.speechSynthesis.cancel();
-      
+      const music = (window as any).__globalMusicController;
+      if (music && music.isPlaying) {
+        music.duckVolume();
+      }
+
       const sanitized = text
         .replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD00-\uDFFF]/g, '')
         .replace(/\*+/g, '') // remove markdown asterisks
@@ -496,9 +499,38 @@ export const CompanionChat: React.FC<CompanionChatProps> = ({
       }
       utterance.rate = 1.05;
       utterance.pitch = 1.0;
+
+      let hasCleanedUp = false;
+      const restoreVolume = () => {
+        if (hasCleanedUp) return;
+        hasCleanedUp = true;
+        if (music) {
+          if (music.activeUtterances) {
+            music.activeUtterances.delete(utterance);
+          }
+          if (music.unduckVolume) {
+            music.unduckVolume();
+          }
+        }
+      };
+
+      utterance.onend = restoreVolume;
+      utterance.onerror = restoreVolume;
+
+      if (music && music.activeUtterances) {
+        music.activeUtterances.add(utterance);
+      }
+
+      const maxDuration = Math.max(3000, (sanitized.length / 12) * 1000 + 2000);
+      setTimeout(restoreVolume, maxDuration);
+
       window.speechSynthesis.speak(utterance);
     } catch (err) {
       console.warn("Speech synthesis issue:", err);
+      const music = (window as any).__globalMusicController;
+      if (music && music.unduckVolume) {
+        music.unduckVolume();
+      }
     }
   };
 

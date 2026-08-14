@@ -61,9 +61,10 @@ class GlobalMusicController {
   currentTrackIndex = 0;
   volume = 0.7;
   isMuted = false;
-  isDucked = false;
+  duckCount = 0;
   currentTime = 0;
   duration = 180;
+  manualPause = false;
   
   audio: HTMLAudioElement;
   listeners = new Set<() => void>();
@@ -73,14 +74,18 @@ class GlobalMusicController {
   masterGainNode: GainNode | null = null;
   audioCtx: AudioContext | null = null;
   analyser: AnalyserNode | null = null;
+  musicGainNode: GainNode | null = null;
+  mediaSourceNode: MediaElementAudioSourceNode | null = null;
+  activeUtterances = new Set<any>();
 
   constructor() {
     this.audio = new Audio();
     this.audio.crossOrigin = 'anonymous';
+    this.audio.preload = 'auto';
 
     this.audio.addEventListener('timeupdate', () => {
       const track = PLAYLIST[this.currentTrackIndex];
-      if (!track.isSynth) {
+      if (!track?.isSynth) {
         this.currentTime = this.audio.currentTime;
         this.notify();
       }
@@ -88,7 +93,7 @@ class GlobalMusicController {
 
     this.audio.addEventListener('loadedmetadata', () => {
       const track = PLAYLIST[this.currentTrackIndex];
-      if (!track.isSynth && this.audio.duration) {
+      if (!track?.isSynth && this.audio.duration) {
         this.duration = this.audio.duration;
         this.notify();
       }
@@ -96,6 +101,17 @@ class GlobalMusicController {
 
     this.audio.addEventListener('ended', () => {
       this.next();
+    });
+
+    // Guard against OS / browser auto-pause on background audio or speech interruptions
+    this.audio.addEventListener('pause', () => {
+      if (this.isPlaying && !this.manualPause) {
+        setTimeout(() => {
+          if (this.isPlaying && !this.manualPause) {
+            this.audio.play().catch(() => {});
+          }
+        }, 50);
+      }
     });
   }
 
@@ -109,47 +125,106 @@ class GlobalMusicController {
   }
 
   initAudioCtx() {
-    if (this.audioCtx) return;
+    if (this.audioCtx && this.mediaSourceNode) return;
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       const ctx = (window as any).__sharedAudioCtx || new AudioContextClass();
       (window as any).__sharedAudioCtx = ctx;
       this.audioCtx = ctx;
 
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 64;
-      this.analyser = analyser;
+      if (!this.analyser) {
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 64;
+        this.analyser = analyser;
+      }
 
-      const source = ctx.createMediaElementSource(this.audio);
-      source.connect(analyser);
-      analyser.connect(ctx.destination);
+      if (!this.musicGainNode) {
+        const musicGain = ctx.createGain();
+        musicGain.gain.setValueAtTime(this.isDucked ? 0.15 : 1.0, ctx.currentTime);
+        this.musicGainNode = musicGain;
+      }
+
+      if (!this.mediaSourceNode) {
+        try {
+          const source = ctx.createMediaElementSource(this.audio);
+          source.connect(this.musicGainNode);
+          this.musicGainNode.connect(this.analyser);
+          this.analyser.connect(ctx.destination);
+          this.mediaSourceNode = source;
+        } catch (e) {
+          // In case media element source was already created
+        }
+      }
     } catch (e) {
       console.warn("Global Music AudioCtx error:", e);
     }
   }
 
-  getEffectiveVolume() {
-    if (this.isMuted) return 0;
-    return this.isDucked ? this.volume * 0.25 : this.volume;
+  get isDucked() {
+    return this.duckCount > 0;
   }
 
-  updateAudioVolume() {
+  getEffectiveVolume() {
+    if (this.isMuted) return 0;
+    // Duck to 15% of user volume so announcements/voice alerts are crystal clear while music keeps playing
+    return this.isDucked ? this.volume * 0.15 : this.volume;
+  }
+
+  updateAudioVolume(smooth = true) {
     const effVol = this.getEffectiveVolume();
     this.audio.volume = effVol;
+
+    // Web audio synth master gain
     if (this.masterGainNode && this.audioCtx) {
-      this.masterGainNode.gain.setValueAtTime(effVol * 0.15, this.audioCtx.currentTime);
+      const time = this.audioCtx.currentTime;
+      try {
+        if (smooth) {
+          this.masterGainNode.gain.cancelScheduledValues(time);
+          this.masterGainNode.gain.setValueAtTime(this.masterGainNode.gain.value, time);
+          this.masterGainNode.gain.linearRampToValueAtTime(effVol * 0.15, time + 0.2);
+        } else {
+          this.masterGainNode.gain.setValueAtTime(effVol * 0.15, time);
+        }
+      } catch (e) {}
+    }
+
+    // Web audio HTML5 stream gain
+    if (this.musicGainNode && this.audioCtx) {
+      const time = this.audioCtx.currentTime;
+      const targetGain = this.isDucked ? 0.15 : 1.0;
+      try {
+        if (smooth) {
+          this.musicGainNode.gain.cancelScheduledValues(time);
+          this.musicGainNode.gain.setValueAtTime(this.musicGainNode.gain.value, time);
+          this.musicGainNode.gain.linearRampToValueAtTime(targetGain, time + 0.2);
+        } else {
+          this.musicGainNode.gain.setValueAtTime(targetGain, time);
+        }
+      } catch (e) {}
     }
   }
 
-  duckVolume() {
-    this.isDucked = true;
-    this.updateAudioVolume();
+  duckVolume(durationMs?: number) {
+    this.duckCount++;
+    this.updateAudioVolume(true);
     this.notify();
+
+    if (durationMs && durationMs > 0) {
+      setTimeout(() => {
+        this.unduckVolume();
+      }, durationMs);
+    }
   }
 
   unduckVolume() {
-    this.isDucked = false;
-    this.updateAudioVolume();
+    this.duckCount = Math.max(0, this.duckCount - 1);
+    this.updateAudioVolume(true);
+    this.notify();
+  }
+
+  forceResetDuck() {
+    this.duckCount = 0;
+    this.updateAudioVolume(true);
     this.notify();
   }
 
@@ -159,10 +234,12 @@ class GlobalMusicController {
       this.audioCtx.resume().catch(() => {});
     }
 
-    this.isPlaying = !this.isPlaying;
+    const nextPlay = !this.isPlaying;
+    this.isPlaying = nextPlay;
+    this.manualPause = !nextPlay;
     const track = PLAYLIST[this.currentTrackIndex];
 
-    if (this.isPlaying) {
+    if (nextPlay) {
       if (track.isSynth) {
         this.startSynth();
       } else {
@@ -170,7 +247,7 @@ class GlobalMusicController {
           this.audio.src = track.url;
           this.audio.load();
         }
-        this.updateAudioVolume();
+        this.updateAudioVolume(false);
         this.audio.play().catch(() => { this.isPlaying = false; });
       }
     } else {
@@ -197,7 +274,7 @@ class GlobalMusicController {
       this.audio.src = track.url;
       this.audio.load();
       if (this.isPlaying) {
-        this.updateAudioVolume();
+        this.updateAudioVolume(false);
         this.audio.play().catch(() => { this.isPlaying = false; });
       }
     }
