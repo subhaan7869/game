@@ -96,7 +96,8 @@ import {
   Layers,
   CloudRain,
   Calendar,
-  CalendarX
+  CalendarX,
+  Home
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -7933,7 +7934,7 @@ export default function App() {
   const [mapCoreMode, setMapCoreMode] = useState<'cyber' | 'google'>('cyber');
   const [navigationApp, setNavigationApp] = useState<'google' | 'waze' | 'apple' | 'cyber'>('google');
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
-  const [isSpeechEnabled, setIsSpeechEnabled] = useState(true);
+  const [isSpeechEnabled, setIsSpeechEnabled] = useState(false);
 
   const insuranceExpiry = user.documentExpiries?.["Vehicle Insurance"];
   const insuranceDaysLeft = useMemo(() => {
@@ -10018,21 +10019,27 @@ export default function App() {
   }, [window.location.search, user?.uid, location]);
 
   const [uploadedDocs, setUploadedDocs] = useState<string[]>([]);
-  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const [uploadingDocs, setUploadingDocs] = useState<string[]>([]);
 
   const toggleDoc = async (label: string) => {
     if (uploadedDocs.includes(label)) {
       setUploadedDocs(prev => prev.filter(l => l !== label));
       return;
     }
+    if (uploadingDocs.includes(label)) return;
 
-    setUploadingDoc(label);
-    await new Promise(r => setTimeout(r, 1500)); // Simulate upload time
+    setUploadingDocs(prev => [...prev, label]);
+    sendNotification("Document Uploaded", `${label} is now being verified. This will take a couple of minutes.`);
+    
+    // 2 minutes verification time
+    await new Promise(r => setTimeout(r, 120000));
+    
     setUploadedDocs(prev => [...prev, label]);
-    setUploadingDoc(null);
+    setUploadingDocs(prev => prev.filter(l => l !== label));
+    sendNotification("Verification Complete", `${label} has been successfully verified.`, "success");
   };
 
-  const allDocsUploaded = uploadedDocs.length === 3;
+  const allDocsUploaded = uploadedDocs.length === 4;
 
   // Surge Pricing Configuration
   const [activeSurgeAreas, setActiveSurgeAreas] = useState<{
@@ -12160,12 +12167,13 @@ export default function App() {
               
               <div className="space-y-4 flex-1 mb-8">
                 {[
-                  { label: "Driving Licence", icon: <FileText size={20} /> },
+                  { label: "Drivers License", icon: <FileText size={20} /> },
                   { label: "Vehicle Insurance", icon: <ShieldCheck size={20} /> },
-                  { label: "Bank Statement", icon: <CreditCard size={20} /> },
+                  { label: "Private Hire License", icon: <FileText size={20} /> },
+                  { label: "Taxi Plate", icon: <CarIcon size={20} /> },
                 ].map((doc, i) => {
                   const isUploaded = uploadedDocs.includes(doc.label);
-                  const isUploading = uploadingDoc === doc.label;
+                  const isUploading = uploadingDocs.includes(doc.label);
                   return (
                     <button 
                       key={`doc-upload-${i}`} 
@@ -12175,7 +12183,7 @@ export default function App() {
                     >
                       <div className="flex items-center gap-4">
                         <div className={isUploaded ? 'text-[#22c55e]' : isUploading ? 'text-amber-500' : 'text-gray-400'}>{doc.icon}</div>
-                        <span className="font-bold text-sm text-white">{isUploading ? 'Uploading...' : doc.label}</span>
+                        <span className="font-bold text-sm text-white">{isUploading ? 'Verifying...' : doc.label}</span>
                       </div>
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isUploaded ? 'bg-[#22c55e] text-black shadow-lg shadow-[#22c55e]/20' : isUploading ? 'bg-amber-500 text-black animate-pulse' : 'bg-white/5 text-gray-400'}`}>
                         {isUploaded ? <Check size={20} /> : isUploading ? <Clock size={20} /> : <ChevronRight size={20} />}
@@ -12315,7 +12323,7 @@ export default function App() {
 
           {currentScreen === 'home' && (
             <div className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
-              {!user.isOnline && !showFullMap ? (
+              {!showFullMap ? (
                 <motion.div key="offline-home-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-white">
                   <OfflineHomeScreen
                     user={user}
@@ -14161,18 +14169,11 @@ export default function App() {
                       </button>
 
                       <button 
-                        onClick={() => {
-                          const next = !isSpeechEnabled;
-                          setIsSpeechEnabled(next);
-                          sendNotification(next ? "Voice Alerts On 🔊" : "Voice Alerts Muted 🔇", next ? "All notifications will be spoken aloud." : "Voice notifications muted.");
-                          if (next) speakNotification("Voice notifications enabled.");
-                        }}
-                        className={`w-11 h-11 border rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 cursor-pointer ${
-                          isSpeechEnabled ? 'bg-blue-600/20 text-blue-400 border-blue-500/40' : 'bg-neutral-900/90 text-gray-400 border-white/10'
-                        }`}
-                        title={isSpeechEnabled ? "Voice Alerts Enabled (Click to Mute)" : "Voice Alerts Muted (Click to Unmute)"}
+                        onClick={() => setShowFullMap(false)}
+                        className="w-11 h-11 bg-neutral-900/90 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 cursor-pointer"
+                        title="Dashboard / Home Screen"
                       >
-                        {isSpeechEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                        <Home size={18} />
                       </button>
 
                       <button 
@@ -16558,8 +16559,9 @@ export default function App() {
                 )}
               </AnimatePresence>
 
-              <div className="space-y-2">
+                  <div className="space-y-2">
                 {[
+                  { icon: <FileText size={18} className="text-blue-500" />, label: "Documents", action: () => setCurrentScreen('documents') },
                   { icon: <Music size={18} className="text-[#22c55e] animate-pulse" />, label: "🔊 Alert Pings & Custom Sounds", action: () => setCurrentScreen('audio_settings') },
                   { icon: <Activity size={18} className="text-[#22c55e]" />, label: "Vercel Web Analytics (Live HUD)", action: () => setShowWebAnalytics(true) },
                   { icon: <User size={18} />, label: "Personal Information", action: () => setCurrentScreen('personal_details') },

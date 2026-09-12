@@ -15,7 +15,8 @@ import {
   MapPin, 
   SlidersHorizontal,
   ChevronUp,
-  List
+  List,
+  ShieldAlert
 } from 'lucide-react';
 import { UserProfile } from '../types';
 
@@ -47,6 +48,15 @@ export const OfflineHomeScreen: React.FC<OfflineHomeScreenProps> = ({
   theme = 'light'
 }) => {
   const [selectedOpportunityTab, setSelectedOpportunityTab] = useState<'all' | 'promos' | 'quests' | 'streaks' | 'airports'>('all');
+
+  const insuranceExpiry = user.documentExpiries?.["Vehicle Insurance"];
+  const insuranceDaysLeft = React.useMemo(() => {
+    if (!insuranceExpiry) return null;
+    const expiryDate = new Date(insuranceExpiry);
+    const today = new Date();
+    const diffTime = expiryDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }, [insuranceExpiry]);
 
   return (
     <div className="relative w-full h-full bg-white text-neutral-900 flex flex-col overflow-hidden select-none font-sans">
@@ -83,6 +93,23 @@ export const OfflineHomeScreen: React.FC<OfflineHomeScreenProps> = ({
       {/* Main Scrollable Offline Home Content */}
       <div className="flex-1 overflow-y-auto custom-scrollbar px-5 pt-4 pb-28 space-y-6">
         
+        {insuranceDaysLeft !== null && insuranceDaysLeft <= 30 && (
+          <div className="bg-orange-50 border border-orange-200 p-4 rounded-3xl flex items-start gap-4">
+            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 shrink-0">
+              <ShieldAlert size={20} />
+            </div>
+            <div>
+              <h3 className="font-black text-orange-900 text-sm">Action Required</h3>
+              <p className="text-xs text-orange-700 font-bold mt-0.5">
+                Your vehicle insurance expires in {insuranceDaysLeft} days ({insuranceExpiry}).
+              </p>
+              <p className="text-[10px] text-orange-600 mt-1">
+                Please update your documents in Settings to stay online.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* 1. Status Section ("You're offline" + "Ready to go?") */}
         <div>
           <button 
@@ -91,18 +118,18 @@ export const OfflineHomeScreen: React.FC<OfflineHomeScreenProps> = ({
           >
             <div className="flex items-center justify-between">
               <h1 className="text-3xl sm:text-4xl font-black text-neutral-900 tracking-tight leading-none group-hover:text-blue-600 transition-colors">
-                You're offline
+                {user.isOnline ? "You're online" : "You're offline"}
               </h1>
               <div className="p-2 bg-gray-100 rounded-full group-hover:bg-blue-50 transition-colors">
                 <SlidersHorizontal size={18} className="text-gray-600 group-hover:text-blue-600" />
               </div>
             </div>
             <p className="text-base font-bold text-gray-500 mt-1">
-              Ready to go?
+              {user.isOnline ? "Finding trips..." : "Ready to go?"}
             </p>
           </button>
           <p className="text-xs text-gray-400 mt-1 font-medium leading-relaxed">
-            When offline, you won't receive trip requests. Configure preferences or tap below to go online.
+            {user.isOnline ? "You are currently receiving trip requests. Tap below to view the live map." : "When offline, you won't receive trip requests. Configure preferences or tap below to go online."}
           </p>
         </div>
 
@@ -208,11 +235,14 @@ export const OfflineHomeScreen: React.FC<OfflineHomeScreenProps> = ({
 
             {/* Embedded Go Online Button */}
             <button 
-              onClick={onGoOnline}
+              onClick={() => {
+                if (user.isOnline && onOpenMap) onOpenMap();
+                else onGoOnline();
+              }}
               className="w-full py-4 bg-[#1f52e3] hover:bg-blue-600 text-white rounded-2xl font-black text-base uppercase tracking-wider shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] cursor-pointer"
             >
               <Navigation size={18} className="fill-white" style={{ transform: 'rotate(45deg)' }} />
-              <span>Go Online</span>
+              <span>{user.isOnline ? "Return to Map" : "Go Online"}</span>
             </button>
           </div>
 
@@ -279,11 +309,14 @@ export const OfflineHomeScreen: React.FC<OfflineHomeScreenProps> = ({
       {/* Floating Bottom Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-30 p-4 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-[0_-10px_30px_rgba(0,0,0,0.08)]">
         <button 
-          onClick={onGoOnline}
+          onClick={() => {
+            if (user.isOnline && onOpenMap) onOpenMap();
+            else onGoOnline();
+          }}
           className="w-full py-4 bg-[#1f52e3] hover:bg-blue-600 text-white rounded-full font-black text-lg uppercase tracking-wider shadow-xl shadow-blue-600/30 flex items-center justify-center gap-3 transition-all active:scale-[0.98] cursor-pointer"
         >
           <Navigation size={22} className="fill-white" style={{ transform: 'rotate(45deg)' }} />
-          <span>Go Online</span>
+          <span>{user.isOnline ? "Return to Map" : "Go Online"}</span>
         </button>
       </div>
     </div>
