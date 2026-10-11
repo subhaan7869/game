@@ -2,114 +2,106 @@ import React from 'react';
 
 export const HyperDriverLogo: React.FC<{ className?: string; size?: 'sm' | 'md' | 'lg' | 'xl' }> = ({ className = '', size = 'md' }) => {
   const dimensions = {
-    sm: { height: 32, width: 110 },
-    md: { height: 50, width: 170 },
-    lg: { height: 80, width: 270 },
-    xl: { height: 140, width: 480 },
+    sm: { height: 40, width: 40 },
+    md: { height: 64, width: 64 },
+    lg: { height: 96, width: 96 },
+    xl: { height: 156, width: 156 },
   }[size];
 
   return (
     <svg
       width={dimensions.width}
       height={dimensions.height}
-      viewBox="0 0 600 180"
+      viewBox="0 0 512 512"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={`${className} select-none`}
     >
       <defs>
-        {/* Gradients */}
-        <linearGradient id="carSpeedLines" x1="0" y1="50" x2="350" y2="50" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#007BFF" stopOpacity="0" />
-          <stop offset="50%" stopColor="#00E5FF" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="#22C55E" stopOpacity="0" />
+        <linearGradient id="hdBgInnerGrad" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#0D1930" />
+          <stop offset="45%" stopColor="#070D19" />
+          <stop offset="100%" stopColor="#03050A" />
         </linearGradient>
-        <linearGradient id="hyperTextGrad" x1="100" y1="80" x2="500" y2="130" gradientUnits="userSpaceOnUse">
+
+        <linearGradient id="hdBorderGrad" x1="36" y1="120" x2="476" y2="392" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#00AEFF" />
+          <stop offset="50%" stopColor="#0077FF" />
+          <stop offset="100%" stopColor="#0040FF" />
+        </linearGradient>
+
+        <linearGradient id="hdSpeedBarTop" x1="156" y1="165" x2="245" y2="165" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#00C8FF" />
+          <stop offset="100%" stopColor="#0055FF" />
+        </linearGradient>
+        <linearGradient id="hdSpeedBarMid" x1="120" y1="202" x2="225" y2="202" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#00DCFF" />
+          <stop offset="100%" stopColor="#0051FF" />
+        </linearGradient>
+        <linearGradient id="hdSpeedBarBot" x1="142" y1="239" x2="225" y2="239" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#00B8FF" />
+          <stop offset="100%" stopColor="#0044FF" />
+        </linearGradient>
+
+        <linearGradient id="hdHGrad" x1="256" y1="125" x2="256" y2="275" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#FFFFFF" />
-          <stop offset="40%" stopColor="#F1F5F9" />
-          <stop offset="50%" stopColor="#E2E8F0" />
-          <stop offset="60%" stopColor="#94A3B8" />
-          <stop offset="100%" stopColor="#475569" />
+          <stop offset="100%" stopColor="#E6EEF8" />
         </linearGradient>
-        <linearGradient id="driverTextGrad" x1="130" y1="120" x2="470" y2="170" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#00E5FF" />
-          <stop offset="50%" stopColor="#3B82F6" />
-          <stop offset="100%" stopColor="#1D4ED8" />
-        </linearGradient>
-        <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="5" result="blur" />
+
+        <filter id="hdBorderGlow" x="-10%" y="-10%" width="120%" height="120%">
+          <feGaussianBlur stdDeviation="6" result="blur" />
           <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
       </defs>
 
-      {/* Speed lines trailing on the left */}
-      <path d="M 60 70 L 220 70" stroke="#007BFF" strokeWidth="3" opacity="0.6" strokeLinecap="round" />
-      <path d="M 100 64 L 250 64" stroke="#00E5FF" strokeWidth="4" opacity="0.8" strokeLinecap="round" />
-      <path d="M 120 76 L 200 76" stroke="#0056b3" strokeWidth="2.5" opacity="0.5" strokeLinecap="round" />
-      
-      {/* Sleek Sports Car Contour */}
-      {/* Roof & Back curve */}
-      <path 
-        d="M 230 72 C 270 55, 340 45, 430 55 C 470 60, 490 68, 510 74 C 500 72, 450 60, 410 58 C 360 56, 290 64, 250 72 Z" 
-        fill="#FFFFFF" 
-      />
-      
-      {/* Windshield & Hood curve */}
-      <path 
-        d="M 320 52 C 370 50, 400 52, 440 62 L 480 68 C 450 63, 400 58, 320 52 Z" 
-        fill="#94A3B8" 
-        opacity="0.8"
+      {/* Rounded Squircle App Icon Frame */}
+      <rect
+        x="38"
+        y="38"
+        width="436"
+        height="436"
+        rx="102"
+        fill="url(#hdBgInnerGrad)"
+        stroke="url(#hdBorderGrad)"
+        strokeWidth="12"
+        filter="url(#hdBorderGlow)"
       />
 
-      {/* Car Side Body & Wheel Arch outline */}
-      <path 
-        d="M 230 72 C 265 72, 275 66, 290 68 C 305 70, 315 76, 320 80 C 330 74, 345 66, 385 68 C 420 70, 435 84, 450 84 C 470 82, 492 78, 510 74" 
-        stroke="#E2E8F0" 
-        strokeWidth="3" 
-        strokeLinecap="round" 
-        fill="none" 
+      {/* Three Horizontal Rounded Speed Bars on Left of H */}
+      <rect x="157" y="154" width="84" height="22" rx="11" fill="url(#hdSpeedBarTop)" />
+      <rect x="121" y="191" width="98" height="22" rx="11" fill="url(#hdSpeedBarMid)" />
+      <rect x="142" y="228" width="76" height="22" rx="11" fill="url(#hdSpeedBarBot)" />
+
+      {/* Bold Slanted White 'H' */}
+      <path
+        d="M 244 128 L 286 128 L 271 182 L 326 182 L 341 128 L 383 128 L 343 272 L 301 272 L 318 212 L 263 212 L 246 272 L 204 272 Z"
+        fill="url(#hdHGrad)"
       />
 
-      {/* Stylized Electric Headlight */}
-      <path 
-        d="M 465 74 C 480 77, 495 80, 502 81 C 495 83, 480 84, 465 82 Z" 
-        fill="#00E5FF" 
-        filter="url(#neonGlow)"
-      />
-
-      {/* Horizon Separator line with blue glow */}
-      <line x1="100" y1="88" x2="520" y2="88" stroke="#1E293B" strokeWidth="2" strokeLinecap="round" />
-      <line x1="140" y1="88" x2="480" y2="88" stroke="#00E5FF" strokeWidth="1.5" strokeLinecap="round" opacity="0.6" filter="url(#neonGlow)" />
-
-      {/* Text "HYPER" slanted */}
+      {/* "Hyper" Typography */}
       <text
-        x="300"
-        y="126"
-        fill="url(#hyperTextGrad)"
-        fontFamily="-apple-system, BlinkMacSystemFont, 'Impact', 'Arial Black', sans-serif"
-        fontSize="48"
+        x="256"
+        y="355"
+        fill="#FFFFFF"
+        fontFamily="'Inter', 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+        fontSize="88"
         fontWeight="900"
-        fontStyle="italic"
-        letterSpacing="8"
+        letterSpacing="-1.5"
         textAnchor="middle"
-        style={{ transform: 'skewX(-10deg)', transformOrigin: '300px 126px' }}
       >
-        BOLT
+        Hyper
       </text>
 
-      {/* Text "DRIVER" slanted electric blue */}
+      {/* "D R I V E R" Typography */}
       <text
-        x="300"
-        y="164"
-        fill="url(#driverTextGrad)"
-        fontFamily="-apple-system, BlinkMacSystemFont, 'Impact', 'Arial Black', sans-serif"
-        fontSize="34"
-        fontWeight="900"
-        fontStyle="italic"
-        letterSpacing="12"
+        x="262"
+        y="404"
+        fill="#009EFF"
+        fontFamily="'Inter', 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+        fontSize="30"
+        fontWeight="800"
+        letterSpacing="14"
         textAnchor="middle"
-        filter="url(#neonGlow)"
-        style={{ transform: 'skewX(-10deg)', transformOrigin: '300px 164px' }}
       >
         DRIVER
       </text>

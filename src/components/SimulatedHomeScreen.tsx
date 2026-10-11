@@ -564,13 +564,13 @@ export default function SimulatedHomeScreen({
         {/* Simulated iOS Style App Icons Grid */}
         <div className="grid grid-cols-4 gap-y-7 gap-x-3 mt-4 max-w-sm mx-auto">
           
-          {/* Dual Dispatch - Our App! */}
+          {/* Hyper Driver - Our App! */}
           <div className="flex flex-col items-center">
             <button 
               onClick={onOpenApp}
-              className="w-14 h-14 bg-gradient-to-tr from-slate-950 to-neutral-900 border-2 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.35)] hover:shadow-[0_0_25px_rgba(59,130,246,0.65)] hover:border-blue-400 rounded-2xl flex items-center justify-center text-blue-400 hover:text-white relative active:scale-90 transition-all cursor-pointer before:absolute before:inset-0 before:bg-blue-500/10 before:rounded-2xl"
+              className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center relative active:scale-90 transition-all cursor-pointer shadow-[0_0_20px_rgba(0,158,255,0.45)] hover:shadow-[0_0_28px_rgba(0,158,255,0.75)] overflow-visible"
             >
-              <Compass size={28} className="text-blue-400 animate-spin-slow shadow-sm" />
+              <img src="/icon.svg" alt="Hyper Driver" className="w-full h-full object-contain rounded-2xl" />
               
               {/* Notifications Badge */}
               {pendingOrder && (
@@ -583,7 +583,7 @@ export default function SimulatedHomeScreen({
                 </motion.div>
               )}
             </button>
-            <span className="text-[10px] text-slate-200 mt-1.5 font-bold tracking-tight text-center truncate w-full">Dual Dispatch</span>
+            <span className="text-[10px] text-slate-200 mt-1.5 font-bold tracking-tight text-center truncate w-full">Hyper Driver</span>
           </div>
 
           {[
