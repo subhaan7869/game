@@ -30,6 +30,9 @@ interface OfflineHomeScreenProps {
   onOpenSearch: () => void;
   onOpenLayers?: () => void;
   onOpenMap?: () => void;
+  onOpenRankPro?: () => void;
+  onOpenLeague?: () => void;
+  onOpenCarPlay?: () => void;
   activeSurgeAreas?: any[];
   theme?: 'light' | 'dark';
 }
@@ -44,6 +47,9 @@ export const OfflineHomeScreen: React.FC<OfflineHomeScreenProps> = ({
   onOpenSearch,
   onOpenLayers,
   onOpenMap,
+  onOpenRankPro,
+  onOpenLeague,
+  onOpenCarPlay,
   activeSurgeAreas = [],
   theme = 'light'
 }) => {
@@ -199,6 +205,87 @@ export const OfflineHomeScreen: React.FC<OfflineHomeScreenProps> = ({
             <span className="text-xs font-black text-blue-600">Explore</span>
           </div>
         </div>
+
+        {/* 2.5 Driver Rank & League Progression System Card */}
+        {(() => {
+          const pts = user.points ?? 350;
+          const computedTier = pts >= 1200 ? 'Diamond' : pts >= 600 ? 'Platinum' : pts >= 200 ? 'Gold' : 'Blue';
+          const nextTierName = computedTier === 'Blue' ? 'Gold' : computedTier === 'Gold' ? 'Platinum' : computedTier === 'Platinum' ? 'Diamond' : 'Max Rank';
+          const tierFloor = computedTier === 'Blue' ? 0 : computedTier === 'Gold' ? 200 : computedTier === 'Platinum' ? 600 : 1200;
+          const nextTarget = computedTier === 'Blue' ? 200 : computedTier === 'Gold' ? 600 : computedTier === 'Platinum' ? 1200 : 2000;
+          const progressPct = computedTier === 'Diamond'
+            ? 100
+            : Math.min(100, Math.max(5, Math.round(((pts - tierFloor) / (nextTarget - tierFloor)) * 100)));
+
+          return (
+            <div className="bg-gradient-to-br from-slate-950 via-[#0d1527] to-slate-900 text-white rounded-3xl p-5 shadow-xl border border-blue-500/25 space-y-4 relative overflow-hidden">
+              <div className="absolute -top-10 -right-10 w-36 h-36 bg-blue-500/15 rounded-full blur-2xl pointer-events-none" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-600 flex items-center justify-center text-black shadow-lg shadow-amber-500/20">
+                    <Award size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">Hyper Pro Rank</span>
+                      <span className="px-2 py-0.5 rounded-full bg-white/10 text-[9px] font-black uppercase tracking-wider text-blue-300">
+                        Level {user.level || Math.max(1, Math.floor(pts / 100) + 1)}
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-black tracking-tight text-white">{computedTier} League Driver</h3>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-black text-amber-400 font-mono leading-none">{pts} XP</p>
+                  <p className="text-[10px] font-bold text-gray-400 mt-1">
+                    {computedTier === 'Diamond' ? 'Top 1% Tier' : `${nextTarget - pts} XP to ${nextTierName}`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-400 via-yellow-400 to-cyan-400 rounded-full transition-all duration-500"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] font-bold text-gray-400">
+                  <span>Rating: {(user.rating || 4.95).toFixed(2)} ★</span>
+                  <span>Acceptance: {user.acceptanceRate ?? 94}%</span>
+                  <span>On-Time: {user.onTimeRate ?? 98}%</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                <button
+                  onClick={() => onOpenRankPro && onOpenRankPro()}
+                  className="py-2.5 px-3 bg-white/10 hover:bg-white/15 border border-white/10 rounded-2xl text-xs font-black uppercase tracking-wider text-white flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Award size={14} className="text-amber-400" />
+                  <span>Pro Perks & Tiers</span>
+                </button>
+                <button
+                  onClick={() => onOpenLeague && onOpenLeague()}
+                  className="py-2.5 px-3 bg-blue-600/80 hover:bg-blue-600 border border-blue-400/40 rounded-2xl text-xs font-black uppercase tracking-wider text-white flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Zap size={14} className="text-cyan-300" />
+                  <span>Live Leaderboard</span>
+                </button>
+              </div>
+
+              {onOpenCarPlay && (
+                <button
+                  onClick={onOpenCarPlay}
+                  className="w-full py-2.5 px-3 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 rounded-2xl text-xs font-black uppercase tracking-wider text-emerald-300 flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Navigation size={14} className="text-emerald-400" />
+                  <span>Open CarPlay Map View (iPad ⇄ PC Sync)</span>
+                </button>
+              )}
+            </div>
+          );
+        })()}
 
         {/* 3. Opportunities Section */}
         <div className="space-y-3">
