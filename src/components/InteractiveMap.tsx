@@ -267,9 +267,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const pendingOfferMarkerDestRef = useRef<L.Marker | null>(null);
   const pendingOfferPolylineRef = useRef<L.Polyline | null>(null);
 
-  const [showServiceLimitsModal, setShowServiceLimitsModal] = useState(false);
-  const [tileStyle, setTileStyle] = useState<'carto_dark' | 'osm_standard' | 'carto_voyager'>('carto_dark');
-
   // Initialize Leaflet Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -285,21 +282,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       center: [startLat, startLng],
       zoom: initialZoom,
       zoomControl: false,
-      attributionControl: true
+      attributionControl: false
     });
 
-    // High-fidelity OpenStreetMap tiles matching Hyper Driver theme
-    let tileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-    if (tileStyle === 'osm_standard') {
-      tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-    } else if (tileStyle === 'carto_voyager' || theme === 'light') {
-      tileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-    }
+    // Beautiful high-fidelity Map Tiles matching Light/Dark theme dynamically
+    const tileUrl = theme === 'dark'
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
     const tileLayer = L.tileLayer(tileUrl, {
       maxZoom: 20,
-      minZoom: 1,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>'
+      minZoom: 1
     }).addTo(map);
 
     tileLayerRef.current = tileLayer;
@@ -336,19 +329,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     }
   }, [isNavigating]);
 
-  // Update Tile Layer URL source dynamically when theme or tileStyle toggles
+  // Update Tile Layer URL source dynamically when theme toggles
   useEffect(() => {
     if (!mapRef.current || !tileLayerRef.current) return;
     
-    let tileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-    if (tileStyle === 'osm_standard') {
-      tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-    } else if (tileStyle === 'carto_voyager' || theme === 'light') {
-      tileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-    }
+    const tileUrl = theme === 'dark'
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
     tileLayerRef.current.setUrl(tileUrl);
-  }, [theme, tileStyle]);
+  }, [theme]);
 
   // Synchronize dynamic Layers upon prop changes
   useEffect(() => {
@@ -662,131 +652,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           </p>
           <div className="mt-4 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-[9px] font-mono font-extrabold uppercase tracking-widest text-amber-400">
             Thread Suspended (0Hz Tick)
-          </div>
-        </div>
-      )}
-
-      {/* Prominent OpenStreetMap & Leaflet Visible Attribution Badge (Compliant with OSM / Leaflet Guidelines) */}
-      <div className="absolute bottom-3 right-3 z-[1000] bg-black/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/15 text-[9.5px] text-gray-300 flex items-center gap-2 shadow-2xl pointer-events-auto">
-        <span className="font-semibold text-gray-200">
-          © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">OpenStreetMap</a> contributors
-        </span>
-        <span className="text-gray-600">•</span>
-        <span className="text-gray-300">Leaflet</span>
-        <span className="text-gray-600">•</span>
-        <button 
-          onClick={() => setShowServiceLimitsModal(true)}
-          className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer transition-colors"
-          title="View Free Service Limits"
-        >
-          <Info size={11} />
-          <span>Services & Limits</span>
-        </button>
-      </div>
-
-      {/* Free Services & Limits Modal */}
-      {showServiceLimitsModal && (
-        <div 
-          className="absolute inset-0 z-[7000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 text-white pointer-events-auto"
-          onClick={() => setShowServiceLimitsModal(false)}
-        >
-          <div 
-            className="w-full max-w-md bg-[#0f172a] border border-white/15 rounded-3xl p-6 shadow-2xl space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
-                  <Info size={18} />
-                </div>
-                <div>
-                  <h3 className="font-black text-base text-white">Free Map Services & Limits</h3>
-                  <p className="text-[10px] text-gray-400">Pure Leaflet & OpenStreetMap (No Google Maps API Key)</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setShowServiceLimitsModal(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-gray-300"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="bg-[#18233c] p-3 rounded-2xl border border-white/5 space-y-1">
-                <div className="flex items-center justify-between text-blue-400 font-black text-xs uppercase">
-                  <span>1. Leaflet (Engine)</span>
-                  <span className="text-emerald-400 text-[10px]">100% Free / Open Source</span>
-                </div>
-                <p className="text-gray-300 text-[11px] leading-relaxed">
-                  Client-side mobile GIS library. Runs entirely in your browser with zero API keys and zero billing.
-                </p>
-              </div>
-
-              <div className="bg-[#18233c] p-3 rounded-2xl border border-white/5 space-y-1">
-                <div className="flex items-center justify-between text-cyan-400 font-black text-xs uppercase">
-                  <span>2. OpenStreetMap & CARTO Tiles</span>
-                  <span className="text-emerald-400 text-[10px]">Free Open Data</span>
-                </div>
-                <p className="text-gray-300 text-[11px] leading-relaxed">
-                  Crowdsourced global road network. <strong>Fair Use Limit:</strong> Standard public tile servers support interactive browsing and driver app usage. Tiles are cached locally in the browser to reduce load.
-                </p>
-              </div>
-
-              <div className="bg-[#18233c] p-3 rounded-2xl border border-white/5 space-y-1">
-                <div className="flex items-center justify-between text-amber-400 font-black text-xs uppercase">
-                  <span>3. Project-OSRM (Routing)</span>
-                  <span className="text-amber-300 text-[10px]">Free Demo Server</span>
-                </div>
-                <p className="text-gray-300 text-[11px] leading-relaxed">
-                  Open Source Routing Machine computes turn-by-turn routes. <strong>Fair Use Limit:</strong> ~300 requests/minute. The app incorporates automatic local fallback routing if network drops occur.
-                </p>
-              </div>
-            </div>
-
-            {/* Tile Style Picker */}
-            <div className="pt-2 border-t border-white/10">
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-2">Switch Map Layer:</span>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => setTileStyle('carto_dark')}
-                  className={`py-2 px-2.5 rounded-xl text-[10px] font-bold border transition-all ${
-                    tileStyle === 'carto_dark' 
-                      ? 'bg-blue-600 border-blue-400 text-white shadow-md' 
-                      : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
-                  }`}
-                >
-                  Dark (Hyper)
-                </button>
-                <button
-                  onClick={() => setTileStyle('osm_standard')}
-                  className={`py-2 px-2.5 rounded-xl text-[10px] font-bold border transition-all ${
-                    tileStyle === 'osm_standard' 
-                      ? 'bg-blue-600 border-blue-400 text-white shadow-md' 
-                      : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
-                  }`}
-                >
-                  OSM Standard
-                </button>
-                <button
-                  onClick={() => setTileStyle('carto_voyager')}
-                  className={`py-2 px-2.5 rounded-xl text-[10px] font-bold border transition-all ${
-                    tileStyle === 'carto_voyager' 
-                      ? 'bg-blue-600 border-blue-400 text-white shadow-md' 
-                      : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
-                  }`}
-                >
-                  Light / Day
-                </button>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowServiceLimitsModal(false)}
-              className="w-full py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold text-xs transition-colors"
-            >
-              Close
-            </button>
           </div>
         </div>
       )}
