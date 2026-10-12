@@ -122,6 +122,7 @@ import { CompanionChat } from './components/CompanionChat';
 import { MultiplayerHub, OtherDriver } from './components/MultiplayerHub';
 import { CommandCentreScreen } from './components/CommandCentreScreen';
 import { OfflineHomeScreen } from './components/OfflineHomeScreen';
+import CarPlayDashboard from './components/CarPlayDashboard';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
@@ -3292,617 +3293,7 @@ const PersonalDetailsScreen = ({
   );
 };
 
-const CarPlayDashboard = ({ 
-  activeOrders, 
-  user, 
-  onClose,
-  isCarPlaySynced,
-  setIsCarPlaySynced,
-  mapNode,
-  isNavigating = false,
-  setIsNavigating,
-  distanceToTarget,
-  handleNextStep,
-  busyAreaTarget,
-  carPlayRoomCode = 'HYPER1',
-  setCarPlayRoomCode,
-  isCarPlayRemoteMode = false,
-  setIsCarPlayRemoteMode,
-  lastSyncedDestination,
-  onTriggerNavigateSync,
-  pendingOrder,
-  orderExpiryTimer = 18,
-  onAcceptOrder,
-  onDeclineOrder,
-  onTriggerTestJob,
-  todayEarningsTotal = 0,
-  activeBrand = 'uber',
-  isMatchingLoading = false,
-  isMatchFailed = false,
-  onToggleOnline,
-  location
-}: { 
-  activeOrders: Order[], 
-  user: UserProfile, 
-  onClose: () => void,
-  isCarPlaySynced: boolean,
-  setIsCarPlaySynced: (val: boolean) => void,
-  mapNode?: React.ReactNode,
-  isNavigating?: boolean,
-  setIsNavigating?: (val: boolean) => void,
-  distanceToTarget?: (order: Order) => string,
-  handleNextStep?: (id: string) => void,
-  busyAreaTarget?: { id: string; name: string; location: Location } | null,
-  carPlayRoomCode?: string,
-  setCarPlayRoomCode?: (code: string) => void,
-  isCarPlayRemoteMode?: boolean,
-  setIsCarPlayRemoteMode?: (val: boolean) => void,
-  lastSyncedDestination?: {
-    label: string;
-    subtitle?: string;
-    miles?: string;
-    minutes?: number;
-    latitude?: number;
-    longitude?: number;
-    stage?: string;
-  } | null,
-  onTriggerNavigateSync?: () => void,
-  pendingOrder?: Order | null,
-  orderExpiryTimer?: number,
-  onAcceptOrder?: () => void,
-  onDeclineOrder?: () => void,
-  onTriggerTestJob?: () => void,
-  todayEarningsTotal?: number,
-  activeBrand?: 'uber' | 'hyper' | 'both',
-  isMatchingLoading?: boolean,
-  isMatchFailed?: boolean,
-  onToggleOnline?: () => void,
-  location?: Location | null
-}) => {
-  const [viewMode, setViewMode] = useState<'split' | 'full_map'>('split');
-  const [editingRoom, setEditingRoom] = useState(carPlayRoomCode);
-  const activeOrder = activeOrders[0];
-
-  const milesStr = activeOrder && distanceToTarget
-    ? distanceToTarget(activeOrder)
-    : lastSyncedDestination?.miles || (activeOrder ? activeOrder.estimatedDistance.toFixed(1) : '0.0');
-  const milesNum = parseFloat(milesStr) || 0;
-  const minsVal = activeOrder
-    ? Math.max(1, Math.ceil(milesNum * 3))
-    : lastSyncedDestination?.minutes || 3;
-
-  const isPickupStage = !activeOrder || activeOrder.status === 'accepted' || activeOrder.status === 'en_route_to_pickup' || activeOrder.status === 'arriving' || activeOrder.status === 'arrived' || activeOrder.status === 'scanning_receipt';
-  const targetTitle = activeOrder
-    ? (isPickupStage ? `Pickup: ${activeOrder.restaurantName || 'Pickup Point'}` : `Dropoff: ${activeOrder.customerName || 'Customer'}`)
-    : busyAreaTarget
-    ? `Surge Zone: ${busyAreaTarget.name}`
-    : lastSyncedDestination?.label || 'Waiting for iPad Navigation';
-
-  const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  // Pay rate calculation for pending job
-  const pendingPayRate = pendingOrder
-    ? calculatePayRate(pendingOrder.estimatedPay, pendingOrder.estimatedDistance)
-    : null;
-  const isPendingDouble = !!(pendingOrder?.isStacked || (pendingOrder?.batchCount && pendingOrder.batchCount > 1));
-  const isPendingDelivery = pendingOrder?.type === 'delivery';
-  const pendingPickupDistance = pendingOrder ? (pendingOrder.estimatedDistance * 0.4).toFixed(1) : '0.8';
-  const pendingPickupMinutes = pendingOrder ? Math.max(1, Math.ceil(parseFloat(pendingPickupDistance) * 3)) : 3;
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }} 
-      animate={{ opacity: 1 }} 
-      exit={{ opacity: 0 }} 
-      className="fixed inset-0 z-[5000] bg-[#050507] text-white flex flex-col font-sans select-none overflow-hidden"
-    >
-      {/* Top CarPlay Status Bar */}
-      <div className="h-12 bg-black/90 backdrop-blur-xl flex items-center justify-between px-5 border-b border-white/10 shrink-0 z-30">
-        <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
-          <span className="text-sm font-black tracking-tight font-mono">{nowStr}</span>
-          <div className="flex items-end gap-0.5 h-3">
-            <div className="w-1 h-1.5 bg-emerald-400 rounded-full" />
-            <div className="w-1 h-2 bg-emerald-400 rounded-full" />
-            <div className="w-1 h-2.5 bg-emerald-400 rounded-full" />
-            <div className="w-1 h-3 bg-emerald-400 rounded-full" />
-          </div>
-
-          {/* Online Toggle */}
-          <button
-            onClick={() => onToggleOnline && onToggleOnline()}
-            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
-              user.isOnline 
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30' 
-                : 'bg-white/10 text-gray-400 border border-white/10 hover:bg-white/15'
-            }`}
-            title="Toggle Driver Online / Offline"
-          >
-            <span className={`w-2 h-2 rounded-full ${user.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-gray-500'}`} />
-            <span>{user.isOnline ? "ONLINE • Scanning" : "OFFLINE"}</span>
-          </button>
-
-          {/* Today's Earnings */}
-          <div className="hidden sm:flex px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-wider text-emerald-400 font-mono">
-            Today: £{todayEarningsTotal.toFixed(2)}
-          </div>
-
-          {/* Room Sync Indicator */}
-          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            Room: {carPlayRoomCode} • {isCarPlayRemoteMode ? 'PC Display' : 'iPad Controller'}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Test Job Request button for quick demonstration on PC */}
-          {onTriggerTestJob && (
-            <button
-              onClick={() => onTriggerTestJob()}
-              className="px-3 py-1 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/40 text-purple-200 rounded-full text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1 shadow-sm active:scale-95"
-              title="Send a sample job request to CarPlay screen"
-            >
-              <Bell size={11} className="text-purple-300" />
-              <span>Test Job Request 🔔</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => setViewMode(prev => prev === 'split' ? 'full_map' : 'split')}
-            className="px-3 py-1 bg-white/10 hover:bg-white/15 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-wider text-white cursor-pointer transition-all"
-          >
-            {viewMode === 'split' ? 'Full Map' : 'Split View'}
-          </button>
-
-          <button 
-            onClick={() => onClose()}
-            className="px-3 py-1 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-400 rounded-full text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all"
-          >
-            Exit
-          </button>
-        </div>
-      </div>
-
-      <div className="flex-1 flex min-h-0 relative">
-        {/* Left CarPlay Dock (Apple CarPlay Style) */}
-        <div className="w-20 bg-black/95 backdrop-blur-xl flex flex-col items-center py-5 gap-4 border-r border-white/10 shrink-0 z-20">
-          <button
-            onClick={() => setViewMode('split')}
-            className={`w-13 h-13 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden border-2 transition-all cursor-pointer ${
-              viewMode === 'split' ? 'border-blue-400 scale-105' : 'border-white/10 opacity-80'
-            }`}
-            title="CarPlay Split View"
-          >
-            <img src="/icon.svg" alt="Hyper Driver" className="w-full h-full object-cover" />
-          </button>
-
-          <button
-            onClick={() => setViewMode('full_map')}
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all cursor-pointer ${
-              viewMode === 'full_map'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/40'
-                : 'bg-white/10 text-gray-300 hover:bg-white/15'
-            }`}
-            title="Full Map View"
-          >
-            <Navigation size={22} />
-          </button>
-
-          <button
-            onClick={() => setIsCarPlayRemoteMode && setIsCarPlayRemoteMode(!isCarPlayRemoteMode)}
-            className={`w-12 h-12 rounded-2xl flex flex-col items-center justify-center transition-all cursor-pointer border ${
-              isCarPlayRemoteMode
-                ? 'bg-emerald-600/30 border-emerald-400 text-emerald-300'
-                : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
-            }`}
-            title="Toggle PC Receiver / iPad Controller Role"
-          >
-            <Smartphone size={18} />
-            <span className="text-[8px] font-black uppercase mt-0.5">{isCarPlayRemoteMode ? 'PC' : 'iPad'}</span>
-          </button>
-
-          {/* Quick Test dispatch trigger on dock */}
-          {onTriggerTestJob && (
-            <button
-              onClick={() => onTriggerTestJob()}
-              className="w-11 h-11 rounded-2xl bg-white/5 hover:bg-purple-600/20 text-gray-400 hover:text-purple-300 border border-white/10 flex items-center justify-center transition-all cursor-pointer"
-              title="Test Job Request"
-            >
-              <Bell size={18} />
-            </button>
-          )}
-
-          <button
-            onClick={onClose}
-            className="mt-auto w-11 h-11 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center text-white cursor-pointer active:scale-95 transition-all"
-            title="Return to Standard View"
-          >
-            <Home size={20} />
-          </button>
-        </div>
-
-        {/* Main CarPlay Content Area: Uses Your Existing Live Map + CarPlay Overlays */}
-        <div className="flex-1 flex gap-4 p-4 min-h-0 relative overflow-hidden bg-[#090a0f]">
-          {/* Primary Map Panel */}
-          <div className={`${viewMode === 'full_map' ? 'flex-1' : 'flex-[1.45]'} relative rounded-[32px] overflow-hidden border border-white/15 shadow-2xl bg-[#0c0c0d] min-h-0`}>
-            {/* Existing InteractiveMap / MapGrid */}
-            <div className="absolute inset-0 w-full h-full">
-              {mapNode}
-            </div>
-
-            {/* CarPlay Turn-by-Turn Top-Left Navigation Card Overlay */}
-            <div className="absolute top-4 left-4 right-4 sm:right-auto sm:w-[340px] z-[3600] pointer-events-auto">
-              <div className={`rounded-3xl p-4 shadow-2xl border backdrop-blur-xl ${
-                isNavigating || activeOrder || busyAreaTarget || lastSyncedDestination
-                  ? 'bg-emerald-950/90 border-emerald-500/40 text-white'
-                  : 'bg-slate-950/90 border-white/15 text-white'
-              }`}>
-                <div className="flex items-center gap-3.5">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg ${
-                    isNavigating ? 'bg-emerald-500 text-black' : 'bg-blue-600 text-white'
-                  }`}>
-                    <Navigation size={24} style={{ transform: 'rotate(45deg)' }} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-black/40 text-emerald-300">
-                        {isNavigating ? 'LIVE ROUTE ACTIVE' : 'CARPLAY READY'}
-                      </span>
-                      {(activeOrder || lastSyncedDestination) && (
-                        <span className="text-xs font-mono font-black text-amber-300">
-                          {milesStr} mi • {minsVal} min
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="text-base font-black tracking-tight truncate mt-1">
-                      {targetTitle}
-                    </h2>
-                    <p className="text-[11px] text-gray-300 font-bold truncate">
-                      {activeOrder
-                        ? `Est. Payout £${activeOrder.estimatedPay.toFixed(2)} • ${isPickupStage ? 'Route to Pickup' : 'Route to Dropoff'}`
-                        : lastSyncedDestination?.subtitle || 'Tap Navigate on iPad to push route to PC map'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Quick Navigation & Step Controls on the Map Card */}
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/10">
-                  <button
-                    onClick={() => {
-                      if (setIsNavigating) setIsNavigating(!isNavigating);
-                      if (!isNavigating && onTriggerNavigateSync) onTriggerNavigateSync();
-                    }}
-                    className={`flex-1 py-2 px-3 rounded-xl font-black text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                      isNavigating
-                        ? 'bg-amber-500 text-black'
-                        : 'bg-blue-600 hover:bg-blue-500 text-white'
-                    }`}
-                  >
-                    <Navigation size={12} />
-                    <span>{isNavigating ? 'Navigating (Sync On)' : 'Navigate & Sync to PC'}</span>
-                  </button>
-
-                  {activeOrder && handleNextStep && (
-                    <button
-                      onClick={() => handleNextStep(activeOrder.id)}
-                      className="py-2 px-3 rounded-xl font-black text-[10px] uppercase tracking-wider bg-emerald-500 hover:bg-emerald-400 text-black transition-all cursor-pointer"
-                    >
-                      {isPickupStage ? 'Confirm Pickup' : 'Complete Trip'}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom CarPlay Map Telemetry Pill */}
-            <div className="absolute bottom-4 left-4 right-4 z-[3600] flex items-center justify-between pointer-events-none">
-              <div className="px-4 py-2 rounded-2xl bg-black/80 backdrop-blur-md border border-white/10 flex items-center gap-3 pointer-events-auto">
-                <span className={`w-2.5 h-2.5 rounded-full ${user.isOnline ? 'bg-emerald-400 animate-ping' : 'bg-gray-500'}`} />
-                <span className="text-xs font-black uppercase tracking-wider">
-                  {user.isOnline
-                    ? activeOrder
-                      ? `${milesStr} mi • ${minsVal} min to ${isPickupStage ? 'pickup' : 'dropoff'}`
-                      : "You're Online • Scanning"
-                    : 'Offline'}
-                </span>
-              </div>
-            </div>
-
-            {/* CarPlay Incoming Job Request Card Overlay (Uber CarPlay Style from Demo Video) */}
-            <AnimatePresence>
-              {pendingOrder && (
-                <motion.div
-                  key={`carplay-job-request-${pendingOrder.id}`}
-                  initial={{ opacity: 0, scale: 0.94, y: 30 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.94, y: 30 }}
-                  transition={{ type: 'spring', damping: 26, stiffness: 260 }}
-                  className="absolute top-4 right-4 bottom-4 w-[calc(100%-32px)] sm:w-[440px] max-w-full z-[4200] flex flex-col pointer-events-auto"
-                >
-                  <div className="flex-1 bg-[#090b10]/95 backdrop-blur-2xl border-2 border-white/20 rounded-[32px] p-5 shadow-[0_25px_70px_rgba(0,0,0,0.9)] flex flex-col justify-between text-white overflow-hidden relative">
-                    {/* Top Badges & Close/Decline */}
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-3">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {/* Service Pill (UberX / Uber Eats / Hyper Ride) */}
-                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider bg-black text-white border border-white/20 shadow-sm">
-                            {isPendingDelivery ? (
-                              <>
-                                <Utensils size={13} className="text-emerald-400" />
-                                <span>{pendingOrder.brand === 'hyper' ? 'Hyper Eats' : 'Uber Eats'}</span>
-                              </>
-                            ) : (
-                              <>
-                                <CarIcon size={13} className="text-blue-400" fill="currentColor" />
-                                <span>{pendingOrder.restaurantName || (pendingOrder.brand === 'hyper' ? 'Hyper Ride' : 'UberX')}</span>
-                              </>
-                            )}
-                          </div>
-
-                          {/* Rating */}
-                          <div className="flex items-center gap-1 bg-white/10 px-2.5 py-1.5 rounded-xl text-xs font-black text-amber-300 border border-white/10">
-                            <Star size={12} fill="#eab308" className="text-yellow-500" />
-                            <span>4.96</span>
-                          </div>
-
-                          {/* Surge Pill */}
-                          {pendingOrder.surge ? (
-                            <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 animate-pulse">
-                              <Flame size={11} className="text-amber-400" />
-                              <span>+{ (pendingOrder.surge * 2.2).toFixed(2) } Surge</span>
-                            </span>
-                          ) : null}
-
-                          {/* Double Order Pill */}
-                          {isPendingDouble && (
-                            <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/40">
-                              ✨ Double
-                            </span>
-                          )}
-
-                          {/* Pre-Booking */}
-                          {pendingOrder.isPreBooking && (
-                            <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/40">
-                              ⏰ Scheduled
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Top Decline (X) */}
-                        <button
-                          onClick={() => onDeclineOrder && onDeclineOrder()}
-                          className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 flex items-center justify-center cursor-pointer active:scale-90 transition-all border border-white/10"
-                          title="Decline Job"
-                        >
-                          <X size={18} />
-                        </button>
-                      </div>
-
-                      {/* Large Fare Display */}
-                      <div className="flex items-baseline justify-between mb-2">
-                        <div>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Total Guaranteed Payout</span>
-                          <h2 className="text-5xl font-black tracking-tight text-white font-sans leading-none mt-0.5">
-                            £{pendingOrder.estimatedPay.toFixed(2)}
-                          </h2>
-                        </div>
-                        {pendingPayRate && (
-                          <div className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider border ${pendingPayRate.color}`}>
-                            <span>{pendingPayRate.icon}</span> <span>{pendingPayRate.label}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Trip Summary Telemetry */}
-                      <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-2xl mb-4 text-xs font-bold text-gray-200">
-                        <span className="text-emerald-400 font-black">Pickup in {pendingPickupMinutes} min ({pendingPickupDistance} mi)</span>
-                        <span className="text-gray-500">•</span>
-                        <span>Total: {pendingOrder.estimatedTime} min ({pendingOrder.estimatedDistance.toFixed(1)} mi)</span>
-                      </div>
-
-                      {/* Route Stops Chain */}
-                      <div className="relative pl-6 space-y-4 my-2 border-l-2 border-dashed border-white/20 ml-3">
-                        {/* Pickup Stop */}
-                        <div className="relative">
-                          <div className="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-emerald-400 ring-4 ring-emerald-500/30 flex items-center justify-center">
-                            <div className="w-1.5 h-1.5 bg-black rounded-full" />
-                          </div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
-                            {isPendingDelivery ? 'Pickup Restaurant' : 'Rider Pickup Point'}
-                          </p>
-                          <h4 className="text-sm font-black text-white truncate">
-                            {pendingOrder.restaurantName || "High St Pickup Point"}
-                          </h4>
-                          <p className="text-[11px] text-gray-400 truncate">
-                            {isPendingDelivery ? "12 Kingsway, Holborn, London" : "Passenger Pickup Location"}
-                          </p>
-                        </div>
-
-                        {/* Dropoff Stop */}
-                        <div className="relative">
-                          <div className="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-sm bg-blue-500 ring-4 ring-blue-500/30 flex items-center justify-center">
-                            <div className="w-1.5 h-1.5 bg-white rounded-full" />
-                          </div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">
-                            {isPendingDelivery ? 'Customer Dropoff' : 'Passenger Destination'}
-                          </p>
-                          <h4 className="text-sm font-black text-white truncate">
-                            {pendingOrder.customerName || "Customer Destination"}
-                          </h4>
-                          <p className="text-[11px] text-gray-400 truncate">
-                            {isPendingDelivery ? "48 High Holborn, London WC1V" : "Final Dropoff Location"}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Bottom Actions with Linear Countdown Bar */}
-                    <div className="space-y-3 pt-3 border-t border-white/10 shrink-0">
-                      {/* Animated Countdown Progress Bar */}
-                      <div className="relative w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                        <motion.div
-                          key={`carplay-timer-${pendingOrder.id}`}
-                          initial={{ width: '100%' }}
-                          animate={{ width: '0%' }}
-                          transition={{ duration: orderExpiryTimer, ease: 'linear' }}
-                          className={`h-full rounded-full ${
-                            orderExpiryTimer <= 5 ? 'bg-red-500' : 'bg-emerald-400'
-                          }`}
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => onDeclineOrder && onDeclineOrder()}
-                          className="h-14 px-5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
-                        >
-                          <X size={16} />
-                          <span>Decline</span>
-                        </button>
-
-                        <button
-                          onClick={() => onAcceptOrder && onAcceptOrder()}
-                          disabled={isMatchingLoading || isMatchFailed}
-                          className={`h-14 flex-1 rounded-2xl font-black text-base uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all cursor-pointer ${
-                            isMatchingLoading
-                              ? 'bg-emerald-600/50 text-white'
-                              : 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-black shadow-emerald-500/30'
-                          }`}
-                        >
-                          {isMatchingLoading ? (
-                            <>
-                              <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                              <span>Matching...</span>
-                            </>
-                          ) : isMatchFailed ? (
-                            <span>Another Driver Accepted</span>
-                          ) : (
-                            <>
-                              <Check size={20} className="stroke-[3]" />
-                              <span>Match ({orderExpiryTimer}s)</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Right Split-Screen Column: iPad <-> PC Connection + Active Order + Media */}
-          {viewMode === 'split' && (
-            <div className="flex-1 flex flex-col gap-4 min-w-[300px] max-w-[420px] overflow-y-auto custom-scrollbar pr-1">
-              {/* iPad <-> PC Pairing & Sync Control Card */}
-              <div className="bg-white/[0.04] rounded-[28px] p-5 border border-white/10 space-y-3.5 shrink-0">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">Cross-Device Bridge</span>
-                    <h3 className="text-base font-black text-white leading-tight">iPad ⇄ PC Live Map Link</h3>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase">
-                    Connected
-                  </span>
-                </div>
-
-                {/* Device Role Selector */}
-                <div className="grid grid-cols-2 gap-2 bg-black/40 p-1.5 rounded-2xl border border-white/5">
-                  <button
-                    onClick={() => setIsCarPlayRemoteMode && setIsCarPlayRemoteMode(false)}
-                    className={`py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                      !isCarPlayRemoteMode
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    📱 iPad (Controller)
-                  </button>
-                  <button
-                    onClick={() => setIsCarPlayRemoteMode && setIsCarPlayRemoteMode(true)}
-                    className={`py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                      isCarPlayRemoteMode
-                        ? 'bg-emerald-600 text-white shadow-md'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    💻 PC (Map Receiver)
-                  </button>
-                </div>
-
-                {/* Shared Room Code Input */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-black/50 border border-white/10 rounded-xl px-3 py-2 flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase">Sync Code:</span>
-                    <input
-                      value={editingRoom}
-                      onChange={(e) => setEditingRoom(e.target.value.toUpperCase())}
-                      className="w-20 bg-transparent text-right font-mono font-black text-sm text-amber-400 outline-none uppercase"
-                      maxLength={8}
-                    />
-                  </div>
-                  <button
-                    onClick={() => setCarPlayRoomCode && setCarPlayRoomCode(editingRoom.trim() || 'HYPER1')}
-                    className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-wider text-white cursor-pointer"
-                  >
-                    Apply
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => onTriggerNavigateSync && onTriggerNavigateSync()}
-                  className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer"
-                >
-                  <Navigation size={14} />
-                  <span>Send Active Route to PC Map Now</span>
-                </button>
-              </div>
-
-              {/* Active Trip Details Card */}
-              {activeOrder ? (
-                <div className="bg-white/[0.04] rounded-[28px] p-5 border border-white/10 flex flex-col justify-between gap-3 shrink-0">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">
-                        {isPickupStage ? 'Incoming Pickup' : 'Customer Dropoff'}
-                      </p>
-                      <h4 className="text-lg font-black truncate">
-                        {isPickupStage ? activeOrder.restaurantName : activeOrder.customerName}
-                      </h4>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-black text-emerald-400">£{activeOrder.estimatedPay.toFixed(2)}</p>
-                      <p className="text-[10px] font-bold text-gray-400">{milesStr} mi • {minsVal} min</p>
-                    </div>
-                  </div>
-
-                  {activeOrder.items && activeOrder.items.length > 0 && (
-                    <div className="bg-black/40 rounded-2xl p-3 border border-white/5 space-y-1">
-                      {activeOrder.items.slice(0, 3).map((item, i) => (
-                        <p key={i} className="text-xs font-bold text-gray-200 truncate">• {item}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-white/[0.04] rounded-[28px] p-5 border border-white/10 text-center shrink-0">
-                  <p className="text-sm font-black text-white">No Active Job Selected</p>
-                  <p className="text-xs text-gray-400 font-bold mt-1">
-                    When you accept a trip or tap Navigate on your iPad, the destination and route automatically project onto this map.
-                  </p>
-                </div>
-              )}
-
-              {/* Media Receiver */}
-              <div className="flex-1 min-h-[180px]">
-                <MediaControls isCarPlay={true} theme="dark" />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
-};
+// CarPlayDashboard is imported from ./components/CarPlayDashboard
 
 
 const OnboardingFlow = ({ 
@@ -8428,16 +7819,9 @@ export default function App() {
   const [isInsuranceRenewalChatOpen, setIsInsuranceRenewalChatOpen] = useState(false);
   const [isRadioExpanded, setIsRadioExpanded] = useState(false);
 
-  // Google Maps Platform Integration Key Checkers
-  const hasGoogleMapsCoreKey = useMemo(() => {
-    const key = process.env.GOOGLE_MAPS_PLATFORM_KEY || 
-                (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY || 
-                "";
-    return Boolean(key) && key !== "YOUR_API_KEY" && key.trim() !== "";
-  }, []);
-
-  const [mapCoreMode, setMapCoreMode] = useState<'cyber' | 'google'>('cyber');
-  const [navigationApp, setNavigationApp] = useState<'google' | 'waze' | 'apple' | 'cyber'>('google');
+  // Hyper OpenStreetMap & Leaflet Navigation (Free, No Google Maps API required)
+  const [mapCoreMode, setMapCoreMode] = useState<'osm' | 'cyber'>('osm');
+  const [navigationApp, setNavigationApp] = useState<'hyper_osm' | 'carto_dark' | 'waze' | 'apple'>('hyper_osm');
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
   const [isSpeechEnabled, setIsSpeechEnabled] = useState(false);
 
@@ -8567,11 +7951,6 @@ export default function App() {
   };
 
   const [isNavigating, setIsNavigating] = useState(false);
-  useEffect(() => {
-    if (!isNavigating) {
-      setMapCoreMode('cyber');
-    }
-  }, [isNavigating]);
   const [userSpeed, setUserSpeed] = useState(0);
   const [currentSpeedLimit, setCurrentSpeedLimit] = useState(30);
   const [isSpeeding, setIsSpeeding] = useState(false);
@@ -9311,6 +8690,26 @@ export default function App() {
 
     setLastSyncedDestination(navDest);
     setIsNavigating(true);
+
+    // Smoothly calculate driving route & lock map camera onto driver & destination
+    if (location && targetLoc) {
+      updateRouteWaypointsAsync(location, targetLoc);
+      setNavSimulation({
+        active: true,
+        orderId: primaryOrder ? primaryOrder.id : (targetArea ? targetArea.id : 'nav_target'),
+        type: isPickup ? 'pickup' : 'dropoff',
+        startPos: { lat: location.latitude, lng: location.longitude },
+        endPos: { lat: targetLoc.latitude, lng: targetLoc.longitude },
+        currentPos: { lat: location.latitude, lng: location.longitude },
+        progress: 0,
+        distanceRemaining: parseFloat(miles) || 0.8,
+        eta: minutes,
+        speed: 28
+      });
+      setMapOffset({ x: 0, y: 0 });
+      playHyperSound('navigate');
+      speakNotification(`Routing to ${label}. Distance: ${miles} miles.`);
+    }
 
     const payload = {
       room: carPlayRoomCode,
@@ -13202,7 +12601,7 @@ export default function App() {
           {currentScreen === 'home' && (
             <div className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
               {!showFullMap ? (
-                <motion.div key="offline-home-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-white">
+                <motion.div key="offline-home-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#070b14]">
                   <OfflineHomeScreen
                     user={user}
                     activeCityKey={activeCityKey}
@@ -13221,13 +12620,43 @@ export default function App() {
                     onOpenCarPlay={() => setCurrentScreen('carplay_dashboard')}
                     theme={theme}
                     activeSurgeAreas={activeSurgeAreas}
+                    onOpenMenu={() => setIsSideMenuOpen(true)}
+                    onOpenTrips={() => setIsBottomMenuOpen(true)}
+                    onOpenEarnings={() => setCurrentScreen('earnings_detail')}
+                    onOpenAccount={() => setIsSideMenuOpen(true)}
+                    onRecenterMap={() => {
+                      if (location) {
+                        setMapOffset({ x: 0, y: 0 });
+                      }
+                    }}
+                    mapNode={
+                      <InteractiveMap
+                        location={location}
+                        heading={heading}
+                        isOnline={false}
+                        isNavigating={false}
+                        currentStops={[]}
+                        pendingOrder={null}
+                        theme="dark"
+                        otherDrivers={otherOnlineDrivers}
+                        activeBrand={activeBrand}
+                        useRealGPS={useRealGPS}
+                        setUseRealGPS={setUseRealGPS}
+                        activeCityCenter={activeCityCenter}
+                        activeSurgeAreas={activeSurgeAreas}
+                        routeWaypoints={[]}
+                        zoom={zoom}
+                        setZoom={setZoom}
+                        iosMapKitEngine={iosMapKitEngine}
+                      />
+                    }
                   />
                 </motion.div>
               ) : (
                 <motion.div ref={mapContainerRef} key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
                   {/* Main Map Backdrop */}
               <div className="h-full w-full absolute inset-0 transition-all duration-500">
-                {mapCoreMode === 'google' ? (
+                {mapCoreMode !== 'cyber' ? (
                   <InteractiveMap
                     location={location}
                     heading={heading}
@@ -14888,74 +14317,27 @@ export default function App() {
               {/* Top Controls Overlay */}
               <div className="absolute top-0 left-0 right-0 z-[4500] pointer-events-none">
                 {!user.isOnline ? (
-                  /* High Fidelity Offline Header with Home Button on Top Left */
-                  <div className="p-4 pt-6 flex justify-between items-center pointer-events-auto">
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => setShowFullMap(false)}
-                        className="w-12 h-12 bg-white text-black rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center active:scale-90 transition-transform shrink-0 cursor-pointer"
-                        title="Dashboard / Home Screen"
-                      >
-                        <Home size={22} strokeWidth={2.5} className="text-black" />
-                      </button>
-                      <button 
-                        onClick={() => setIsSearchOpen(true)}
-                        className="w-12 h-12 bg-white text-black rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.12)] border border-gray-100 flex items-center justify-center active:scale-90 transition-transform shrink-0 cursor-pointer"
-                      >
-                        <Search size={22} strokeWidth={3} className="text-black" />
-                      </button>
-                    </div>
-                    
-                    <div 
-                      onMouseDown={handleEarningsPressStart}
-                      onMouseUp={() => handleEarningsPressEnd()}
-                      onMouseLeave={handleEarningsPressCancel}
-                      onTouchStart={handleEarningsPressStart}
-                      onTouchEnd={() => handleEarningsPressEnd()}
-                      onTouchCancel={handleEarningsPressCancel}
-                      className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform select-none"
-                      title="Hold to hide/show total earnings"
+                  /* Authentic Offline Header matching screenshot: Left Hamburger Menu, Right GPS Reticle */
+                  <div className="p-4 pt-4 flex justify-between items-center pointer-events-auto">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
+                      className="w-12 h-12 rounded-full bg-[#111827]/85 hover:bg-[#1a2336] border border-white/10 backdrop-blur-xl flex items-center justify-center text-white shadow-2xl active:scale-95 transition-all shrink-0 cursor-pointer"
+                      title="Menu"
                     >
-                      <div className="px-5 py-2 bg-black border-[2px] border-white rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.2)] flex items-center justify-center min-w-[130px] h-[46px]">
-                        <span className="font-sans text-lg font-black tracking-tight text-white flex items-center gap-1">
-                          {isEarningsHidden ? (
-                            <span className="flex items-center gap-1 text-gray-400 font-mono tracking-widest text-base">
-                              <EyeOff size={16} className="text-emerald-400" />
-                              ••••••
-                            </span>
-                          ) : (
-                            <>
-                              <span className="text-emerald-400 font-bold">£</span>
-                              {todayEarningsTotal.toFixed(2)}
-                            </>
-                          )}
-                        </span>
-                      </div>
-                      <div className="mt-[-8px] px-2.5 py-0.5 bg-white border border-gray-200 rounded text-[9px] font-black uppercase tracking-wider text-black shadow-md z-10 font-sans font-bold flex items-center gap-1">
-                        {isEarningsHidden && <EyeOff size={10} className="text-amber-500" />}
-                        TODAY
-                      </div>
-                    </div>
+                      <Menu size={22} strokeWidth={2.5} />
+                    </button>
 
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => setCurrentScreen('carplay_dashboard')}
-                        className="w-12 h-12 bg-emerald-600 text-white rounded-full shadow-[0_6px_20px_rgba(16,185,129,0.3)] border border-emerald-400/40 flex items-center justify-center active:scale-90 transition-transform shrink-0 cursor-pointer"
-                        title="Open CarPlay Map View (iPad ↔ PC Sync)"
-                      >
-                        <CarIcon size={20} />
-                      </button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
-                        className="w-12 h-12 rounded-full border-[2px] border-white shadow-[0_6px_20px_rgba(0,0,0,0.12)] overflow-hidden active:scale-90 transition-transform shrink-0"
-                      >
-                        <img 
-                          src={user.profilePic || "https://picsum.photos/seed/driver/100/100"} 
-                          alt="Profile" 
-                          className="w-full h-full object-cover" 
-                        />
-                      </button>
-                    </div>
+                    <button 
+                      onClick={() => {
+                        if (location) {
+                          setMapOffset({ x: 0, y: 0 });
+                        }
+                      }}
+                      className="w-12 h-12 rounded-full bg-[#111827]/85 hover:bg-[#1a2336] border border-white/10 backdrop-blur-xl flex items-center justify-center text-white shadow-2xl active:scale-95 transition-all shrink-0 cursor-pointer"
+                      title="Recenter Map on Vehicle GPS"
+                    >
+                      <Target size={22} strokeWidth={2.5} />
+                    </button>
                   </div>
                 ) : (
                   /* Standard Online Header — Home Button Moved from Top Right to Top Left */
@@ -15297,67 +14679,97 @@ export default function App() {
             </div>
           ) : (
             <>
-                {/* Center Floating GO Button */}
-                {!isBottomMenuOpen && (
-                  <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-[4500] pointer-events-auto flex flex-col items-center">
+                {/* Center Floating Concentric GO Button (Matching screenshot) */}
+                {!isBottomMenuOpen && !user.isOnline && (
+                  <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-[4500] pointer-events-auto flex flex-col items-center">
                     <motion.div
                       initial={{ scale: 0.9, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="relative"
+                      whileTap={{ scale: 0.93 }}
+                      className="relative group cursor-pointer"
+                      onClick={handleGoOnline}
                     >
-                      {/* Outer glowing halo */}
-                      <div className="absolute -inset-3 rounded-full bg-[#1f52e3]/20 animate-ping pointer-events-none" style={{ animationDuration: '3s' }} />
-                      <div className="absolute -inset-2 rounded-full border-[2px] border-[#1f52e3]/45 pointer-events-none" />
-                      
-                      <button
-                        onClick={handleGoOnline}
-                        className="relative w-20 h-20 rounded-full bg-[#1f52e3] hover:bg-blue-600 active:scale-95 text-white flex items-center justify-center font-sans font-black text-2xl uppercase tracking-tight border-[4px] border-white shadow-[0_8px_30px_rgba(31,82,227,0.4)] transition-all duration-300"
-                      >
-                        GO
-                      </button>
+                      {/* Neon outer glowing pulse aura */}
+                      <div className="absolute -inset-5 rounded-full bg-blue-600/35 blur-2xl pointer-events-none animate-pulse" style={{ animationDuration: '2.5s' }} />
+                      <div className="absolute -inset-2 rounded-full border border-blue-400/30 pointer-events-none" />
+
+                      {/* Glowing Concentric White Ring & Royal Blue Button */}
+                      <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full border-[3.5px] border-white bg-gradient-to-b from-[#2575fc] via-[#1a66ff] to-[#0052e0] shadow-[0_0_45px_rgba(26,102,255,0.7)] flex items-center justify-center transition-all duration-300 group-hover:scale-105 active:scale-95">
+                        <span className="font-sans font-black text-3xl sm:text-4xl uppercase tracking-wider text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+                          GO
+                        </span>
+                      </div>
                     </motion.div>
                   </div>
                 )}
 
-                {/* Bottom White Action Bar */}
+                {/* Bottom Offline Sheet & 4-Tab Navigation Bar (Matching screenshot) */}
                 {!isBottomMenuOpen && !user.isOnline && (
-                  <div className="absolute bottom-0 left-0 right-0 z-[4500]">
-                    <motion.div 
-                      key="offline-bottom-bar"
-                      initial={{ y: 100 }}
-                      animate={{ y: 0 }}
-                      className="w-full bg-white border-t border-gray-100 shadow-[0_-10px_40px_rgba(0,0,0,0.12)] rounded-t-[32px] py-6 px-8 flex items-center justify-between pointer-events-auto cursor-pointer"
-                      onClick={() => {
-                        setShowFullMap(false);
-                      }}
-                    >
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowFullMap(false);
-                        }}
-                        className="p-1.5 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center"
-                        title="Back to main screen"
+                  <div className="absolute bottom-0 left-0 right-0 z-[4500] pointer-events-auto">
+                    {/* Dark Navy Rounded Sheet */}
+                    <div className="w-full px-3 sm:px-4 pb-0">
+                      <div 
+                        onClick={() => setIsBottomMenuOpen(true)}
+                        className="w-full bg-[#0f172a]/95 hover:bg-[#131d35] backdrop-blur-2xl border border-white/10 rounded-t-[28px] sm:rounded-t-[32px] p-4 sm:p-5 shadow-2xl flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all"
                       >
-                        <ChevronUp size={24} strokeWidth={3} className="text-black rotate-180" />
-                      </button>
-                      
-                      <div className="text-center flex-1">
-                        <p className="font-sans text-[22px] font-black tracking-tight text-neutral-900 leading-none">
-                          You're offline
-                        </p>
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="w-11 h-11 rounded-full bg-[#1e293b] flex items-center justify-center shrink-0 border border-white/5">
+                            <div className="w-3.5 h-3.5 rounded-full bg-[#64748b]" />
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-sans font-black text-lg sm:text-xl text-white tracking-tight leading-tight">
+                              You're offline
+                            </h3>
+                            <p className="text-xs sm:text-sm text-slate-400 font-medium mt-0.5 truncate">
+                              Go online to start receiving trips
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="p-1 rounded-full text-slate-400 hover:text-white transition-colors shrink-0">
+                          <ChevronRight size={22} strokeWidth={2.5} />
+                        </div>
                       </div>
-                      
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentScreen('trip_preferences');
-                        }}
-                        className="p-1.5 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center"
+                    </div>
+
+                    {/* 4-Tab Bottom Navigation Bar */}
+                    <div className="w-full bg-[#080d1a] border-t border-white/5 py-2.5 px-4 sm:px-8 flex items-center justify-around shadow-2xl">
+                      <button
+                        onClick={() => setCurrentScreen('home')}
+                        className="flex flex-col items-center justify-center flex-1 py-1 cursor-pointer"
                       >
-                        <List size={24} strokeWidth={3} className="text-black" />
+                        <Home size={22} className="text-[#2575fc] fill-[#2575fc]" />
+                        <span className="text-[11px] font-bold text-[#2575fc] mt-1 leading-none">Home</span>
+                        <div className="w-6 h-0.5 bg-[#2575fc] rounded-full mt-1.5 shadow-[0_0_8px_#2575fc]" />
                       </button>
-                    </motion.div>
+
+                      <button
+                        onClick={() => setIsBottomMenuOpen(true)}
+                        className="flex flex-col items-center justify-center flex-1 py-1 cursor-pointer text-slate-400 hover:text-white transition-colors"
+                      >
+                        <List size={22} strokeWidth={2} />
+                        <span className="text-[11px] font-medium text-slate-400 mt-1 leading-none">Trips</span>
+                        <div className="w-6 h-0.5 bg-transparent mt-1.5" />
+                      </button>
+
+                      <button
+                        onClick={() => setCurrentScreen('earnings_detail')}
+                        className="flex flex-col items-center justify-center flex-1 py-1 cursor-pointer text-slate-400 hover:text-white transition-colors"
+                      >
+                        <CreditCard size={22} strokeWidth={2} />
+                        <span className="text-[11px] font-medium text-slate-400 mt-1 leading-none">Earnings</span>
+                        <div className="w-6 h-0.5 bg-transparent mt-1.5" />
+                      </button>
+
+                      <button
+                        onClick={() => setIsSideMenuOpen(true)}
+                        className="flex flex-col items-center justify-center flex-1 py-1 cursor-pointer text-slate-400 hover:text-white transition-colors"
+                      >
+                        <User size={22} strokeWidth={2} />
+                        <span className="text-[11px] font-medium text-slate-400 mt-1 leading-none">Account</span>
+                        <div className="w-6 h-0.5 bg-transparent mt-1.5" />
+                      </button>
+                    </div>
                   </div>
                 )}
               </>
