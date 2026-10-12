@@ -35,6 +35,10 @@ function getDefaultRoomState(room) {
     navTriggeredAt: 0,
     lastUpdated: Date.now(),
     controllerDevice: 'iPad',
+    pendingOrder: null,
+    orderExpiryTimer: 18,
+    action: null,
+    orderId: null,
   };
 }
 

@@ -3309,7 +3309,18 @@ const CarPlayDashboard = ({
   isCarPlayRemoteMode = false,
   setIsCarPlayRemoteMode,
   lastSyncedDestination,
-  onTriggerNavigateSync
+  onTriggerNavigateSync,
+  pendingOrder,
+  orderExpiryTimer = 18,
+  onAcceptOrder,
+  onDeclineOrder,
+  onTriggerTestJob,
+  todayEarningsTotal = 0,
+  activeBrand = 'uber',
+  isMatchingLoading = false,
+  isMatchFailed = false,
+  onToggleOnline,
+  location
 }: { 
   activeOrders: Order[], 
   user: UserProfile, 
@@ -3335,7 +3346,18 @@ const CarPlayDashboard = ({
     longitude?: number;
     stage?: string;
   } | null,
-  onTriggerNavigateSync?: () => void
+  onTriggerNavigateSync?: () => void,
+  pendingOrder?: Order | null,
+  orderExpiryTimer?: number,
+  onAcceptOrder?: () => void,
+  onDeclineOrder?: () => void,
+  onTriggerTestJob?: () => void,
+  todayEarningsTotal?: number,
+  activeBrand?: 'uber' | 'hyper' | 'both',
+  isMatchingLoading?: boolean,
+  isMatchFailed?: boolean,
+  onToggleOnline?: () => void,
+  location?: Location | null
 }) => {
   const [viewMode, setViewMode] = useState<'split' | 'full_map'>('split');
   const [editingRoom, setEditingRoom] = useState(carPlayRoomCode);
@@ -3358,6 +3380,15 @@ const CarPlayDashboard = ({
 
   const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  // Pay rate calculation for pending job
+  const pendingPayRate = pendingOrder
+    ? calculatePayRate(pendingOrder.estimatedPay, pendingOrder.estimatedDistance)
+    : null;
+  const isPendingDouble = !!(pendingOrder?.isStacked || (pendingOrder?.batchCount && pendingOrder.batchCount > 1));
+  const isPendingDelivery = pendingOrder?.type === 'delivery';
+  const pendingPickupDistance = pendingOrder ? (pendingOrder.estimatedDistance * 0.4).toFixed(1) : '0.8';
+  const pendingPickupMinutes = pendingOrder ? Math.max(1, Math.ceil(parseFloat(pendingPickupDistance) * 3)) : 3;
+
   return (
     <motion.div 
       initial={{ opacity: 0 }} 
@@ -3366,8 +3397,8 @@ const CarPlayDashboard = ({
       className="fixed inset-0 z-[5000] bg-[#050507] text-white flex flex-col font-sans select-none overflow-hidden"
     >
       {/* Top CarPlay Status Bar */}
-      <div className="h-11 bg-black/85 backdrop-blur-xl flex items-center justify-between px-5 border-b border-white/10 shrink-0 z-30">
-        <div className="flex items-center gap-4">
+      <div className="h-12 bg-black/90 backdrop-blur-xl flex items-center justify-between px-5 border-b border-white/10 shrink-0 z-30">
+        <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
           <span className="text-sm font-black tracking-tight font-mono">{nowStr}</span>
           <div className="flex items-end gap-0.5 h-3">
             <div className="w-1 h-1.5 bg-emerald-400 rounded-full" />
@@ -3375,36 +3406,65 @@ const CarPlayDashboard = ({
             <div className="w-1 h-2.5 bg-emerald-400 rounded-full" />
             <div className="w-1 h-3 bg-emerald-400 rounded-full" />
           </div>
+
+          {/* Online Toggle */}
+          <button
+            onClick={() => onToggleOnline && onToggleOnline()}
+            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
+              user.isOnline 
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30' 
+                : 'bg-white/10 text-gray-400 border border-white/10 hover:bg-white/15'
+            }`}
+            title="Toggle Driver Online / Offline"
+          >
+            <span className={`w-2 h-2 rounded-full ${user.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-gray-500'}`} />
+            <span>{user.isOnline ? "ONLINE • Scanning" : "OFFLINE"}</span>
+          </button>
+
+          {/* Today's Earnings */}
+          <div className="hidden sm:flex px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-wider text-emerald-400 font-mono">
+            Today: £{todayEarningsTotal.toFixed(2)}
+          </div>
+
+          {/* Room Sync Indicator */}
           <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            Room: {carPlayRoomCode} • {isCarPlayRemoteMode ? 'PC Display Mode' : 'iPad ⇄ PC Live Sync'}
+            Room: {carPlayRoomCode} • {isCarPlayRemoteMode ? 'PC Display' : 'iPad Controller'}
           </span>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          {/* Test Job Request button for quick demonstration on PC */}
+          {onTriggerTestJob && (
+            <button
+              onClick={() => onTriggerTestJob()}
+              className="px-3 py-1 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/40 text-purple-200 rounded-full text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all flex items-center gap-1 shadow-sm active:scale-95"
+              title="Send a sample job request to CarPlay screen"
+            >
+              <Bell size={11} className="text-purple-300" />
+              <span>Test Job Request 🔔</span>
+            </button>
+          )}
+
           <button
             onClick={() => setViewMode(prev => prev === 'split' ? 'full_map' : 'split')}
             className="px-3 py-1 bg-white/10 hover:bg-white/15 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-wider text-white cursor-pointer transition-all"
           >
-            {viewMode === 'split' ? 'Full Screen Map' : 'Split Dashboard'}
+            {viewMode === 'split' ? 'Full Map' : 'Split View'}
           </button>
-          <div className="px-2.5 py-1 bg-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-            CarPlay Map
-          </div>
+
           <button 
-            onClick={() => {
-              onClose();
-            }}
+            onClick={() => onClose()}
             className="px-3 py-1 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-400 rounded-full text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all"
           >
-            Exit CarPlay
+            Exit
           </button>
         </div>
       </div>
 
       <div className="flex-1 flex min-h-0 relative">
-        {/* Left CarPlay Dock (App Icons) */}
-        <div className="w-20 bg-black/90 backdrop-blur-xl flex flex-col items-center py-5 gap-4 border-r border-white/10 shrink-0 z-20">
+        {/* Left CarPlay Dock (Apple CarPlay Style) */}
+        <div className="w-20 bg-black/95 backdrop-blur-xl flex flex-col items-center py-5 gap-4 border-r border-white/10 shrink-0 z-20">
           <button
             onClick={() => setViewMode('split')}
             className={`w-13 h-13 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden border-2 transition-all cursor-pointer ${
@@ -3440,6 +3500,17 @@ const CarPlayDashboard = ({
             <span className="text-[8px] font-black uppercase mt-0.5">{isCarPlayRemoteMode ? 'PC' : 'iPad'}</span>
           </button>
 
+          {/* Quick Test dispatch trigger on dock */}
+          {onTriggerTestJob && (
+            <button
+              onClick={() => onTriggerTestJob()}
+              className="w-11 h-11 rounded-2xl bg-white/5 hover:bg-purple-600/20 text-gray-400 hover:text-purple-300 border border-white/10 flex items-center justify-center transition-all cursor-pointer"
+              title="Test Job Request"
+            >
+              <Bell size={18} />
+            </button>
+          )}
+
           <button
             onClick={onClose}
             className="mt-auto w-11 h-11 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center text-white cursor-pointer active:scale-95 transition-all"
@@ -3451,7 +3522,7 @@ const CarPlayDashboard = ({
 
         {/* Main CarPlay Content Area: Uses Your Existing Live Map + CarPlay Overlays */}
         <div className="flex-1 flex gap-4 p-4 min-h-0 relative overflow-hidden bg-[#090a0f]">
-          {/* Left / Primary Panel: Live Existing Map with CarPlay Turn-by-Turn Overlay */}
+          {/* Primary Map Panel */}
           <div className={`${viewMode === 'full_map' ? 'flex-1' : 'flex-[1.45]'} relative rounded-[32px] overflow-hidden border border-white/15 shadow-2xl bg-[#0c0c0d] min-h-0`}>
             {/* Existing InteractiveMap / MapGrid */}
             <div className="absolute inset-0 w-full h-full">
@@ -3535,6 +3606,188 @@ const CarPlayDashboard = ({
                 </span>
               </div>
             </div>
+
+            {/* CarPlay Incoming Job Request Card Overlay (Uber CarPlay Style from Demo Video) */}
+            <AnimatePresence>
+              {pendingOrder && (
+                <motion.div
+                  key={`carplay-job-request-${pendingOrder.id}`}
+                  initial={{ opacity: 0, scale: 0.94, y: 30 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.94, y: 30 }}
+                  transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+                  className="absolute top-4 right-4 bottom-4 w-[calc(100%-32px)] sm:w-[440px] max-w-full z-[4200] flex flex-col pointer-events-auto"
+                >
+                  <div className="flex-1 bg-[#090b10]/95 backdrop-blur-2xl border-2 border-white/20 rounded-[32px] p-5 shadow-[0_25px_70px_rgba(0,0,0,0.9)] flex flex-col justify-between text-white overflow-hidden relative">
+                    {/* Top Badges & Close/Decline */}
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {/* Service Pill (UberX / Uber Eats / Hyper Ride) */}
+                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider bg-black text-white border border-white/20 shadow-sm">
+                            {isPendingDelivery ? (
+                              <>
+                                <Utensils size={13} className="text-emerald-400" />
+                                <span>{pendingOrder.brand === 'hyper' ? 'Hyper Eats' : 'Uber Eats'}</span>
+                              </>
+                            ) : (
+                              <>
+                                <CarIcon size={13} className="text-blue-400" fill="currentColor" />
+                                <span>{pendingOrder.restaurantName || (pendingOrder.brand === 'hyper' ? 'Hyper Ride' : 'UberX')}</span>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Rating */}
+                          <div className="flex items-center gap-1 bg-white/10 px-2.5 py-1.5 rounded-xl text-xs font-black text-amber-300 border border-white/10">
+                            <Star size={12} fill="#eab308" className="text-yellow-500" />
+                            <span>4.96</span>
+                          </div>
+
+                          {/* Surge Pill */}
+                          {pendingOrder.surge ? (
+                            <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 animate-pulse">
+                              <Flame size={11} className="text-amber-400" />
+                              <span>+{ (pendingOrder.surge * 2.2).toFixed(2) } Surge</span>
+                            </span>
+                          ) : null}
+
+                          {/* Double Order Pill */}
+                          {isPendingDouble && (
+                            <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                              ✨ Double
+                            </span>
+                          )}
+
+                          {/* Pre-Booking */}
+                          {pendingOrder.isPreBooking && (
+                            <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                              ⏰ Scheduled
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Top Decline (X) */}
+                        <button
+                          onClick={() => onDeclineOrder && onDeclineOrder()}
+                          className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-gray-300 flex items-center justify-center cursor-pointer active:scale-90 transition-all border border-white/10"
+                          title="Decline Job"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+
+                      {/* Large Fare Display */}
+                      <div className="flex items-baseline justify-between mb-2">
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Total Guaranteed Payout</span>
+                          <h2 className="text-5xl font-black tracking-tight text-white font-sans leading-none mt-0.5">
+                            £{pendingOrder.estimatedPay.toFixed(2)}
+                          </h2>
+                        </div>
+                        {pendingPayRate && (
+                          <div className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider border ${pendingPayRate.color}`}>
+                            <span>{pendingPayRate.icon}</span> <span>{pendingPayRate.label}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Trip Summary Telemetry */}
+                      <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-2xl mb-4 text-xs font-bold text-gray-200">
+                        <span className="text-emerald-400 font-black">Pickup in {pendingPickupMinutes} min ({pendingPickupDistance} mi)</span>
+                        <span className="text-gray-500">•</span>
+                        <span>Total: {pendingOrder.estimatedTime} min ({pendingOrder.estimatedDistance.toFixed(1)} mi)</span>
+                      </div>
+
+                      {/* Route Stops Chain */}
+                      <div className="relative pl-6 space-y-4 my-2 border-l-2 border-dashed border-white/20 ml-3">
+                        {/* Pickup Stop */}
+                        <div className="relative">
+                          <div className="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-emerald-400 ring-4 ring-emerald-500/30 flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 bg-black rounded-full" />
+                          </div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
+                            {isPendingDelivery ? 'Pickup Restaurant' : 'Rider Pickup Point'}
+                          </p>
+                          <h4 className="text-sm font-black text-white truncate">
+                            {pendingOrder.restaurantName || "High St Pickup Point"}
+                          </h4>
+                          <p className="text-[11px] text-gray-400 truncate">
+                            {isPendingDelivery ? "12 Kingsway, Holborn, London" : "Passenger Pickup Location"}
+                          </p>
+                        </div>
+
+                        {/* Dropoff Stop */}
+                        <div className="relative">
+                          <div className="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-sm bg-blue-500 ring-4 ring-blue-500/30 flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                          </div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">
+                            {isPendingDelivery ? 'Customer Dropoff' : 'Passenger Destination'}
+                          </p>
+                          <h4 className="text-sm font-black text-white truncate">
+                            {pendingOrder.customerName || "Customer Destination"}
+                          </h4>
+                          <p className="text-[11px] text-gray-400 truncate">
+                            {isPendingDelivery ? "48 High Holborn, London WC1V" : "Final Dropoff Location"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom Actions with Linear Countdown Bar */}
+                    <div className="space-y-3 pt-3 border-t border-white/10 shrink-0">
+                      {/* Animated Countdown Progress Bar */}
+                      <div className="relative w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                        <motion.div
+                          key={`carplay-timer-${pendingOrder.id}`}
+                          initial={{ width: '100%' }}
+                          animate={{ width: '0%' }}
+                          transition={{ duration: orderExpiryTimer, ease: 'linear' }}
+                          className={`h-full rounded-full ${
+                            orderExpiryTimer <= 5 ? 'bg-red-500' : 'bg-emerald-400'
+                          }`}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => onDeclineOrder && onDeclineOrder()}
+                          className="h-14 px-5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                        >
+                          <X size={16} />
+                          <span>Decline</span>
+                        </button>
+
+                        <button
+                          onClick={() => onAcceptOrder && onAcceptOrder()}
+                          disabled={isMatchingLoading || isMatchFailed}
+                          className={`h-14 flex-1 rounded-2xl font-black text-base uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all cursor-pointer ${
+                            isMatchingLoading
+                              ? 'bg-emerald-600/50 text-white'
+                              : 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-black shadow-emerald-500/30'
+                          }`}
+                        >
+                          {isMatchingLoading ? (
+                            <>
+                              <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                              <span>Matching...</span>
+                            </>
+                          ) : isMatchFailed ? (
+                            <span>Another Driver Accepted</span>
+                          ) : (
+                            <>
+                              <Check size={20} className="stroke-[3]" />
+                              <span>Match ({orderExpiryTimer}s)</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Right Split-Screen Column: iPad <-> PC Connection + Active Order + Media */}
@@ -6697,6 +6950,12 @@ export default function App() {
 
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(() => {
     try {
+      if (typeof window !== 'undefined') {
+        const search = window.location.search;
+        if (search.includes('carplay') || search.includes('mode=carplay')) {
+          return 'carplay_dashboard';
+        }
+      }
       const hasSeen = localStorage.getItem('hyper_driver_has_seen_onboarding') === 'true';
       if (!hasSeen) return 'onboarding';
       const saved = localStorage.getItem('hyper_driver_current_screen');
@@ -6727,6 +6986,7 @@ export default function App() {
   const currentWebAudioGainRef = useRef<GainNode | null>(null);
   const isAcceptingRef = useRef<boolean>(false);
   const handleAcceptOrderRef = useRef<() => void>(() => {});
+  const handleDeclineOrderRef = useRef<() => void>(() => {});
   const [backgroundTicks, setBackgroundTicks] = useState(0);
 
   const startEngineKeepAlive = React.useCallback(() => {
@@ -6814,7 +7074,17 @@ export default function App() {
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
   const [showAppLauncher, setShowAppLauncher] = useState<boolean>(false);
   const [isCarPlaySynced, setIsCarPlaySynced] = useState(false);
-  const [isCarPlayRemoteMode, setIsCarPlayRemoteMode] = useState(false);
+  const [isCarPlayRemoteMode, setIsCarPlayRemoteMode] = useState<boolean>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const search = window.location.search;
+        if (search.includes('carplay') || search.includes('mode=carplay') || search.includes('pc=1')) {
+          return true;
+        }
+      }
+    } catch {}
+    return false;
+  });
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     try {
       const saved = localStorage.getItem('hyper_driver_theme');
@@ -9102,7 +9372,7 @@ export default function App() {
       const isNewNavTrigger = data.navTriggeredAt && data.navTriggeredAt > lastNavTriggerSeenRef.current;
 
       // Apply incoming state if this device is in PC Receiver Mode, on the CarPlay screen, or receiving an explicit Navigate trigger from iPad
-      if (isCarPlayRemoteMode || currentScreen === 'carplay_dashboard' || isNewNavTrigger) {
+      if (isCarPlayRemoteMode || currentScreen === 'carplay_dashboard' || isNewNavTrigger || data.pendingOrder || data.action) {
         isApplyingRemoteRef.current = true;
 
         if (data.location && typeof data.location.latitude === 'number') {
@@ -9122,6 +9392,43 @@ export default function App() {
         }
         if (data.navDestination) {
           setLastSyncedDestination(data.navDestination);
+        }
+
+        // Synchronize pending job requests from iPad to CarPlay PC receiver
+        if (data.pendingOrder !== undefined) {
+          if (data.pendingOrder) {
+            setPendingOrder(prevPending => {
+              if (!prevPending || prevPending.id !== data.pendingOrder.id) {
+                // New incoming job alert on CarPlay screen
+                playHyperSound('order');
+                if (isCarPlayRemoteMode && currentScreen !== 'carplay_dashboard') {
+                  setCurrentScreen('carplay_dashboard');
+                }
+                setToasts(prev => [
+                  ...prev.slice(-2),
+                  {
+                    id: Math.random().toString(36).slice(2, 9),
+                    title: 'New Trip Request on CarPlay 🔔',
+                    body: `£${data.pendingOrder.estimatedPay?.toFixed(2)} • ${data.pendingOrder.type === 'delivery' ? data.pendingOrder.restaurantName : data.pendingOrder.customerName}`,
+                    type: 'alert'
+                  }
+                ]);
+              }
+              return data.pendingOrder;
+            });
+            if (typeof data.orderExpiryTimer === 'number') {
+              setOrderExpiryTimer(data.orderExpiryTimer);
+            }
+          } else {
+            setPendingOrder(null);
+          }
+        }
+
+        // Remote action sync (driver clicked Accept or Decline on iPad or PC)
+        if (data.action === 'accept_order') {
+          handleAcceptOrderRef.current();
+        } else if (data.action === 'decline_order') {
+          handleDeclineOrderRef.current();
         }
 
         if (isNewNavTrigger) {
@@ -9171,7 +9478,55 @@ export default function App() {
       es.close();
       if (bc) bc.close();
     };
-  }, [carPlayRoomCode, isCarPlayRemoteMode, currentScreen]);
+  }, [carPlayRoomCode, isCarPlayRemoteMode, currentScreen, playHyperSound]);
+
+  // Immediate real-time broadcast of pendingOrder from controller (iPad) to CarPlay PC receiver
+  useEffect(() => {
+    if (isCarPlayRemoteMode || isApplyingRemoteRef.current) return;
+    const payload = {
+      room: carPlayRoomCode,
+      senderDeviceId: myDeviceIdRef.current,
+      pendingOrder: pendingOrder ? {
+        id: pendingOrder.id,
+        customerName: pendingOrder.customerName,
+        restaurantName: pendingOrder.restaurantName,
+        type: pendingOrder.type,
+        brand: pendingOrder.brand,
+        estimatedPay: pendingOrder.estimatedPay,
+        estimatedDistance: pendingOrder.estimatedDistance,
+        estimatedTime: pendingOrder.estimatedTime,
+        isMatching: pendingOrder.isMatching,
+        isPreBooking: pendingOrder.isPreBooking,
+        isStacked: pendingOrder.isStacked,
+        batchCount: pendingOrder.batchCount,
+        surge: pendingOrder.surge,
+        pickupLocation: pendingOrder.pickupLocation,
+        customerLocation: pendingOrder.customerLocation,
+        items: pendingOrder.items,
+        pin: pendingOrder.pin,
+        pickupPos: pendingOrder.pickupPos
+      } : null,
+      orderExpiryTimer,
+      isOnline: user.isOnline,
+      location: location || activeCityCenter,
+      heading,
+      activeOrders,
+      isNavigating,
+      lastUpdated: Date.now()
+    };
+
+    fetch('/api/carplay/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
+
+    try {
+      const bc = new BroadcastChannel('hyper_carplay_sync');
+      bc.postMessage(payload);
+      bc.close();
+    } catch {}
+  }, [pendingOrder, orderExpiryTimer, carPlayRoomCode, isCarPlayRemoteMode, user.isOnline, location, heading, activeOrders, isNavigating, activeCityCenter]);
 
   // Continuous background telemetry sync from controller to room when navigating or orders change
   useEffect(() => {
@@ -11514,8 +11869,10 @@ export default function App() {
     };
   }, [user.isOnline, isKeepAliveActive, isOnBreak, activeOrders.length, pendingOrder === null, radarOrders.length, isOffAppSimulated, triggerBackgroundOrderGeneration, addDebugLog]);
 
-  const handleAcceptOrder = () => {
+  const handleAcceptOrder = (fromRemote: any = false) => {
+    const isRemote = fromRemote === true;
     if (!pendingOrder) return;
+    const currentPending = pendingOrder;
 
     // Check total order limit - stacked counts as 2
     const orderCountToAdd = (pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1)) ? 2 : 1;
@@ -11527,7 +11884,7 @@ export default function App() {
     }
 
     const processOrder = () => {
-      if (!pendingOrder) return;
+      if (!currentPending) return;
 
       if (orderCountToAdd === 2) {
         // Split into 2 jobs as requested (max+1 logic)
@@ -11620,8 +11977,30 @@ export default function App() {
 
       setMapOffset({ x: 0, y: 0 }); // Snap map back to driver on acceptance
       playHyperSound('accept');
-      const targetPoint = pendingOrder.type === 'delivery' ? (pendingOrder.restaurantName || "Store Pick-up") : "Rider Pickup Point";
+      const targetPoint = currentPending.type === 'delivery' ? (currentPending.restaurantName || "Store Pick-up") : "Rider Pickup Point";
       speakNav(`Dispatch received. Initiating route to ${targetPoint}. Keep safe pace.`);
+
+      if (!isRemote) {
+        const payload = {
+          room: carPlayRoomCode,
+          senderDeviceId: myDeviceIdRef.current,
+          action: 'accept_order',
+          orderId: currentPending.id,
+          pendingOrder: null,
+          lastUpdated: Date.now()
+        };
+        fetch('/api/carplay/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).catch(() => {});
+        try {
+          const bc = new BroadcastChannel('hyper_carplay_sync');
+          bc.postMessage(payload);
+          bc.close();
+        } catch {}
+      }
+      sendDestinationToPC({ order: currentPending });
 
       // Simulated Customer Greeting after 5 seconds
       const orderIds = orderCountToAdd === 2 
@@ -11804,11 +12183,13 @@ export default function App() {
     setShowShiftSummary(true);
   };
 
-  const handleDeclineOrder = () => {
+  const handleDeclineOrder = (fromRemote: any = false) => {
+    const isRemote = fromRemote === true;
     if (pendingOrder) {
-      const orderToMove = { ...pendingOrder, isMatching: true }; // Ensure it's marked as a match for radar
+      const currentPending = pendingOrder;
+      const orderToMove = { ...currentPending, isMatching: true }; // Ensure it's marked as a match for radar
       setRadarOrders(prev => {
-        if (!prev.some(r => r.id === pendingOrder.id)) {
+        if (!prev.some(r => r.id === currentPending.id)) {
           return [...prev, orderToMove];
         }
         return prev;
@@ -11817,6 +12198,27 @@ export default function App() {
       setTimeout(() => {
         setRadarOrders(curr => curr.filter(o => o.id !== orderToMove.id));
       }, 30000);
+
+      if (!isRemote) {
+        const payload = {
+          room: carPlayRoomCode,
+          senderDeviceId: myDeviceIdRef.current,
+          action: 'decline_order',
+          orderId: currentPending.id,
+          pendingOrder: null,
+          lastUpdated: Date.now()
+        };
+        fetch('/api/carplay/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).catch(() => {});
+        try {
+          const bc = new BroadcastChannel('hyper_carplay_sync');
+          bc.postMessage(payload);
+          bc.close();
+        } catch {}
+      }
     }
     setPendingOrder(null);
     setOrderExpiryTimer(10);
@@ -11828,6 +12230,7 @@ export default function App() {
       return { ...prev, acceptanceRate: nextAcc };
     });
   };
+  handleDeclineOrderRef.current = handleDeclineOrder;
 
   const handleCancelOrder = (orderId: string, reason: string) => {
     console.log(`Order ${orderId} cancelled. Reason: ${reason}`);
@@ -17672,6 +18075,24 @@ export default function App() {
               setIsCarPlayRemoteMode={setIsCarPlayRemoteMode}
               lastSyncedDestination={lastSyncedDestination}
               onTriggerNavigateSync={() => sendDestinationToPC()}
+              pendingOrder={pendingOrder}
+              orderExpiryTimer={orderExpiryTimer}
+              onAcceptOrder={() => handleAcceptOrder()}
+              onDeclineOrder={() => handleDeclineOrder()}
+              onTriggerTestJob={() => {
+                const testJob = generateSmartOrder();
+                if (testJob) {
+                  setPendingOrder(testJob);
+                  setOrderExpiryTimer(18);
+                  playHyperSound('order');
+                }
+              }}
+              todayEarningsTotal={todayEarningsTotal}
+              activeBrand={activeBrand}
+              isMatchingLoading={isMatchingLoading}
+              isMatchFailed={isMatchFailed}
+              onToggleOnline={() => setUser(prev => ({ ...prev, isOnline: !prev.isOnline }))}
+              location={location}
               mapNode={
                 mapCoreMode === 'google' ? (
                   <InteractiveMap
