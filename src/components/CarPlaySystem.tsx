@@ -1001,7 +1001,7 @@ export const CarPlaySystem: React.FC<CarPlaySystemProps> = ({
               <div className="p-3 bg-white/5 rounded-2xl border border-white/5">
                 <h4 className="font-black text-emerald-400 uppercase text-[11px] mb-1">Leaflet & OpenStreetMap</h4>
                 <p>
-                  Map tiles are rendered via Leaflet using Carto Voyager and Dark basemaps, powered by OpenStreetMap contributors. 
+                  Map tiles are rendered via Leaflet using official OpenStreetMap tiles (100% free, zero API keys required, and no watermarks).
                   Attribution is permanently displayed in the bottom-right corner as required by Open Data Commons Open Database License (ODbL).
                 </p>
               </div>

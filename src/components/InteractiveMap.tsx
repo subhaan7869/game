@@ -285,15 +285,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       attributionControl: true
     });
 
-    // Beautiful high-fidelity Map Tiles matching Light/Dark theme dynamically (Leaflet + OpenStreetMap)
-    const tileUrl = theme === 'dark'
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+    // Official OpenStreetMap Tiles (100% Free, Zero API Keys, No Watermarks)
+    const tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
     const tileLayer = L.tileLayer(tileUrl, {
-      maxZoom: 20,
+      maxZoom: 19,
       minZoom: 1,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a>'
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors'
     }).addTo(map);
 
     tileLayerRef.current = tileLayer;
@@ -329,17 +327,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       mapRef.current.setView(driverLatLng, 17.5, { animate: true });
     }
   }, [isNavigating]);
-
-  // Update Tile Layer URL source dynamically when theme toggles
-  useEffect(() => {
-    if (!mapRef.current || !tileLayerRef.current) return;
-    
-    const tileUrl = theme === 'dark'
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-
-    tileLayerRef.current.setUrl(tileUrl);
-  }, [theme]);
 
   // Synchronize dynamic Layers upon prop changes
   useEffect(() => {
@@ -630,7 +617,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
       {/* Leaflet Map Viewer Canvas Core */}
       <div 
-        className="w-full h-full relative overflow-hidden transition-all duration-500 origin-bottom" 
+        className={`w-full h-full relative overflow-hidden transition-all duration-500 origin-bottom ${theme === 'dark' ? 'dark-tiles' : ''}`}
         style={{ 
           height: '100%', 
           minHeight: '380px',

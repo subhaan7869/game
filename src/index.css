@@ -52,3 +52,9 @@ html, body {
   text-decoration: underline;
 }
 
+/* Hyper Dark Blue Navigation Styling for OpenStreetMap (100% Free, No Watermark, No API Key Required) */
+.dark-tiles .leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(88%) contrast(96%);
+}
+
+
