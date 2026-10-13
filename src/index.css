@@ -32,3 +32,23 @@ html, body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* OpenStreetMap / Leaflet visible attribution styling */
+.leaflet-control-attribution {
+  background: rgba(10, 12, 18, 0.75) !important;
+  color: #94a3b8 !important;
+  font-size: 9px !important;
+  padding: 2px 6px !important;
+  border-radius: 6px !important;
+  margin: 6px !important;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.leaflet-control-attribution a {
+  color: #60a5fa !important;
+  text-decoration: none;
+}
+.leaflet-control-attribution a:hover {
+  text-decoration: underline;
+}
+

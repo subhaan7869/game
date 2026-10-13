@@ -282,17 +282,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       center: [startLat, startLng],
       zoom: initialZoom,
       zoomControl: false,
-      attributionControl: false
+      attributionControl: true
     });
 
-    // Beautiful high-fidelity Map Tiles matching Light/Dark theme dynamically
+    // Beautiful high-fidelity Map Tiles matching Light/Dark theme dynamically (Leaflet + OpenStreetMap)
     const tileUrl = theme === 'dark'
       ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
       : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
     const tileLayer = L.tileLayer(tileUrl, {
       maxZoom: 20,
-      minZoom: 1
+      minZoom: 1,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a>'
     }).addTo(map);
 
     tileLayerRef.current = tileLayer;
