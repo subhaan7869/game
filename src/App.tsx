@@ -8771,7 +8771,7 @@ export default function App() {
       const isNewNavTrigger = data.navTriggeredAt && data.navTriggeredAt > lastNavTriggerSeenRef.current;
 
       // Apply incoming state if this device is in PC Receiver Mode, on the CarPlay screen, or receiving an explicit Navigate trigger from iPad
-      if (isCarPlayRemoteMode || currentScreen === 'carplay_dashboard' || isNewNavTrigger || data.pendingOrder || data.action) {
+      if (isCarPlayRemoteMode || currentScreen === 'carplay_dashboard' || isNewNavTrigger || data.pendingOrder !== undefined || data.action || data.isNavigating !== undefined) {
         isApplyingRemoteRef.current = true;
 
         if (data.location && typeof data.location.latitude === 'number') {
@@ -10511,21 +10511,21 @@ export default function App() {
   // Map Background Component for depth and to prevent "black screen" feel
   const MapGrid = () => {
     // Dynamic styling based on Busyness (Uber-like color shifts) and brand selection
-    let baseBg = 'bg-[#0c0c0d]';
-    let roadColor = '#3b82f6'; // Light blue
-    let radialGlowColor = 'rgba(59,130,246,0.06)';
-    let vignetteColor = 'rgba(0,0,0,0.4)';
+    let baseBg = 'bg-[#020617]'; // Pitch Black
+    let roadColor = '#2563eb'; // Electric Royal Blue
+    let radialGlowColor = 'rgba(37,99,235,0.12)';
+    let vignetteColor = 'rgba(2,6,23,0.7)';
 
     if (activeBrand === 'hyper') {
-      baseBg = 'bg-[#0c0418]'; // Deep Midnight Violet/Purple
-      roadColor = '#a855f7'; // Glowing Electric Purple
-      radialGlowColor = 'rgba(168, 85, 247, 0.08)';
-      vignetteColor = 'rgba(12, 4, 24, 0.65)';
+      baseBg = 'bg-[#020617]'; // Deep Midnight Black
+      roadColor = '#0066ff'; // Electric Blue
+      radialGlowColor = 'rgba(0, 102, 255, 0.15)';
+      vignetteColor = 'rgba(2, 6, 23, 0.75)';
     } else if (activeBrand === 'both') {
-      baseBg = 'bg-[#0a0518]'; // Deep Cyber Indigo/Violet
-      roadColor = '#c084fc'; // Vibrant Light Purple/Indigo
-      radialGlowColor = 'rgba(192, 132, 252, 0.12)';
-      vignetteColor = 'rgba(10, 5, 24, 0.65)';
+      baseBg = 'bg-[#020617]'; // Deep Midnight Black
+      roadColor = '#3b82f6'; // Bright Blue
+      radialGlowColor = 'rgba(59, 130, 246, 0.15)';
+      vignetteColor = 'rgba(2, 6, 23, 0.75)';
     } else {
       if (busynessMode === 'High') {
         baseBg = 'bg-[#150606]'; // Dark Crimson Tint
@@ -13178,7 +13178,7 @@ export default function App() {
                 {/* Navigation Overlay */}
                 <AnimatePresence>
                   {isNavigating && activeOrders.length > 0 && (
-                    <div className="absolute top-0 left-0 right-0 z-[150] flex flex-col gap-3 p-3 sm:p-4 pointer-events-none">
+                    <div className="absolute top-[76px] left-0 right-0 z-[150] flex flex-col gap-3 p-3 sm:p-4 pointer-events-none">
                       <motion.div 
                         initial={{ y: -50, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
@@ -14506,7 +14506,7 @@ export default function App() {
               </div>
 
               {/* Bottom Menu Toggle Button / Map Status Bar */}
-              {user.isOnline && !pendingOrder && !isBottomMenuOpen && (
+              {user.isOnline && !pendingOrder && !isBottomMenuOpen && !isRadarDrawerOpen && (
                 <div className="absolute bottom-0 left-0 right-0 z-[4500]">
                   <motion.div 
                     key="online-bar"
@@ -17495,6 +17495,24 @@ export default function App() {
                   playHyperSound('order');
                 }
               }}
+              onTriggerMatchJob={() => {
+                const testJob = generateSmartOrder();
+                if (testJob) {
+                  const matchJob = { ...testJob, isMatching: true };
+                  setPendingOrder(matchJob);
+                  setOrderExpiryTimer(18);
+                  playHyperSound('order');
+                }
+              }}
+              onTriggerNormalJob={() => {
+                const testJob = generateSmartOrder();
+                if (testJob) {
+                  const normalJob = { ...testJob, isMatching: false };
+                  setPendingOrder(normalJob);
+                  setOrderExpiryTimer(18);
+                  playHyperSound('order');
+                }
+              }}
               todayEarningsTotal={todayEarningsTotal}
               activeBrand={activeBrand}
               isMatchingLoading={isMatchingLoading}
@@ -17521,6 +17539,7 @@ export default function App() {
                     zoom={zoom}
                     setZoom={setZoom}
                     iosMapKitEngine={iosMapKitEngine}
+                    hideOverlays={true}
                     onNavigateToSurgeArea={(area) => {
                       const surgeAreaLocation = {
                         latitude: activeCityCenter.latitude + area.lat,
@@ -17674,62 +17693,39 @@ export default function App() {
           />
         )}
 
-        {/* Global Trip Request Overlay - Visible on any screen */}
+        {/* Global Trip Request Overlay - Visible on mobile screens, suppressed on CarPlay screen */}
          <AnimatePresence>
-          {pendingOrder && (
+          {pendingOrder && currentScreen !== 'carplay_dashboard' && (
             <motion.div 
               initial={{ y: '100%', opacity: 0 }} 
               animate={{ y: 0, opacity: 1 }} 
               exit={{ y: '100%', opacity: 0 }} 
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className={pendingOrder.isMatching 
-                ? `absolute inset-x-3 bottom-0 md:bottom-4 z-[5000] w-[calc(100%-24px)] max-w-md mx-auto flex flex-col overflow-hidden border p-6 transition-all duration-500 ${
-                    pendingOrder.brand === 'hyper'
-                      ? 'bg-gradient-to-b from-[#140224] to-[#08030d] text-white border-purple-500/30 shadow-[0_25px_60px_rgba(168,85,247,0.18)] rounded-[40px]'
-                      : 'bg-white text-black rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-gray-100'
-                  }`
-                : `absolute inset-x-0 bottom-0 z-[5000] w-full max-w-md mx-auto flex flex-col overflow-hidden pb-2 transition-all duration-500 ${
-                    pendingOrder.brand === 'hyper'
-                      ? 'bg-gradient-to-b from-[#0d011a] to-[#08030d] text-white border-t-purple-500/25 shadow-[0_-15px_45px_rgba(168,85,247,0.1)] rounded-t-[44px]'
-                      : 'bg-white text-black rounded-t-[36px] shadow-[0_-15px_45px_rgba(0,0,0,0.22)] border-t border-gray-100'
-                  }`
+                ? `absolute inset-x-3 bottom-0 md:bottom-4 z-[5000] w-[calc(100%-24px)] max-w-md mx-auto flex flex-col overflow-hidden border-2 border-white p-6 transition-all duration-500 bg-black text-white rounded-[32px] shadow-[0_25px_60px_rgba(255,255,255,0.18)] ring-1 ring-white/60`
+                : `absolute inset-x-0 bottom-0 z-[5000] w-full max-w-md mx-auto flex flex-col overflow-hidden pb-2 transition-all duration-500 bg-[#020617] text-white border-t-2 border-[#2563eb] shadow-[0_-15px_45px_rgba(37,99,235,0.35)] rounded-t-[36px]`
               }
               id="uber-incoming-trip-sheet"
             >
               {pendingOrder.isMatching ? (
-                /* MATCH JOB CUSTOM LAYOUT FROM SCREENSHOT */
-                <div className="flex flex-col gap-4">
-                  {/* Top Raw Code with selections and close button */}
+                /* MATCH JOB CUSTOM LAYOUT - BLACK & WHITE THEME */
+                <div className="flex flex-col gap-4 text-white">
+                  {/* Top Header with service pill and close button */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-sm ${
-                        pendingOrder.brand === 'hyper' ? 'bg-[#00ca72] text-white font-extrabold' : 'bg-[#1a1a1a] text-white'
-                      }`}>
-                        {pendingOrder.type === 'delivery' ? (
-                          <>
-                            <Utensils size={13} className={pendingOrder.brand === 'hyper' ? 'text-white' : 'text-white'} />
-                            <span>{pendingOrder.brand === 'hyper' ? 'Hyper Eats' : 'Uber Eats'}</span>
-                          </>
-                        ) : (
-                          <>
-                            <CarIcon size={13} className={pendingOrder.brand === 'hyper' ? 'text-white' : 'text-white'} fill="currentColor" />
-                            <span>{pendingOrder.restaurantName || (pendingOrder.brand === 'hyper' ? 'Hyper Ride' : 'UberX')}</span>
-                          </>
-                        )}
+                      <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-sm bg-black text-white border border-white">
+                        <Zap size={13} className="text-white fill-white" />
+                        <span>⚡ MATCH • {pendingOrder.type === 'delivery' ? 'Hyper Eats' : 'Hyper Ride'}</span>
                       </div>
                       {pendingOrder.isPreBooking && (
-                        <span className="px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider font-mono shadow-sm bg-purple-600 text-white animate-pulse">
+                        <span className="px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider font-mono shadow-sm bg-white text-black">
                           ⏰ PRE-BOOKING
                         </span>
                       )}
                       {(() => {
                         const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
                         return (
-                          <span className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider font-mono shadow-sm ${
-                            isDouble 
-                              ? 'bg-amber-100 text-amber-800 border border-amber-200' 
-                              : 'bg-blue-100 text-blue-800 border border-blue-200'
-                          }`}>
+                          <span className="px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider font-mono shadow-sm bg-white text-black border border-white">
                             {isDouble ? '✨ DOUBLE ORDER' : 'SINGLE ORDER'}
                           </span>
                         );
@@ -17738,29 +17734,26 @@ export default function App() {
                     
                     <button 
                       onClick={handleDeclineOrder}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors active:scale-90 ${
-                        pendingOrder.brand === 'hyper'
-                          ? 'bg-white/5 hover:bg-white/10 text-white border border-white/5'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-500'
-                      }`}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors active:scale-90 bg-white/10 hover:bg-white/20 text-white border border-white/20 cursor-pointer"
                       aria-label="Decline"
                     >
-                      <X size={16} className={pendingOrder.brand === 'hyper' ? 'text-gray-300' : 'text-gray-550'} />
+                      <X size={16} className="text-white" />
                     </button>
                   </div>
 
                   {/* Premium display payout & rating */}
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center justify-between">
-                      <h2 className={`font-sans text-[48px] font-black tracking-tight leading-none ${
-                        pendingOrder.brand === 'hyper' ? 'text-white' : 'text-gray-900'
-                      }`}>
-                        £{pendingOrder.estimatedPay % 1 === 0 ? pendingOrder.estimatedPay.toFixed(0) : pendingOrder.estimatedPay.toFixed(2)}
-                      </h2>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-300">⚡ Guaranteed Match Fare</span>
+                        <h2 className="font-sans text-[48px] font-black tracking-tight leading-none text-white mt-0.5">
+                          £{pendingOrder.estimatedPay % 1 === 0 ? pendingOrder.estimatedPay.toFixed(0) : pendingOrder.estimatedPay.toFixed(2)}
+                        </h2>
+                      </div>
                       {(() => {
                         const payRate = calculatePayRate(pendingOrder.estimatedPay, pendingOrder.estimatedDistance);
                         return (
-                          <div className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 font-black text-[10px] uppercase tracking-wider border shadow-sm ${payRate.color}`}>
+                          <div className="px-3 py-1.5 rounded-xl flex items-center gap-1.5 font-black text-[10px] uppercase tracking-wider border border-white/30 bg-white/10 text-white shadow-sm">
                             <span>{payRate.icon}</span>
                             <span>Rate: {payRate.label}</span>
                           </div>
@@ -17768,73 +17761,68 @@ export default function App() {
                       })()}
                     </div>
                     
-                    <div className={`flex items-center gap-1 mt-1 border w-fit px-2 py-0.5 rounded-md ${
-                      pendingOrder.brand === 'hyper'
-                        ? 'bg-white/5 border-white/10 text-gray-300'
-                        : 'bg-gray-100 border-gray-200/50 text-gray-700'
-                    }`}>
-                      <Star size={11} fill="#eab308" className="text-yellow-500" />
-                      <span className="font-sans font-black text-xs">4.94</span>
+                    <div className="flex items-center gap-1 mt-1 border border-white/20 w-fit px-2 py-0.5 rounded-md bg-white/10 text-white">
+                      <Star size={11} fill="#ffffff" className="text-white" />
+                      <span className="font-sans font-black text-xs">4.96</span>
                     </div>
                   </div>
 
                   {/* Horizontal Divider */}
-                  <div className={`h-px my-1 ${pendingOrder.brand === 'hyper' ? 'bg-white/10' : 'bg-gray-100'}`} />
+                  <div className="h-px my-1 bg-white/20" />
 
                   {/* Timeline with accurate metrics formatted */}
                   {(() => {
                     const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
-                    const isHyper = pendingOrder.brand === 'hyper';
                     if (isDouble) {
                       return (
                         <div className="relative pl-6 py-1 space-y-6">
                           {/* Vertical Connecting Line */}
-                          <div className={`absolute left-[7px] top-[14px] bottom-[14px] w-[2px] ${isHyper ? 'bg-[#00ea72]/80' : 'bg-black'}`} />
+                          <div className="absolute left-[7px] top-[14px] bottom-[14px] w-[2px] bg-white/40" />
 
                           {/* Top pickup locator dot/circle */}
-                          <div className={`absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full border-2 border-white ring-2 ${isHyper ? 'bg-[#00ca72] ring-[#00ff88]/50' : 'bg-black ring-black'}`} />
+                          <div className="absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full border-2 border-white ring-2 bg-white ring-white/50" />
 
                           {/* Middle dropoff circle/dot */}
-                          <div className={`absolute left-[3px] top-[100px] w-2.5 h-2.5 rounded-full border-2 border-white ring-1 ${isHyper ? 'bg-[#00ea72] ring-[#00ea72]/50' : 'bg-blue-600 ring-blue-600'}`} />
+                          <div className="absolute left-[3px] top-[100px] w-2.5 h-2.5 rounded-full border-2 border-white ring-1 bg-white ring-white/50" />
 
                           {/* Bottom dropoff square design */}
-                          <div className={`absolute left-[3px] bottom-[15px] w-2.5 h-2.5 ${isHyper ? 'bg-[#00ff88]' : 'bg-indigo-600'}`} />
+                          <div className="absolute left-[3px] bottom-[15px] w-2.5 h-2.5 bg-white" />
 
                           {/* Pickup Info */}
                           <div>
-                            <p className={`font-sans text-xs font-bold ${isHyper ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
+                            <p className="font-sans text-xs font-bold text-gray-300">
                               3 min (0.5 mi)
                             </p>
-                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isHyper ? 'text-white' : 'text-gray-800'}`}>
-                              {pendingOrder.type === 'ride' ? `Pickup Co-riders: ${pendingOrder.customerName.replace(" & Co-rider 👥", "").trim()}` : (pendingOrder.restaurantName || "Pwllmelin Road, Cardiff, CF5 2NQ")}
+                            <p className="font-sans text-sm font-black leading-snug mt-1 text-white">
+                              {pendingOrder.type === 'ride' ? `Pickup Co-riders: ${pendingOrder.customerName.replace(" & Co-rider 👥", "").trim()}` : (pendingOrder.restaurantName || "Pickup Location")}
                             </p>
-                            <p className={`font-sans text-[11px] font-bold ${isHyper ? 'text-gray-400' : 'text-gray-400'}`}>
+                            <p className="font-sans text-[11px] font-bold text-gray-400">
                               {pendingOrder.type === 'delivery' ? "12 Kingsway, Holborn, London WC2B 6YB" : "Passenger Pickup Location"}
                             </p>
                           </div>
 
                           {/* Dropoff 1 Info */}
                           <div>
-                            <p className={`font-sans text-xs font-bold ${isHyper ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
+                            <p className="font-sans text-xs font-bold text-gray-300">
                               {pendingOrder.estimatedTime} mins (approx) • Dropoff 1
                             </p>
-                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isHyper ? 'text-white' : 'text-gray-800'}`}>
+                            <p className="font-sans text-sm font-black leading-snug mt-1 text-white">
                               {pendingOrder.type === 'ride' ? `Dropoff 1: ${pendingOrder.customerName.replace(" & Co-rider 👥", "").trim()}` : pendingOrder.customerName.replace(" + 1 more", "").replace(" (Max+1)", "").trim()}
                             </p>
-                            <p className={`font-sans text-[11px] font-bold ${isHyper ? 'text-gray-400' : 'text-gray-400'}`}>
+                            <p className="font-sans text-[11px] font-bold text-gray-400">
                               {pendingOrder.type === 'ride' ? "Passenger 1 Destination" : "48 High Holborn, London WC1V 6RL"}
                             </p>
                           </div>
 
                           {/* Dropoff 2 Info */}
                           <div>
-                            <p className={`font-sans text-xs font-bold ${isHyper ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
+                            <p className="font-sans text-xs font-bold text-gray-300">
                               +{Math.floor(pendingOrder.estimatedTime * 0.4)} mins • Dropoff 2 (Shared)
                             </p>
-                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isHyper ? 'text-white' : 'text-gray-800'}`}>
+                            <p className="font-sans text-sm font-black leading-snug mt-1 text-white">
                               {pendingOrder.type === 'ride' ? "Dropoff 2: Co-rider 👥" : "Recipient (Part 2)"}
                             </p>
-                            <p className={`font-sans text-[11px] font-bold ${isHyper ? 'text-gray-400' : 'text-gray-400'}`}>
+                            <p className="font-sans text-[11px] font-bold text-gray-400">
                               {pendingOrder.type === 'ride' ? "Passenger 2 Destination" : "42 Southampton Row, London WC1B 4AR"}
                             </p>
                           </div>
@@ -17844,35 +17832,35 @@ export default function App() {
                       return (
                         <div className="relative pl-6 py-1 space-y-7">
                           {/* Vertical Connecting Line */}
-                          <div className={`absolute left-[7px] top-[14px] bottom-[14px] w-[2px] ${isHyper ? 'bg-[#00ea72]/80' : 'bg-black'}`} />
+                          <div className="absolute left-[7px] top-[14px] bottom-[14px] w-[2px] bg-white/40" />
 
                           {/* Top pickup locator dot/circle */}
-                          <div className={`absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full border-2 border-white ring-2 ${isHyper ? 'bg-[#00ca72] ring-[#00ff88]/50' : 'bg-black ring-black'}`} />
+                          <div className="absolute left-[3px] top-[10px] w-2.5 h-2.5 rounded-full border-2 border-white ring-2 bg-white ring-white/50" />
 
                           {/* Bottom dropoff square design */}
-                          <div className={`absolute left-[3px] bottom-[15px] w-2.5 h-2.5 ${isHyper ? 'bg-[#00ff88]' : 'bg-black'}`} />
+                          <div className="absolute left-[3px] bottom-[15px] w-2.5 h-2.5 bg-white" />
 
-                          {/* Time & distance metadata headers matching screenshot perfectly */}
+                          {/* Time & distance metadata headers */}
                           <div>
-                            <p className={`font-sans text-xs font-bold ${isHyper ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
+                            <p className="font-sans text-xs font-bold text-gray-300">
                               3 min (0.5 mi)
                             </p>
-                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isHyper ? 'text-white' : 'text-gray-800'}`}>
-                              {pendingOrder.restaurantName || "Pwllmelin Road, Cardiff, CF5 2NQ"}
+                            <p className="font-sans text-sm font-black leading-snug mt-1 text-white">
+                              {pendingOrder.restaurantName || "Pickup Location"}
                             </p>
-                            <p className={`font-sans text-[11px] font-bold ${isHyper ? 'text-gray-400' : 'text-gray-400'}`}>
+                            <p className="font-sans text-[11px] font-bold text-gray-400">
                               {pendingOrder.type === 'delivery' ? "12 Kingsway, Holborn, London WC2B 6YB" : "Driver Pickup Point"}
                             </p>
                           </div>
 
                           <div>
-                            <p className={`font-sans text-xs font-bold ${isHyper ? 'text-[#00ff88]/90' : 'text-gray-500'}`}>
+                            <p className="font-sans text-xs font-bold text-gray-300">
                               {pendingOrder.estimatedTime} mins ({pendingOrder.estimatedDistance.toFixed(1)} mi)
                             </p>
-                            <p className={`font-sans text-sm font-black leading-snug mt-1 ${isHyper ? 'text-white' : 'text-gray-800'}`}>
-                              {pendingOrder.customerName || "45 The Hayes, Cardiff"}
+                            <p className="font-sans text-sm font-black leading-snug mt-1 text-white">
+                              {pendingOrder.customerName || "Customer Destination"}
                             </p>
-                            <p className={`font-sans text-[11px] font-bold ${isHyper ? 'text-gray-400' : 'text-gray-400'}`}>
+                            <p className="font-sans text-[11px] font-bold text-gray-400">
                               {pendingOrder.type === 'delivery' ? "48 High Holborn, London WC1V 6RL" : "Final Destination Address"}
                             </p>
                           </div>
@@ -17881,11 +17869,11 @@ export default function App() {
                     }
                   })()}
 
-                  {/* Large Charcoal/Black Accept Match Button with Decline option */}
+                  {/* Accept Match Button with Decline option */}
                   <div className="pt-2 shrink-0 flex gap-3 items-center">
                     <button 
                       onClick={handleDeclineOrder}
-                      className="py-4 px-5 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 active:scale-95 transition-all min-h-[58px]"
+                      className="py-4 px-5 bg-white/10 hover:bg-white/20 text-white border border-white/30 rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 active:scale-95 transition-all min-h-[58px] cursor-pointer"
                     >
                       <X size={18} />
                       <span>Decline</span>
@@ -17893,11 +17881,7 @@ export default function App() {
                     <button 
                       onClick={handleAcceptOrder}
                       disabled={isMatchingLoading || isMatchFailed}
-                      className={`relative flex-1 py-4 active:scale-[0.98] transition-all rounded-2xl font-black text-lg shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden flex items-center justify-center min-h-[58px] ${
-                        pendingOrder.brand === 'hyper' 
-                          ? 'bg-purple-600 hover:bg-purple-700 text-white hover:text-white' 
-                          : 'bg-[#1a1a1a] hover:bg-black text-white hover:text-white'
-                      }`}
+                      className="relative flex-1 py-4 active:scale-[0.98] transition-all rounded-2xl font-black text-lg overflow-hidden flex items-center justify-center min-h-[58px] bg-white hover:bg-gray-100 text-black shadow-lg shadow-white/30 cursor-pointer"
                     >
                       {/* Action progress countdown line */}
                       {!isMatchingLoading && !isMatchFailed && (
@@ -17906,9 +17890,7 @@ export default function App() {
                           initial={{ width: '100%' }}
                           animate={{ width: '0%' }}
                           transition={{ duration: 18, ease: 'linear' }}
-                          className={`absolute bottom-0 left-0 h-1 z-20 ${
-                            pendingOrder.brand === 'hyper' ? 'bg-black/30' : 'bg-amber-500'
-                          }`}
+                          className="absolute bottom-0 left-0 h-1 z-20 bg-neutral-800"
                         />
                       )}
 
@@ -17918,15 +17900,16 @@ export default function App() {
                             <motion.div 
                               animate={{ rotate: 360 }}
                               transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                              className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full"
+                              className="w-5 h-5 border-3 border-black border-t-transparent rounded-full"
                             />
                             <span>Matching...</span>
                           </>
                         ) : isMatchFailed ? (
                           <span>Another driver accepted</span>
                         ) : (
-                          <span className="tracking-wide font-sans font-black text-base">
-                            Match
+                          <span className="tracking-wide font-sans font-black text-base flex items-center gap-1.5">
+                            <Zap size={18} className="text-black fill-black" />
+                            <span>Match ({orderExpiryTimer}s)</span>
                           </span>
                         )}
                       </span>
@@ -17937,28 +17920,24 @@ export default function App() {
                 /* ORIGINAL NORMAL JOB STYLE */
                 <>
                   {/* Top Handle bar */}
-                  <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mt-3 shrink-0" />
+                  <div className="w-12 h-1 bg-blue-500/40 rounded-full mx-auto mt-3 shrink-0" />
 
                   {/* Header section with badge & close button */}
                   <div className="flex items-center justify-between px-6 pt-3 pb-2 shrink-0">
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-2 bg-[#00b050] text-white px-4 py-2 rounded-full font-black text-xs uppercase tracking-wider shadow-sm">
-                        <span className="text-base leading-none">🍴</span>
-                        <span className="align-middle">Add delivery</span>
+                      <div className="flex items-center gap-2 bg-[#0a0f1d] text-blue-300 border border-[#2563eb]/60 px-4 py-2 rounded-full font-black text-xs uppercase tracking-wider shadow-sm">
+                        <CarIcon size={14} className="text-blue-400" fill="currentColor" />
+                        <span className="align-middle">{pendingOrder.type === 'delivery' ? 'Hyper Eats' : 'Hyper Ride'}</span>
                       </div>
                       {pendingOrder.isPreBooking && (
-                        <span className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider font-mono shadow-sm bg-purple-600 text-white animate-pulse flex items-center gap-1">
+                        <span className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider font-mono shadow-sm bg-blue-900/80 text-blue-200 border border-blue-500/40 flex items-center gap-1">
                           ⏰ PRE-BOOKING
                         </span>
                       )}
                       {(() => {
                         const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
                         return (
-                          <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider font-mono shadow-sm ${
-                            isDouble 
-                              ? 'bg-amber-100 text-amber-800 border border-amber-200' 
-                              : 'bg-blue-100 text-blue-800 border border-blue-200'
-                          }`}>
+                          <span className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider font-mono shadow-sm bg-blue-950/70 text-blue-300 border border-blue-500/40">
                             {isDouble ? '✨ DOUBLE ORDER (2x PAY)' : 'SINGLE ORDER'}
                           </span>
                         );
@@ -17967,23 +17946,26 @@ export default function App() {
                     
                     <button 
                       onClick={handleDeclineOrder}
-                      className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors active:scale-90"
+                      className="w-10 h-10 bg-white/5 hover:bg-white/15 border border-blue-500/30 rounded-full flex items-center justify-center transition-colors active:scale-90 text-blue-200 cursor-pointer"
                       aria-label="Decline"
                     >
-                      <X size={20} className="text-gray-600" />
+                      <X size={20} className="text-blue-300" />
                     </button>
                   </div>
 
                   {/* Main payout and details */}
                   <div className="px-6 py-2 shrink-0">
                     <div className="flex items-center justify-between">
-                      <h2 className="font-sans text-[48px] font-black text-gray-900 tracking-tight leading-none">
-                        +£{pendingOrder.estimatedPay.toFixed(2)}
-                      </h2>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">Total Guaranteed Payout</span>
+                        <h2 className="font-sans text-[48px] font-black text-white tracking-tight leading-none mt-0.5">
+                          +£{pendingOrder.estimatedPay.toFixed(2)}
+                        </h2>
+                      </div>
                       {(() => {
                         const payRate = calculatePayRate(pendingOrder.estimatedPay, pendingOrder.estimatedDistance);
                         return (
-                          <div className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 font-black text-[10px] uppercase tracking-wider border shadow-sm ${payRate.color}`}>
+                          <div className="px-3 py-1.5 rounded-xl flex items-center gap-1.5 font-black text-[10px] uppercase tracking-wider border border-blue-500/40 bg-blue-950/70 text-blue-300 shadow-sm">
                             <span>{payRate.icon}</span>
                             <span>Rate: {payRate.label}</span>
                           </div>
@@ -17991,18 +17973,16 @@ export default function App() {
                       })()}
                     </div>
                     
-                    <div className="flex items-center gap-2 mt-2.5 text-gray-700 font-bold text-sm">
+                    <div className="flex items-center gap-2 mt-2.5 text-blue-200 font-bold text-sm">
                       <span className="text-base">⏱️</span>
-                      <span className="text-black font-black">+{ pendingOrder.estimatedDistance.toFixed(1) } mi</span>
-                      <span className="text-gray-300">•</span>
+                      <span className="text-white font-black">+{ pendingOrder.estimatedDistance.toFixed(1) } mi</span>
+                      <span className="text-blue-500/50">•</span>
                       <span>{pendingOrder.estimatedTime} min</span>
-                      <span className="text-gray-300">•</span>
+                      <span className="text-blue-500/50">•</span>
                       {(() => {
                         const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
                         return (
-                          <span className={`px-2.5 py-0.5 rounded-md font-mono text-[10px] uppercase font-black ${
-                            isDouble ? 'bg-amber-500/15 text-amber-700' : 'bg-slate-100 text-slate-600'
-                          }`}>
+                          <span className="px-2.5 py-0.5 rounded-md font-mono text-[10px] uppercase font-black bg-blue-950/80 text-blue-300 border border-blue-500/30">
                             {isDouble ? '2 Deliveries' : '1 Delivery'}
                           </span>
                         );
@@ -18016,17 +17996,17 @@ export default function App() {
                       const isDouble = !!(pendingOrder.isStacked || (pendingOrder.batchCount && pendingOrder.batchCount > 1));
                       if (isDouble) {
                         return (
-                          <div className="relative pl-8 border-l-2 border-dashed border-gray-300 ml-3 py-1 space-y-6">
-                            {/* Pickup dot (black square with internal dot) */}
-                            <div className="absolute left-[-8px] top-[12px] w-4 h-4 bg-black rounded-sm flex items-center justify-center">
+                          <div className="relative pl-8 border-l-2 border-dashed border-blue-500/30 ml-3 py-1 space-y-6">
+                            {/* Pickup dot */}
+                            <div className="absolute left-[-8px] top-[12px] w-4 h-4 bg-[#0066ff] rounded-sm flex items-center justify-center ring-2 ring-blue-500/50">
                               <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
                             </div>
 
                             <div>
-                              <p className="font-sans text-lg font-black text-gray-900 leading-tight">
-                                {pendingOrder.type === 'ride' ? "Shared Ride Co-riders Pickup" : (pendingOrder.restaurantName || "Pizza Express - Holborn")}
+                              <p className="font-sans text-lg font-black text-white leading-tight">
+                                {pendingOrder.type === 'ride' ? "Shared Ride Co-riders Pickup" : (pendingOrder.restaurantName || "Pickup Location")}
                               </p>
-                              <p className="font-sans text-xs text-gray-500 font-bold mt-1">
+                              <p className="font-sans text-xs text-blue-300/80 font-bold mt-1">
                                 {pendingOrder.type === 'delivery' 
                                   ? "12 Kingsway, Holborn, London WC2B 6YB" 
                                   : "Passenger Pickup Location"}
@@ -18035,14 +18015,14 @@ export default function App() {
 
                             {/* First dropoff dot */}
                             <div className="relative pl-8 pb-1">
-                              <div className="absolute left-[-31px] top-[4px] w-3.5 h-3.5 rounded-full bg-blue-600 flex items-center justify-center border-2 border-white">
+                              <div className="absolute left-[-31px] top-[4px] w-3.5 h-3.5 rounded-full bg-blue-600 flex items-center justify-center border-2 border-white ring-2 ring-blue-500/40">
                                 <div className="w-1.5 h-1.5 bg-white rounded-full" />
                               </div>
                               <div>
-                                <p className="font-sans text-[15px] text-gray-600 font-black leading-tight">
+                                <p className="font-sans text-[15px] text-white font-black leading-tight">
                                   Dropoff 1: {pendingOrder.type === 'ride' ? pendingOrder.customerName.replace(" & Co-rider 👥", "").trim() : pendingOrder.customerName.replace(" + 1 more", "").replace(" (Max+1)", "").trim()}
                                 </p>
-                                <p className="font-sans text-xs text-gray-400 font-bold mt-1">
+                                <p className="font-sans text-xs text-blue-300/80 font-bold mt-1">
                                   {pendingOrder.type === 'ride' ? "Passenger 1 Destination" : "48 High Holborn, London WC1V 6RL"}
                                 </p>
                               </div>
@@ -18050,14 +18030,14 @@ export default function App() {
 
                             {/* Second dropoff dot */}
                             <div className="relative pl-8">
-                              <div className="absolute left-[-31px] top-[4px] w-3.5 h-3.5 rounded-full bg-indigo-600 flex items-center justify-center border-2 border-white">
+                              <div className="absolute left-[-31px] top-[4px] w-3.5 h-3.5 rounded-full bg-blue-700 flex items-center justify-center border-2 border-white ring-2 ring-blue-500/40">
                                 <div className="w-1 h-1 bg-white rounded-full" />
                               </div>
                               <div>
-                                <p className="font-sans text-[15px] text-gray-600 font-black leading-tight">
+                                <p className="font-sans text-[15px] text-white font-black leading-tight">
                                   Dropoff 2: {pendingOrder.type === 'ride' ? "Co-rider 👥" : "Recipient (Part 2)"}
                                 </p>
-                                <p className="font-sans text-xs text-gray-400 font-bold mt-1">
+                                <p className="font-sans text-xs text-blue-300/80 font-bold mt-1">
                                   {pendingOrder.type === 'ride' ? "Passenger 2 Destination" : "42 Southampton Row, London WC1B 4AR"}
                                 </p>
                               </div>
@@ -18066,33 +18046,33 @@ export default function App() {
                         );
                       } else {
                         return (
-                          <div className="relative pl-8 border-l-2 border-dashed border-gray-300 ml-3 py-1 space-y-5">
-                            {/* Pickup dot (black square with internal dot) */}
-                            <div className="absolute left-[-8px] top-[12px] w-4 h-4 bg-black rounded-sm flex items-center justify-center">
+                          <div className="relative pl-8 border-l-2 border-dashed border-blue-500/30 ml-3 py-1 space-y-5">
+                            {/* Pickup dot */}
+                            <div className="absolute left-[-8px] top-[12px] w-4 h-4 bg-[#0066ff] rounded-sm flex items-center justify-center ring-2 ring-blue-500/50">
                               <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
                             </div>
 
                             <div>
-                              <p className="font-sans text-lg font-black text-gray-900 leading-tight">
-                                {pendingOrder.restaurantName || "Pizza Express - Holborn"}
+                              <p className="font-sans text-lg font-black text-white leading-tight">
+                                {pendingOrder.restaurantName || "Pickup Location"}
                               </p>
-                              <p className="font-sans text-xs text-gray-500 font-bold mt-1">
+                              <p className="font-sans text-xs text-blue-300/80 font-bold mt-1">
                                 {pendingOrder.type === 'delivery' 
                                   ? "12 Kingsway, Holborn, London WC2B 6YB" 
                                   : "Driver Pickup Point"}
                               </p>
                             </div>
 
-                            {/* Dropoff destination point icon (blue circular dot) */}
-                            <div className="absolute left-[-7px] bottom-[10px] w-3.5 h-3.5 rounded-full bg-blue-600 flex items-center justify-center">
+                            {/* Dropoff destination point icon */}
+                            <div className="absolute left-[-7px] bottom-[10px] w-3.5 h-3.5 rounded-full bg-blue-600 flex items-center justify-center border-2 border-white ring-2 ring-blue-500/40">
                               <div className="w-1 h-1 bg-white rounded-full" />
                             </div>
 
                             <div className="pt-2">
-                              <p className="font-sans text-[15px] text-gray-600 font-black leading-tight">
+                              <p className="font-sans text-[15px] text-white font-black leading-tight">
                                 {pendingOrder.type === 'delivery' ? `Customer: ${pendingOrder.customerName}` : "Passenger Dropoff"}
                               </p>
-                              <p className="font-sans text-xs text-gray-400 font-bold mt-1">
+                              <p className="font-sans text-xs text-blue-300/80 font-bold mt-1">
                                 {pendingOrder.type === 'delivery' 
                                   ? "48 High Holborn, London WC1V 6RL"
                                   : "Final Destination Address"}
@@ -18108,7 +18088,7 @@ export default function App() {
                   <div className="p-6 pt-2 shrink-0 flex gap-3 items-center">
                     <button 
                       onClick={handleDeclineOrder}
-                      className="py-5 px-6 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 rounded-2xl font-black text-base uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 active:scale-95 transition-all min-h-[64px]"
+                      className="py-5 px-6 bg-white/5 hover:bg-white/15 text-white border border-white/20 rounded-2xl font-black text-base uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 active:scale-95 transition-all min-h-[64px] cursor-pointer"
                     >
                       <X size={20} />
                       <span>Decline</span>
@@ -18116,11 +18096,7 @@ export default function App() {
                     <button 
                       onClick={handleAcceptOrder}
                       disabled={isMatchingLoading || isMatchFailed}
-                      className={`relative flex-1 py-5 active:scale-[0.98] transition-all rounded-2xl font-black text-xl overflow-hidden flex items-center justify-center min-h-[64px] ${
-                        pendingOrder.brand === 'hyper'
-                          ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-[0_12px_36px_rgba(168,85,247,0.32)] shadow-purple-500/30'
-                          : 'bg-[#1a1a1a] hover:bg-black text-white shadow-[0_12px_36px_rgba(0,0,0,0.3)]'
-                      }`}
+                      className="relative flex-1 py-5 active:scale-[0.98] transition-all rounded-2xl font-black text-xl overflow-hidden flex items-center justify-center min-h-[64px] bg-gradient-to-r from-blue-600 via-[#0066ff] to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white shadow-lg shadow-blue-500/40 cursor-pointer"
                     >
                       {/* Action progress countdown line */}
                       {!isMatchingLoading && !isMatchFailed && (
@@ -18129,9 +18105,7 @@ export default function App() {
                           initial={{ width: '100%' }}
                           animate={{ width: '0%' }}
                           transition={{ duration: 18, ease: 'linear' }}
-                          className={`absolute bottom-0 left-0 h-1.5 z-20 ${
-                            pendingOrder.brand === 'hyper' ? 'bg-black/25' : 'bg-white/35'
-                          }`}
+                          className="absolute bottom-0 left-0 h-1.5 z-20 bg-[#0066ff]"
                         />
                       )}
 
@@ -18163,7 +18137,7 @@ export default function App() {
       </div>
 
       {/* Bottom Nav */}
-      {!['onboarding', 'documents', 'face_verification'].includes(currentScreen) && !isOffAppSimulated && !pendingOrder && (
+      {!['onboarding', 'documents', 'face_verification', 'carplay_dashboard'].includes(currentScreen) && !isOffAppSimulated && !pendingOrder && (
         <div className="h-20 bg-[#0c0c0d] border-t border-white/5 flex items-center justify-around px-2 z-[2000] shrink-0 relative pb-4 shadow-2xl">
           <NavButton 
             active={currentScreen === 'home'} 

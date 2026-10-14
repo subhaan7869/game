@@ -46,6 +46,7 @@ export interface InteractiveMapProps {
   zoom?: number;
   setZoom?: (zoom: number) => void;
   iosMapKitEngine?: 'rendered' | 'suspended';
+  hideOverlays?: boolean;
 }
 
 // 1. Custom Driver Icon Constructor using the highly realistic green car design
@@ -71,8 +72,8 @@ const getDriverIcon = (heading: number, isOnline?: boolean) => {
   return L.divIcon({
     html: `
       <div id="leaflet-car-marker" class="relative w-8 h-8 flex items-center justify-center">
-        <div class="absolute inset-0 bg-[#13AA52]/45 rounded-full animate-ping opacity-60" style="animation-duration: 2.2s"></div>
-        <div class="w-5 h-5 bg-[#13AA52] border-2 border-white rounded-full shadow-md flex items-center justify-center transition-all" style="transform: rotate(${(heading || 0)}deg)">
+        <div class="absolute inset-0 bg-[#0066ff]/40 rounded-full animate-ping opacity-75" style="animation-duration: 2s"></div>
+        <div class="w-5 h-5 bg-[#0066ff] border-2 border-white rounded-full shadow-[0_0_12px_rgba(0,102,255,0.8)] flex items-center justify-center transition-all" style="transform: rotate(${(heading || 0)}deg)">
           <svg class="w-2.5 h-2.5 text-white fill-white" viewBox="0 0 24 24">
             <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
           </svg>
@@ -143,10 +144,17 @@ const getStopIcon = (stop: ActiveStop) => {
 const getPendingOfferIcon = (type: 'pickup' | 'dest', order: any) => {
   const isPickup = type === 'pickup';
   const label = isPickup 
-    ? (order.type === 'delivery' ? order.restaurantName : 'Offer Pickup')
-    : 'Offer Destination';
-  const bgClass = isPickup ? 'bg-orange-500' : 'bg-emerald-500';
-  const borderClass = isPickup ? 'border-orange-400' : 'border-emerald-400';
+    ? (order.type === 'delivery' ? (order.restaurantName || 'Pickup') : 'Offer Pickup')
+    : (order.customerName ? `Drop: ${order.customerName}` : 'Destination');
+    
+  const isMatch = !!order?.isMatching;
+  // Black & white for match job, blue & black for normal job
+  const bgClass = isMatch 
+    ? 'bg-black text-white' 
+    : (isPickup ? 'bg-[#0066ff] text-white' : 'bg-blue-700 text-white');
+  const borderClass = isMatch 
+    ? 'border-white ring-1 ring-white/50' 
+    : 'border-blue-400 ring-1 ring-blue-500/50';
   
   const svgIcon = isPickup
     ? (order.type === 'delivery' 
@@ -157,14 +165,14 @@ const getPendingOfferIcon = (type: 'pickup' | 'dest', order: any) => {
   return L.divIcon({
     className: '',
     html: `
-      <div class="flex flex-col items-center" style="width: 140px; margin-left: -70px; margin-top: -50px;">
-        <div class="px-2 py-0.5 text-[8px] font-black ${bgClass} border ${borderClass} text-white rounded-lg shadow-xl uppercase whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
-          ${label}
+      <div class="flex flex-col items-center select-none" style="width: 150px; margin-left: -75px; margin-top: -52px;">
+        <div class="px-2.5 py-1 text-[8.5px] font-black ${bgClass} border ${borderClass} rounded-lg shadow-2xl uppercase tracking-wider whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
+          ${isMatch ? '⚡ MATCH: ' : ''}${label}
         </div>
-        <div class="w-8 h-8 rounded-full ${bgClass} border-2 border-white shadow-2xl flex items-center justify-center mt-1">
+        <div class="w-8 h-8 rounded-full ${bgClass} border-2 ${isMatch ? 'border-white shadow-[0_0_12px_rgba(255,255,255,0.7)]' : 'border-white shadow-[0_0_14px_rgba(0,102,255,0.8)]'} flex items-center justify-center mt-1">
           ${svgIcon}
         </div>
-        <div class="w-0.5 h-3 ${bgClass} mt-[-2px]" />
+        <div class="w-0.5 h-3 ${isMatch ? 'bg-white' : 'bg-[#0066ff]'} mt-[-2px]" />
       </div>
     `,
     iconSize: [1, 1],
@@ -246,7 +254,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   routeWaypoints,
   zoom,
   setZoom,
-  iosMapKitEngine = 'rendered'
+  iosMapKitEngine = 'rendered',
+  hideOverlays = false
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -484,10 +493,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       }).addTo(map);
 
       pendingOfferPolylineRef.current = L.polyline(points, {
-        color: '#f97316',
-        weight: 4,
+        color: pendingOrder.isMatching ? '#ffffff' : '#0066ff',
+        weight: 5,
         dashArray: '6, 8',
-        opacity: 0.8,
+        opacity: 0.95,
         lineJoin: 'round'
       }).addTo(map);
 
@@ -550,70 +559,74 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     <div className="w-full h-full min-h-[380px] rounded-[32px] overflow-hidden border border-white/10 bg-[#0d0e12] flex flex-col relative group select-none">
       
       {/* Absolute HUD Layer Overlays */}
-      <div className="absolute top-4 right-4 z-[5500] flex items-center gap-2 pointer-events-auto">
-        {/* Toggle Live GPS Button */}
-        <button
-          onClick={() => setUseRealGPS?.(!useRealGPS)}
-          className={`h-9 px-3 border rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xl active:scale-90 backdrop-blur-md cursor-pointer ${
-            useRealGPS 
-              ? 'bg-emerald-500/90 text-black border-emerald-400' 
-              : 'bg-[#111216]/90 border-white/10 text-white hover:bg-[#18191f]'
-          }`}
-          title="Toggle Simulation vs Real GPS"
-        >
-          <div className={`w-2 h-2 rounded-full ${useRealGPS ? 'bg-black animate-pulse' : 'bg-gray-400'}`} />
-          <span className="uppercase tracking-wider">{useRealGPS ? 'GPS: Real' : 'GPS: Sim'}</span>
-        </button>
-
-        {/* Perspective Flip Camera */}
-        <button
-          onClick={() => setViewAngle(prev => prev === 'top' ? 'tilt' : 'top')}
-          className="w-9 h-9 bg-[#111216]/90 border border-white/10 rounded-xl text-white flex items-center justify-center transition-all shadow-xl active:scale-90 backdrop-blur-md cursor-pointer hover:bg-[#18191f]"
-          title="Toggle 3D Perspective"
-        >
-          <RotateCcw size={14} className={`text-blue-400 transition-transform duration-300 ${viewAngle === 'tilt' ? 'rotate-90' : ''}`} />
-        </button>
-
-        {/* Custom Zoom Controls */}
-        <div className="flex flex-col bg-[#111216]/90 border border-white/10 rounded-xl overflow-hidden shadow-xl backdrop-blur-md z-[5501]">
-          <button 
-            onClick={() => mapRef.current?.zoomIn()} 
-            className="w-9 h-9 flex items-center justify-center text-blue-400 border-b border-white/5 hover:bg-[#18191f] active:scale-90 transition-all cursor-pointer"
-            title="Zoom In"
+      {!hideOverlays && (
+        <div className="absolute top-4 right-4 z-[5500] flex items-center gap-2 pointer-events-auto">
+          {/* Toggle Live GPS Button */}
+          <button
+            onClick={() => setUseRealGPS?.(!useRealGPS)}
+            className={`h-9 px-3 border rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xl active:scale-90 backdrop-blur-md cursor-pointer ${
+              useRealGPS 
+                ? 'bg-emerald-500/90 text-black border-emerald-400' 
+                : 'bg-[#111216]/90 border-white/10 text-white hover:bg-[#18191f]'
+            }`}
+            title="Toggle Simulation vs Real GPS"
           >
-            <ZoomIn size={14} />
+            <div className={`w-2 h-2 rounded-full ${useRealGPS ? 'bg-black animate-pulse' : 'bg-gray-400'}`} />
+            <span className="uppercase tracking-wider">{useRealGPS ? 'GPS: Real' : 'GPS: Sim'}</span>
           </button>
-          <button 
-            onClick={() => mapRef.current?.zoomOut()} 
-            className="w-9 h-9 flex items-center justify-center text-blue-400 hover:bg-[#18191f] active:scale-90 transition-all cursor-pointer"
-            title="Zoom Out"
+
+          {/* Perspective Flip Camera */}
+          <button
+            onClick={() => setViewAngle(prev => prev === 'top' ? 'tilt' : 'top')}
+            className="w-9 h-9 bg-[#111216]/90 border border-white/10 rounded-xl text-white flex items-center justify-center transition-all shadow-xl active:scale-90 backdrop-blur-md cursor-pointer hover:bg-[#18191f]"
+            title="Toggle 3D Perspective"
           >
-            <ZoomOut size={14} />
+            <RotateCcw size={14} className={`text-blue-400 transition-transform duration-300 ${viewAngle === 'tilt' ? 'rotate-90' : ''}`} />
           </button>
+
+          {/* Custom Zoom Controls */}
+          <div className="flex flex-col bg-[#111216]/90 border border-white/10 rounded-xl overflow-hidden shadow-xl backdrop-blur-md z-[5501]">
+            <button 
+              onClick={() => mapRef.current?.zoomIn()} 
+              className="w-9 h-9 flex items-center justify-center text-blue-400 border-b border-white/5 hover:bg-[#18191f] active:scale-90 transition-all cursor-pointer"
+              title="Zoom In"
+            >
+              <ZoomIn size={14} />
+            </button>
+            <button 
+              onClick={() => mapRef.current?.zoomOut()} 
+              className="w-9 h-9 flex items-center justify-center text-blue-400 hover:bg-[#18191f] active:scale-90 transition-all cursor-pointer"
+              title="Zoom Out"
+            >
+              <ZoomOut size={14} />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Dispatch Core Brand Banner */}
-      <div className="absolute bottom-4 left-4 z-[1000] bg-[#111216]/90 backdrop-blur-md border border-white/10 rounded-2xl p-2.5 px-4 flex items-center gap-3 shadow-2xl pointer-events-none">
-        <div className="flex -space-x-1.5 overflow-hidden">
-          {activeBrand === 'both' ? (
-            <>
-              <span className="w-3.5 h-3.5 rounded-full bg-blue-500 border border-black" />
-              <span className="w-3.5 h-3.5 rounded-full bg-[#00ca72] border border-black" />
-            </>
-          ) : (
-            <span className={`w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-black ${activeBrand === 'hyper' ? 'bg-[#00ca72]' : 'bg-blue-500'}`}>
-              <ShieldCheck size={10} className="text-white" />
-            </span>
-          )}
+      {!hideOverlays && (
+        <div className="absolute bottom-4 left-4 z-[1000] bg-[#111216]/90 backdrop-blur-md border border-white/10 rounded-2xl p-2.5 px-4 flex items-center gap-3 shadow-2xl pointer-events-none">
+          <div className="flex -space-x-1.5 overflow-hidden">
+            {activeBrand === 'both' ? (
+              <>
+                <span className="w-3.5 h-3.5 rounded-full bg-blue-500 border border-black" />
+                <span className="w-3.5 h-3.5 rounded-full bg-[#00ca72] border border-black" />
+              </>
+            ) : (
+              <span className={`w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-black ${activeBrand === 'hyper' ? 'bg-[#00ca72]' : 'bg-blue-500'}`}>
+                <ShieldCheck size={10} className="text-white" />
+              </span>
+            )}
+          </div>
+          <div className="text-left leading-none">
+            <p className={`text-[9px] font-black tracking-wider uppercase ${activeBrand === 'hyper' ? 'text-[#00ff88]' : activeBrand === 'both' ? 'text-[#a855f7]' : 'text-blue-400'}`}>
+              {activeBrand === 'both' ? 'Dual-Dispatch GPS Core' : activeBrand === 'hyper' ? 'Hyper Driver GPS Core' : 'Uber Driver GPS Core'}
+            </p>
+            <p className="text-[10px] font-bold text-gray-300 mt-0.5">Tracking Drivers GPS Core</p>
+          </div>
         </div>
-        <div className="text-left leading-none">
-          <p className={`text-[9px] font-black tracking-wider uppercase ${activeBrand === 'hyper' ? 'text-[#00ff88]' : activeBrand === 'both' ? 'text-[#a855f7]' : 'text-blue-400'}`}>
-            {activeBrand === 'both' ? 'Dual-Dispatch GPS Core' : activeBrand === 'hyper' ? 'Hyper Driver GPS Core' : 'Uber Driver GPS Core'}
-          </p>
-          <p className="text-[10px] font-bold text-gray-300 mt-0.5">Tracking Drivers GPS Core</p>
-        </div>
-      </div>
+      )}
 
       {/* Leaflet Map Viewer Canvas Core */}
       <div 

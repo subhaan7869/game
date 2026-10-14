@@ -52,9 +52,20 @@ html, body {
   text-decoration: underline;
 }
 
-/* Hyper Dark Blue Navigation Styling for OpenStreetMap (100% Free, No Watermark, No API Key Required) */
+/* Hyper Blue & Black Navigation Styling for OpenStreetMap (100% Free, No Watermark, No API Key Required) */
+.dark-tiles,
+.dark-tiles .leaflet-container {
+  background-color: #020617 !important;
+}
+
 .dark-tiles .leaflet-tile-pane {
-  filter: invert(100%) hue-rotate(180deg) brightness(88%) contrast(96%);
+  /* Pitch black background with electric blue roads and waterways */
+  filter: invert(100%) hue-rotate(210deg) saturate(320%) brightness(55%) contrast(150%);
+  background-color: #020617 !important;
+}
+
+.dark-tiles .leaflet-tile {
+  filter: invert(100%) hue-rotate(210deg) saturate(320%) brightness(55%) contrast(150%);
 }
 
 
