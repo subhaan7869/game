@@ -434,7 +434,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       const boundsKey = routeWaypoints.length + "_" + (routeWaypoints[0]?.latitude || 0);
       if ((map as any).lastBoundsKey !== boundsKey) {
         (map as any).lastBoundsKey = boundsKey;
-        map.fitBounds(bounds, { padding: [50, 50] });
+        map.fitBounds(bounds, { 
+          paddingTopLeft: [30, isNavigating ? 150 : 60], 
+          paddingBottomRight: [30, 140] 
+        });
       }
     } else if (isNavigating && currentStops.length > 0) {
       const stopLatLngs = currentStops.map(s => L.latLng(s.location.latitude, s.location.longitude));
@@ -462,7 +465,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       }).addTo(map);
 
       const bounds = L.latLngBounds(pathPoints);
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { 
+        paddingTopLeft: [30, isNavigating ? 150 : 60], 
+        paddingBottomRight: [30, 140] 
+      });
     }
 
     // 4. Offer Pending Preview Layer

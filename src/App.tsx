@@ -13326,169 +13326,122 @@ export default function App() {
                   );
                 })}
                 
-                {/* Navigation Overlay */}
+                {/* Navigation Overlay - Unified Sleek Dynamic HUD */}
                 <AnimatePresence>
                   {isNavigating && (activeOrders.length > 0 || destinationFilter?.active || busyAreaTarget) && (
-                    <div className="absolute top-[76px] left-0 right-0 z-[150] flex flex-col gap-3 p-3 sm:p-4 pointer-events-none">
+                    <div className="absolute top-16 left-0 right-0 z-[3500] flex flex-col gap-2 p-3 sm:p-4 pointer-events-none max-w-lg mx-auto">
                       <motion.div 
-                        initial={{ y: -50, opacity: 0 }}
+                        initial={{ y: -30, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: -50, opacity: 0 }}
-                        className="bg-[#1a1a1a] text-white px-6 py-4 rounded-[32px] shadow-2xl flex items-center justify-between border border-white/10 backdrop-blur-xl pointer-events-auto"
+                        exit={{ y: -30, opacity: 0 }}
+                        className="bg-[#080c16]/95 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl shadow-2xl flex items-center justify-between border border-blue-500/30 backdrop-blur-xl pointer-events-auto ring-1 ring-blue-500/20"
                       >
-                        <div className="flex items-center gap-5">
-                          <div className="bg-blue-600 p-3 rounded-2xl shadow-[0_0_25px_rgba(37,99,235,0.4)]">
-                            <motion.div
-                               animate={isLowPerformance ? {} : { rotate: [45, 55, 45] }}
-                               transition={isLowPerformance ? {} : { duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-                            >
-                              <Navigation size={28} className="fill-white text-white" />
-                            </motion.div>
+                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                          <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-2.5 rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] shrink-0">
+                            <Navigation size={22} className="fill-white text-white" />
                           </div>
-                          <div className="max-w-[180px]">
-                            {activeOrders.some(o => o.isPreBooking) && (
-                              <div className="px-2 py-0.5 rounded bg-purple-600 text-white text-[8px] font-black uppercase tracking-wider w-fit mb-1 shadow-sm animate-pulse">
-                                ⏰ PRE-BOOKING
-                              </div>
+                          <div className="min-w-0">
+                            {destinationFilter?.active && activeOrders.length === 0 ? (
+                              <>
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                  <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded">
+                                    Destination Mode Active
+                                  </span>
+                                  <span className="text-[7.5px] font-mono px-1 py-0.2 bg-white/10 text-gray-300 rounded font-bold">
+                                    Filtered
+                                  </span>
+                                </div>
+                                <p className="font-display text-sm sm:text-base font-black leading-tight tracking-tight text-white truncate">
+                                  {destinationFilter.shortName}
+                                </p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[10px] font-black text-blue-400">
+                                    {destinationFilter.distanceMi.toFixed(1)} mi
+                                  </span>
+                                  <div className="w-1 h-1 rounded-full bg-white/30" />
+                                  <span className="text-[10px] font-bold text-gray-300">
+                                    ETA ~{destinationFilter.estimatedMinutes} mins
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                {activeOrders.some(o => o.isPreBooking) && (
+                                  <div className="px-1.5 py-0.5 rounded bg-purple-600 text-white text-[7.5px] font-black uppercase tracking-wider w-fit mb-0.5 shadow-sm animate-pulse">
+                                    ⏰ PRE-BOOKING
+                                  </div>
+                                )}
+                                <p className="font-display text-sm sm:text-base font-black leading-tight tracking-tight truncate">
+                                  {currentStop?.label || (activeOrders[0]?.status === 'accepted' ? (activeOrders[0]?.type === 'delivery' ? activeOrders[0]?.restaurantName : 'Pickup Location') : (busyAreaTarget ? `Zone: ${busyAreaTarget.name}` : 'Destination'))}
+                                </p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">
+                                    {activeOrders[0] ? `Arrive ${getArrivalTime(activeOrders[0]?.estimatedTime / 2)}` : 'Navigating'}
+                                  </p>
+                                  <div className="w-1 h-1 rounded-full bg-blue-500" />
+                                  <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">
+                                    {activeOrders[0] ? `${activeOrders[0]?.estimatedDistance.toFixed(1)} mi` : 'Route Active'}
+                                  </p>
+                                </div>
+                              </>
                             )}
-                            <p className="font-display text-xl font-black leading-tight tracking-tight truncate">
-                              {currentStop?.label || (activeOrders[0]?.status === 'accepted' ? (activeOrders[0]?.type === 'delivery' ? activeOrders[0]?.restaurantName : 'Pickup Location') : (destinationFilter ? `Dest: ${destinationFilter.shortName}` : 'Destination'))}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">
-                                 {activeOrders[0] ? `Arrive by ${getArrivalTime(activeOrders[0]?.estimatedTime / 2)}` : (destinationFilter ? `ETA ~${destinationFilter.estimatedMinutes} mins` : 'Navigating')}
-                               </p>
-                               <div className="w-1 h-1 rounded-full bg-blue-500" />
-                               <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">
-                                 {activeOrders[0] ? `${activeOrders[0]?.estimatedDistance.toFixed(1)} mi` : (destinationFilter ? `${destinationFilter.distanceMi.toFixed(1)} mi` : 'Route Active')}
-                               </p>
-                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4 pr-1">
-                           {activeOrders.length > 0 ? (
-                             <div className="text-right hidden sm:block">
-                                <p className="font-display text-2xl font-black leading-tight">£{activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}</p>
-                                <p className="text-[8px] font-black text-blue-500 tracking-[0.2em] uppercase">Real-Time Pay</p>
-                             </div>
-                           ) : destinationFilter ? (
-                             <button
-                               onClick={dispatchJobTowardsDestination}
-                               className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase rounded-xl tracking-wider transition-all cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5"
-                               title="Get trips heading towards this destination"
-                             >
-                               <Zap size={13} className="fill-black" />
-                               <span>Get Job ⚡</span>
-                             </button>
-                           ) : null}
-                           <button onClick={() => setMapCoreMode('google')} className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg active:scale-90 transition-transform" title="Toggle Map Provider">
-                             <MapPin size={18} />
-                           </button>
-                           <button 
-                             onClick={() => {
-                               setIsNavigating(false);
-                               if (destinationFilter) handleClearDestinationFilter();
-                             }} 
-                             className="px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-full flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all cursor-pointer"
-                             title="Exit Navigation & Return to Normal Map"
-                           >
-                             <ArrowLeft size={14} />
-                             <span className="hidden sm:inline">Exit Nav</span>
-                           </button>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {activeOrders.length > 0 ? (
+                            <div className="text-right hidden sm:block pr-1">
+                              <p className="font-display text-lg font-black leading-tight">£{activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}</p>
+                              <p className="text-[7.5px] font-black text-blue-400 tracking-wider uppercase">Live Pay</p>
+                            </div>
+                          ) : destinationFilter?.active ? (
+                            <button
+                              onClick={dispatchJobTowardsDestination}
+                              className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] sm:text-xs uppercase rounded-xl tracking-wider transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-1"
+                              title="Get trips heading towards this destination"
+                            >
+                              <Zap size={12} className="fill-black" />
+                              <span>Get Job ⚡</span>
+                            </button>
+                          ) : null}
+
+                          <button 
+                            onClick={() => {
+                              setIsNavigating(false);
+                              if (destinationFilter) handleClearDestinationFilter();
+                            }} 
+                            className="p-2 sm:px-3 sm:py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl flex items-center gap-1 text-[10px] font-black uppercase tracking-wider shadow-md active:scale-95 transition-all cursor-pointer"
+                            title="Exit Navigation & Return to Normal Map"
+                          >
+                            <X size={15} />
+                            <span className="hidden sm:inline">Exit</span>
+                          </button>
                         </div>
                       </motion.div>
 
-                      {/* Destination Mode Floating Banner */}
-                      {destinationFilter?.active && (
-                        <motion.div 
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="bg-[#020617]/95 border-2 border-emerald-500 rounded-2xl p-3 shadow-2xl flex items-center justify-between text-white backdrop-blur-xl ring-1 ring-emerald-400/40 pointer-events-auto"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400 shrink-0">
-                              <Target size={16} className="animate-pulse" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400">Destination Mode Active</span>
-                                <span className="text-[8px] font-mono px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded font-black">Filtered</span>
-                              </div>
-                              <h4 className="text-xs font-black text-white truncate">{destinationFilter.shortName}</h4>
-                              <p className="text-[9px] text-gray-400 font-bold">{destinationFilter.distanceMi} mi • ~{destinationFilter.estimatedMinutes} mins</p>
-                            </div>
+                      {/* Integrated Sleek Lane Guidance Strip */}
+                      <motion.div 
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-[#080c16]/90 rounded-xl px-3.5 py-1.5 flex items-center justify-between border border-white/10 shadow-lg backdrop-blur-md pointer-events-auto text-xs"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex gap-1 items-end h-3.5">
+                            {[1, 2, 3, 4, 5].map(l => (
+                              <div 
+                                key={`lane-marker-${l}`} 
+                                className={`w-1 rounded-full transition-all duration-300 ${l === 4 ? 'h-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]' : 'h-2 bg-white/20'}`} 
+                              />
+                            ))}
                           </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              onClick={dispatchJobTowardsDestination}
-                              className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] uppercase rounded-xl tracking-wider transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-1"
-                              title="Instantly dispatch a trip heading towards this destination"
-                            >
-                              <Zap size={11} className="fill-black" />
-                              <span>Get Job ⚡</span>
-                            </button>
-                            <button
-                              onClick={handleClearDestinationFilter}
-                              className="p-1.5 bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white rounded-xl transition-all cursor-pointer"
-                              title="Clear Destination"
-                            >
-                              <X size={15} />
-                            </button>
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {/* Tactical HUD: Speed & Lane Assistance */}
-                      <div className="flex gap-2.5 overflow-x-auto no-scrollbar max-w-full pb-1 pointer-events-auto">
-                         {/* Dynamic Speedometer */}
-                         <motion.div 
-                           initial={{ x: -30, opacity: 0 }}
-                           animate={{ x: 0, opacity: 1 }}
-                           className={`bg-white rounded-[28px] px-6 py-4 shadow-2xl flex flex-col items-center justify-center border-4 h-20 min-w-24 ${isSpeeding ? 'border-red-500 bg-red-50 animate-pulse' : 'border-black'}`}
-                         >
-                            <span className={`text-4xl font-black italic leading-none tracking-tighter ${isSpeeding ? 'text-red-600' : 'text-black'}`}>{Math.round(userSpeed)}</span>
-                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] mt-1">MPH</span>
-                         </motion.div>
-
-                         {/* Legal Speed Limit (UK Style Circle) */}
-                         <motion.div 
-                           initial={{ x: -20, opacity: 0 }}
-                           animate={{ x: 0, opacity: 1 }}
-                           transition={{ delay: 0.1 }}
-                           className="bg-white rounded-full w-20 h-20 border-[6px] border-red-600 flex flex-col items-center justify-center shadow-2xl z-10"
-                         >
-                            <span className="text-3xl font-black text-black leading-none">{currentSpeedLimit}</span>
-                            <span className="text-[8px] font-black text-gray-400 leading-none">LIMIT</span>
-                         </motion.div>
-
-                         {/* Smart Lane Guidance */}
-                         <motion.div 
-                           initial={{ x: -20, opacity: 0 }}
-                           animate={{ x: 0, opacity: 1 }}
-                           transition={{ delay: 0.2 }}
-                           className="bg-[#1a1a1a]/95 rounded-[28px] px-6 py-4 flex items-center gap-4 border border-white/10 shadow-2xl backdrop-blur-xl h-20"
-                         >
-                            <div className="flex gap-2 items-end h-8">
-                               {[1, 2, 3, 4, 5].map(l => (
-                                 <motion.div 
-                                    key={`lane-marker-${l}`} 
-                                    animate={l === 4 ? { opacity: [0.4, 1, 0.4] } : {}}
-                                    transition={{ duration: 1.5, repeat: Infinity }}
-                                    className={`w-1.5 rounded-full transition-all duration-700 ${l === 4 ? 'h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)]' : 'h-5 bg-white/10'}`} 
-                                 />
-                               ))}
-                            </div>
-                            <div className="text-left">
-                               <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest leading-none mb-1.5">Lane Assistance</p>
-                               <p className="text-sm font-black text-white leading-tight uppercase">Keep Right</p>
-                               <p className="text-[10px] font-bold text-blue-500 leading-none mt-1">Exit in 0.4 mi</p>
-                            </div>
-                            <div className="bg-blue-600/20 p-2 rounded-xl">
-                               <ArrowUp size={18} className="text-blue-500 rotate-45" />
-                            </div>
-                         </motion.div>
-                      </div>
+                          <span className="text-[10px] font-black text-gray-200 uppercase tracking-wider">Keep Right</span>
+                          <span className="text-[9px] font-bold text-blue-400">• Exit in 0.4 mi</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[8px] font-mono text-gray-400 uppercase tracking-widest hidden sm:inline">Lane Assist</span>
+                          <ArrowUp size={13} className="text-blue-400 rotate-45" />
+                        </div>
+                      </motion.div>
                     </div>
                   )}
                 </AnimatePresence>
@@ -14177,23 +14130,47 @@ export default function App() {
                       </button>
                     </div>
 
-                    {/* Left Side Safety & Vehicle Dock */}
-                    <div className="absolute bottom-36 left-4 flex items-center gap-2 pointer-events-auto z-[4550]">
-                      <button 
-                        onClick={() => setIsSafetyToolkitOpen(true)}
-                        className="w-11 h-11 bg-slate-900/90 text-blue-400 rounded-full shadow-xl flex items-center justify-center border border-white/10 active:scale-90 transition-transform backdrop-blur-md"
-                        title="Safety Toolkit"
-                      >
-                        <Shield size={20} />
-                      </button>
-                      <button 
-                        onClick={() => setIsVehicleSettingsOpen(true)}
-                        className="w-11 h-11 bg-slate-900/90 text-white rounded-full shadow-xl flex items-center justify-center border border-white/10 active:scale-90 transition-transform backdrop-blur-md relative"
-                        title="Vehicle Settings"
-                      >
-                        <Settings2 size={20} />
-                      </button>
-                    </div>
+                    {/* Left Side: Navigation Speedometer HUD or Safety Dock */}
+                    {isNavigating ? (
+                      <div className="absolute bottom-36 left-4 flex items-center gap-2 pointer-events-auto z-[4550]">
+                        {/* Dynamic Speedometer */}
+                        <div className={`rounded-2xl px-3.5 py-2 shadow-2xl border flex flex-col items-center justify-center min-w-[62px] ${isSpeeding ? 'bg-red-950/95 border-red-500 text-red-200 animate-pulse' : 'bg-slate-900/95 border-white/10 text-white backdrop-blur-md'}`}>
+                          <span className="text-2xl font-black italic leading-none">{Math.round(userSpeed)}</span>
+                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest mt-0.5">MPH</span>
+                        </div>
+                        {/* Legal Speed Limit (UK Style Circle) */}
+                        <div className="bg-white rounded-full w-12 h-12 border-[4px] border-red-600 flex flex-col items-center justify-center shadow-2xl">
+                          <span className="text-base font-black text-black leading-none">{currentSpeedLimit}</span>
+                          <span className="text-[6px] font-black text-gray-400 leading-none">LIMIT</span>
+                        </div>
+                        {/* Compact Safety Toolkit Button */}
+                        <button 
+                          onClick={() => setIsSafetyToolkitOpen(true)}
+                          className="w-10 h-10 bg-slate-900/90 text-blue-400 rounded-full shadow-xl flex items-center justify-center border border-white/10 active:scale-90 transition-transform backdrop-blur-md"
+                          title="Safety Toolkit"
+                        >
+                          <Shield size={18} />
+                        </button>
+                      </div>
+                    ) : (
+                      /* Left Side Safety & Vehicle Dock when not navigating */
+                      <div className="absolute bottom-36 left-4 flex items-center gap-2 pointer-events-auto z-[4550]">
+                        <button 
+                          onClick={() => setIsSafetyToolkitOpen(true)}
+                          className="w-11 h-11 bg-slate-900/90 text-blue-400 rounded-full shadow-xl flex items-center justify-center border border-white/10 active:scale-90 transition-transform backdrop-blur-md"
+                          title="Safety Toolkit"
+                        >
+                          <Shield size={20} />
+                        </button>
+                        <button 
+                          onClick={() => setIsVehicleSettingsOpen(true)}
+                          className="w-11 h-11 bg-slate-900/90 text-white rounded-full shadow-xl flex items-center justify-center border border-white/10 active:scale-90 transition-transform backdrop-blur-md relative"
+                          title="Vehicle Settings"
+                        >
+                          <Settings2 size={20} />
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </motion.div>
@@ -14386,12 +14363,12 @@ export default function App() {
                     </div>
                   </div>
                 ) : (
-                  /* Standard Online Header — Home Button Moved from Top Right to Top Left */
-                  <div className="p-4 flex justify-between items-center pointer-events-auto">
-                    <div className="flex items-center gap-2">
+                  /* Standard Online Header — Responsive single-row layout that never wraps */
+                  <div className="px-3 sm:px-4 py-2 sm:py-3 flex justify-between items-center pointer-events-auto gap-1 sm:gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                       <button 
                         onClick={() => setShowFullMap(false)}
-                        className="w-11 h-11 bg-neutral-900/90 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 cursor-pointer"
+                        className="w-10 h-10 sm:w-11 sm:h-11 bg-neutral-900/90 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 cursor-pointer"
                         title="Dashboard / Home Screen"
                       >
                         <Home size={18} />
@@ -14399,7 +14376,7 @@ export default function App() {
 
                       <button 
                         onClick={(e) => { e.stopPropagation(); setIsSideMenuOpen(true); }}
-                        className={`w-11 h-11 backdrop-blur-md rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 border ${
+                        className={`w-10 h-10 sm:w-11 sm:h-11 backdrop-blur-md rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 border ${
                           activeBrand === 'hyper' 
                             ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_10px_rgba(168,85,247,0.15)]'
                             : activeBrand === 'both'
@@ -14407,14 +14384,14 @@ export default function App() {
                             : 'bg-neutral-900/90 text-white border-white/10'
                         }`}
                       >
-                        <Menu size={20} />
+                        <Menu size={18} />
                       </button>
                     </div>
                     
                     <motion.div 
                       initial={{ y: -50, scale: 0.9 }}
                       animate={{ y: 0, scale: 1 }}
-                      className={`px-5 py-1.5 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 cursor-pointer select-none min-w-[150px] max-w-[210px] min-h-[44px] transition-all relative border ${
+                      className={`px-3 sm:px-5 py-1 sm:py-1.5 rounded-full shadow-2xl flex flex-col items-center justify-center active:scale-95 cursor-pointer select-none min-w-[120px] sm:min-w-[150px] max-w-[170px] sm:max-w-[210px] min-h-[38px] sm:min-h-[44px] transition-all relative border shrink-0 ${
                         activeBrand === 'hyper' 
                           ? 'bg-[#1a0c2e]/90 text-[#c084fc] border-[#c084fc]/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]' 
                           : activeBrand === 'both'
@@ -14441,19 +14418,19 @@ export default function App() {
                       onTouchCancel={handleEarningsPressCancel}
                       title="Hold to hide/show earnings"
                     >
-                      <span className="text-[7.5px] font-black uppercase tracking-[0.25em] text-gray-400 leading-none mb-0.5 select-none flex items-center gap-1">
-                        {isEarningsHidden && <EyeOff size={9} className="text-amber-400" />}
+                      <span className="text-[7px] sm:text-[7.5px] font-black uppercase tracking-[0.2em] text-gray-400 leading-none mb-0.5 select-none flex items-center gap-1">
+                        {isEarningsHidden && <EyeOff size={8} className="text-amber-400" />}
                         {topBarMode === 'today' && "Today's Earnings"}
                         {topBarMode === 'last_trip' && "Last Trip Payout"}
                         {topBarMode === 'hyper_driver_pro' && `Hyper Pro - ${userTier}`}
                       </span>
 
-                      <div className="flex items-center gap-1.5 justify-center leading-none">
-                        <span className={`font-display text-base font-black tracking-tight select-none ${
+                      <div className="flex items-center gap-1 justify-center leading-none">
+                        <span className={`font-display text-sm sm:text-base font-black tracking-tight select-none ${
                           activeBrand === 'hyper' ? 'text-[#00ff88]' : 'text-white'
                         }`}>
                           {isEarningsHidden && (topBarMode === 'today' || topBarMode === 'last_trip') ? (
-                            <span className="text-gray-400 tracking-widest font-mono text-sm flex items-center gap-1">
+                            <span className="text-gray-400 tracking-widest font-mono text-xs sm:text-sm flex items-center gap-1">
                               ••••••
                             </span>
                           ) : (
@@ -14466,27 +14443,28 @@ export default function App() {
                         </span>
                       </div>
 
-                      <div className="flex gap-1 mt-1 justify-center select-none">
+                      <div className="flex gap-1 mt-0.5 justify-center select-none">
                         <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'today' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
                         <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'last_trip' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
                         <span className={`w-1 h-0.5 rounded-full transition-all duration-250 ${topBarMode === 'hyper_driver_pro' ? (activeBrand === 'hyper' ? 'bg-[#00ff88] w-2.5' : 'bg-[#22c55e] w-2.5') : 'bg-white/30'}`} />
                       </div>
                     </motion.div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                       {user.isOnline && (
                         pendingOrder ? (
-                          <div className="px-2.5 py-1 bg-amber-500/20 backdrop-blur-md rounded-full border border-amber-500/40 text-amber-400 font-mono text-[10px] font-bold shadow-lg flex items-center gap-1 animate-pulse">
-                            <Clock size={11} className="text-amber-400" />
+                          <div className="px-2 py-1 bg-amber-500/20 backdrop-blur-md rounded-full border border-amber-500/40 text-amber-400 font-mono text-[9px] sm:text-[10px] font-bold shadow-lg flex items-center gap-1 animate-pulse">
+                            <Clock size={10} className="text-amber-400" />
                             <span>{orderExpiryTimer}s</span>
                           </div>
                         ) : jobTimerRemaining !== null && jobTimerRemaining >= 0 ? (
-                          <div className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-white font-mono text-[10px] font-bold shadow-lg flex items-center gap-1">
-                            <Clock size={11} className="text-[#00ff88]" />
+                          <div className="px-2 py-1 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-white font-mono text-[9px] sm:text-[10px] font-bold shadow-lg flex items-center gap-1">
+                            <Clock size={10} className="text-[#00ff88]" />
                             <span>{Math.floor(jobTimerRemaining / 60)}:{(jobTimerRemaining % 60).toString().padStart(2, '0')}</span>
                           </div>
                         ) : null
                       )}
+
                       <button 
                         onClick={() => {
                           const apps: Array<'google' | 'waze' | 'apple' | 'cyber'> = ['google', 'waze', 'apple', 'cyber'];
@@ -14498,27 +14476,27 @@ export default function App() {
                           sendNotification("Navigation App Switched 🧭", `Primary turn-by-turn routing provider set to ${appNames[nextApp]}.`, "success");
                           speakNotification(`Navigation provider switched to ${appNames[nextApp]}.`);
                         }}
-                        className="h-11 px-3.5 bg-blue-600 hover:bg-blue-500 border border-blue-400 text-white rounded-full shadow-2xl flex items-center gap-1.5 active:scale-95 transition-transform shrink-0 cursor-pointer"
+                        className="h-10 sm:h-11 px-2.5 sm:px-3 bg-blue-600 hover:bg-blue-500 border border-blue-400 text-white rounded-full shadow-2xl flex items-center gap-1 active:scale-95 transition-transform shrink-0 cursor-pointer"
                         title="Switch Navigation Provider (OpenStreetMap, Waze, Apple Maps, Cyber 3D)"
                       >
-                        <Navigation size={16} className="fill-white" />
-                        <span className="text-[10px] font-black uppercase tracking-wider">{navigationApp === 'google' ? 'OpenStreetMap' : navigationApp === 'waze' ? 'Waze' : navigationApp === 'apple' ? 'Apple' : 'Cyber 3D'}</span>
+                        <Navigation size={14} className="fill-white" />
+                        <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider hidden sm:inline">{navigationApp === 'google' ? 'OSM' : navigationApp === 'waze' ? 'Waze' : navigationApp === 'apple' ? 'Apple' : '3D'}</span>
                       </button>
 
                       <button 
                         onClick={() => setCurrentScreen('carplay_dashboard')}
-                        className="w-11 h-11 bg-emerald-600/90 hover:bg-emerald-500 text-white border border-emerald-400/40 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 cursor-pointer"
+                        className="w-10 h-10 sm:w-11 sm:h-11 bg-emerald-600/90 hover:bg-emerald-500 text-white border border-emerald-400/40 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 cursor-pointer"
                         title="CarPlay View & iPad ↔ PC Map Sync"
                       >
-                        <CarIcon size={18} />
+                        <CarIcon size={16} />
                       </button>
 
                       <button 
                         onClick={() => setIsSearchOpen(true)}
-                        className="w-11 h-11 bg-slate-950 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 cursor-pointer"
-                        title="Search Hotspots"
+                        className="w-10 h-10 sm:w-11 sm:h-11 bg-slate-950 text-white border border-white/10 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform shrink-0 cursor-pointer"
+                        title="Search Hotspots & Real Addresses"
                       >
-                        <Search size={20} />
+                        <Search size={16} />
                       </button>
                     </div>
                   </div>
