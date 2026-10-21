@@ -53,6 +53,10 @@ html, body {
 }
 
 /* Hyper Blue & Black Navigation Styling for OpenStreetMap (100% Free, No Watermark, No API Key Required) */
+.leaflet-container {
+  background-color: #020617 !important;
+}
+
 .dark-tiles,
 .dark-tiles .leaflet-container {
   background-color: #020617 !important;

@@ -26,10 +26,12 @@ import {
   ShieldCheck,
   RotateCcw,
   Clock,
-  Zap
+  Zap,
+  Target,
+  Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Order, UserProfile, Location } from '../types';
+import { Order, UserProfile, Location, DestinationFilter } from '../types';
 import { MediaControls } from './MediaControls';
 import { calculatePayRate } from '../utils/payRate';
 
@@ -72,6 +74,9 @@ export interface CarPlaySystemProps {
   isMatchFailed?: boolean;
   onToggleOnline?: () => void;
   location?: Location | null;
+  destinationFilter?: DestinationFilter | null;
+  onOpenSearch?: () => void;
+  onDispatchJobToArea?: () => void;
 }
 
 export const CarPlaySystem: React.FC<CarPlaySystemProps> = ({
@@ -104,7 +109,10 @@ export const CarPlaySystem: React.FC<CarPlaySystemProps> = ({
   isMatchingLoading = false,
   isMatchFailed = false,
   onToggleOnline,
-  location
+  location,
+  destinationFilter,
+  onOpenSearch,
+  onDispatchJobToArea
 }) => {
   // CarPlay view layout: 'infotainment' (realistic automotive unit), 'dual_studio' (phone + carplay side-by-side), or 'fullscreen' (edge-to-edge)
   const [frameMode, setFrameMode] = useState<'infotainment' | 'dual_studio' | 'fullscreen'>('infotainment');
@@ -185,15 +193,57 @@ export const CarPlaySystem: React.FC<CarPlaySystemProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Test Job Trigger Button */}
-          {onTriggerTestJob && (
+          {/* Search Address Button in CarPlay */}
+          {onOpenSearch && (
             <button
-              onClick={onTriggerTestJob}
-              className="px-2.5 py-1 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/40 text-purple-200 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
-              title="Dispatch a realistic incoming trip request to CarPlay (matches RideShare Guy video)"
+              onClick={onOpenSearch}
+              className="px-2.5 py-1 bg-blue-950/80 hover:bg-blue-900 border border-blue-500/50 text-blue-200 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-sm"
+              title="Search Real Address Destination & Route"
             >
-              <Bell size={12} className="text-purple-300 animate-bounce" />
-              <span>Test Trip Offer 🔔</span>
+              <Search size={11} className="text-blue-400" />
+              <span>Search Address 🔍</span>
+            </button>
+          )}
+
+          {/* Destination Filter Active Badge & Area Job Dispatch */}
+          {destinationFilter?.active && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-950/90 border border-emerald-500/60 rounded-lg text-emerald-200 text-[10px] font-bold">
+              <Target size={11} className="text-emerald-400 animate-pulse" />
+              <span className="truncate max-w-[110px]">{destinationFilter.shortName}</span>
+              {onDispatchJobToArea && (
+                <button
+                  onClick={onDispatchJobToArea}
+                  className="px-2 py-0.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase rounded text-[9px] transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-sm"
+                  title="Dispatch Job to this Destination Area"
+                >
+                  <Zap size={9} className="fill-black" />
+                  <span>Get Job</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Match Job Trigger Button (Black & White Theme) */}
+          {onTriggerMatchJob && (
+            <button
+              onClick={onTriggerMatchJob}
+              className="px-2.5 py-1 bg-black hover:bg-neutral-900 border border-white text-white rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-sm shadow-white/20"
+              title="Dispatch Match Job (Black & White Theme) to iPad & PC CarPlay"
+            >
+              <Zap size={11} className="text-white fill-white" />
+              <span>Match Job ⚡</span>
+            </button>
+          )}
+
+          {/* Normal Job Trigger Button (Blue & Black Theme) */}
+          {(onTriggerNormalJob || onTriggerTestJob) && (
+            <button
+              onClick={onTriggerNormalJob || onTriggerTestJob}
+              className="px-2.5 py-1 bg-[#030712] hover:bg-[#0f172a] border border-[#2563eb] text-blue-300 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-sm shadow-blue-500/20"
+              title="Dispatch Normal Job (Blue & Black Theme) to iPad & PC CarPlay"
+            >
+              <CarIcon size={11} className="text-blue-400" />
+              <span>Normal Job 🚗</span>
             </button>
           )}
 
@@ -302,6 +352,45 @@ export const CarPlaySystem: React.FC<CarPlaySystemProps> = ({
                   </div>
                 </div>
 
+                {/* Destination Filter Card or Search Bar on iPad */}
+                {destinationFilter?.active ? (
+                  <div className="bg-[#030712] border-2 border-emerald-500/70 rounded-2xl p-2.5 flex items-center justify-between text-white shadow-lg">
+                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400 shrink-0">
+                        <Target size={14} className="animate-pulse" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[8px] font-black uppercase text-emerald-400 tracking-wider">Destination Active</p>
+                        <p className="text-xs font-black text-white truncate">{destinationFilter.shortName}</p>
+                      </div>
+                    </div>
+                    {onDispatchJobToArea && (
+                      <button
+                        onClick={onDispatchJobToArea}
+                        className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[9px] uppercase rounded-lg transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-sm shrink-0"
+                      >
+                        <Zap size={10} className="fill-black" />
+                        <span>Get Job ⚡</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  onOpenSearch && (
+                    <button
+                      onClick={onOpenSearch}
+                      className="w-full py-2 px-3 bg-white/5 hover:bg-white/10 border border-blue-500/30 hover:border-blue-400 rounded-xl flex items-center justify-between text-left transition-all active:scale-[0.99] cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Search size={14} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                        <span className="text-[10px] font-bold text-gray-300 group-hover:text-white">Where to? (Search Real Address)</span>
+                      </div>
+                      <span className="text-[8px] font-black uppercase tracking-wider text-blue-400 bg-blue-500/20 px-2 py-0.5 rounded">
+                        Route & Jobs
+                      </span>
+                    </button>
+                  )
+                )}
+
                 {/* Test Job Trigger Dual Buttons on iPad (Match B&W vs Normal Blue) */}
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -341,13 +430,21 @@ export const CarPlaySystem: React.FC<CarPlaySystemProps> = ({
                     : "bg-[#030712] border-2 border-[#2563eb] rounded-2xl p-3 shadow-2xl space-y-2 ring-1 ring-[#0066ff]/50 text-white animate-pulse"
                   }>
                     <div className="flex items-center justify-between">
-                      <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${
-                        pendingOrder.isMatching 
-                          ? 'bg-black text-white border border-white' 
-                          : 'bg-[#0a0f1d] text-blue-300 border border-blue-500/50'
-                      }`}>
-                        {pendingOrder.isMatching ? '⚡ MATCH JOB' : (pendingOrder.type === 'delivery' ? '🍔 Hyper Eats' : '🚗 Hyper Ride')}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${
+                          pendingOrder.isMatching 
+                            ? 'bg-black text-white border border-white' 
+                            : 'bg-[#0a0f1d] text-blue-300 border border-blue-500/50'
+                        }`}>
+                          {pendingOrder.isMatching ? '⚡ MATCH JOB' : (pendingOrder.type === 'delivery' ? '🍔 Hyper Eats' : '🚗 Hyper Ride')}
+                        </span>
+                        {pendingOrder.isTowardsDestination && (
+                          <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 flex items-center gap-0.5">
+                            <Target size={9} />
+                            <span>Towards Dest</span>
+                          </span>
+                        )}
+                      </div>
                       <span className={`text-base font-black ${pendingOrder.isMatching ? 'text-white' : 'text-blue-300'}`}>
                         £{pendingOrder.estimatedPay.toFixed(2)}
                       </span>
@@ -830,6 +927,14 @@ export const CarPlaySystem: React.FC<CarPlaySystemProps> = ({
                                       : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
                                   }`}>
                                     Double Trip
+                                  </span>
+                                )}
+
+                                {/* Destination Filter Pill */}
+                                {pendingOrder.isTowardsDestination && (
+                                  <span className="px-2 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider border flex items-center gap-1 bg-emerald-500/20 text-emerald-300 border-emerald-400/50 animate-pulse">
+                                    <Target size={11} className="text-emerald-400" />
+                                    <span>Towards {pendingOrder.destinationFilterAddress || 'Destination'}</span>
                                   </span>
                                 )}
                               </div>

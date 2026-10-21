@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { MapPin, Navigation, Eye, Compass, RotateCcw, AlertCircle, Info, Settings, ShieldCheck, Utensils, User, HelpCircle, CheckCircle2, ZoomIn, ZoomOut } from 'lucide-react';
+import { MapPin, Navigation, Eye, Compass, AlertCircle, Info, Settings, ShieldCheck, Utensils, User, HelpCircle, CheckCircle2 } from 'lucide-react';
 
 interface Location {
   latitude: number;
@@ -556,54 +556,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   ]);
 
   return (
-    <div className="w-full h-full min-h-[380px] rounded-[32px] overflow-hidden border border-white/10 bg-[#0d0e12] flex flex-col relative group select-none">
+    <div className="w-full h-full min-h-[380px] rounded-[32px] overflow-hidden border border-white/10 bg-[#020617] flex flex-col relative group select-none">
       
-      {/* Absolute HUD Layer Overlays */}
-      {!hideOverlays && (
-        <div className="absolute top-4 right-4 z-[5500] flex items-center gap-2 pointer-events-auto">
-          {/* Toggle Live GPS Button */}
-          <button
-            onClick={() => setUseRealGPS?.(!useRealGPS)}
-            className={`h-9 px-3 border rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xl active:scale-90 backdrop-blur-md cursor-pointer ${
-              useRealGPS 
-                ? 'bg-emerald-500/90 text-black border-emerald-400' 
-                : 'bg-[#111216]/90 border-white/10 text-white hover:bg-[#18191f]'
-            }`}
-            title="Toggle Simulation vs Real GPS"
-          >
-            <div className={`w-2 h-2 rounded-full ${useRealGPS ? 'bg-black animate-pulse' : 'bg-gray-400'}`} />
-            <span className="uppercase tracking-wider">{useRealGPS ? 'GPS: Real' : 'GPS: Sim'}</span>
-          </button>
-
-          {/* Perspective Flip Camera */}
-          <button
-            onClick={() => setViewAngle(prev => prev === 'top' ? 'tilt' : 'top')}
-            className="w-9 h-9 bg-[#111216]/90 border border-white/10 rounded-xl text-white flex items-center justify-center transition-all shadow-xl active:scale-90 backdrop-blur-md cursor-pointer hover:bg-[#18191f]"
-            title="Toggle 3D Perspective"
-          >
-            <RotateCcw size={14} className={`text-blue-400 transition-transform duration-300 ${viewAngle === 'tilt' ? 'rotate-90' : ''}`} />
-          </button>
-
-          {/* Custom Zoom Controls */}
-          <div className="flex flex-col bg-[#111216]/90 border border-white/10 rounded-xl overflow-hidden shadow-xl backdrop-blur-md z-[5501]">
-            <button 
-              onClick={() => mapRef.current?.zoomIn()} 
-              className="w-9 h-9 flex items-center justify-center text-blue-400 border-b border-white/5 hover:bg-[#18191f] active:scale-90 transition-all cursor-pointer"
-              title="Zoom In"
-            >
-              <ZoomIn size={14} />
-            </button>
-            <button 
-              onClick={() => mapRef.current?.zoomOut()} 
-              className="w-9 h-9 flex items-center justify-center text-blue-400 hover:bg-[#18191f] active:scale-90 transition-all cursor-pointer"
-              title="Zoom Out"
-            >
-              <ZoomOut size={14} />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Dispatch Core Brand Banner */}
       {!hideOverlays && (
         <div className="absolute bottom-4 left-4 z-[1000] bg-[#111216]/90 backdrop-blur-md border border-white/10 rounded-2xl p-2.5 px-4 flex items-center gap-3 shadow-2xl pointer-events-none">
@@ -628,9 +582,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </div>
       )}
 
-      {/* Leaflet Map Viewer Canvas Core */}
+      {/* Leaflet Map Viewer Canvas Core - Always styled with Hyper Blue & Black dark-tiles */}
       <div 
-        className={`w-full h-full relative overflow-hidden transition-all duration-500 origin-bottom ${theme === 'dark' ? 'dark-tiles' : ''}`}
+        className="w-full h-full relative overflow-hidden transition-all duration-500 origin-bottom dark-tiles"
         style={{ 
           height: '100%', 
           minHeight: '380px',

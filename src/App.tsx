@@ -111,7 +111,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, HyperProTier, ScheduledOrder, CompletedTrip, NavSimulation, Quest } from './types';
+import { Location, Order, JobType, AppScreen, ChatMessage, UserProfile, HyperProTier, ScheduledOrder, CompletedTrip, NavSimulation, Quest, DestinationFilter } from './types';
 import { HyperDriverLogo } from './components/HyperDriverLogo';
 import { MediaControls } from './components/MediaControls';
 import { InteractiveMap } from './components/InteractiveMap';
@@ -123,6 +123,8 @@ import { MultiplayerHub, OtherDriver } from './components/MultiplayerHub';
 import { CommandCentreScreen } from './components/CommandCentreScreen';
 import { OfflineHomeScreen } from './components/OfflineHomeScreen';
 import { CarPlaySystem } from './components/CarPlaySystem';
+import { AddressSearchModal } from './components/AddressSearchModal';
+import { searchRealAddresses, GeocodedAddress, calculateDistanceMiles, estimateDriveMinutes } from './utils/geocoding';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
@@ -7870,10 +7872,23 @@ export default function App() {
   
   // Chat & Notifications
   const [orderStatusFilter, setOrderStatusFilter] = useState<'all' | 'accepted' | 'picked_up'>('all');
+  const [isDestFilterOpen, setIsDestFilterOpen] = useState(false);
+  const [destinationFilter, setDestinationFilter] = useState<DestinationFilter | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   
   // Trip Stop Logic for Multiple Orders
   const currentStops = useMemo(() => {
-    if (activeOrders.length === 0) return [];
+    if (activeOrders.length === 0) {
+      if (destinationFilter?.active) {
+        return [{
+          orderId: 'dest_filter',
+          type: 'dropoff' as const,
+          location: destinationFilter.location,
+          label: `Destination: ${destinationFilter.shortName}`
+        }];
+      }
+      return [];
+    }
     
     const stops: { orderId: string, type: 'pickup' | 'dropoff', location: Location, label: string }[] = [];
     
@@ -7933,7 +7948,7 @@ export default function App() {
     }
 
     return stops;
-  }, [activeOrders, hyperXAutoQueue]);
+  }, [activeOrders, hyperXAutoQueue, destinationFilter]);
 
   const [busyAreaTarget, setBusyAreaTarget] = useState<{ id: string, name: string, location: Location } | null>(null);
 
@@ -8117,8 +8132,6 @@ export default function App() {
   const [isOfflineHomeSheetOpen, setIsOfflineHomeSheetOpen] = useState(false);
   const [showFullMap, setShowFullMap] = useState(false);
   const [heading, setHeading] = useState(0);
-  const [isDestFilterOpen, setIsDestFilterOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchCategory, setSearchCategory] = useState<'all' | 'airports' | 'surge' | 'food'>('all');
   const [isInboxOpen, setIsInboxOpen] = useState(false);
@@ -9214,9 +9227,10 @@ export default function App() {
   useEffect(() => {
     const hasJob = activeOrders.length > 0;
     const isNavBusy = !hasJob && !!busyAreaTarget;
+    const isNavDest = !hasJob && !!destinationFilter?.active;
     
-    if (!isNavigating || !user.isOnline || hasJob || !isNavBusy || !location || useRealGPS) {
-      if (isNavigating && !hasJob && !isNavBusy) {
+    if (!isNavigating || !user.isOnline || hasJob || (!isNavBusy && !isNavDest) || !location || useRealGPS) {
+      if (isNavigating && !hasJob && !isNavBusy && !isNavDest) {
         setIsNavigating(false);
       }
       return;
@@ -9239,6 +9253,9 @@ export default function App() {
       } else if (!onJob && busyTarget) {
         target = busyTarget.location;
         label = `Surge Area: ${busyTarget.name}`;
+      } else if (!onJob && destinationFilter?.active) {
+        target = destinationFilter.location;
+        label = `Destination: ${destinationFilter.shortName}`;
       } else {
         return; // Nothing to navigate to
       }
@@ -9262,10 +9279,16 @@ export default function App() {
           setRouteWaypoints(updatedRoute);
         } else {
           setLocation(target);
-          setIsNavigating(false);
           if (!onJob) {
-            setBusyAreaTarget(null);
-            sendNotification("Arrived", `Arrived at busy region: ${label}`, "success");
+            if (busyTarget) {
+              setBusyAreaTarget(null);
+              setIsNavigating(false);
+              sendNotification("Arrived", `Arrived at busy region: ${label}`, "success");
+            } else if (destinationFilter?.active) {
+              sendNotification("Arrived at Destination 🎯", `You have arrived at ${destinationFilter.shortName}. Local jobs ready!`, "success");
+              speakNotification(`You have arrived at ${destinationFilter.shortName}.`);
+              dispatchJobTowardsDestination();
+            }
           } else {
             sendNotification("Arrived", `You have arrived at ${label}`, "success");
           }
@@ -9290,7 +9313,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(moveInterval);
-  }, [isNavigating, user.isOnline, activeOrders.length > 0, !!busyAreaTarget, location === null, useRealGPS]);
+  }, [isNavigating, user.isOnline, activeOrders.length > 0, !!busyAreaTarget, !!destinationFilter?.active, location === null, useRealGPS]);
 
   // Synchronize Nav Simulation with current active stop or busyAreaTarget
   useEffect(() => {
@@ -9663,12 +9686,12 @@ export default function App() {
         setLocation(prev => {
           if (!prev) return { latitude: activeCityCenter.latitude, longitude: activeCityCenter.longitude };
           
-          if (isNavigating && (activeOrders.length > 0 || busyAreaTarget)) {
+          if (isNavigating && (activeOrders.length > 0 || busyAreaTarget || destinationFilter?.active)) {
             const order = activeOrders[0];
             const currentTargetStop = currentStops[0]?.location;
             const target = currentTargetStop || (order ? (order.status === 'accepted' 
               ? (order.type === 'delivery' ? order.restaurantLocation : order.pickupLocation) 
-              : order.customerLocation) : busyAreaTarget?.location);
+              : order.customerLocation) : (busyAreaTarget?.location || destinationFilter?.location));
             
             if (!target) return prev;
             
@@ -9733,6 +9756,11 @@ export default function App() {
                   setBusyAreaTarget(null);
                   setIsNavigating(false);
                   sendNotification("Arrived", `Arrived at busy region`, "success");
+                  lastTargetRef.current = null;
+                } else if (destinationFilter?.active) {
+                  sendNotification("Arrived at Destination 🎯", `You have arrived at ${destinationFilter.shortName}. Local jobs ready!`, "success");
+                  speakNotification(`You have arrived at ${destinationFilter.shortName}.`);
+                  dispatchJobTowardsDestination();
                   lastTargetRef.current = null;
                 }
               }
@@ -10689,8 +10717,18 @@ export default function App() {
         pickupOffsetLng = (Math.random() - 0.5) * 0.15;
       }
 
-      const custLat = pickupLat + pickupOffsetLat;
-      const custLng = pickupLng + pickupOffsetLng;
+      let custLat = pickupLat + pickupOffsetLat;
+      let custLng = pickupLng + pickupOffsetLng;
+      let isTowardsDest = false;
+      let destFilterAddress: string | undefined = undefined;
+
+      if (destinationFilter?.active) {
+        // Dropoff is right at / heading towards driver's chosen destination address!
+        custLat = destinationFilter.location.latitude + (Math.random() - 0.5) * 0.005;
+        custLng = destinationFilter.location.longitude + (Math.random() - 0.5) * 0.005;
+        isTowardsDest = true;
+        destFilterAddress = destinationFilter.shortName;
+      }
 
       const distToPickup = Math.sqrt(Math.pow(pickupLat - driverLoc.latitude, 2) + Math.pow(pickupLng - driverLoc.longitude, 2)) * MILES_PER_DEGREE;
       const tripDist = Math.sqrt(Math.pow(custLat - pickupLat, 2) + Math.pow(custLng - pickupLng, 2)) * MILES_PER_DEGREE;
@@ -10774,7 +10812,9 @@ export default function App() {
       return {
         id: Math.random().toString(36).substring(2, 11),
         type,
-        customerName: isStacked ? (type === 'ride' ? `${customerName} & Co-rider 👥` : `${customerName} (Max+1)`) : (variant.includes('XL') ? `${customerName} (5 Passengers)` : customerName),
+        customerName: isTowardsDest
+          ? `${customerName} (Towards ${destFilterAddress})`
+          : (isStacked ? (type === 'ride' ? `${customerName} & Co-rider 👥` : `${customerName} (Max+1)`) : (variant.includes('XL') ? `${customerName} (5 Passengers)` : customerName)),
         restaurantName: type === 'delivery' ? ((variant.includes('Connect') || variant.includes('Send')) ? "Parcel Center" : (chosenRestaurant?.name || "Local Kitchen")) : variant,
         restaurantLocation: { latitude: pickupLat, longitude: pickupLng },
         pickupLocation: { latitude: pickupLat, longitude: pickupLng },
@@ -10800,7 +10840,9 @@ export default function App() {
         verificationMethod,
         receiptRequired,
         receiptVerified: false,
-        brand: orderBrand
+        brand: orderBrand,
+        isTowardsDestination: isTowardsDest,
+        destinationFilterAddress: destFilterAddress
       } as Order;
     });
 
@@ -10808,10 +10850,117 @@ export default function App() {
       let score = 0;
       score += (10 / (order.type === 'ride' ? order.id.length : 1)); // Mock dist
       score += (order.estimatedPay * 2);
+      if (order.isTowardsDestination) {
+        score += 800; // Prioritize destination orders
+      }
       return { order, score };
     });
 
     return scoredCandidates.sort((a, b) => b.score - a.score)[0].order;
+  };
+
+  // Handler for setting a real address destination and engaging destination filter mode
+  const handleSelectDestination = (dest: GeocodedAddress) => {
+    const driverLoc = location || activeCityCenter || { latitude: 51.5074, longitude: -0.1278 };
+    const destLoc = dest.location;
+    const distMi = dest.distanceMi !== undefined ? dest.distanceMi : calculateDistanceMiles(driverLoc, destLoc);
+    const estMins = dest.estimatedMinutes || estimateDriveMinutes(distMi);
+
+    // 1. Activate destination filter state
+    const filter: DestinationFilter = {
+      active: true,
+      address: dest.fullAddress,
+      shortName: dest.title,
+      location: destLoc,
+      distanceMi: distMi,
+      estimatedMinutes: estMins,
+      setAt: Date.now()
+    };
+    setDestinationFilter(filter);
+
+    // 2. Ensure driver is online so trips can be dispatched and received
+    setUser(u => ({ ...u, isOnline: true }));
+
+    // 3. Trigger turn-by-turn routing via OSRM
+    if (updateRouteWaypointsRef.current) {
+      updateRouteWaypointsRef.current(driverLoc, destLoc);
+    }
+
+    // 4. Engage navigation mode and bring up map
+    setIsNavigating(true);
+    setCurrentScreen('home');
+    setShowFullMap(true);
+
+    // 5. Broadcast to PC CarPlay & iPad simultaneously
+    const navDest = {
+      label: `Destination: ${dest.title}`,
+      subtitle: `${distMi.toFixed(1)} mi • ~${estMins} min route (Destination Mode)`,
+      miles: distMi.toFixed(1),
+      minutes: estMins,
+      latitude: destLoc.latitude,
+      longitude: destLoc.longitude,
+      stage: 'dropoff' as const
+    };
+    setLastSyncedDestination(navDest);
+
+    sendDestinationToPC({
+      location: destLoc,
+      label: `Destination: ${dest.title}`,
+      subtitle: `${distMi.toFixed(1)} mi • Filtering trips towards destination`
+    });
+
+    // 6. Audio and visual alerts
+    sendNotification(
+      `Destination Mode Active 🎯`,
+      `Routing to ${dest.title}. Disagreeing trips filtered out — only trips towards ${dest.title} will be offered.`,
+      'success'
+    );
+    speakNotification(`Navigation started to ${dest.title}. Routing active. Filtering trips towards your destination.`);
+    playHyperSound('accept');
+
+    // 7. Automatically dispatch an offer towards this destination area after 1.2s!
+    setTimeout(() => {
+      dispatchJobTowardsDestination();
+    }, 1200);
+  };
+
+  const handleClearDestinationFilter = () => {
+    setDestinationFilter(null);
+    if (activeOrders.length === 0) {
+      setIsNavigating(false);
+      setRouteWaypoints([]);
+      setLastSyncedDestination(null);
+    }
+    sendNotification("Destination Mode Cleared", "Resumed standard dispatch radius across your city.", "info");
+    speakNotification("Destination mode cleared. Standard trip dispatch resumed.");
+  };
+
+  const dispatchJobTowardsDestination = () => {
+    if (!destinationFilter?.active) return;
+    const smartJob = generateSmartOrder();
+    if (smartJob) {
+      const destJob: Order = {
+        ...smartJob,
+        isTowardsDestination: true,
+        destinationFilterAddress: destinationFilter.shortName,
+        customerName: smartJob.type === 'ride' 
+          ? `Passenger (Destination: ${destinationFilter.shortName})`
+          : `Customer (${destinationFilter.shortName})`,
+        customerLocation: {
+          latitude: destinationFilter.location.latitude + (Math.random() - 0.5) * 0.003,
+          longitude: destinationFilter.location.longitude + (Math.random() - 0.5) * 0.003
+        }
+      };
+      setPendingOrder(destJob);
+      setOrderExpiryTimer(18);
+      playHyperSound('order');
+      sendNotification(
+        `Job towards ${destinationFilter.shortName} Found! 🎯`,
+        `£${destJob.estimatedPay.toFixed(2)} • Heading to ${destinationFilter.shortName}`,
+        'success'
+      );
+      speakNotification(`New trip offer found heading towards ${destinationFilter.shortName}.`);
+    }
   };
 
   // Pre-booking exact-time dispatcher helper
@@ -12629,6 +12778,8 @@ export default function App() {
                     onOpenCarPlay={() => setCurrentScreen('carplay_dashboard')}
                     theme={theme}
                     activeSurgeAreas={activeSurgeAreas}
+                    destinationFilter={destinationFilter}
+                    onClearDestinationFilter={handleClearDestinationFilter}
                   />
                 </motion.div>
               ) : (
@@ -13177,7 +13328,7 @@ export default function App() {
                 
                 {/* Navigation Overlay */}
                 <AnimatePresence>
-                  {isNavigating && activeOrders.length > 0 && (
+                  {isNavigating && (activeOrders.length > 0 || destinationFilter?.active || busyAreaTarget) && (
                     <div className="absolute top-[76px] left-0 right-0 z-[150] flex flex-col gap-3 p-3 sm:p-4 pointer-events-none">
                       <motion.div 
                         initial={{ y: -50, opacity: 0 }}
@@ -13201,37 +13352,92 @@ export default function App() {
                               </div>
                             )}
                             <p className="font-display text-xl font-black leading-tight tracking-tight truncate">
-                              {currentStop?.label || (activeOrders[0]?.status === 'accepted' ? (activeOrders[0]?.type === 'delivery' ? activeOrders[0]?.restaurantName : 'Pickup Location') : 'Destination')}
+                              {currentStop?.label || (activeOrders[0]?.status === 'accepted' ? (activeOrders[0]?.type === 'delivery' ? activeOrders[0]?.restaurantName : 'Pickup Location') : (destinationFilter ? `Dest: ${destinationFilter.shortName}` : 'Destination'))}
                             </p>
                             <div className="flex items-center gap-2 mt-1">
                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">
-                                 Arrive by {getArrivalTime(activeOrders[0]?.estimatedTime / 2)}
+                                 {activeOrders[0] ? `Arrive by ${getArrivalTime(activeOrders[0]?.estimatedTime / 2)}` : (destinationFilter ? `ETA ~${destinationFilter.estimatedMinutes} mins` : 'Navigating')}
                                </p>
                                <div className="w-1 h-1 rounded-full bg-blue-500" />
                                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">
-                                 {activeOrders[0]?.estimatedDistance.toFixed(1)} mi
+                                 {activeOrders[0] ? `${activeOrders[0]?.estimatedDistance.toFixed(1)} mi` : (destinationFilter ? `${destinationFilter.distanceMi.toFixed(1)} mi` : 'Route Active')}
                                </p>
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-4 pr-1">
-                           <div className="text-right hidden sm:block">
-                              <p className="font-display text-2xl font-black leading-tight">£{activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}</p>
-                              <p className="text-[8px] font-black text-blue-500 tracking-[0.2em] uppercase">Real-Time Pay</p>
-                           </div>
+                           {activeOrders.length > 0 ? (
+                             <div className="text-right hidden sm:block">
+                                <p className="font-display text-2xl font-black leading-tight">£{activeOrders.reduce((sum, o) => sum + o.estimatedPay, 0).toFixed(2)}</p>
+                                <p className="text-[8px] font-black text-blue-500 tracking-[0.2em] uppercase">Real-Time Pay</p>
+                             </div>
+                           ) : destinationFilter ? (
+                             <button
+                               onClick={dispatchJobTowardsDestination}
+                               className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase rounded-xl tracking-wider transition-all cursor-pointer shadow-lg active:scale-95 flex items-center gap-1.5"
+                               title="Get trips heading towards this destination"
+                             >
+                               <Zap size={13} className="fill-black" />
+                               <span>Get Job ⚡</span>
+                             </button>
+                           ) : null}
                            <button onClick={() => setMapCoreMode('google')} className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg active:scale-90 transition-transform" title="Toggle Map Provider">
                              <MapPin size={18} />
                            </button>
                            <button 
-                             onClick={() => setIsNavigating(false)} 
+                             onClick={() => {
+                               setIsNavigating(false);
+                               if (destinationFilter) handleClearDestinationFilter();
+                             }} 
                              className="px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-full flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all cursor-pointer"
                              title="Exit Navigation & Return to Normal Map"
                            >
                              <ArrowLeft size={14} />
-                             <span className="hidden sm:inline">Normal Map</span>
+                             <span className="hidden sm:inline">Exit Nav</span>
                            </button>
                         </div>
                       </motion.div>
+
+                      {/* Destination Mode Floating Banner */}
+                      {destinationFilter?.active && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-[#020617]/95 border-2 border-emerald-500 rounded-2xl p-3 shadow-2xl flex items-center justify-between text-white backdrop-blur-xl ring-1 ring-emerald-400/40 pointer-events-auto"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400 shrink-0">
+                              <Target size={16} className="animate-pulse" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400">Destination Mode Active</span>
+                                <span className="text-[8px] font-mono px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded font-black">Filtered</span>
+                              </div>
+                              <h4 className="text-xs font-black text-white truncate">{destinationFilter.shortName}</h4>
+                              <p className="text-[9px] text-gray-400 font-bold">{destinationFilter.distanceMi} mi • ~{destinationFilter.estimatedMinutes} mins</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={dispatchJobTowardsDestination}
+                              className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] uppercase rounded-xl tracking-wider transition-all cursor-pointer shadow-md active:scale-95 flex items-center gap-1"
+                              title="Instantly dispatch a trip heading towards this destination"
+                            >
+                              <Zap size={11} className="fill-black" />
+                              <span>Get Job ⚡</span>
+                            </button>
+                            <button
+                              onClick={handleClearDestinationFilter}
+                              className="p-1.5 bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white rounded-xl transition-all cursor-pointer"
+                              title="Clear Destination"
+                            >
+                              <X size={15} />
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
 
                       {/* Tactical HUD: Speed & Lane Assistance */}
                       <div className="flex gap-2.5 overflow-x-auto no-scrollbar max-w-full pb-1 pointer-events-auto">
@@ -13992,149 +14198,19 @@ export default function App() {
                 )}
               </motion.div>
 
-              {/* Search Modal */}
-              <AnimatePresence>
-                {isSearchOpen && (
-                  <div className="absolute inset-0 z-[5200] flex items-start justify-center p-4 pt-12">
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSearchOpen(false)} className="absolute inset-0 bg-black/70 backdrop-blur-md" />
-                    <motion.div initial={{ y: -30, opacity: 0, scale: 0.95 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: -30, opacity: 0, scale: 0.95 }} className={`w-full max-w-lg rounded-[32px] p-6 shadow-2xl relative z-10 border border-white/10 flex flex-col max-h-[82vh] overflow-hidden ${theme === 'dark' ? 'bg-[#121316] text-white' : 'bg-white text-black'}`}>
-                      {/* Top Go Back Row */}
-                      <div className="flex items-center justify-between gap-3 mb-3 pb-2 border-b border-white/10">
-                        <button 
-                          onClick={() => { setIsSearchOpen(false); setCurrentScreen('home'); }} 
-                          className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 shadow-md cursor-pointer"
-                        >
-                          <ArrowLeft size={16} />
-                          <span>Go Back to Map</span>
-                        </button>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Hotspots & Search</span>
-                        <button 
-                          onClick={() => setIsSearchOpen(false)} 
-                          className="p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-transform active:scale-95 shrink-0 cursor-pointer"
-                        >
-                          <X size={18} />
-                        </button>
-                      </div>
-
-                      {/* Search Header Bar */}
-                      <div className="flex items-center gap-3 p-3 bg-black/20 dark:bg-white/5 border border-white/10 rounded-2xl mb-4">
-                        <Search className="text-blue-400 shrink-0" size={20} />
-                        <input 
-                          autoFocus
-                          type="text" 
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="Search hotspots, airports, streets..." 
-                          className="flex-1 bg-transparent border-none outline-none font-extrabold text-base text-white placeholder-gray-400"
-                        />
-                        {searchQuery && (
-                          <button onClick={() => setSearchQuery('')} className="p-1 text-gray-400 hover:text-white">
-                            <X size={16} />
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Category Chips */}
-                      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-2 custom-scrollbar shrink-0">
-                        {[
-                          { id: 'all', label: 'All Hotspots' },
-                          { id: 'airports', label: '✈️ Airports & Rails' },
-                          { id: 'surge', label: '🔥 High Surge' },
-                          { id: 'food', label: '🍔 Dining & Clubs' }
-                        ].map((cat, cIdx) => (
-                          <button
-                            key={`cat-chip-${cat.id}-${cIdx}`}
-                            onClick={() => setSearchCategory(cat.id as any)}
-                            className={`px-3 py-1.5 rounded-xl font-black text-xs whitespace-nowrap transition-all border ${
-                              searchCategory === cat.id
-                                ? 'bg-blue-600 text-white border-blue-400 shadow-md'
-                                : 'bg-white/5 text-gray-300 border-white/5 hover:bg-white/10'
-                            }`}
-                          >
-                            {cat.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Filtered Search Results */}
-                      <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar pr-1">
-                        {(() => {
-                          const ALL_HOTSPOTS = [
-                            { id: 'lhr-t5', name: 'Heathrow Terminal 5 VIP Arrivals', category: 'airports', city: 'London', type: 'Airport', surge: '2.1x', dist: '3.4 mi', coords: { latitude: 51.4700, longitude: -0.4543 } },
-                            { id: 'lgw-south', name: 'Gatwick South Taxi Express Rank', category: 'airports', city: 'London', type: 'Airport', surge: '1.8x', dist: '8.1 mi', coords: { latitude: 51.1537, longitude: -0.1821 } },
-                            { id: 'stpancras', name: 'St Pancras Eurostar Taxi Portico', category: 'airports', city: 'London', type: 'Train Station', surge: '1.5x', dist: '1.2 mi', coords: { latitude: 51.5314, longitude: -0.1261 } },
-                            { id: 'shoreditch', name: 'Shoreditch High Street Nightlife Hub', category: 'surge', city: 'London', type: 'Hotspot', surge: '2.4x', dist: '0.8 mi', coords: { latitude: 51.5246, longitude: -0.0781 } },
-                            { id: 'soho-mayfair', name: 'Soho Square & Mayfair Members Clubs', category: 'food', city: 'London', type: 'Executive Ranks', surge: '1.9x', dist: '1.1 mi', coords: { latitude: 51.5152, longitude: -0.1321 } },
-                            { id: 'westfield-stratford', name: 'Westfield Stratford Taxi Plaza', category: 'food', city: 'London', type: 'Shopping', surge: '1.4x', dist: '2.9 mi', coords: { latitude: 51.5435, longitude: -0.0072 } },
-                            { id: 'cardiff-bay', name: 'Cardiff Bay VIP Marina Plaza', category: 'surge', city: 'Cardiff', type: 'Hotspot', surge: '1.7x', dist: '1.5 mi', coords: { latitude: 51.4646, longitude: -3.1652 } },
-                            { id: 'cardiff-central', name: 'Cardiff Central Station Taxi Loop', category: 'airports', city: 'Cardiff', type: 'Train Station', surge: '1.6x', dist: '0.6 mi', coords: { latitude: 51.4769, longitude: -3.1791 } },
-                            { id: 'nottingham-station', name: 'Nottingham Station Carriage Drive', category: 'airports', city: 'Nottingham', type: 'Train Station', surge: '1.8x', dist: '0.9 mi', coords: { latitude: 52.9472, longitude: -1.1465 } },
-                            { id: 'lace-market', name: 'Lace Market Dining & Penthouse Hub', category: 'food', city: 'Nottingham', type: 'Hotspot', surge: '2.0x', dist: '1.1 mi', coords: { latitude: 52.9515, longitude: -1.1432 } }
-                          ];
-
-                          const filtered = ALL_HOTSPOTS.filter(spot => {
-                            const matchQuery = !searchQuery || 
-                              spot.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                              spot.city.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                              spot.type.toLowerCase().includes(searchQuery.toLowerCase());
-                            
-                            const matchCategory = searchCategory === 'all' || spot.category === searchCategory;
-                            return matchQuery && matchCategory;
-                          });
-
-                          if (filtered.length === 0) {
-                            return (
-                              <div className="flex flex-col items-center justify-center py-10 text-center text-gray-400">
-                                <Search size={36} className="mb-2 opacity-30 text-white" />
-                                <p className="font-extrabold text-sm text-white">No hotspots found</p>
-                                <p className="text-xs text-gray-500 mt-1">Try searching for "Heathrow", "Station", "Shoreditch" or "Cardiff"</p>
-                              </div>
-                            );
-                          }
-
-                          return filtered.map((spot, sIdx) => (
-                            <button
-                              key={`hotspot-res-${spot.id}-${sIdx}`}
-                              onClick={() => {
-                                if (spot.coords) {
-                                  setLocation(spot.coords);
-                                }
-                                setIsSearchOpen(false);
-                                setCurrentScreen('home');
-                                setIsNavigating(true);
-                                sendNotification(`Routing to ${spot.name} 🚀`, `High demand active (${spot.surge} Surge multiplier). Navigating now!`, 'success');
-                                speakNotification(`Navigating to ${spot.name}. High demand area active.`);
-                              }}
-                              className="w-full flex items-center justify-between p-3.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 rounded-2xl transition-all active:scale-[0.98] text-left group"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                                  <MapPin size={20} />
-                                </div>
-                                <div>
-                                  <h4 className="font-extrabold text-sm text-white leading-tight">{spot.name}</h4>
-                                  <p className="text-[11px] text-gray-400 font-bold mt-0.5">
-                                    {spot.city} • <span className="text-blue-400">{spot.type}</span> ({spot.dist})
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="flex flex-col items-end gap-1 shrink-0">
-                                <span className="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/30 text-amber-400 font-mono font-black text-[10px]">
-                                  {spot.surge}
-                                </span>
-                                <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
-                                  Tap to route →
-                                </span>
-                              </div>
-                            </button>
-                          ));
-                        })()}
-                      </div>
-                    </motion.div>
-                  </div>
-                )}
-              </AnimatePresence>
+              {/* Real Address Search & Destination Navigation Modal */}
+              <AddressSearchModal
+                isOpen={isSearchOpen || isDestFilterOpen}
+                onClose={() => {
+                  setIsSearchOpen(false);
+                  setIsDestFilterOpen(false);
+                }}
+                driverLocation={location || activeCityCenter}
+                activeDestinationFilter={destinationFilter}
+                onSelectDestination={handleSelectDestination}
+                onClearDestination={handleClearDestinationFilter}
+                theme={theme}
+              />
 
               {/* Inbox Modal */}
               <AnimatePresence>
@@ -14168,63 +14244,7 @@ export default function App() {
                   </div>
                 )}
               </AnimatePresence>
-              <AnimatePresence>
-                {isDestFilterOpen && (
-                  <div className="absolute inset-0 z-[250] flex items-end justify-center p-4">
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      onClick={() => setIsDestFilterOpen(false)}
-                      className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                    />
-                    <motion.div 
-                      initial={{ y: 100, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      exit={{ y: 100, opacity: 0 }}
-                      className="bg-white w-full max-w-md rounded-[32px] p-8 shadow-2xl relative z-10"
-                    >
-                      <div className="flex justify-between items-center mb-8">
-                        <h2 className="font-display text-3xl font-black text-black tracking-tight">Set Destination</h2>
-                        <button onClick={() => setIsDestFilterOpen(false)} className="p-2 bg-gray-100 rounded-full text-black">
-                          <X size={24} />
-                        </button>
-                      </div>
 
-                      <div className="space-y-6">
-                        <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-                          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Current Filter</p>
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white">
-                              <Navigation size={24} />
-                            </div>
-                            <div>
-                              <p className="text-xl font-black text-black">Heading Home</p>
-                              <p className="text-sm font-bold text-gray-400">2 uses remaining today</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="relative">
-                          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={24} />
-                          <input 
-                            type="text" 
-                            placeholder="Where to?" 
-                            className="w-full bg-gray-100 border-none rounded-2xl py-6 pl-16 pr-6 text-xl font-bold focus:ring-2 focus:ring-blue-600 outline-none"
-                          />
-                        </div>
-
-                        <button 
-                          onClick={() => setIsDestFilterOpen(false)}
-                          className="w-full py-6 bg-black text-white rounded-2xl text-xl font-black shadow-xl active:scale-95 transition-transform"
-                        >
-                          Set Destination
-                        </button>
-                      </div>
-                    </motion.div>
-                  </div>
-                )}
-              </AnimatePresence>
 
               {/* Safety Toolkit Modal */}
               <AnimatePresence>
@@ -14501,6 +14521,42 @@ export default function App() {
                         <Search size={20} />
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {/* Floating Real Address Search Bar */}
+                {!isNavigating && !pendingOrder && (
+                  <div className="px-4 pt-2 pb-1 flex justify-center pointer-events-auto">
+                    <button
+                      onClick={() => setIsSearchOpen(true)}
+                      className="w-full max-w-md h-12 px-4 bg-[#080a14]/95 hover:bg-[#0e1322] text-white border border-blue-500/50 hover:border-blue-400 rounded-2xl shadow-[0_12px_36px_rgba(0,0,0,0.85)] backdrop-blur-xl flex items-center justify-between text-left transition-all active:scale-[0.99] cursor-pointer group"
+                      title="Search any real address to start navigation and get trips to that area"
+                    >
+                      <div className="flex items-center gap-3 truncate min-w-0 pr-2">
+                        <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0 group-hover:scale-105 transition-transform">
+                          <Search size={16} />
+                        </div>
+                        <div className="truncate">
+                          <p className="text-xs font-black text-white group-hover:text-blue-300 truncate">
+                            {destinationFilter?.active ? (
+                              <span className="text-emerald-400 flex items-center gap-1.5 font-black">
+                                <Target size={13} className="text-emerald-400 animate-pulse" />
+                                <span>Target: {destinationFilter.shortName}</span>
+                              </span>
+                            ) : (
+                              "Where to? Enter real address, street, or postcode..."
+                            )}
+                          </p>
+                          <p className="text-[10px] text-gray-400 font-bold truncate">
+                            {destinationFilter?.active ? `${destinationFilter.distanceMi} mi away • Dispatches jobs to this area` : "Direct navigation from your location + get area jobs"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-3 py-1.5 rounded-xl shadow-md shrink-0 flex items-center gap-1">
+                        <Navigation size={11} className="fill-white" />
+                        <span>Navigate</span>
+                      </span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -17519,6 +17575,9 @@ export default function App() {
               isMatchFailed={isMatchFailed}
               onToggleOnline={() => setUser(prev => ({ ...prev, isOnline: !prev.isOnline }))}
               location={location}
+              destinationFilter={destinationFilter}
+              onOpenSearch={() => setIsSearchOpen(true)}
+              onDispatchJobToArea={dispatchJobTowardsDestination}
               mapNode={
                 mapCoreMode === 'google' ? (
                   <InteractiveMap
@@ -17730,6 +17789,12 @@ export default function App() {
                           </span>
                         );
                       })()}
+                      {pendingOrder.isTowardsDestination && (
+                        <span className="px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider font-mono shadow-sm bg-white text-black border border-white flex items-center gap-1 animate-pulse">
+                          <Target size={11} className="text-black" />
+                          <span>🎯 ON YOUR ROUTE</span>
+                        </span>
+                      )}
                     </div>
                     
                     <button 
@@ -17861,7 +17926,12 @@ export default function App() {
                               {pendingOrder.customerName || "Customer Destination"}
                             </p>
                             <p className="font-sans text-[11px] font-bold text-gray-400">
-                              {pendingOrder.type === 'delivery' ? "48 High Holborn, London WC1V 6RL" : "Final Destination Address"}
+                              {pendingOrder.destinationFilterAddress ? (
+                                <span className="text-white flex items-center gap-1 font-black">
+                                  <Target size={11} className="text-white" />
+                                  <span>Area: {pendingOrder.destinationFilterAddress}</span>
+                                </span>
+                              ) : (pendingOrder.type === 'delivery' ? "48 High Holborn, London WC1V 6RL" : "Final Destination Address")}
                             </p>
                           </div>
                         </div>
@@ -18073,9 +18143,14 @@ export default function App() {
                                 {pendingOrder.type === 'delivery' ? `Customer: ${pendingOrder.customerName}` : "Passenger Dropoff"}
                               </p>
                               <p className="font-sans text-xs text-blue-300/80 font-bold mt-1">
-                                {pendingOrder.type === 'delivery' 
+                                {pendingOrder.destinationFilterAddress ? (
+                                  <span className="text-emerald-300 flex items-center gap-1 font-black">
+                                    <Target size={11} className="text-emerald-400" />
+                                    <span>Area: {pendingOrder.destinationFilterAddress}</span>
+                                  </span>
+                                ) : (pendingOrder.type === 'delivery' 
                                   ? "48 High Holborn, London WC1V 6RL"
-                                  : "Final Destination Address"}
+                                  : "Final Destination Address")}
                               </p>
                             </div>
                           </div>

@@ -36,6 +36,18 @@ export interface Order {
   brand?: 'uber' | 'hyper';
   isPreBooking?: boolean;
   scheduledTimeStr?: string;
+  isTowardsDestination?: boolean;
+  destinationFilterAddress?: string;
+}
+
+export interface DestinationFilter {
+  active: boolean;
+  address: string;
+  shortName: string;
+  location: Location;
+  distanceMi: number;
+  estimatedMinutes: number;
+  setAt: number;
 }
 
 export interface NavSimulation {

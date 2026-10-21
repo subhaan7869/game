@@ -894,7 +894,7 @@ export const CommandCentreScreen: React.FC<CommandCentreScreenProps> = ({
                     <span className="text-base font-mono font-black text-white leading-none">{r.score.toFixed(1)}</span>
                     <div className="flex gap-0.5">
                       {[1, 2, 3, 4, 5].map((s) => (
-                        <Star key={s} size={8} fill={s <= Math.round(r.score) ? '#eab308' : 'none'} className="text-yellow-500" />
+                        <Star key={`star-rep-${idx}-${s}`} size={8} fill={s <= Math.round(r.score) ? '#eab308' : 'none'} className="text-yellow-500" />
                       ))}
                     </div>
                   </div>

@@ -16,9 +16,10 @@ import {
   SlidersHorizontal,
   ChevronUp,
   List,
-  ShieldAlert
+  ShieldAlert,
+  Target
 } from 'lucide-react';
-import { UserProfile } from '../types';
+import { UserProfile, DestinationFilter } from '../types';
 
 interface OfflineHomeScreenProps {
   user: UserProfile;
@@ -35,6 +36,8 @@ interface OfflineHomeScreenProps {
   onOpenCarPlay?: () => void;
   activeSurgeAreas?: any[];
   theme?: 'light' | 'dark';
+  destinationFilter?: DestinationFilter | null;
+  onClearDestinationFilter?: () => void;
 }
 
 export const OfflineHomeScreen: React.FC<OfflineHomeScreenProps> = ({
@@ -51,7 +54,9 @@ export const OfflineHomeScreen: React.FC<OfflineHomeScreenProps> = ({
   onOpenLeague,
   onOpenCarPlay,
   activeSurgeAreas = [],
-  theme = 'light'
+  theme = 'light',
+  destinationFilter,
+  onClearDestinationFilter
 }) => {
   const [selectedOpportunityTab, setSelectedOpportunityTab] = useState<'all' | 'promos' | 'quests' | 'streaks' | 'airports'>('all');
 
@@ -138,6 +143,63 @@ export const OfflineHomeScreen: React.FC<OfflineHomeScreenProps> = ({
             {user.isOnline ? "You are currently receiving trip requests. Tap below to view the live map." : "When offline, you won't receive trip requests. Configure preferences or tap below to go online."}
           </p>
         </div>
+
+        {/* Real Address Search Bar / Destination Mode Pill */}
+        {destinationFilter?.active ? (
+          <div className="bg-emerald-50 border-2 border-emerald-500 rounded-3xl p-4 shadow-sm flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/30">
+                <Target size={20} className="animate-pulse" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Destination Filter Active</span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 bg-emerald-200/80 text-emerald-900 rounded font-black">Filtered Trips</span>
+                </div>
+                <h4 className="text-sm font-black text-emerald-950 truncate">{destinationFilter.shortName}</h4>
+                <p className="text-[11px] text-emerald-700 font-bold">{destinationFilter.distanceMi} mi away • ~{destinationFilter.estimatedMinutes} mins</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={onOpenSearch}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase rounded-xl transition-all cursor-pointer active:scale-95 shadow-sm"
+              >
+                Change
+              </button>
+              {onClearDestinationFilter && (
+                <button
+                  onClick={onClearDestinationFilter}
+                  className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                  title="Clear Destination"
+                >
+                  <ShieldAlert size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={onOpenSearch}
+            className="w-full p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-blue-400 rounded-3xl flex items-center justify-between text-left transition-all active:scale-[0.99] shadow-sm group cursor-pointer"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-black text-white flex items-center justify-center shrink-0 shadow-md shadow-black/20 group-hover:bg-blue-600 transition-colors">
+                <Search size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-black text-gray-900 group-hover:text-blue-600 transition-colors flex items-center gap-1.5">
+                  <span>Where to? (Set Destination)</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-100 text-blue-700 font-black uppercase">Live Geocoding</span>
+                </p>
+                <p className="text-xs text-gray-500 font-bold mt-0.5">Enter any real address to start navigation & get jobs on your route</p>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-500 group-hover:text-blue-600 group-hover:border-blue-300 transition-colors shrink-0">
+              <ChevronRight size={16} />
+            </div>
+          </button>
+        )}
 
         {/* 2. Mini Map Preview Card */}
         <div 

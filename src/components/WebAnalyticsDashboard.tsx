@@ -449,7 +449,7 @@ export const WebAnalyticsDashboard: React.FC<WebAnalyticsDashboardProps> = ({
                   
                   <div className="space-y-2">
                     {pageStats.map((item, idx) => (
-                      <div key={item.path} className="relative p-3 rounded-xl bg-[#12141f]/40 border border-white/5 overflow-hidden group">
+                      <div key={`page-stat-${item.path || 'p'}-${idx}`} className="relative p-3 rounded-xl bg-[#12141f]/40 border border-white/5 overflow-hidden group">
                         {/* Progress Bar background */}
                         <div 
                           className="absolute inset-y-0 left-0 bg-[#0070f3]/5 transition-all duration-1000"
@@ -626,8 +626,8 @@ export const WebAnalyticsDashboard: React.FC<WebAnalyticsDashboardProps> = ({
                       { name: 'simulate_movement', value: isSimulatingMovement ? 'ACTIVE' : 'INACTIVE', desc: 'GPS automatic mock location walker settings' },
                       { name: 'use_google_maps', value: 'ENABLED', desc: 'Interactive Google Maps Platform component binding' },
                       { name: 'target_price_limit', value: `£${targetPrice.toFixed(2)}`, desc: 'Minimum acceptable payout filter for matched jobs' },
-                    ].map(flag => (
-                      <div key={flag.name} className="p-3 rounded-xl bg-[#12141f]/35 border border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
+                    ].map((flag, idx) => (
+                      <div key={`flag-${flag.name}-${idx}`} className="p-3 rounded-xl bg-[#12141f]/35 border border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
                         <div>
                           <code className="text-orange-400 font-mono font-black">{flag.name}</code>
                           <p className="text-[10px] text-gray-400 mt-0.5 font-bold">{flag.desc}</p>
