@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { MapPin, Navigation, Eye, Compass, AlertCircle, Info, Settings, ShieldCheck, Utensils, User, HelpCircle, CheckCircle2 } from 'lucide-react';
+import { AcceptanceZone } from './AcceptanceRateHeatmapOverlay';
 
 interface Location {
   latitude: number;
@@ -47,6 +48,9 @@ export interface InteractiveMapProps {
   setZoom?: (zoom: number) => void;
   iosMapKitEngine?: 'rendered' | 'suspended';
   hideOverlays?: boolean;
+  showAcceptanceOverlay?: boolean;
+  acceptanceZones?: AcceptanceZone[];
+  onSelectAcceptanceZone?: (zone: AcceptanceZone) => void;
 }
 
 // 1. Custom Driver Icon Constructor using the highly realistic green car design
@@ -236,6 +240,62 @@ const getSurgeAreaIcon = (area: any) => {
   });
 };
 
+// 6. Order Acceptance Rate Heatmap Zone Icon Constructor
+const getAcceptanceZoneIcon = (zone: AcceptanceZone) => {
+  const isTop = zone.isHighest || zone.rank === 1;
+  const isHigh = zone.acceptanceRate >= 88;
+
+  // Luminous aura gradients
+  const mainGrad = isTop 
+    ? 'rgba(16, 185, 129, 0.28)' 
+    : isHigh 
+    ? 'rgba(59, 130, 246, 0.22)' 
+    : 'rgba(245, 158, 11, 0.18)';
+
+  const subGrad = isTop 
+    ? 'rgba(16, 185, 129, 0.08)' 
+    : isHigh 
+    ? 'rgba(59, 130, 246, 0.06)' 
+    : 'rgba(245, 158, 11, 0.04)';
+
+  const ringColor = isTop 
+    ? 'rgba(52, 211, 153, 0.6)' 
+    : isHigh 
+    ? 'rgba(96, 165, 250, 0.5)' 
+    : 'rgba(251, 191, 36, 0.4)';
+
+  return L.divIcon({
+    className: '',
+    html: `
+      <div class="relative flex flex-col items-center select-none" style="width: 280px; height: 280px; margin-left: -140px; margin-top: -140px;">
+        <!-- Neon acceptance heat pulse rings -->
+        <div class="absolute w-[280px] h-[280px] rounded-full animate-pulse blur-md pointer-events-none" style="background: radial-gradient(circle, ${mainGrad} 0%, ${subGrad} 55%, transparent 100%); animation-duration: ${isTop ? '2.5s' : '3.8s'}; top: 0; left: 0;"></div>
+        <div class="absolute w-[180px] h-[180px] rounded-full pointer-events-none" style="border: 2px dashed ${ringColor}; top: 50px; left: 50px; opacity: 0.85;"></div>
+
+        <!-- Interactive center acceptance badge trigger -->
+        <div class="absolute top-[110px] flex flex-col items-center pointer-events-auto z-40">
+          <button class="acceptance-zone-trigger px-3 py-1.5 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.7)] flex items-center gap-1.5 transition-all hover:scale-110 active:scale-95 cursor-pointer pointer-events-auto border ${
+            isTop 
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-emerald-300 ring-2 ring-emerald-400/50 shadow-emerald-500/40' 
+              : isHigh 
+              ? 'bg-gradient-to-r from-blue-700 to-indigo-700 text-white border-blue-300 shadow-blue-500/30' 
+              : 'bg-gradient-to-r from-amber-700 to-orange-700 text-white border-amber-300'
+          }">
+            <span class="w-2 h-2 rounded-full ${isTop ? 'bg-white animate-ping' : 'bg-emerald-300'} shrink-0"></span>
+            <span class="font-sans font-black text-[11px] tracking-tight uppercase">${isTop ? '🏆 ' : '⭐ '}${zone.acceptanceRate}% ACC.</span>
+          </button>
+          
+          <div class="px-2 py-0.5 bg-black/90 rounded-md text-white font-black text-[8px] uppercase tracking-wider mt-1 border ${isTop ? 'border-emerald-400/50 text-emerald-300' : 'border-white/10 text-gray-200'} shadow-lg whitespace-nowrap">
+            ${isTop ? '#1 TOP AREA • ' : ''}${zone.name}
+          </div>
+        </div>
+      </div>
+    `,
+    iconSize: [280, 280],
+    iconAnchor: [140, 140]
+  });
+};
+
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   location,
   heading = 0,
@@ -255,7 +315,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   zoom,
   setZoom,
   iosMapKitEngine = 'rendered',
-  hideOverlays = false
+  hideOverlays = false,
+  showAcceptanceOverlay = false,
+  acceptanceZones,
+  onSelectAcceptanceZone
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -266,6 +329,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const otherDriversMarkersRef = useRef<Map<string, L.Marker>>(new Map());
   const stopsMarkersRef = useRef<L.Marker[]>([]);
   const surgeAreasMarkersRef = useRef<L.Marker[]>([]);
+  const acceptanceZoneMarkersRef = useRef<L.Marker[]>([]);
 
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
@@ -541,7 +605,33 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       });
     }
 
-    // 6. Center map camera on driver if static
+    // 6. Order Acceptance Rate Heatmap Overlay Layers
+    acceptanceZoneMarkersRef.current.forEach(m => m.remove());
+    acceptanceZoneMarkersRef.current = [];
+
+    if (showAcceptanceOverlay && acceptanceZones && acceptanceZones.length > 0) {
+      acceptanceZones.forEach(zone => {
+        const latlng = L.latLng(zone.center.latitude, zone.center.longitude);
+        const zoneMarker = L.marker(latlng, { icon: getAcceptanceZoneIcon(zone) }).addTo(map);
+
+        setTimeout(() => {
+          const el = zoneMarker.getElement();
+          if (el) {
+            const btn = el.querySelector('.acceptance-zone-trigger');
+            if (btn) {
+              btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                onSelectAcceptanceZone?.(zone);
+              });
+            }
+          }
+        }, 80);
+
+        acceptanceZoneMarkersRef.current.push(zoneMarker);
+      });
+    }
+
+    // 7. Center map camera on driver if static
     if (!isNavigating && !pendingOrder) {
       map.panTo(driverLatLng);
     }
@@ -558,7 +648,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     activeSurgeAreas, 
     activeBrand,
     routeWaypoints,
-    iosMapKitEngine
+    iosMapKitEngine,
+    showAcceptanceOverlay,
+    acceptanceZones
   ]);
 
   return (

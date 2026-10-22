@@ -124,6 +124,7 @@ import { CommandCentreScreen } from './components/CommandCentreScreen';
 import { OfflineHomeScreen } from './components/OfflineHomeScreen';
 import { CarPlaySystem } from './components/CarPlaySystem';
 import { AddressSearchModal } from './components/AddressSearchModal';
+import { AcceptanceRateHeatmapOverlay, getAcceptanceZonesForCity, AcceptanceZone } from './components/AcceptanceRateHeatmapOverlay';
 import { searchRealAddresses, GeocodedAddress, calculateDistanceMiles, estimateDriveMinutes } from './utils/geocoding';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -8425,6 +8426,47 @@ export default function App() {
     return { latitude: 51.5074, longitude: -0.1278 };
   }, [useRealGPS, location, activeCityKey, stableHeatmapCenter]);
 
+  // Order Acceptance Rate Heatmap Overlay State & Analytics
+  const [showAcceptanceOverlay, setShowAcceptanceOverlay] = useState<boolean>(true);
+  const [isAcceptanceModalOpen, setIsAcceptanceModalOpen] = useState<boolean>(false);
+  const [selectedAcceptanceZone, setSelectedAcceptanceZone] = useState<AcceptanceZone | null>(null);
+
+  const acceptanceZones = useMemo(() => {
+    return getAcceptanceZonesForCity(
+      activeCityKey,
+      activeCityCenter,
+      completedTrips,
+      user.acceptanceRate
+    );
+  }, [activeCityKey, activeCityCenter, completedTrips, user.acceptanceRate]);
+
+  const handleNavigateToAcceptanceZone = (zone: AcceptanceZone) => {
+    setBusyAreaTarget({
+      id: zone.id,
+      name: `${zone.name} (${zone.acceptanceRate}% Acc.)`,
+      location: zone.center
+    });
+    setIsNavigating(true);
+    setMapOffset({ x: 0, y: 0 });
+    addToast("Routing to High-Acceptance Zone", `Navigating to ${zone.name} (${zone.acceptanceRate}% order acceptance area).`, "success");
+    sendNotification("High-Acceptance Routing Active 🎯", `Heading towards ${zone.name}. Historical acceptance rate: ${zone.acceptanceRate}%.`);
+  };
+
+  const handleFilterDestinationToAcceptanceZone = (zone: AcceptanceZone) => {
+    setDestinationFilter({
+      id: zone.id,
+      shortName: zone.name,
+      fullName: `${zone.name}, ${activeCityKey}`,
+      location: zone.center,
+      active: true,
+      distanceMi: 1.6,
+      estimatedMinutes: 6
+    });
+    setIsNavigating(true);
+    addToast("Destination Filter Set", `Only matching trips heading towards ${zone.name}.`, "success");
+    sendNotification("Destination Filter Set", `Filtered for trips towards ${zone.name} (${zone.acceptanceRate}% acceptance area).`);
+  };
+
   const [activeRestaurants, setActiveRestaurants] = useState<{
     name: string;
     offset: { lat: number; lng: number };
@@ -12805,6 +12847,12 @@ export default function App() {
                     zoom={zoom}
                     setZoom={setZoom}
                     iosMapKitEngine={iosMapKitEngine}
+                    showAcceptanceOverlay={showAcceptanceOverlay}
+                    acceptanceZones={acceptanceZones}
+                    onSelectAcceptanceZone={(zone) => {
+                      setSelectedAcceptanceZone(zone);
+                      setIsAcceptanceModalOpen(true);
+                    }}
                     onNavigateToSurgeArea={(area) => {
                       if (activeOrders.length > 0) {
                         addToast("Busy Area Locked", "Complete your current active orders first before navigating to a surge zone.", "alert");
@@ -17577,6 +17625,12 @@ export default function App() {
                     setZoom={setZoom}
                     iosMapKitEngine={iosMapKitEngine}
                     hideOverlays={true}
+                    showAcceptanceOverlay={showAcceptanceOverlay}
+                    acceptanceZones={acceptanceZones}
+                    onSelectAcceptanceZone={(zone) => {
+                      setSelectedAcceptanceZone(zone);
+                      setIsAcceptanceModalOpen(true);
+                    }}
                     onNavigateToSurgeArea={(area) => {
                       const surgeAreaLocation = {
                         latitude: activeCityCenter.latitude + area.lat,
