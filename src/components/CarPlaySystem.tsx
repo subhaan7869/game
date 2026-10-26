@@ -1191,7 +1191,7 @@ export const CarPlaySystem: React.FC<CarPlaySystemProps> = ({
                         {activeOrder.items && activeOrder.items.length > 0 && (
                           <div className="bg-black/40 rounded-xl p-2.5 border border-white/5 space-y-0.5">
                             {activeOrder.items.slice(0, 2).map((item, i) => (
-                              <p key={i} className="text-[11px] font-bold text-gray-300 truncate">• {item}</p>
+                              <p key={`carplay-order-item-${i}`} className="text-[11px] font-bold text-gray-300 truncate">• {item}</p>
                             ))}
                           </div>
                         )}

@@ -52,6 +52,7 @@ import {
   Settings,
   Edit2,
   Trophy,
+  Award,
   ChevronRight,
   Send,
   Phone,
@@ -8454,13 +8455,13 @@ export default function App() {
 
   const handleFilterDestinationToAcceptanceZone = (zone: AcceptanceZone) => {
     setDestinationFilter({
-      id: zone.id,
-      shortName: zone.name,
-      fullName: `${zone.name}, ${activeCityKey}`,
-      location: zone.center,
       active: true,
+      address: `${zone.name}, ${activeCityKey}`,
+      shortName: zone.name,
+      location: zone.center,
       distanceMi: 1.6,
-      estimatedMinutes: 6
+      estimatedMinutes: 6,
+      setAt: Date.now()
     });
     setIsNavigating(true);
     addToast("Destination Filter Set", `Only matching trips heading towards ${zone.name}.`, "success");
@@ -12605,6 +12606,7 @@ export default function App() {
           <AnimatePresence mode="wait">
             {isOffAppSimulated ? (
               <SimulatedHomeScreen
+                key="simulated_home"
                 pendingOrder={pendingOrder}
                 isOnline={user.isOnline}
                 onOpenApp={() => setIsOffAppSimulated(false)}
@@ -12624,6 +12626,7 @@ export default function App() {
               />
             ) : currentScreen === 'onboarding' && (
               <OnboardingFlow 
+                key="onboarding_flow"
                 user={user}
                 setUser={setUser}
                 theme={theme}
@@ -12799,7 +12802,7 @@ export default function App() {
           )}
 
           {currentScreen === 'home' && (
-            <div className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
+            <div key="home_screen" className="h-full w-full relative overflow-hidden bg-[#0c0c0d]">
               {!showFullMap ? (
                 <motion.div key="offline-home-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full relative overflow-hidden bg-white">
                   <OfflineHomeScreen
@@ -13377,7 +13380,7 @@ export default function App() {
                 {/* Navigation Overlay - Unified Sleek Dynamic HUD */}
                 <AnimatePresence>
                   {isNavigating && (activeOrders.length > 0 || destinationFilter?.active || busyAreaTarget) && (
-                    <div className="absolute top-16 left-0 right-0 z-[3500] flex flex-col gap-2 p-3 sm:p-4 pointer-events-none max-w-lg mx-auto">
+                    <div key="navigation-overlay-hud" className="absolute top-16 left-0 right-0 z-[3500] flex flex-col gap-2 p-3 sm:p-4 pointer-events-none max-w-lg mx-auto">
                       <motion.div 
                         initial={{ y: -30, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
@@ -14176,6 +14179,32 @@ export default function App() {
                           </span>
                         )}
                       </button>
+
+                      {/* Acceptance Rate Heatmap Overlay Toggle Button */}
+                      <button 
+                        onClick={() => {
+                          const next = !showAcceptanceOverlay;
+                          setShowAcceptanceOverlay(next);
+                          addToast(
+                            next ? "Acceptance Heatmap Active" : "Acceptance Heatmap Hidden",
+                            next 
+                              ? `Highlighting areas where order acceptance rate is highest (${acceptanceZones[0]?.name || 'City Hub'}).` 
+                              : "Order acceptance heatmap layer turned off.",
+                            "info"
+                          );
+                        }}
+                        className={`w-11 h-11 rounded-full shadow-xl flex items-center justify-center border active:scale-95 transition-all backdrop-blur-md relative cursor-pointer ${
+                          showAcceptanceOverlay 
+                            ? 'bg-emerald-600 text-black border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.5)]' 
+                            : 'bg-slate-900/90 text-gray-400 border-white/10 hover:text-white'
+                        }`}
+                        title="Toggle Order Acceptance Rate Heatmap"
+                      >
+                        <Award size={20} className={showAcceptanceOverlay ? "stroke-[2.5]" : ""} />
+                        {showAcceptanceOverlay && (
+                          <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-300 rounded-full border border-black animate-ping" />
+                        )}
+                      </button>
                     </div>
 
                     {/* Left Side: Navigation Speedometer HUD or Safety Dock */}
@@ -14235,6 +14264,21 @@ export default function App() {
                 onSelectDestination={handleSelectDestination}
                 onClearDestination={handleClearDestinationFilter}
                 theme={theme}
+              />
+
+              {/* Order Acceptance Rate Heatmap & Zone Breakdown Modal */}
+              <AcceptanceRateHeatmapOverlay
+                completedTrips={completedTrips}
+                driverLocation={location}
+                activeCityCenter={activeCityCenter}
+                activeCityKey={activeCityKey}
+                overallAcceptanceRate={user.acceptanceRate}
+                isOpen={isAcceptanceModalOpen}
+                onClose={() => setIsAcceptanceModalOpen(false)}
+                onNavigateToZone={handleNavigateToAcceptanceZone}
+                onFilterDestinationToZone={handleFilterDestinationToAcceptanceZone}
+                selectedZone={selectedAcceptanceZone}
+                onSelectZone={(zone) => setSelectedAcceptanceZone(zone)}
               />
 
               {/* Inbox Modal */}
@@ -14583,6 +14627,33 @@ export default function App() {
                         <span>Navigate</span>
                       </span>
                     </button>
+                  </div>
+                )}
+
+                {/* Floating Acceptance Rate Hotspot Pill */}
+                {user.isOnline && showAcceptanceOverlay && !isNavigating && !pendingOrder && (
+                  <div className="px-4 pb-1.5 flex justify-center pointer-events-auto">
+                    <motion.div
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      onClick={() => {
+                        setSelectedAcceptanceZone(acceptanceZones[0] || null);
+                        setIsAcceptanceModalOpen(true);
+                      }}
+                      className="px-3.5 py-1.5 bg-[#060c14]/95 hover:bg-[#091522] border border-emerald-500/50 hover:border-emerald-400 rounded-full shadow-[0_8px_24px_rgba(16,185,129,0.25)] flex items-center gap-2 cursor-pointer active:scale-95 backdrop-blur-xl text-white transition-all group"
+                      title="Inspect areas where your order acceptance rate is highest"
+                    >
+                      <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        <span className="font-bold text-gray-400 uppercase tracking-wider text-[8.5px]">Top Acceptance Area:</span>
+                        <span className="font-black text-emerald-400 group-hover:text-emerald-300 transition-colors">
+                          {acceptanceZones[0]?.name || "City Hub"} ({acceptanceZones[0]?.acceptanceRate || 98}%)
+                        </span>
+                      </div>
+                      <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 text-[8px] font-black rounded uppercase">
+                        View Rates
+                      </span>
+                    </motion.div>
                   </div>
                 )}
               </div>
@@ -17031,7 +17102,6 @@ export default function App() {
                   { icon: <CarIcon size={18} />, label: "Vehicle Details", action: () => setCurrentScreen('vehicle_details') },
                   { icon: <CreditCard size={18} />, label: "Payment", action: () => setCurrentScreen('payment_methods') },
                   { icon: <History size={18} />, label: "Trip History", action: () => setCurrentScreen('trip_history') },
-                  { icon: <FileText size={18} />, label: "Documents", action: () => setCurrentScreen('documents') },
                   { icon: <Settings size={18} />, label: "App Settings", action: () => sendNotification("Settings", "Settings updated.") },
                   ...(firebaseUser ? [{ icon: <LogOut size={18} />, label: "Sign Out", action: () => {
                     logout();
@@ -17327,6 +17397,7 @@ export default function App() {
 
           {currentScreen === 'trip_history' && (
             <TripHistoryScreen 
+              key="screen_trip_history"
               completedTrips={completedTrips} 
               onClose={() => setCurrentScreen('account')} 
               theme={theme} 
@@ -17335,6 +17406,7 @@ export default function App() {
 
           {currentScreen === 'insurance' && (
             <InsuranceScreen 
+              key="screen_insurance"
               user={user}
               setUser={setUser}
               onClose={() => setCurrentScreen('account')}
@@ -17345,6 +17417,7 @@ export default function App() {
 
           {currentScreen === 'airport_queues' && (
             <AirportQueuesScreen 
+              key="screen_airport_queues"
               onClose={() => setCurrentScreen('home')}
               theme={theme}
               location={location}
@@ -17367,6 +17440,7 @@ export default function App() {
 
           {currentScreen === 'audio_settings' && (
             <AudioSettingsScreen
+              key="screen_audio_settings"
               theme={theme}
               onClose={() => setCurrentScreen('account')}
               soundPreference={soundPreference}
@@ -17535,6 +17609,7 @@ export default function App() {
 
           {currentScreen === 'scheduled_orders' && (
             <ScheduledOrdersScreen 
+              key="screen_scheduled_orders"
               scheduledOrders={scheduledOrders}
               setScheduledOrders={setScheduledOrders}
               onClose={() => setCurrentScreen('home')}
@@ -17549,6 +17624,7 @@ export default function App() {
 
           {currentScreen === 'carplay_dashboard' && (
             <CarPlayDashboard 
+              key="screen_carplay_dashboard"
               activeOrders={activeOrders}
               user={user}
               onClose={() => setCurrentScreen('home')}
@@ -17655,6 +17731,7 @@ export default function App() {
 
           {currentScreen === 'command_centre' && (
             <CommandCentreScreen 
+              key="screen_command_centre"
               user={user}
               setUser={setUser}
               location={location}
@@ -17687,6 +17764,7 @@ export default function App() {
 
           {currentScreen === 'earnings_detail' && (
             <EarningsDetail 
+              key="screen_earnings_detail"
               earnings={earnings}
               user={user}
               setUser={setUser}
