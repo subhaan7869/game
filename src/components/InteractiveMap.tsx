@@ -51,6 +51,8 @@ export interface InteractiveMapProps {
   showAcceptanceOverlay?: boolean;
   acceptanceZones?: AcceptanceZone[];
   onSelectAcceptanceZone?: (zone: AcceptanceZone) => void;
+  radarOrders?: any[];
+  onSelectRadarOrder?: (order: any) => void;
 }
 
 // 1. Custom Driver Icon Constructor using the highly realistic green car design
@@ -296,6 +298,60 @@ const getAcceptanceZoneIcon = (zone: AcceptanceZone) => {
   });
 };
 
+// 7. Radar Order Icon Constructor with Dynamic 'Pulse' Animation for High-Value Orders
+const getRadarOrderIcon = (order: any) => {
+  const isHighValue = (order.estimatedPay >= 14) || ((order.estimatedPay / (order.estimatedDistance || 1)) >= 2.5);
+  const isDelivery = order.type === 'delivery';
+  const payFormatted = Number(order.estimatedPay || 0).toFixed(2);
+
+  if (isHighValue) {
+    return L.divIcon({
+      className: '',
+      html: `
+        <div class="relative flex flex-col items-center select-none" style="width: 150px; margin-left: -75px; margin-top: -62px;">
+          <!-- Multi-tier High-Value Pulse Wave Animation Effect -->
+          <div class="absolute w-20 h-20 rounded-full bg-emerald-400/30 animate-ping pointer-events-none" style="top: 10px; left: 35px; animation-duration: 1.8s;"></div>
+          <div class="absolute w-24 h-24 rounded-full bg-teal-400/20 blur-sm animate-pulse pointer-events-none" style="top: 2px; left: 27px; animation-duration: 1.4s;"></div>
+
+          <!-- Glowing High-Value Badge -->
+          <div class="px-2.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 text-black shadow-[0_0_18px_rgba(16,185,129,0.9)] border border-white flex items-center gap-1 z-30 whitespace-nowrap leading-tight">
+            <span>💎 £${payFormatted}</span>
+            <span class="bg-black/35 text-white px-1 rounded text-[7px] font-mono">HIGH VALUE</span>
+          </div>
+
+          <!-- Pulsing Icon Container -->
+          <button class="radar-order-marker-trigger relative w-12 h-12 rounded-2xl bg-black border-[2.5px] border-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.85)] flex items-center justify-center mt-1 cursor-pointer pointer-events-auto transition-transform hover:scale-115 active:scale-95 group">
+            <span class="text-xl leading-none filter drop-shadow">${isDelivery ? '🍕' : '🚗'}</span>
+          </button>
+          
+          <div class="w-2 h-2 bg-emerald-400 rounded-full mt-0.5 shadow-[0_0_10px_rgba(16,185,129,1)]"></div>
+        </div>
+      `,
+      iconSize: [1, 1],
+      iconAnchor: [0, 0]
+    });
+  }
+
+  // Standard Radar Order Icon
+  return L.divIcon({
+    className: '',
+    html: `
+      <div class="relative flex flex-col items-center select-none" style="width: 120px; margin-left: -60px; margin-top: -50px;">
+        <div class="absolute w-12 h-12 rounded-full bg-blue-500/25 animate-ping pointer-events-none" style="top: 12px; left: 36px; animation-duration: 2.5s;"></div>
+        <div class="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-slate-900/95 text-blue-300 border border-blue-400/60 shadow-md whitespace-nowrap z-20">
+          £${payFormatted}
+        </div>
+        <button class="radar-order-marker-trigger relative w-10 h-10 rounded-2xl bg-[#090d16] border-2 border-blue-500 shadow-[0_0_14px_rgba(59,130,246,0.6)] flex items-center justify-center mt-0.5 cursor-pointer pointer-events-auto transition-transform hover:scale-110 active:scale-95">
+          <span class="text-base leading-none">${isDelivery ? '🍕' : '🚗'}</span>
+        </button>
+        <div class="w-1.5 h-1.5 bg-blue-400 rounded-full mt-0.5 shadow-[0_0_6px_rgba(59,130,246,0.8)]"></div>
+      </div>
+    `,
+    iconSize: [1, 1],
+    iconAnchor: [0, 0]
+  });
+};
+
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   location,
   heading = 0,
@@ -318,7 +374,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   hideOverlays = false,
   showAcceptanceOverlay = false,
   acceptanceZones,
-  onSelectAcceptanceZone
+  onSelectAcceptanceZone,
+  radarOrders,
+  onSelectRadarOrder
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -330,6 +388,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const stopsMarkersRef = useRef<L.Marker[]>([]);
   const surgeAreasMarkersRef = useRef<L.Marker[]>([]);
   const acceptanceZoneMarkersRef = useRef<L.Marker[]>([]);
+  const radarOrdersMarkersRef = useRef<L.Marker[]>([]);
 
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
@@ -378,6 +437,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     });
 
     return () => {
+      radarOrdersMarkersRef.current.forEach(m => m.remove());
+      radarOrdersMarkersRef.current = [];
       map.remove();
       mapRef.current = null;
     };
@@ -631,7 +692,43 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       });
     }
 
-    // 7. Center map camera on driver if static
+    // 7. Radar Order Pins Layer with 'Pulse' Animation
+    radarOrdersMarkersRef.current.forEach(m => m.remove());
+    radarOrdersMarkersRef.current = [];
+
+    if (isOnline && !isNavigating && radarOrders && radarOrders.length > 0) {
+      radarOrders.forEach(order => {
+        const pickup = order.pickupLocation || order.pickupPos;
+        if (!pickup) return;
+        const lat = pickup.latitude ?? pickup.lat;
+        const lng = pickup.longitude ?? pickup.lng;
+        if (typeof lat !== 'number' || typeof lng !== 'number') return;
+
+        const pos = L.latLng(lat, lng);
+        const marker = L.marker(pos, { icon: getRadarOrderIcon(order) }).addTo(map);
+
+        setTimeout(() => {
+          const el = marker.getElement();
+          if (el) {
+            const btn = el.querySelector('.radar-order-marker-trigger');
+            if (btn) {
+              btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                onSelectRadarOrder?.(order);
+              });
+            }
+          }
+        }, 80);
+
+        marker.on('click', () => {
+          onSelectRadarOrder?.(order);
+        });
+
+        radarOrdersMarkersRef.current.push(marker);
+      });
+    }
+
+    // 8. Center map camera on driver if static
     if (!isNavigating && !pendingOrder) {
       map.panTo(driverLatLng);
     }
@@ -650,7 +747,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     routeWaypoints,
     iosMapKitEngine,
     showAcceptanceOverlay,
-    acceptanceZones
+    acceptanceZones,
+    radarOrders
   ]);
 
   return (

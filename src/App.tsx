@@ -8081,6 +8081,13 @@ export default function App() {
   const [radarDisplayMode, setRadarDisplayMode] = useState<'couple' | 'none'>('couple');
   const [isRadarDropdownOpen, setIsRadarDropdownOpen] = useState(false);
   const [isRadarDrawerOpen, setIsRadarDrawerOpen] = useState(false);
+  const [radarMinPayout, setRadarMinPayout] = useState<number>(0);
+  const [isRadarFilterOpen, setIsRadarFilterOpen] = useState(false);
+
+  const filteredRadarOrders = useMemo(() => {
+    if (radarMinPayout <= 0) return radarOrders;
+    return radarOrders.filter(o => o.estimatedPay >= radarMinPayout);
+  }, [radarOrders, radarMinPayout]);
 
   // --- Ambient Background Keep-Alive Audio Controller Effect ---
   useEffect(() => {
@@ -11656,15 +11663,16 @@ export default function App() {
   handleAcceptOrderRef.current = handleAcceptOrder;
 
   const handleAcceptBothRadarOrders = () => {
-    if (radarOrders.length < 2) return;
+    const availableOrders = filteredRadarOrders.length > 0 ? filteredRadarOrders : radarOrders;
+    if (availableOrders.length < 2) return;
     
-    const countToAdd = Math.min(radarOrders.length, 3 - activeOrders.length);
+    const countToAdd = Math.min(availableOrders.length, 3 - activeOrders.length);
     if (countToAdd <= 0) {
       sendNotification("Limit Reached", "You can only handle up to 3 active orders / trips at a time. Please complete or decline existing ones.");
       return;
     }
 
-    const ordersToAccept = radarOrders.slice(0, countToAdd).map(r => ({ ...r, status: 'accepted' as any }));
+    const ordersToAccept = availableOrders.slice(0, countToAdd).map(r => ({ ...r, status: 'accepted' as any }));
 
     setActiveOrders(prev => [...prev, ...ordersToAccept]);
     
@@ -11759,6 +11767,61 @@ export default function App() {
       longestTrip: 0
     });
     playHyperSound('accept');
+
+    // Seed initial radar orders (including high-value dispatches) so high-value pulse & filter can be tested immediately
+    if (radarOrders.length === 0) {
+      const cityCenter = activeCityCenter || { latitude: 51.5074, longitude: -0.1278 };
+      const sampleRadarOrders: Order[] = [
+        {
+          id: `radar_hi_${Date.now()}_1`,
+          type: 'ride',
+          restaurantName: 'VIP Airport Express',
+          customerName: 'Marcus Vance 💎',
+          pickupLocation: { latitude: cityCenter.latitude + 0.007, longitude: cityCenter.longitude + 0.006 },
+          customerLocation: { latitude: cityCenter.latitude + 0.035, longitude: cityCenter.longitude + 0.028 },
+          estimatedPay: 22.80, // High-value match
+          estimatedDistance: 5.4,
+          estimatedTime: 18,
+          status: 'pending',
+          items: ['VIP Executive Ride', 'Terminal 5 Priority'],
+          pin: '7721',
+          isMatching: true,
+          surge: 1.8
+        },
+        {
+          id: `radar_ord_${Date.now()}_2`,
+          type: 'delivery',
+          restaurantName: 'Gourmet Burger Kitchen',
+          customerName: 'Sarah Jenkins',
+          pickupLocation: { latitude: cityCenter.latitude - 0.005, longitude: cityCenter.longitude - 0.004 },
+          customerLocation: { latitude: cityCenter.latitude - 0.015, longitude: cityCenter.longitude + 0.008 },
+          estimatedPay: 8.40,
+          estimatedDistance: 2.1,
+          estimatedTime: 12,
+          status: 'pending',
+          items: ['2x Truffle Burgers', 'Loaded Parmesan Fries', 'Vanilla Shake'],
+          pin: '3391',
+          isMatching: true
+        },
+        {
+          id: `radar_hi_${Date.now()}_3`,
+          type: 'ride',
+          restaurantName: 'Financial Center Line',
+          customerName: 'Eleanor Sterling 💎',
+          pickupLocation: { latitude: cityCenter.latitude + 0.004, longitude: cityCenter.longitude - 0.008 },
+          customerLocation: { latitude: cityCenter.latitude - 0.02, longitude: cityCenter.longitude - 0.015 },
+          estimatedPay: 16.50, // High-value match
+          estimatedDistance: 3.8,
+          estimatedTime: 14,
+          status: 'pending',
+          items: ['Hyper Comfort Ride', 'Priority Match'],
+          pin: '9420',
+          isMatching: true,
+          surge: 1.5
+        }
+      ];
+      setRadarOrders(sampleRadarOrders);
+    }
 
     // Proactively request browser/device notification permissions to guarantee background trip offers ring
     if ("Notification" in window) {
@@ -12856,6 +12919,13 @@ export default function App() {
                       setSelectedAcceptanceZone(zone);
                       setIsAcceptanceModalOpen(true);
                     }}
+                    radarOrders={filteredRadarOrders}
+                    onSelectRadarOrder={(order) => {
+                      setPendingOrder(order);
+                      setOrderExpiryTimer(18);
+                      playHyperSound('order');
+                      sendNotification("Radar Trip Selected 🎯", `Reviewing offer: £${order.estimatedPay.toFixed(2)} • ${order.restaurantName || "Trip Radar"}`);
+                    }}
                     onNavigateToSurgeArea={(area) => {
                       if (activeOrders.length > 0) {
                         addToast("Busy Area Locked", "Complete your current active orders first before navigating to a surge zone.", "alert");
@@ -12981,31 +13051,80 @@ export default function App() {
                 </div>
               )}
 
-              {/* Radar Orders Map Overlay (Interactive Icons) */}
-              {user.isOnline && !isNavigating && radarOrders.map((order, idx) => (
-                <motion.div
-                  key={`radar-icon-${order.id}-${idx}`}
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0, opacity: 0 }}
-                  style={{ 
-                    position: 'absolute',
-                    left: `calc(50% + ${(order.pickupLocation?.longitude - (location?.longitude || 0)) * MAP_SCALE + (mapOffset.x || 0)}px)`,
-                    top: `calc(50% + ${((location?.latitude || 0) - order.pickupLocation?.latitude) * MAP_SCALE + (mapOffset.y || 0)}px)`,
-                    transform: 'translate(-50%, -50%)',
-                    zIndex: 2000
-                  }}
-                  onClick={() => setPendingOrder(order)}
-                  className="cursor-pointer group pointer-events-auto"
-                >
-                  <div className="relative">
-                    <div className={`absolute inset-0 bg-blue-500 rounded-full opacity-20 ${isLowPerformance ? '' : 'animate-ping'}`} />
-                    <div className="relative w-12 h-12 bg-white dark:bg-black rounded-3xl shadow-2xl flex items-center justify-center border-2 border-blue-600 group-hover:scale-110 transition-transform">
-                      {order.type === 'ride' ? <User size={20} className="text-blue-600" /> : <Coffee size={20} className="text-orange-500" />}
+              {/* Radar Orders Map Overlay (Interactive Icons with High-Value Pulse Effect) */}
+              {user.isOnline && !isNavigating && filteredRadarOrders.map((order, idx) => {
+                const isHighValue = (order.estimatedPay >= 14) || ((order.estimatedPay / (order.estimatedDistance || 1)) >= 2.5);
+                const isDelivery = order.type === 'delivery';
+                return (
+                  <motion.div
+                    key={`radar-icon-${order.id}-${idx}`}
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0, opacity: 0 }}
+                    style={{ 
+                      position: 'absolute',
+                      left: `calc(50% + ${(order.pickupLocation?.longitude - (location?.longitude || 0)) * MAP_SCALE + (mapOffset.x || 0)}px)`,
+                      top: `calc(50% + ${((location?.latitude || 0) - order.pickupLocation?.latitude) * MAP_SCALE + (mapOffset.y || 0)}px)`,
+                      transform: 'translate(-50%, -50%)',
+                      zIndex: isHighValue ? 2050 : 2000
+                    }}
+                    onClick={() => {
+                      setPendingOrder(order);
+                      setOrderExpiryTimer(18);
+                      playHyperSound('order');
+                      sendNotification("Radar Trip Selected 🎯", `Reviewing offer: £${order.estimatedPay.toFixed(2)} • ${order.restaurantName || "Trip Radar"}`);
+                    }}
+                    className="cursor-pointer group pointer-events-auto select-none"
+                  >
+                    <div className="relative flex flex-col items-center">
+                      {isHighValue ? (
+                        <>
+                          {/* Multi-Tier Radiant Pulse Wave Animation */}
+                          <motion.div
+                            animate={{ scale: [1, 2.2, 2.6], opacity: [0.75, 0.3, 0] }}
+                            transition={{ duration: 1.8, repeat: Infinity, ease: 'easeOut' }}
+                            className="absolute -inset-4 rounded-full bg-emerald-400/30 border-2 border-emerald-400 pointer-events-none"
+                          />
+                          <motion.div
+                            animate={{ scale: [1, 1.6, 2], opacity: [0.9, 0.45, 0] }}
+                            transition={{ duration: 1.8, repeat: Infinity, ease: 'easeOut', delay: 0.45 }}
+                            className="absolute -inset-2 rounded-full bg-teal-400/25 border border-teal-300 pointer-events-none"
+                          />
+
+                          {/* Floating High-Value Badge */}
+                          <motion.div 
+                            animate={{ y: [-2, 2, -2] }}
+                            transition={{ duration: 1.6, repeat: Infinity }}
+                            className="absolute -top-7 px-2.5 py-0.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 text-black font-black text-[8.5px] rounded-full shadow-[0_0_15px_rgba(16,185,129,0.85)] border border-white whitespace-nowrap flex items-center gap-1 z-30 uppercase tracking-wider"
+                          >
+                            <Sparkles size={10} className="fill-black text-black" />
+                            <span>£{order.estimatedPay.toFixed(2)} HIGH VALUE</span>
+                          </motion.div>
+                        </>
+                      ) : (
+                        <>
+                          <div className={`absolute inset-0 bg-blue-500 rounded-full opacity-25 ${isLowPerformance ? '' : 'animate-ping'}`} />
+                          <div className="absolute -top-6 px-1.5 py-0.5 bg-slate-950/90 text-blue-300 font-mono font-bold text-[8px] rounded-md shadow border border-blue-500/30 whitespace-nowrap z-20">
+                            £{order.estimatedPay.toFixed(2)}
+                          </div>
+                        </>
+                      )}
+
+                      <motion.div 
+                        animate={isHighValue ? { scale: [1, 1.08, 1] } : undefined}
+                        transition={isHighValue ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' } : undefined}
+                        className={`relative w-12 h-12 rounded-3xl shadow-2xl flex items-center justify-center border-2 transition-transform group-hover:scale-110 ${
+                          isHighValue
+                            ? 'bg-black/95 border-emerald-400 text-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.75)] ring-2 ring-emerald-400/40'
+                            : 'bg-white dark:bg-black border-blue-600 text-blue-500'
+                        }`}
+                      >
+                        {isDelivery ? <Coffee size={20} className={isHighValue ? "text-emerald-400" : "text-orange-500"} /> : <User size={20} className={isHighValue ? "text-emerald-400" : "text-blue-600"} />}
+                      </motion.div>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
 
               {/* Speedometer Overlay */}
               {user.isOnline && !pendingOrder && !isNavigating && (
@@ -13104,7 +13223,12 @@ export default function App() {
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
                       </span>
-                      <span>Trip Radar • {radarOrders.length} Available</span>
+                      <span>Trip Radar • {filteredRadarOrders.length}{radarMinPayout > 0 ? ` of ${radarOrders.length}` : ''} Available</span>
+                      {radarMinPayout > 0 && (
+                        <span className="px-2 py-0.5 bg-emerald-500/25 border border-emerald-400/40 text-emerald-300 rounded-full text-[9px] font-black lowercase tracking-normal">
+                          ≥£{radarMinPayout}
+                        </span>
+                      )}
                       <ChevronUp size={14} />
                     </motion.button>
                   </div>
@@ -13122,15 +13246,18 @@ export default function App() {
                     className="absolute inset-x-0 bottom-2 z-[2500] pointer-events-none"
                   >
                     <div className="mx-4 bg-black/95 text-white rounded-[32px] p-6 shadow-[0_-20px_60px_rgba(0,0,0,0.5)] border-t border-white/10 pointer-events-auto overflow-hidden">
-                      <div className="flex items-center justify-between mb-5">
-                        <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+                        <div className="flex items-center gap-2.5 flex-wrap">
                           <div className={`w-3 h-3 rounded-full animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.8)] ${radarDisplayMode === 'none' ? 'bg-gray-500' : 'bg-blue-500'}`} />
                           <h3 className="text-sm font-black uppercase tracking-[0.25em] shrink-0">Trip Radar</h3>
                           
                           {/* Dropdown Menu */}
                           <div className="relative inline-block">
                             <button 
-                              onClick={() => setIsRadarDropdownOpen(!isRadarDropdownOpen)}
+                              onClick={() => {
+                                setIsRadarDropdownOpen(!isRadarDropdownOpen);
+                                setIsRadarFilterOpen(false);
+                              }}
                               className="px-3 py-1.5 bg-white/10 hover:bg-white/15 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all outline-none"
                             >
                               <span>{radarDisplayMode === 'couple' ? 'Couple of Trips' : 'None'}</span>
@@ -13177,22 +13304,112 @@ export default function App() {
                               </>
                             )}
                           </div>
+
+                          {/* Filter Menu by Minimum Payout */}
+                          <div className="relative inline-block">
+                            <button 
+                              onClick={() => {
+                                setIsRadarFilterOpen(!isRadarFilterOpen);
+                                setIsRadarDropdownOpen(false);
+                              }}
+                              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all outline-none border ${
+                                radarMinPayout > 0 
+                                  ? 'bg-emerald-600/25 border-emerald-500/50 text-emerald-300 shadow-sm shadow-emerald-500/20' 
+                                  : 'bg-white/10 hover:bg-white/15 border-transparent text-gray-200'
+                              }`}
+                            >
+                              <SlidersHorizontal size={11} className={radarMinPayout > 0 ? "text-emerald-400" : "text-gray-400"} />
+                              <span>{radarMinPayout > 0 ? `≥ £${radarMinPayout}` : 'Filter'}</span>
+                              {radarMinPayout > 0 && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              )}
+                              <ChevronDown size={11} className={`transition-transform duration-200 ${isRadarFilterOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {isRadarFilterOpen && (
+                              <>
+                                <div 
+                                  className="fixed inset-0 z-[3000]" 
+                                  onClick={() => setIsRadarFilterOpen(false)}
+                                />
+                                <div className="absolute left-0 mt-2 w-64 bg-neutral-900 border border-white/10 rounded-2xl p-4 shadow-2xl z-[3100] text-left">
+                                  <div className="flex items-center justify-between mb-3">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                      <SlidersHorizontal size={11} className="text-emerald-400" />
+                                      Min Payout
+                                    </span>
+                                    <span className="text-xs font-black text-emerald-400">
+                                      {radarMinPayout > 0 ? `≥ £${radarMinPayout.toFixed(2)}` : 'All Offers'}
+                                    </span>
+                                  </div>
+
+                                  {/* Quick Presets */}
+                                  <div className="grid grid-cols-5 gap-1 mb-3">
+                                    {[0, 8, 12, 16, 20].map((amount) => (
+                                      <button
+                                        key={`preset-${amount}`}
+                                        onClick={() => setRadarMinPayout(amount)}
+                                        className={`py-1 rounded-lg text-[10px] font-black transition-all ${
+                                          radarMinPayout === amount
+                                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                                            : 'bg-white/5 hover:bg-white/10 text-gray-300'
+                                        }`}
+                                      >
+                                        {amount === 0 ? 'All' : `£${amount}+`}
+                                      </button>
+                                    ))}
+                                  </div>
+
+                                  {/* Range Slider */}
+                                  <div className="space-y-1 mb-3">
+                                    <div className="flex justify-between text-[9px] font-bold text-gray-500 uppercase tracking-wider">
+                                      <span>£0</span>
+                                      <span>£25</span>
+                                    </div>
+                                    <input 
+                                      type="range"
+                                      min={0}
+                                      max={25}
+                                      step={1}
+                                      value={radarMinPayout}
+                                      onChange={(e) => setRadarMinPayout(Number(e.target.value))}
+                                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                    />
+                                  </div>
+
+                                  <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px]">
+                                    <span className="text-gray-400 font-medium">
+                                      Matches: <strong className="text-white">{filteredRadarOrders.length}</strong> of {radarOrders.length}
+                                    </span>
+                                    {radarMinPayout > 0 && (
+                                      <button
+                                        onClick={() => setRadarMinPayout(0)}
+                                        className="text-emerald-400 hover:text-emerald-300 font-bold uppercase tracking-wider transition-colors"
+                                      >
+                                        Reset
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
 
                         {/* Minimize button on top right of Trip Radar */}
                         <div className="flex items-center gap-3">
-                          {radarOrders.length >= 2 && (
+                          {filteredRadarOrders.length >= 2 && (
                             <button
                               id="accept-both-radar-trips-btn"
                               onClick={handleAcceptBothRadarOrders}
                               className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all outline-none animate-pulse shadow-lg shadow-emerald-500/20 active:scale-95"
                             >
                               <Zap size={11} fill="currentColor" />
-                              <span>{radarOrders.length === 2 ? 'Accept Both Trips' : 'Accept All Trips'}</span>
+                              <span>{filteredRadarOrders.length === 2 ? 'Accept Both Trips' : `Accept All (${filteredRadarOrders.length})`}</span>
                             </button>
                           )}
                           <span className="text-[10px] font-bold opacity-40 uppercase tracking-widest hidden sm:inline">
-                            {radarDisplayMode === 'none' ? 'MUTED' : `${radarOrders.length} TRIP${radarOrders.length !== 1 ? 'S' : ''} DISCOVERED`}
+                            {radarDisplayMode === 'none' ? 'MUTED' : `${filteredRadarOrders.length} OF ${radarOrders.length} DISCOVERED`}
                           </span>
                           <button 
                             onClick={() => setIsRadarDrawerOpen(false)}
@@ -13220,66 +13437,105 @@ export default function App() {
                             <span className="text-xs text-gray-400 font-medium animate-pulse">Scanning for nearby rides and pizza runs...</span>
                           </div>
                         </div>
+                      ) : filteredRadarOrders.length === 0 ? (
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 text-center flex flex-col items-center justify-center gap-2">
+                          <SlidersHorizontal size={20} className="text-gray-400" />
+                          <p className="text-xs font-bold text-gray-200">No radar jobs matching ≥ £{radarMinPayout}</p>
+                          <p className="text-[11px] text-gray-400">Try lowering your minimum payout to see all {radarOrders.length} available dispatches.</p>
+                          <button
+                            onClick={() => setRadarMinPayout(0)}
+                            className="mt-1 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-[10px] font-black uppercase tracking-wider transition-all"
+                          >
+                            Reset Filter (Show All {radarOrders.length})
+                          </button>
+                        </div>
                       ) : (
                         <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-none snap-x">
-                          {radarOrders.map((order, idx) => (
-                            <motion.div 
-                              key={`radar-list-item-${order.id}-${idx}`}
-                              initial={{ scale: 0.9, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              className="min-w-[325px] max-w-[325px] snap-center bg-white/5 hover:bg-white/10 rounded-[24px] p-5 border border-white/5 transition-all text-left relative"
-                            >
-                              <div className="flex justify-between items-start mb-6">
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${order.type === 'ride' ? 'bg-blue-600/20 text-blue-500' : 'bg-orange-500/20 text-orange-500'}`}>
-                                    {order.type === 'ride' ? <User size={24} /> : <Coffee size={24} />}
+                          {filteredRadarOrders.map((order, idx) => {
+                            const isHighValue = (order.estimatedPay >= 14) || ((order.estimatedPay / (order.estimatedDistance || 1)) >= 2.5);
+                            return (
+                              <motion.div 
+                                key={`radar-list-item-${order.id}-${idx}`}
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className={`min-w-[325px] max-w-[325px] snap-center rounded-[24px] p-5 border transition-all text-left relative overflow-hidden ${
+                                  isHighValue 
+                                    ? 'bg-gradient-to-br from-emerald-950/40 via-neutral-900 to-black border-emerald-500/40 shadow-[0_0_25px_rgba(16,185,129,0.15)]'
+                                    : 'bg-white/5 hover:bg-white/10 border-white/5'
+                                }`}
+                              >
+                                {isHighValue && (
+                                  <div className="absolute top-2 right-4 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[8px] font-black uppercase tracking-wider">
+                                    <Sparkles size={9} className="text-emerald-300" />
+                                    <span>High Value Match</span>
                                   </div>
-                                  <div>
-                                    <div className="flex items-center gap-1.5">
-                                      <p className="text-2xl font-black">£{order.estimatedPay.toFixed(2)}</p>
-                                      {(() => {
-                                        const payRate = calculatePayRate(order.estimatedPay, order.estimatedDistance);
-                                        return (
-                                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border ${payRate.color}`}>
-                                            {payRate.label}
-                                          </span>
-                                        );
-                                      })()}
+                                )}
+                                <div className="flex justify-between items-start mb-6 pt-1">
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                                      isHighValue 
+                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                                        : order.type === 'ride' 
+                                          ? 'bg-blue-600/20 text-blue-500' 
+                                          : 'bg-orange-500/20 text-orange-500'
+                                    }`}>
+                                      {order.type === 'ride' ? <User size={24} /> : <Coffee size={24} />}
                                     </div>
-                                    <p className="text-[10px] font-black opacity-30 uppercase tracking-widest leading-none">{order.estimatedDistance.toFixed(1)} mi • {order.estimatedTime} min</p>
+                                    <div>
+                                      <div className="flex items-center gap-1.5">
+                                        <p className={`text-2xl font-black ${isHighValue ? 'text-emerald-300' : 'text-white'}`}>
+                                          £{order.estimatedPay.toFixed(2)}
+                                        </p>
+                                        {(() => {
+                                          const payRate = calculatePayRate(order.estimatedPay, order.estimatedDistance);
+                                          return (
+                                            <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border ${payRate.color}`}>
+                                              {payRate.label}
+                                            </span>
+                                          );
+                                        })()}
+                                      </div>
+                                      <p className="text-[10px] font-black opacity-40 uppercase tracking-widest leading-none">
+                                        {order.estimatedDistance.toFixed(1)} mi • {order.estimatedTime} min
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-1.5 shrink-0">
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setRadarOrders(prev => prev.filter(r => r.id !== order.id));
+                                      }}
+                                      className="px-2.5 py-1.5 bg-red-600/20 hover:bg-red-600 border border-red-500/30 hover:border-red-500 text-red-400 hover:text-white rounded-full text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer active:scale-90"
+                                      title="Decline"
+                                    >
+                                      DECLINE
+                                    </button>
+                                    <button 
+                                      onClick={() => setPendingOrder(order)}
+                                      className={`px-3.5 py-1.5 text-white rounded-full text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-lg active:scale-95 hover:scale-105 ${
+                                        isHighValue 
+                                          ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/25' 
+                                          : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/20'
+                                      }`}
+                                    >
+                                      MATCH
+                                    </button>
                                   </div>
                                 </div>
-                                <div className="flex gap-1.5 shrink-0">
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setRadarOrders(prev => prev.filter(r => r.id !== order.id));
-                                    }}
-                                    className="px-2.5 py-1.5 bg-red-600/20 hover:bg-red-600 border border-red-500/30 hover:border-red-500 text-red-400 hover:text-white rounded-full text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer active:scale-90"
-                                    title="Decline"
-                                  >
-                                    DECLINE
-                                  </button>
-                                  <button 
-                                    onClick={() => setPendingOrder(order)}
-                                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-lg shadow-blue-500/20 active:scale-95 hover:scale-105"
-                                  >
-                                    MATCH
-                                  </button>
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <MapPin size={12} className={isHighValue ? "text-emerald-400" : "text-blue-500"} />
+                                    <span className="text-xs font-bold truncate opacity-80">{order.type === 'ride' ? 'Pickup Location' : order.restaurantName}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Navigation size={12} className="text-gray-400" />
+                                    <span className="text-xs font-medium truncate opacity-60">{order.customerName}</span>
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="flex flex-col gap-2">
-                                <div className="flex items-center gap-2">
-                                  <MapPin size={12} className="text-blue-500" />
-                                  <span className="text-xs font-bold truncate opacity-80">{order.type === 'ride' ? 'Pickup Location' : order.restaurantName}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Navigation size={12} className="text-gray-400" />
-                                  <span className="text-xs font-medium truncate opacity-60">{order.customerName}</span>
-                                </div>
-                              </div>
-                            </motion.div>
-                          ))}
+                              </motion.div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
