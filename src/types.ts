@@ -102,6 +102,7 @@ export interface CompletedTrip {
     distancePay: number;
     timePay: number;
     surge: number;
+    surgeMultiplier?: number;
     tip: number;
   };
 }

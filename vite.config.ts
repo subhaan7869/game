@@ -18,14 +18,14 @@ export default defineConfig(({mode}) => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
           navigateFallback: '/index.html',
-          maximumFileSizeToCacheInBytes: 3500000
+          maximumFileSizeToCacheInBytes: 12000000
         },
         manifest: {
-          name: 'Hyper Driver Dashboard',
-          short_name: 'Hyper Driver',
-          description: 'Interactive High-Fidelity Open Banking & Driver Ledger Simulator',
-          theme_color: '#090a0f',
-          background_color: '#090a0f',
+          name: 'Uber Driver',
+          short_name: 'Uber Driver',
+          description: 'Uber Driver PWA - Live Navigation, Trip Radar, Surge Hexagons & Instant Cashout',
+          theme_color: '#000000',
+          background_color: '#000000',
           display: 'standalone',
           icons: [
             {

@@ -126,6 +126,8 @@ import { OfflineHomeScreen } from './components/OfflineHomeScreen';
 import { CarPlaySystem } from './components/CarPlaySystem';
 import { AddressSearchModal } from './components/AddressSearchModal';
 import { AcceptanceRateHeatmapOverlay, getAcceptanceZonesForCity, AcceptanceZone } from './components/AcceptanceRateHeatmapOverlay';
+import { UberPwaInstallPrompt } from './components/UberPwaInstallPrompt';
+import { requestScreenWakeLock, releaseScreenWakeLock, triggerUberHaptic, updateAppBadge, playAuthenticUberChime } from './utils/pwaDevice';
 import { searchRealAddresses, GeocodedAddress, calculateDistanceMiles, estimateDriveMinutes } from './utils/geocoding';
 import { auth, db, signInWithGoogle, registerWithEmail, logInWithEmail, sendEmailVerificationLink, logout, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -5423,8 +5425,85 @@ const TripHistoryScreen = ({
   onClose: () => void,
   theme: string
 }) => {
+  const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<'all' | 'ride' | 'delivery'>('all');
+
+  const getTripBreakdown = (trip: CompletedTrip) => {
+    const base = trip.breakdown?.base ?? Number(Math.max(2.5, trip.earnings * 0.35).toFixed(2));
+    const distancePay = trip.breakdown?.distancePay ?? Number((trip.distance * 0.85).toFixed(2));
+    const timePay = trip.breakdown?.timePay ?? Number(Math.max(0.8, trip.distance * 0.3).toFixed(2));
+    const surgeMultiplier = trip.breakdown?.surgeMultiplier ?? (trip.breakdown?.surge && trip.breakdown.surge > 0 ? Number((1 + trip.breakdown.surge / Math.max(1, base + distancePay + timePay)).toFixed(1)) : 1.0);
+    const surge = trip.breakdown?.surge ?? Number((surgeMultiplier > 1.0 ? (base + distancePay + timePay) * (surgeMultiplier - 1.0) : 0).toFixed(2));
+    const tip = trip.breakdown?.tip ?? Number(Math.max(0, trip.earnings - (base + distancePay + timePay + surge)).toFixed(2));
+    return { base, distancePay, timePay, surge, surgeMultiplier, tip };
+  };
+
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+
+  // 7-day daily earnings strictly matching completed trips for each calendar day
+  const last7DaysData = useMemo(() => {
+    const data = [];
+    const now = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+      const targetDate = new Date(now);
+      targetDate.setDate(now.getDate() - i);
+      const isToday = i === 0;
+      
+      const dayLabel = isToday ? 'Today' : targetDate.toLocaleDateString('en-GB', { weekday: 'short' });
+      const fullDate = targetDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      const dateKey = targetDate.toDateString();
+      
+      // Strict matching: calculate the exact sum of trips completed on this specific calendar day
+      const dayTrips = completedTrips.filter(t => {
+        const tDate = new Date(t.timestamp);
+        return tDate.toDateString() === targetDate.toDateString();
+      });
+      
+      const realDaySum = dayTrips.reduce((sum, t) => sum + (t.earnings || 0), 0);
+      
+      data.push({
+        day: dayLabel,
+        date: fullDate,
+        dateKey,
+        amount: Number(realDaySum.toFixed(2)),
+        tripsCount: dayTrips.length,
+        isToday,
+      });
+    }
+    return data;
+  }, [completedTrips]);
+
+  const filteredTrips = completedTrips.filter(t => {
+    if (filterType !== 'all' && t.type !== filterType) return false;
+    if (selectedDayKey) {
+      const tDate = new Date(t.timestamp).toDateString();
+      return tDate === selectedDayKey;
+    }
+    return true;
+  });
+
   const totalEarnings = completedTrips.reduce((sum, trip) => sum + trip.earnings, 0);
   const totalDistance = completedTrips.reduce((sum, trip) => sum + trip.distance, 0);
+
+  const sevenDayTotal = useMemo(() => {
+    return last7DaysData.reduce((acc, curr) => acc + curr.amount, 0);
+  }, [last7DaysData]);
+
+  const sevenDayAverage = useMemo(() => {
+    return sevenDayTotal / 7;
+  }, [sevenDayTotal]);
+
+  const bestDay = useMemo(() => {
+    return [...last7DaysData].sort((a, b) => b.amount - a.amount)[0];
+  }, [last7DaysData]);
+
+  const toggleTripExpand = (tripKey: string) => {
+    triggerUberHaptic('tap');
+    setExpandedTripId(prev => prev === tripKey ? null : tripKey);
+  };
+
+  const selectedDayInfo = selectedDayKey ? last7DaysData.find(d => d.dateKey === selectedDayKey) : null;
 
   return (
     <motion.div 
@@ -5433,83 +5512,386 @@ const TripHistoryScreen = ({
       exit={{ x: '100%' }} 
       className={`h-full w-full p-6 overflow-y-auto pb-32 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}
     >
-      <div className="flex items-center gap-4 mb-8">
-        <button onClick={onClose} className={`p-2 rounded-full ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={24} /></button>
-        <h1 className="font-display text-3xl font-black tracking-tight">Trip History</h1>
+      <div className="flex items-center gap-4 mb-6">
+        <button onClick={onClose} className={`p-2 rounded-full active:scale-95 transition-transform ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'}`}><ArrowRight className="rotate-180" size={24} /></button>
+        <div>
+          <h1 className="font-display text-3xl font-black tracking-tight">Trip History</h1>
+          <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Tap any bar or trip to view exact breakdown</p>
+        </div>
       </div>
 
       {completedTrips.length > 0 && (
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className={`p-5 rounded-[32px] ${theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-gray-50 border border-gray-100'}`}>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Earnings</p>
-            <p className="text-2xl font-black text-green-500">£{totalEarnings.toFixed(2)}</p>
+        <>
+          <div className="grid grid-cols-2 gap-4 mb-5">
+            <div className={`p-5 rounded-[32px] ${theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-gray-50 border border-gray-100'}`}>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Earnings</p>
+              <p className="text-2xl font-black text-green-500">£{totalEarnings.toFixed(2)}</p>
+            </div>
+            <div className={`p-5 rounded-[32px] ${theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-gray-50 border border-gray-100'}`}>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Distance</p>
+              <p className="text-2xl font-black">{totalDistance.toFixed(1)} mi</p>
+            </div>
           </div>
-          <div className={`p-5 rounded-[32px] ${theme === 'dark' ? 'bg-white/5 border border-white/5' : 'bg-gray-50 border border-gray-100'}`}>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Distance</p>
-            <p className="text-2xl font-black">{totalDistance.toFixed(1)} mi</p>
+
+          {/* 7-Day Total Daily Earnings Recharts Bar Chart */}
+          <div className={`p-6 rounded-[32px] mb-5 border transition-all ${
+            theme === 'dark' 
+              ? 'bg-[#121214] border-white/5 shadow-2xl' 
+              : 'bg-white border-gray-100 shadow-md'
+          }`}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <TrendingUp size={16} className="text-[#22c55e]" />
+                  <h3 className="text-xs font-black uppercase tracking-widest text-white">
+                    7-Day Daily Earnings
+                  </h3>
+                </div>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                  Matches completed trips: £{sevenDayTotal.toFixed(2)} 7-day total • Avg: £{sevenDayAverage.toFixed(2)}/day
+                </p>
+              </div>
+              {bestDay && bestDay.amount > 0 && (
+                <span className="text-[10px] font-black text-[#22c55e] bg-[#22c55e]/10 border border-[#22c55e]/20 px-2.5 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1">
+                  <Sparkles size={11} />
+                  Peak: {bestDay.day} (£{bestDay.amount.toFixed(0)})
+                </span>
+              )}
+            </div>
+
+            {/* Recharts Bar Chart Container */}
+            <div className="h-44 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  data={last7DaysData} 
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                  onClick={(state: any) => {
+                    if (state && state.activePayload && state.activePayload.length > 0) {
+                      const clickedKey = state.activePayload[0].payload?.dateKey;
+                      triggerUberHaptic('tap');
+                      setSelectedDayKey(prev => prev === clickedKey ? null : clickedKey);
+                    }
+                  }}
+                >
+                  <defs>
+                    <linearGradient id="tripHistBarGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#22c55e" stopOpacity={1} />
+                      <stop offset="90%" stopColor="#15803d" stopOpacity={0.8} />
+                    </linearGradient>
+                    <linearGradient id="tripHistBarTodayGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
+                      <stop offset="90%" stopColor="#1d4ed8" stopOpacity={0.8} />
+                    </linearGradient>
+                    <linearGradient id="tripHistBarPeakGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
+                      <stop offset="90%" stopColor="#047857" stopOpacity={0.8} />
+                    </linearGradient>
+                    <linearGradient id="tripHistBarSelectedGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f59e0b" stopOpacity={1} />
+                      <stop offset="90%" stopColor="#d97706" stopOpacity={0.8} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                  <XAxis 
+                    dataKey="day" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 700 }} 
+                    dy={8} 
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#6b7280', fontSize: 9, fontWeight: 600 }}
+                    tickFormatter={(val) => `£${val}`}
+                    dx={-4}
+                  />
+                  <Tooltip 
+                    cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-[#1a1a1e] border border-white/10 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">{data.date} • {data.day}</p>
+                            <p className="text-sm font-black text-[#22c55e]">£{Number(data.amount).toFixed(2)}</p>
+                            <p className="text-[9px] text-gray-400 font-bold mt-0.5">{data.tripsCount} trip{data.tripsCount === 1 ? '' : 's'} on this day</p>
+                            {data.isToday && <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest block mt-0.5">• Active Day</span>}
+                            <span className="text-[8px] text-gray-500 uppercase tracking-wider block mt-1">Tap bar to filter list</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="amount" radius={[8, 8, 3, 3]} maxBarSize={38} className="cursor-pointer">
+                    {last7DaysData.map((entry, index) => {
+                      const isSelected = selectedDayKey && entry.dateKey === selectedDayKey;
+                      const isPeak = bestDay && entry.day === bestDay.day && entry.amount > 0;
+                      return (
+                        <Cell 
+                          key={`cell-history-bar-${index}`} 
+                          fill={isSelected ? 'url(#tripHistBarSelectedGradient)' : entry.isToday ? 'url(#tripHistBarTodayGradient)' : isPeak ? 'url(#tripHistBarPeakGradient)' : 'url(#tripHistBarGradient)'} 
+                          stroke={isSelected ? '#ffffff' : 'transparent'}
+                          strokeWidth={isSelected ? 2 : 0}
+                        />
+                      );
+                    })}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Micro stats summary */}
+            <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-white/5">
+              <div className="text-center">
+                <p className="text-[8px] font-black uppercase tracking-widest text-gray-400">7-Day Total</p>
+                <p className="text-xs font-black text-white mt-0.5">£{sevenDayTotal.toFixed(2)}</p>
+              </div>
+              <div className="text-center border-x border-white/5">
+                <p className="text-[8px] font-black uppercase tracking-widest text-gray-400">Daily Average</p>
+                <p className="text-xs font-black text-[#22c55e] mt-0.5">£{sevenDayAverage.toFixed(2)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[8px] font-black uppercase tracking-widest text-gray-400">Peak Day</p>
+                <p className="text-xs font-black text-amber-400 mt-0.5">£{bestDay ? bestDay.amount.toFixed(2) : '0.00'}</p>
+              </div>
+            </div>
           </div>
-        </div>
+
+          {/* Interactive Day Filter Notification */}
+          {selectedDayInfo && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 mb-5"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+                <div>
+                  <p className="text-xs font-black text-white">
+                    Showing {selectedDayInfo.day} ({selectedDayInfo.date})
+                  </p>
+                  <p className="text-[10px] text-amber-400 font-bold">
+                    {selectedDayInfo.tripsCount} trip{selectedDayInfo.tripsCount === 1 ? '' : 's'} • Daily Total: £{selectedDayInfo.amount.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedDayKey(null)}
+                className="text-[10px] font-black uppercase tracking-wider text-black bg-amber-400 hover:bg-amber-300 px-3 py-1.5 rounded-xl transition-transform active:scale-95 shadow-sm"
+              >
+                Show All Days
+              </button>
+            </motion.div>
+          )}
+
+          {/* Filter Pills */}
+          <div className="flex gap-2 mb-6 p-1 rounded-2xl bg-white/5 border border-white/5">
+            {[
+              { id: 'all', label: 'All Trips' },
+              { id: 'ride', label: 'Rides' },
+              { id: 'delivery', label: 'Deliveries' }
+            ].map(f => (
+              <button
+                key={f.id}
+                onClick={() => setFilterType(f.id as any)}
+                className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${filterType === f.id ? 'bg-[#22c55e] text-black shadow-md' : 'text-gray-400 hover:text-white'}`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
-      {completedTrips.length === 0 ? (
+      {filteredTrips.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${theme === 'dark' ? 'bg-white/5 text-gray-500' : 'bg-gray-100 text-gray-400'}`}>
             <History size={40} />
           </div>
           <h3 className="text-xl font-black mb-2">No trips yet</h3>
-          <p className="text-gray-400 font-bold text-sm px-8">Your completed deliveries will appear here. Go online to start earning!</p>
+          <p className="text-gray-400 font-bold text-sm px-8">Your completed trips and deliveries will appear here. Go online to start earning!</p>
         </div>
       ) : (
         <div className="space-y-4">
-          <h3 className="font-black text-sm uppercase tracking-widest text-gray-400 px-2">Recent Activities</h3>
-          {completedTrips.slice().reverse().map((trip, idx) => (
-            <motion.div 
-              key={`completed-trip-list-${trip.id || idx}-${idx}`}
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              className={`p-5 rounded-[32px] border-2 transition-all ${theme === 'dark' ? 'bg-white/5 border-white/5 shadow-xl shadow-black/20' : 'bg-white border-gray-100 shadow-sm border-b-4'}`}
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-500/10 text-green-500 rounded-xl flex items-center justify-center">
-                    <CheckCircle2 size={20} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Trip Completed</p>
-                    <p className="text-sm font-black">{new Date(trip.timestamp).toLocaleDateString()} • {new Date(trip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xl font-black text-green-500 leading-none">£{trip.earnings.toFixed(2)}</p>
-                  <p className="text-[10px] font-bold text-gray-400 mt-1">{trip.distance.toFixed(1)} mi</p>
-                </div>
-              </div>
+          <h3 className="font-black text-xs uppercase tracking-widest text-gray-400 px-2">Recent Activities ({filteredTrips.length})</h3>
+          {filteredTrips.slice().reverse().map((trip, idx) => {
+            const tripKey = trip.id || `trip-idx-${idx}`;
+            const isExpanded = expandedTripId === tripKey;
+            const b = getTripBreakdown(trip);
 
-              <div className="space-y-4 relative py-2 mb-2">
-                <div className="absolute left-[7px] top-3 bottom-3 w-0.5 bg-gray-200 dark:bg-white/10" />
-                
-                <div className="flex items-center gap-4 relative z-10">
-                  <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-white dark:border-black flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 bg-white rounded-full" />
+            return (
+              <motion.div 
+                key={`completed-trip-card-${tripKey}`}
+                layout
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                onClick={() => toggleTripExpand(tripKey)}
+                className={`p-5 rounded-[32px] border-2 transition-all cursor-pointer ${
+                  isExpanded 
+                    ? (theme === 'dark' ? 'bg-[#151518] border-[#22c55e]/60 shadow-[0_10px_30px_rgba(34,197,94,0.15)] ring-1 ring-[#22c55e]/40' : 'bg-white border-green-500 shadow-md')
+                    : (theme === 'dark' ? 'bg-white/5 border-white/5 shadow-xl hover:border-white/10 active:scale-[0.99]' : 'bg-white border-gray-100 shadow-sm hover:border-gray-200 active:scale-[0.99]')
+                }`}
+              >
+                {/* Trip Card Header */}
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${trip.type === 'ride' ? 'bg-green-500/15 text-green-500' : 'bg-amber-500/15 text-amber-500'}`}>
+                      {trip.type === 'ride' ? <Car size={20} /> : <Utensils size={20} />}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">
+                          {trip.type === 'ride' ? 'Hyper Ride' : 'Delivery Route'}
+                        </span>
+                        {b.surgeMultiplier > 1.0 && (
+                          <span className="flex items-center gap-0.5 text-[9px] font-black text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded-full border border-amber-500/30">
+                            <Zap size={9} fill="currentColor" /> {b.surgeMultiplier.toFixed(1)}x
+                          </span>
+                        )}
+                        {b.tip > 0 && (
+                          <span className="flex items-center gap-0.5 text-[9px] font-black text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded-full border border-emerald-500/30">
+                            <Star size={9} fill="currentColor" /> Tip
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm font-black text-white mt-1">
+                        {new Date(trip.timestamp).toLocaleDateString()} • {new Date(trip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Restaurant</p>
-                    <p className="text-xs font-bold leading-tight">{trip.restaurantName}</p>
+                  <div className="text-right flex items-center gap-2">
+                    <div>
+                      <p className="text-xl font-black text-green-500 leading-none">£{trip.earnings.toFixed(2)}</p>
+                      <p className="text-[10px] font-bold text-gray-400 mt-1">{trip.distance.toFixed(1)} mi</p>
+                    </div>
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-[#22c55e] text-black' : 'bg-white/10 text-gray-400'}`}>
+                      <ChevronDown size={14} />
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 relative z-10">
-                  <div className="w-4 h-4 rounded-sm bg-orange-500 border-2 border-white dark:border-black flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 bg-white rounded-sm" />
+                {/* Route Segment */}
+                <div className="space-y-3 relative py-2 mb-2 pl-1">
+                  <div className="absolute left-[13px] top-4 bottom-4 w-0.5 bg-gray-200 dark:bg-white/10" />
+                  
+                  <div className="flex items-center gap-3 relative z-10">
+                    <div className="w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white dark:border-black shrink-0" />
+                    <div className="overflow-hidden">
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Pickup Location</p>
+                      <p className="text-xs font-bold leading-tight truncate text-white">{trip.restaurantName || "Pickup Location"}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Customer</p>
-                    <p className="text-xs font-bold leading-tight">{trip.customerName}</p>
+
+                  <div className="flex items-center gap-3 relative z-10">
+                    <div className="w-3.5 h-3.5 rounded-sm bg-orange-500 border-2 border-white dark:border-black shrink-0" />
+                    <div className="overflow-hidden">
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Drop-off Destination</p>
+                      <p className="text-xs font-bold leading-tight truncate text-white">{trip.customerName}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+
+                {/* Expandable Fare Breakdown View */}
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                      className="overflow-hidden pt-3 mt-2 border-t border-white/10"
+                    >
+                      <div className="flex items-center justify-between mb-3 px-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#22c55e] flex items-center gap-1.5">
+                          <CheckCircle2 size={12} />
+                          Driver Fare Breakdown
+                        </span>
+                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                          Net Payout
+                        </span>
+                      </div>
+
+                      <div className="rounded-2xl bg-black/40 border border-white/5 p-4 space-y-3 text-xs">
+                        {/* 1. Base Fare */}
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-gray-400 flex items-center gap-2">
+                            <DollarSign size={14} className="text-blue-400" />
+                            Base Fare
+                          </span>
+                          <span className="font-black text-white text-sm">£{b.base.toFixed(2)}</span>
+                        </div>
+
+                        {/* Distance & Time */}
+                        <div className="flex justify-between items-center text-gray-400 text-[11px] pl-5">
+                          <span className="flex items-center gap-1.5">
+                            <Clock size={12} className="text-gray-500" /> Distance ({trip.distance.toFixed(1)} mi) & Time
+                          </span>
+                          <span className="font-bold text-white">£{(b.distancePay + b.timePay).toFixed(2)}</span>
+                        </div>
+
+                        {/* 2. Surge Multiplier */}
+                        <div className={`flex justify-between items-center p-2 rounded-xl transition-colors ${b.surgeMultiplier > 1 ? 'bg-amber-500/10 border border-amber-500/20' : ''}`}>
+                          <div className="flex items-center gap-2">
+                            <Zap size={15} fill={b.surgeMultiplier > 1 ? "currentColor" : "none"} className={b.surgeMultiplier > 1 ? "text-amber-400" : "text-gray-500"} />
+                            <div>
+                              <span className={`font-bold block ${b.surgeMultiplier > 1 ? 'text-amber-400' : 'text-gray-400'}`}>Surge Multiplier</span>
+                              <span className="text-[9px] text-gray-400">
+                                {b.surgeMultiplier > 1 ? `High demand boost (${b.surgeMultiplier.toFixed(1)}x)` : 'Standard rate (1.0x)'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className={`font-black text-sm block ${b.surgeMultiplier > 1 ? 'text-amber-400' : 'text-gray-400'}`}>
+                              {b.surge > 0 ? `+£${b.surge.toFixed(2)}` : '£0.00'}
+                            </span>
+                            <span className={`text-[9px] font-black px-1.5 py-0.2 rounded ${b.surgeMultiplier > 1 ? 'bg-amber-400 text-black' : 'text-gray-500'}`}>
+                              {b.surgeMultiplier.toFixed(1)}x
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 3. Customer Tip */}
+                        <div className={`flex justify-between items-center p-2 rounded-xl transition-colors ${b.tip > 0 ? 'bg-emerald-500/10 border border-emerald-500/20' : ''}`}>
+                          <div className="flex items-center gap-2">
+                            <Star size={15} fill={b.tip > 0 ? "currentColor" : "none"} className={b.tip > 0 ? "text-[#22c55e]" : "text-gray-500"} />
+                            <div>
+                              <span className={`font-bold block ${b.tip > 0 ? 'text-emerald-400' : 'text-gray-400'}`}>Customer Tip</span>
+                              <span className="text-[9px] text-gray-400">100% directly paid to you</span>
+                            </div>
+                          </div>
+                          <span className={`font-black text-sm ${b.tip > 0 ? 'text-emerald-400' : 'text-gray-400'}`}>
+                            {b.tip > 0 ? `+£${b.tip.toFixed(2)}` : '£0.00'}
+                          </span>
+                        </div>
+
+                        {/* Total Driver Payout */}
+                        <div className="pt-2 border-t border-white/10 flex justify-between items-center">
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">Total Earnings</span>
+                            <span className="text-[9px] text-gray-500">Transferred to driver balance</span>
+                          </div>
+                          <span className="text-2xl font-black text-green-500">£{trip.earnings.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Click action indicator */}
+                <div className="mt-2 text-center">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors inline-flex items-center gap-1">
+                    {isExpanded ? (
+                      <>Hide Breakdown <ChevronUp size={11} /></>
+                    ) : (
+                      <>View Fare Breakdown <ChevronDown size={11} /></>
+                    )}
+                  </span>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </motion.div>
@@ -7778,12 +8160,110 @@ export default function App() {
     }
   });
   const [completedTrips, setCompletedTrips] = useState<CompletedTrip[]>(() => {
+    // Generate realistic historical trips matching the exact days of the past week
+    const generate7DaySampleTrips = (): CompletedTrip[] => {
+      const now = new Date();
+      const trips: CompletedTrip[] = [];
+      
+      const dayConfigs = [
+        {
+          dayOffset: 0, // Today
+          items: [
+            { rest: "Mayfair Executive Line", cust: "Marcus Vance 💎", pay: 24.80, dist: 5.2, type: 'ride' as const, base: 4.50, distPay: 7.80, timePay: 3.50, surge: 5.00, mult: 1.6, tip: 4.00, hour: 11, min: 20 },
+            { rest: "City of London Shuttle", cust: "Oliver Twist", pay: 18.50, dist: 4.0, type: 'ride' as const, base: 3.50, distPay: 5.60, timePay: 2.90, surge: 3.50, mult: 1.4, tip: 3.00, hour: 14, min: 45 },
+            { rest: "Honest Burgers - Soho", cust: "Sarah Jenkins", pay: 11.20, dist: 2.1, type: 'delivery' as const, base: 2.80, distPay: 2.60, timePay: 1.80, surge: 1.50, mult: 1.3, tip: 2.50, hour: 17, min: 10 }
+          ]
+        },
+        {
+          dayOffset: 1, // Yesterday
+          items: [
+            { rest: "Canary Wharf Premier", cust: "David Sterling", pay: 34.50, dist: 7.8, type: 'ride' as const, base: 5.00, distPay: 12.50, timePay: 5.00, surge: 7.00, mult: 1.7, tip: 5.00, hour: 9, min: 15 },
+            { rest: "Dishoom Covent Garden", cust: "Amara Patel", pay: 16.80, dist: 3.2, type: 'delivery' as const, base: 3.00, distPay: 4.20, timePay: 2.60, surge: 3.00, mult: 1.4, tip: 4.00, hour: 13, min: 30 },
+            { rest: "Kensington Town Line", cust: "Charlotte Windsor", pay: 22.40, dist: 4.5, type: 'ride' as const, base: 4.00, distPay: 6.80, timePay: 3.60, surge: 4.00, mult: 1.5, tip: 4.00, hour: 18, min: 40 }
+          ]
+        },
+        {
+          dayOffset: 2, // 2 days ago
+          items: [
+            { rest: "Heathrow Terminal 5 Line", cust: "Lucas Meyer", pay: 42.00, dist: 14.2, type: 'ride' as const, base: 6.00, distPay: 22.00, timePay: 8.00, surge: 0.00, mult: 1.0, tip: 6.00, hour: 8, min: 30 },
+            { rest: "Gaucho Steakhouse", cust: "Elena Rostova", pay: 14.70, dist: 3.1, type: 'delivery' as const, base: 3.00, distPay: 3.90, timePay: 2.30, surge: 0.00, mult: 1.0, tip: 5.50, hour: 19, min: 15 }
+          ]
+        },
+        {
+          dayOffset: 3, // 3 days ago
+          items: [
+            { rest: "Westminster VIP Transfer", cust: "James Thornton", pay: 28.50, dist: 6.1, type: 'ride' as const, base: 4.50, distPay: 9.00, timePay: 4.00, surge: 6.00, mult: 1.6, tip: 5.00, hour: 10, min: 0 },
+            { rest: "Nando's Camden", cust: "Toby Maguire", pay: 9.80, dist: 1.8, type: 'delivery' as const, base: 2.50, distPay: 2.20, timePay: 1.60, surge: 1.50, mult: 1.3, tip: 2.00, hour: 13, min: 15 },
+            { rest: "Soho House Shuttle", cust: "Sophia Loren", pay: 19.40, dist: 3.9, type: 'ride' as const, base: 3.50, distPay: 5.50, timePay: 2.90, surge: 4.50, mult: 1.5, tip: 3.00, hour: 21, min: 30 }
+          ]
+        },
+        {
+          dayOffset: 4, // 4 days ago
+          items: [
+            { rest: "Paddington Express Link", cust: "Liam Neeson", pay: 21.00, dist: 4.8, type: 'ride' as const, base: 4.00, distPay: 7.00, timePay: 3.50, surge: 3.50, mult: 1.4, tip: 3.00, hour: 12, min: 10 },
+            { rest: "Wagamama Southbank", cust: "Chloe Bennett", pay: 12.60, dist: 2.4, type: 'delivery' as const, base: 2.80, distPay: 3.00, timePay: 1.80, surge: 2.00, mult: 1.3, tip: 3.00, hour: 18, min: 5 }
+          ]
+        },
+        {
+          dayOffset: 5, // 5 days ago
+          items: [
+            { rest: "City Airport Fast Track", cust: "Victor Vance", pay: 31.20, dist: 8.5, type: 'ride' as const, base: 5.00, distPay: 13.20, timePay: 5.00, surge: 4.00, mult: 1.3, tip: 4.00, hour: 7, min: 45 },
+            { rest: "Pizza Pilgrims Soho", cust: "Hannah Abbott", pay: 13.50, dist: 2.6, type: 'delivery' as const, base: 2.80, distPay: 3.20, timePay: 2.00, surge: 2.50, mult: 1.4, tip: 3.00, hour: 19, min: 50 }
+          ]
+        },
+        {
+          dayOffset: 6, // 6 days ago
+          items: [
+            { rest: "Battersea Power Station VIP", cust: "Noah Sinclair", pay: 26.40, dist: 5.8, type: 'ride' as const, base: 4.50, distPay: 8.50, timePay: 4.40, surge: 5.00, mult: 1.5, tip: 4.00, hour: 16, min: 20 }
+          ]
+        }
+      ];
+
+      dayConfigs.forEach(dc => {
+        const targetDate = new Date(now);
+        targetDate.setDate(now.getDate() - dc.dayOffset);
+        dc.items.forEach((item, idx) => {
+          const d = new Date(targetDate);
+          d.setHours(item.hour, item.min, 0, 0);
+          trips.push({
+            id: `seed_trip_${dc.dayOffset}_${idx}`,
+            type: item.type,
+            restaurantName: item.rest,
+            customerName: item.cust,
+            earnings: item.pay,
+            distance: item.dist,
+            timestamp: d.getTime(),
+            breakdown: {
+              base: item.base,
+              distancePay: item.distPay,
+              timePay: item.timePay,
+              surge: item.surge,
+              surgeMultiplier: item.mult,
+              tip: item.tip
+            }
+          });
+        });
+      });
+
+      return trips;
+    };
+
     try {
-      const saved = localStorage.getItem('hyper_driver_completed_trips');
-      return saved ? JSON.parse(saved) : [];
+      const saved = localStorage.getItem('hyper_driver_completed_trips_v3');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= 7) return parsed;
+      }
     } catch (e) {
-      return [];
+      // ignore
     }
+
+    const initialSeed = generate7DaySampleTrips();
+    try {
+      localStorage.setItem('hyper_driver_completed_trips_v3', JSON.stringify(initialSeed));
+      localStorage.setItem('hyper_driver_completed_trips', JSON.stringify(initialSeed));
+    } catch (e) {}
+    return initialSeed;
   });
 
   // Enhanced Performance Detection
@@ -9246,6 +9726,11 @@ export default function App() {
   // Order Expiry Timer
   useEffect(() => {
     if (!pendingOrder) return;
+
+    // Authentic Uber PWA: haptics, synthesized 2-tone chime, and badge count
+    triggerUberHaptic('dispatch');
+    playAuthenticUberChime();
+    updateAppBadge(1 + radarOrders.length);
 
     const interval = setInterval(() => {
       setOrderExpiryTimer(prev => {
@@ -11584,6 +12069,8 @@ export default function App() {
 
       setMapOffset({ x: 0, y: 0 }); // Snap map back to driver on acceptance
       playHyperSound('accept');
+      triggerUberHaptic('accept');
+      updateAppBadge(activeOrders.length + orderCountToAdd);
       const targetPoint = currentPending.type === 'delivery' ? (currentPending.restaurantName || "Store Pick-up") : "Rider Pickup Point";
       speakNav(`Dispatch received. Initiating route to ${targetPoint}. Keep safe pace.`);
 
@@ -11675,6 +12162,8 @@ export default function App() {
     const ordersToAccept = availableOrders.slice(0, countToAdd).map(r => ({ ...r, status: 'accepted' as any }));
 
     setActiveOrders(prev => [...prev, ...ordersToAccept]);
+    triggerUberHaptic('accept');
+    updateAppBadge(activeOrders.length + ordersToAccept.length);
     
     // Remove accepted ones from radarOrders queue
     const acceptedIds = new Set(ordersToAccept.map(o => o.id));
@@ -11767,6 +12256,11 @@ export default function App() {
       longestTrip: 0
     });
     playHyperSound('accept');
+    triggerUberHaptic('accept');
+
+    // PWA Feature: Keep display awake while driving
+    requestScreenWakeLock().catch(() => {});
+    updateAppBadge(radarOrders.length);
 
     // Seed initial radar orders (including high-value dispatches) so high-value pulse & filter can be tested immediately
     if (radarOrders.length === 0) {
@@ -11844,6 +12338,9 @@ export default function App() {
     setHyperOnline(false);
     setIsOnBreak(false);
     setShowShiftSummary(true);
+    triggerUberHaptic('tap');
+    releaseScreenWakeLock().catch(() => {});
+    updateAppBadge(0);
   };
 
   const handleDeclineOrder = (fromRemote: any = false) => {
@@ -11886,6 +12383,8 @@ export default function App() {
     setPendingOrder(null);
     setOrderExpiryTimer(10);
     playHyperSound('accept');
+    triggerUberHaptic('tap');
+    updateAppBadge(radarOrders.length);
 
     // Decrement Acceptance Rate
     setUser(prev => {
@@ -12174,13 +12673,14 @@ export default function App() {
     const order = activeOrders.find(o => o.id === orderId);
     if (!order) return;
 
-    const base = order.baseFare || 2.0;
-    const distancePay = order.estimatedDistance * (order.mileageRate || 0.5);
-    const timePay = (order.estimatedTime || 10) * (order.timeRate || 0.1);
-    const surge = order.surgeMultiplier || 1.0;
-    const tip = Math.random() > 0.6 ? Math.floor(Math.random() * 5) + 1 : 0;
+    const base = order.baseFare || 2.5;
+    const distancePay = order.estimatedDistance * (order.mileageRate || 0.85);
+    const timePay = (order.estimatedTime || 10) * (order.timeRate || 0.15);
+    const surgeMultiplier = order.surgeMultiplier || order.surge || 1.0;
+    const surgeBonus = Number(((base + distancePay + timePay) * Math.max(0, surgeMultiplier - 1.0)).toFixed(2));
+    const tip = Math.random() > 0.5 ? Math.floor(Math.random() * 4) + 1.5 : 0;
     
-    const earnedPay = Number(((base + distancePay + timePay) * surge + tip).toFixed(2));
+    const earnedPay = Number(((base + distancePay + timePay + surgeBonus) + tip).toFixed(2));
 
     setEarnings(prev => prev + earnedPay);
     setTodayEarningsTotal(prev => prev + earnedPay);
@@ -12198,13 +12698,20 @@ export default function App() {
       {
         id: order.id,
         type: order.type,
-        restaurantName: order.restaurantName || "HyperX Trip",
+        restaurantName: order.restaurantName || "Uber Trip",
         customerName: order.customerName,
         earnings: earnedPay,
         distance: order.estimatedDistance,
         timestamp: Date.now(),
         // Breakdown for summary
-        breakdown: { base, distancePay, timePay, surge, tip }
+        breakdown: { 
+          base: Number(base.toFixed(2)), 
+          distancePay: Number(distancePay.toFixed(2)), 
+          timePay: Number(timePay.toFixed(2)), 
+          surge: surgeBonus,
+          surgeMultiplier,
+          tip: Number(tip.toFixed(2)) 
+        }
       },
       ...prev
     ]);
@@ -12581,6 +13088,9 @@ export default function App() {
         <LoadingScreen />
       ) : (
         <div className={`h-[100dvh] w-full font-sans overflow-hidden flex flex-col select-none relative transition-all duration-500 ${theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-gray-100 text-black'}`}>
+        {/* Uber PWA Installation Banner & Native App Experience Prompt */}
+        <UberPwaInstallPrompt theme={theme} />
+
         {/* In-App Toasts */}
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[2000] w-full max-w-[400px] px-4 pointer-events-none flex flex-col items-center gap-3">
           <AnimatePresence>
@@ -13126,15 +13636,38 @@ export default function App() {
                 );
               })}
 
-              {/* Speedometer Overlay */}
-              {user.isOnline && !pendingOrder && !isNavigating && (
-                <div className="absolute left-6 bottom-48 z-[3550] flex flex-col items-center">
-                  <div className="w-20 h-20 bg-black/80 text-white rounded-full flex flex-col items-center justify-center shadow-2xl border border-white/10 backdrop-blur-md">
-                    <span className="text-3xl font-black leading-none">
-                      {isNavigating ? Math.floor(Math.random() * 15 + 25) : 0}
-                    </span>
-                    <span className="text-[8px] font-black opacity-60 uppercase tracking-widest">mph</span>
-                  </div>
+              {/* Uber Speedometer & Road Speed Limit Overlay */}
+              {user.isOnline && !pendingOrder && (
+                <div className="absolute left-6 bottom-48 z-[3550] flex items-center gap-2 pointer-events-auto select-none">
+                  {/* Current Speed Pill */}
+                  {(() => {
+                    const currentMph = isNavigating ? Math.floor(Math.random() * 10 + 26) : 0;
+                    const speedLimit = 30; // UK urban speed limit
+                    const isOverSpeed = isNavigating && currentMph > speedLimit;
+
+                    return (
+                      <div className="flex items-center gap-2">
+                        <div className={`w-20 h-20 rounded-full flex flex-col items-center justify-center shadow-2xl backdrop-blur-md transition-all duration-300 border-2 ${
+                          isOverSpeed 
+                            ? 'bg-red-950/90 text-red-200 border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)] animate-pulse' 
+                            : 'bg-black/85 text-white border-white/15'
+                        }`}>
+                          <span className={`text-3xl font-black leading-none ${isOverSpeed ? 'text-red-400' : 'text-white'}`}>
+                            {currentMph}
+                          </span>
+                          <span className="text-[8px] font-black opacity-60 uppercase tracking-widest mt-0.5">mph</span>
+                        </div>
+
+                        {/* Official UK Speed Limit Sign */}
+                        <div 
+                          className="w-12 h-12 bg-white rounded-full flex flex-col items-center justify-center shadow-2xl border-[3.5px] border-red-600 shrink-0"
+                          title="Current Road Speed Limit"
+                        >
+                          <span className="text-black font-sans font-black text-sm leading-none">{speedLimit}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -18132,6 +18665,16 @@ export default function App() {
               }
               id="uber-incoming-trip-sheet"
             >
+              {/* Authentic Uber Countdown Progress Bar */}
+              <div className="w-full h-1.5 bg-white/10 overflow-hidden relative shrink-0">
+                <motion.div 
+                  initial={{ width: '100%' }}
+                  animate={{ width: `${Math.max(0, (orderExpiryTimer / 18) * 100)}%` }}
+                  transition={{ duration: 0.9, ease: 'linear' }}
+                  className={`h-full ${pendingOrder.isMatching ? 'bg-white' : 'bg-blue-500'} shadow-[0_0_8px_rgba(37,99,235,0.8)]`}
+                />
+              </div>
+
               {pendingOrder.isMatching ? (
                 /* MATCH JOB CUSTOM LAYOUT - BLACK & WHITE THEME */
                 <div className="flex flex-col gap-4 text-white">

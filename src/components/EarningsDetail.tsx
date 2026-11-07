@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, History, Briefcase, Clock, Star, DollarSign, MapPin, Zap, 
   User, Utensils, Landmark, ArrowRight, ArrowLeft, RefreshCw, ChevronRight,
-  TrendingUp
+  ChevronDown, ChevronUp, TrendingUp, Sparkles
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
+import { 
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
+  Tooltip, ResponsiveContainer, Cell, AreaChart, Area 
+} from 'recharts';
 import { CompletedTrip, UserProfile, AppScreen } from '../types';
 
 export const EarningsDetail = ({ 
@@ -35,8 +38,19 @@ export const EarningsDetail = ({
 }) => {
   const [page, setPage] = useState(0); // 0: Day, 1: Week, 2: Month, 3: Year
   const [selectedTrip, setSelectedTrip] = useState<CompletedTrip | null>(null);
+  const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
   const [isCashOutLoading, setIsCashOutLoading] = useState(false);
   const pages = ['Day', 'Week', 'Month', 'Year'];
+
+  const getTripBreakdown = (trip: CompletedTrip) => {
+    const base = trip.breakdown?.base ?? Number(Math.max(2.5, trip.earnings * 0.35).toFixed(2));
+    const distancePay = trip.breakdown?.distancePay ?? Number((trip.distance * 0.85).toFixed(2));
+    const timePay = trip.breakdown?.timePay ?? Number(Math.max(0.8, trip.distance * 0.3).toFixed(2));
+    const surgeMultiplier = trip.breakdown?.surgeMultiplier ?? (trip.breakdown?.surge && trip.breakdown.surge > 0 ? Number((1 + trip.breakdown.surge / Math.max(1, base + distancePay + timePay)).toFixed(1)) : 1.0);
+    const surge = trip.breakdown?.surge ?? Number((surgeMultiplier > 1.0 ? (base + distancePay + timePay) * (surgeMultiplier - 1.0) : 0).toFixed(2));
+    const tip = trip.breakdown?.tip ?? Number(Math.max(0, trip.earnings - (base + distancePay + timePay + surge)).toFixed(2));
+    return { base, distancePay, timePay, surge, surgeMultiplier, tip };
+  };
 
   const stats = user.earningsStats || { daily: 45.50, weekly: 385.50, monthly: 1450.00, ytd: 16845.50 };
 
@@ -80,6 +94,50 @@ export const EarningsDetail = ({
     }
     return { date: d, amount };
   });
+
+  // 3. Dynamic 7-Day Trend Chart Data (Last 7 Days)
+  const last7DaysData = useMemo(() => {
+    const data = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      const isToday = i === 0;
+      
+      const dayLabel = isToday ? 'Today' : d.toLocaleDateString('en-GB', { weekday: 'short' });
+      const dateFormatted = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      
+      // Filter real completed trips for this calendar day
+      const dayTrips = (completedTrips || []).filter(t => {
+        const tripDate = new Date(t.timestamp);
+        return tripDate.toDateString() === d.toDateString();
+      });
+      
+      const tripSum = dayTrips.reduce((acc, curr) => acc + (curr.earnings || 0), 0);
+      const amount = isToday && stats.daily > tripSum ? stats.daily : tripSum;
+      
+      data.push({
+        day: dayLabel,
+        date: dateFormatted,
+        amount: Number(amount.toFixed(2)),
+        tripsCount: dayTrips.length,
+        isToday,
+      });
+    }
+    return data;
+  }, [completedTrips, stats.daily]);
+
+  const sevenDayTotal = useMemo(() => {
+    return last7DaysData.reduce((acc, curr) => acc + curr.amount, 0);
+  }, [last7DaysData]);
+
+  const sevenDayAverage = useMemo(() => {
+    return sevenDayTotal / 7;
+  }, [sevenDayTotal]);
+
+  const highestDay = useMemo(() => {
+    return [...last7DaysData].sort((a, b) => b.amount - a.amount)[0] || last7DaysData[0];
+  }, [last7DaysData]);
 
   // Trips calculation
   let displayTrips = user.deliveriesToday;
@@ -205,19 +263,28 @@ export const EarningsDetail = ({
                   </span>
                   <span className="font-black text-white">£{b.timePay.toFixed(2)}</span>
                 </div>
-                {b.surge > 0 && (
-                  <div className="flex justify-between items-center text-amber-500 text-sm">
-                    <span className="font-black flex items-center gap-2">
-                       <Zap size={16} fill="currentColor" /> Surge Factor
-                     </span>
-                    <span className="font-black">+£{b.surge.toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center text-[#22c55e] text-sm pt-2 border-t border-white/5">
-                  <span className="font-black flex items-center gap-2">
-                    <Star size={16} fill="currentColor" /> Customer Tip
+                {/* Surge Multiplier */}
+                <div className="flex justify-between items-center text-sm">
+                  <span className={`font-bold flex items-center gap-2 ${b.surgeMultiplier && b.surgeMultiplier > 1 ? 'text-amber-400' : 'text-gray-400'}`}>
+                    <Zap size={16} fill={b.surgeMultiplier && b.surgeMultiplier > 1 ? "currentColor" : "none"} className={b.surgeMultiplier && b.surgeMultiplier > 1 ? "text-amber-400" : "text-gray-500"} />
+                    Surge Multiplier
                   </span>
-                  <span className="font-black text-emerald-400">+£{b.tip.toFixed(2)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${b.surgeMultiplier && b.surgeMultiplier > 1 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/5 text-gray-400'}`}>
+                      {b.surgeMultiplier ? `${b.surgeMultiplier.toFixed(1)}x` : (b.surge > 0 ? '1.5x' : '1.0x Standard')}
+                    </span>
+                    <span className={`font-black ${b.surge > 0 ? 'text-amber-400' : 'text-white'}`}>
+                      {b.surge > 0 ? `+£${b.surge.toFixed(2)}` : '£0.00'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Customer Tip */}
+                <div className="flex justify-between items-center text-sm pt-2 border-t border-white/5">
+                  <span className="font-black flex items-center gap-2 text-[#22c55e]">
+                    <Star size={16} fill="currentColor" /> Customer Tip (100% to you)
+                  </span>
+                  <span className="font-black text-emerald-400">{b.tip > 0 ? `+£${b.tip.toFixed(2)}` : '£0.00'}</span>
                 </div>
               </div>
             </div>
@@ -367,6 +434,110 @@ export const EarningsDetail = ({
               </div>
             </div>
 
+            {/* 7-Day Daily Earnings Trend Line Chart using Recharts */}
+            <div className="rounded-[32px] p-6 border border-white/5 bg-[#121214] mb-8 shadow-xl">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <TrendingUp size={15} className="text-[#22c55e]" />
+                    <h3 className="text-xs font-black uppercase tracking-widest text-white">Daily Trend (Last 7 Days)</h3>
+                  </div>
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-0.5">
+                    7-Day Total: £{sevenDayTotal.toFixed(2)} • Avg: £{sevenDayAverage.toFixed(2)}/day
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-black text-[#22c55e] bg-[#22c55e]/10 border border-[#22c55e]/20 px-2.5 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1">
+                    <Sparkles size={10} />
+                    Peak: {highestDay?.day} (£{highestDay?.amount.toFixed(0)})
+                  </span>
+                </div>
+              </div>
+
+              {/* Small Recharts Line Chart Container */}
+              <div className="h-40 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={last7DaysData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="earningsLineGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#10b981" />
+                        <stop offset="50%" stopColor="#22c55e" />
+                        <stop offset="100%" stopColor="#3b82f6" />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
+                    <XAxis 
+                      dataKey="day" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#6b7280', fontSize: 10, fontWeight: 700 }} 
+                      dy={8} 
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#6b7280', fontSize: 9, fontWeight: 600 }}
+                      tickFormatter={(val) => `£${val}`}
+                      dx={-4}
+                    />
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-[#1a1a1e] border border-white/10 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md">
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">{data.date} • {data.day}</p>
+                              <p className="text-sm font-black text-[#22c55e]">£{Number(data.amount).toFixed(2)}</p>
+                              {data.isToday && <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest block mt-0.5">• Active Shift</span>}
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="amount" 
+                      stroke="url(#earningsLineGradient)" 
+                      strokeWidth={3}
+                      dot={(props: any) => {
+                        const { cx, cy, payload } = props;
+                        const isToday = payload?.isToday;
+                        return (
+                          <circle
+                            key={`dot-${cx}-${cy}`}
+                            cx={cx}
+                            cy={cy}
+                            r={isToday ? 5 : 3.5}
+                            fill={isToday ? '#3b82f6' : '#22c55e'}
+                            stroke="#121214"
+                            strokeWidth={2}
+                          />
+                        );
+                      }}
+                      activeDot={{ r: 6, fill: '#22c55e', stroke: '#ffffff', strokeWidth: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Micro Stats Bar */}
+              <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-white/5">
+                <div className="text-center">
+                  <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">7-Day Total</p>
+                  <p className="text-xs font-black text-white mt-0.5">£{sevenDayTotal.toFixed(2)}</p>
+                </div>
+                <div className="text-center border-x border-white/5">
+                  <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Daily Average</p>
+                  <p className="text-xs font-black text-[#22c55e] mt-0.5">£{sevenDayAverage.toFixed(2)}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[8px] font-black uppercase tracking-widest text-gray-500">Highest Day</p>
+                  <p className="text-xs font-black text-amber-400 mt-0.5">£{highestDay?.amount.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+
             <div className="rounded-[32px] p-6 border border-white/5 bg-[#121214] mb-8 shadow-xl">
               <h3 className="text-xs font-black uppercase tracking-widest text-[#22c55e] mb-6">Income Breakdown</h3>
               <div className="space-y-4">
@@ -397,32 +568,146 @@ export const EarningsDetail = ({
               {completedTrips.length === 0 ? (
                 <div className="py-12 text-center bg-[#121214] border border-white/5 rounded-3xl text-gray-500 text-sm italic">No recent activity to show</div>
               ) : (
-                completedTrips.slice(0, 10).map((trip, i) => (
-                  <motion.div 
-                    key={`trip-entry-${trip.id}-${i}`} 
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    className="p-5 rounded-[24px] border border-white/5 bg-[#121214] transition-all hover:border-white/10 active:scale-[0.98] cursor-pointer flex items-center justify-between"
-                    onClick={() => setSelectedTrip(trip)}
-                  >
-                    <div className="flex items-center gap-4 text-left">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${trip.type === 'ride' ? 'bg-[#22c55e]/10 text-[#22c55e]' : 'bg-amber-500/10 text-amber-500'}`}>
-                        {trip.type === 'ride' ? <User size={20} /> : <Utensils size={20} />}
+                completedTrips.slice(0, 10).map((trip, i) => {
+                  const tripKey = trip.id || `earn-trip-${i}`;
+                  const isExpanded = expandedTripId === tripKey;
+                  const b = getTripBreakdown(trip);
+
+                  return (
+                    <motion.div 
+                      key={`trip-entry-${tripKey}`} 
+                      layout
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.04 }}
+                      className={`rounded-[28px] border transition-all overflow-hidden ${
+                        isExpanded 
+                          ? 'border-[#22c55e]/60 bg-[#161619] shadow-xl shadow-black/40 ring-1 ring-[#22c55e]/30' 
+                          : 'border-white/5 bg-[#121214] hover:border-white/10 active:scale-[0.99]'
+                      }`}
+                    >
+                      {/* Clickable Header Row */}
+                      <div 
+                        onClick={() => setExpandedTripId(prev => prev === tripKey ? null : tripKey)}
+                        className="p-5 flex items-center justify-between cursor-pointer"
+                      >
+                        <div className="flex items-center gap-4 text-left">
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${trip.type === 'ride' ? 'bg-[#22c55e]/15 text-[#22c55e]' : 'bg-amber-500/15 text-amber-500'}`}>
+                            {trip.type === 'ride' ? <User size={20} /> : <Utensils size={20} />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h4 className="font-black text-sm text-white truncate max-w-[130px]">{trip.restaurantName || trip.customerName}</h4>
+                              {b.surgeMultiplier > 1 && (
+                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-0.5">
+                                  <Zap size={9} fill="currentColor" /> {b.surgeMultiplier.toFixed(1)}x
+                                </span>
+                              )}
+                              {b.tip > 0 && (
+                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-0.5">
+                                  <Star size={9} fill="currentColor" /> Tip
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight mt-0.5">
+                               {new Date(trip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {trip.distance.toFixed(1)} mi
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right flex items-center gap-2.5">
+                          <div>
+                            <p className="font-black text-base text-white">£{trip.earnings.toFixed(2)}</p>
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block">
+                              {isExpanded ? 'Collapse' : 'Breakdown'}
+                            </span>
+                          </div>
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-[#22c55e] text-black' : 'bg-white/5 text-gray-400'}`}>
+                            <ChevronDown size={14} />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-black text-sm text-white truncate max-w-[120px]">{trip.restaurantName || trip.customerName}</h4>
-                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight mt-0.5">
-                           {new Date(trip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {trip.distance.toFixed(1)} mi
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right flex items-center gap-2">
-                      <p className="font-black text-base text-white">£{trip.earnings.toFixed(2)}</p>
-                      <ChevronRight size={14} className="text-gray-600" />
-                    </div>
-                  </motion.div>
-                ))
+
+                      {/* Expandable Breakdown View */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.22, ease: 'easeInOut' }}
+                            className="px-5 pb-5 pt-1 border-t border-white/5"
+                          >
+                            <div className="p-4 rounded-2xl bg-black/40 border border-white/5 space-y-2.5 text-xs">
+                              <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-[#22c55e] pb-1.5 border-b border-white/5">
+                                <span>Itemized Fare</span>
+                                <span>Driver Breakdown</span>
+                              </div>
+
+                              {/* 1. Base Fare */}
+                              <div className="flex justify-between items-center">
+                                <span className="font-bold text-gray-400 flex items-center gap-1.5">
+                                  <DollarSign size={13} className="text-blue-400" /> Base Fare
+                                </span>
+                                <span className="font-black text-white">£{b.base.toFixed(2)}</span>
+                              </div>
+
+                              {/* Distance & Time Pay */}
+                              <div className="flex justify-between items-center text-gray-400 text-[11px] pl-4">
+                                <span>Distance & Time ({trip.distance.toFixed(1)} mi)</span>
+                                <span className="font-bold text-white">£{(b.distancePay + b.timePay).toFixed(2)}</span>
+                              </div>
+
+                              {/* 2. Surge Multiplier */}
+                              <div className={`flex justify-between items-center p-2 rounded-xl ${b.surgeMultiplier > 1 ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-white/5'}`}>
+                                <div className="flex items-center gap-2">
+                                  <Zap size={14} fill={b.surgeMultiplier > 1 ? "currentColor" : "none"} className={b.surgeMultiplier > 1 ? "text-amber-400" : "text-gray-400"} />
+                                  <span className={`font-bold ${b.surgeMultiplier > 1 ? 'text-amber-400' : 'text-gray-400'}`}>Surge Multiplier</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${b.surgeMultiplier > 1 ? 'bg-amber-400 text-black' : 'text-gray-400'}`}>
+                                    {b.surgeMultiplier.toFixed(1)}x
+                                  </span>
+                                  <span className={`font-black ${b.surge > 0 ? 'text-amber-400' : 'text-gray-400'}`}>
+                                    {b.surge > 0 ? `+£${b.surge.toFixed(2)}` : '£0.00'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* 3. Customer Tip */}
+                              <div className={`flex justify-between items-center p-2 rounded-xl ${b.tip > 0 ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-white/5'}`}>
+                                <div className="flex items-center gap-2">
+                                  <Star size={14} fill={b.tip > 0 ? "currentColor" : "none"} className={b.tip > 0 ? "text-[#22c55e]" : "text-gray-400"} />
+                                  <span className={`font-bold ${b.tip > 0 ? 'text-emerald-400' : 'text-gray-400'}`}>Customer Tip (100% yours)</span>
+                                </div>
+                                <span className={`font-black ${b.tip > 0 ? 'text-emerald-400 font-mono text-sm' : 'text-gray-400'}`}>
+                                  {b.tip > 0 ? `+£${b.tip.toFixed(2)}` : '£0.00'}
+                                </span>
+                              </div>
+
+                              {/* Total Payout */}
+                              <div className="pt-2 border-t border-white/10 flex justify-between items-center">
+                                <span className="font-black text-white uppercase tracking-wider text-xs">Total Net Payout</span>
+                                <span className="text-xl font-black text-[#22c55e]">£{trip.earnings.toFixed(2)}</span>
+                              </div>
+                            </div>
+
+                            {/* View Full Route Map Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedTrip(trip);
+                              }}
+                              className="mt-3 w-full py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white flex items-center justify-center gap-2 transition-all active:scale-98"
+                            >
+                              <span>View Full Route Map & Receipt</span>
+                              <ChevronRight size={14} />
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })
               )}
               <button className="w-full py-4 text-xs font-black uppercase tracking-widest text-gray-500 hover:text-[#22c55e] transition-colors">Load More History</button>
             </div>

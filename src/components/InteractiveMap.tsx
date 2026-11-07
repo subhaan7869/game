@@ -192,46 +192,64 @@ const getSurgeAreaIcon = (area: any) => {
   let subGrad = 'rgba(249, 115, 22, 0.06)';
   let centerGrad = 'rgba(239, 68, 68, 0.35)';
   let edgeGrad = 'rgba(220, 38, 38, 0.08)';
+  let hexFill = '#DC2626';
 
   if (area.periodId === 'breakfast') {
     mainGrad = 'rgba(245, 158, 11, 0.25)';
     subGrad = 'rgba(251, 191, 36, 0.08)';
     centerGrad = 'rgba(251, 191, 36, 0.4)';
     edgeGrad = 'rgba(251, 191, 36, 0.1)';
+    hexFill = '#D97706';
   } else if (area.periodId === 'lunch') {
     mainGrad = 'rgba(249, 115, 22, 0.25)';
     subGrad = 'rgba(217, 119, 6, 0.08)';
     centerGrad = 'rgba(249, 115, 22, 0.4)';
     edgeGrad = 'rgba(217, 119, 6, 0.1)';
+    hexFill = '#EA580C';
   } else if (area.periodId === 'dinner') {
     mainGrad = 'rgba(220, 38, 38, 0.25)';
     subGrad = 'rgba(185, 28, 28, 0.08)';
     centerGrad = 'rgba(220, 38, 38, 0.42)';
     edgeGrad = 'rgba(185, 28, 28, 0.12)';
+    hexFill = '#B91C1C';
   } else if (area.periodId === 'offpeak') {
     mainGrad = 'rgba(16, 185, 129, 0.15)';
     subGrad = 'rgba(45, 212, 191, 0.05)';
     centerGrad = 'rgba(16, 185, 129, 0.25)';
     edgeGrad = 'rgba(45, 212, 191, 0.06)';
+    hexFill = '#059669';
   }
 
-  const pingBgClass = area.periodId === 'offpeak' ? 'bg-emerald-500' : area.periodId === 'breakfast' ? 'bg-amber-500' : 'bg-orange-500';
+  const surgeCash = Math.max(1.0, Math.round((area.multiplier - 1) * 2.5 * 2) / 2).toFixed(2);
 
   return L.divIcon({
     className: '',
     html: `
       <div class="relative flex flex-col items-center select-none" style="width: 280px; height: 280px; margin-left: -140px; margin-top: -140px;">
-        <!-- Neon heat pulse rings nested perfectly -->
+        <!-- Hexagonal grid translucent layer -->
+        <svg class="absolute inset-0 w-[280px] h-[280px] pointer-events-none opacity-40 animate-pulse" style="animation-duration: 4s;" viewBox="0 0 100 100">
+          <polygon points="50,10 90,30 90,70 50,90 10,70 10,30" fill="${mainGrad}" stroke="${centerGrad}" stroke-width="1.5" stroke-dasharray="3,3" />
+        </svg>
+
+        <!-- Neon heat pulse rings -->
         <div class="absolute w-[280px] h-[280px] rounded-full animate-pulse blur-md pointer-events-none" style="background: radial-gradient(circle, ${mainGrad} 0%, ${subGrad} 50%, transparent 100%); animation-duration: 3.5s; top: 0; left: 0;"></div>
         <div class="absolute w-[140px] h-[140px] rounded-full blur-sm pointer-events-none" style="background: radial-gradient(circle, ${centerGrad} 0%, ${edgeGrad} 50%, transparent 100%); top: 70px; left: 70px;"></div>
 
-        <!-- Interactive multi center navigation button -->
-        <div class="absolute top-[125px] flex flex-col items-center pointer-events-auto z-40">
-          <button class="surge-nav-trigger px-2.5 py-1 bg-black text-white hover:bg-white hover:text-black border border-white/20 rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.6)] flex items-center gap-1.5 transition-all hover:scale-110 active:scale-95 cursor-pointer pointer-events-auto">
-            <span class="w-1.5 h-1.5 rounded-full ${pingBgClass} animate-ping shrink-0"></span>
-            <span class="font-sans font-black text-[10px] tracking-tight uppercase">${area.multiplier}x Surge</span>
+        <!-- Official Uber Hexagon Surge Pill -->
+        <div class="absolute top-[115px] flex flex-col items-center pointer-events-auto z-40">
+          <button class="surge-nav-trigger group flex items-center bg-black/95 hover:bg-neutral-900 text-white rounded-full p-1 pr-3 border border-white/30 shadow-[0_8px_25px_rgba(0,0,0,0.8)] transition-all hover:scale-105 active:scale-95 cursor-pointer pointer-events-auto">
+            <!-- Uber Hexagon icon tag -->
+            <div class="w-7 h-7 rounded-full flex items-center justify-center mr-1.5 shadow-inner" style="background: ${hexFill};">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-white">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor"/>
+              </svg>
+            </div>
+            <div class="flex flex-col text-left">
+              <span class="font-sans font-black text-[11px] leading-tight text-white tracking-tight">+£${surgeCash}</span>
+              <span class="font-sans text-[7.5px] font-bold text-emerald-400 uppercase tracking-widest">${area.multiplier}x Surge</span>
+            </div>
           </button>
-          <div class="px-1.5 py-0.5 bg-black/75 rounded-md text-gray-300 font-bold text-[7.5px] uppercase tracking-wider mt-1 border border-white/5 shadow-md">
+          <div class="px-2 py-0.5 bg-black/85 rounded-full text-gray-300 font-extrabold text-[7.5px] uppercase tracking-wider mt-1 border border-white/10 shadow-md">
             ${area.name}
           </div>
         </div>
